@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { SanPham, DoiTra, KOCBooking } from "@prisma/client";
 
 export async function GET() {
   try {
@@ -11,15 +10,15 @@ export async function GET() {
     ]);
 
     const tongSanPham = sanPhams.length;
-    const tongTonKho = sanPhams.reduce((s: number, sp: SanPham) => s + sp.tonKho, 0);
-    const spSapHet = sanPhams.filter((sp: SanPham) => sp.tonKho <= 5).length;
+    const tongTonKho = sanPhams.reduce((s: number, sp: typeof sanPhams[0]) => s + sp.tonKho, 0);
+    const spSapHet = sanPhams.filter((sp: typeof sanPhams[0]) => sp.tonKho <= 5).length;
 
-    const choXuLy = doiTras.filter((d: DoiTra) => d.trangThai === "cho_xu_ly").length;
-    const dangXuLy = doiTras.filter((d: DoiTra) => d.trangThai === "dang_xu_ly").length;
+    const choXuLy = doiTras.filter((d: typeof doiTras[0]) => d.trangThai === "cho_xu_ly").length;
+    const dangXuLy = doiTras.filter((d: typeof doiTras[0]) => d.trangThai === "dang_xu_ly").length;
 
-    const tongChiPhiKOC = bookings.reduce((s: number, b: KOCBooking) => s + b.chiPhi, 0);
-    const tongDoanhThuKOC = bookings.reduce((s: number, b: KOCBooking) => s + b.doanhThu, 0);
-    const bookingDangChay = bookings.filter((b: KOCBooking) => b.trangThai === "dang_chay").length;
+    const tongChiPhiKOC = bookings.reduce((s: number, b: typeof bookings[0]) => s + b.chiPhi, 0);
+    const tongDoanhThuKOC = bookings.reduce((s: number, b: typeof bookings[0]) => s + b.doanhThu, 0);
+    const bookingDangChay = bookings.filter((b: typeof bookings[0]) => b.trangThai === "dang_chay").length;
 
     // Recent activity
     const recentDoiTra = await prisma.doiTra.findMany({
