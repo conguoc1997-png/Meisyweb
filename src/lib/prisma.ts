@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@/generated/prisma";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -6,10 +6,7 @@ const globalForPrisma = globalThis as unknown as {
 
 function getPrisma(): PrismaClient {
   if (!globalForPrisma.prisma) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    globalForPrisma.prisma = new PrismaClient({ datasourceUrl: url } as any);
+    globalForPrisma.prisma = new PrismaClient();
   }
   return globalForPrisma.prisma;
 }
