@@ -10,14 +10,14 @@ export async function GET() {
     ]);
 
     const tongSanPham = sanPhams.length;
-    const tongTonKho = sanPhams.reduce((s, sp) => s + sp.tonKho, 0);
+    const tongTonKho = sanPhams.reduce((s: number, sp) => s + sp.tonKho, 0);
     const spSapHet = sanPhams.filter((sp) => sp.tonKho <= 5).length;
 
     const choXuLy = doiTras.filter((d) => d.trangThai === "cho_xu_ly").length;
     const dangXuLy = doiTras.filter((d) => d.trangThai === "dang_xu_ly").length;
 
-    const tongChiPhiKOC = bookings.reduce((s, b) => s + b.chiPhi, 0);
-    const tongDoanhThuKOC = bookings.reduce((s, b) => s + b.doanhThu, 0);
+    const tongChiPhiKOC = bookings.reduce((s: number, b) => s + b.chiPhi, 0);
+    const tongDoanhThuKOC = bookings.reduce((s: number, b) => s + b.doanhThu, 0);
     const bookingDangChay = bookings.filter((b) => b.trangThai === "dang_chay").length;
 
     // Recent activity
