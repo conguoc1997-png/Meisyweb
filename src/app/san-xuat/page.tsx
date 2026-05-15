@@ -875,12 +875,12 @@ export default function SanXuatPage() {
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá KH</th>
                 <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[11px]">Đã cắt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá TT</th>
+                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Thiếu</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ghi chú may</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu giặt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50">Số SP</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Nhận về</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Thiếu</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Trạng thái</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">HĐ May</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Vi sinh</th>
@@ -961,6 +961,12 @@ export default function SanXuatPage() {
                         <span className="text-slate-600 text-xs px-2">{lo.soLaThucTe ?? "—"}</span>
                       )}
                     </td>
+                    {/* Thiếu — ngay sau Lá TT */}
+                    <td className="px-3 py-2.5 text-right">
+                      {lo.soSanPham != null && lo.hangThucTe != null
+                        ? <span className={thieu > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}>{thieu > 0 ? thieu.toLocaleString() : "0"}</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
                     {/* Ghi chú may — chỉ hiện cho lô 1 cây; lô nhiều cây dùng per-cây */}
                     <td className="px-1.5 py-1 max-w-[150px]">
                       {!hasCay ? (editingGhiChuMay?.id === lo.id ? (
@@ -1035,11 +1041,6 @@ export default function SanXuatPage() {
                           {lo.hangThucTe?.toLocaleString() ?? <span className="text-slate-300 font-normal">— nhập</span>}
                         </button>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {lo.soSanPham != null && lo.hangThucTe != null
-                        ? <span className={thieu > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}>{thieu > 0 ? thieu.toLocaleString() : "0"}</span>
-                        : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       {hasCay ? (
@@ -1153,7 +1154,20 @@ export default function SanXuatPage() {
                             </button>
                           )}
                         </td>
-                        {/* col 9: Ghi chú may — per-cây inline edit */}
+                        {/* col 9: Thiếu per-cây + chênh lệch lá */}
+                        <td className="px-2 py-1.5 text-right">
+                          {thieuCay != null && (
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded block mb-0.5 ${thieuCay > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                              {thieuCay > 0 ? thieuCay.toLocaleString() : "0"}
+                            </span>
+                          )}
+                          {chenh != null && (
+                            <span className={`text-[10px] px-1 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                              {chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)} lá
+                            </span>
+                          )}
+                        </td>
+                        {/* col 10: Ghi chú may — per-cây inline edit */}
                         <td className="px-1.5 py-1 max-w-[150px]">
                           {editingCayGhiChu?.id === lo.id && editingCayGhiChu.ci === ci ? (
                             <input
@@ -1229,19 +1243,6 @@ export default function SanXuatPage() {
                             >
                               {nhanVeCay != null ? nhanVeCay.toLocaleString() : <span className="text-slate-300 font-normal">—</span>}
                             </button>
-                          )}
-                        </td>
-                        {/* col 13: Thiếu per-cây + chênh lệch lá */}
-                        <td className="px-2 py-1.5 text-right">
-                          {thieuCay != null && (
-                            <span className={`text-[11px] px-1.5 py-0.5 rounded block mb-0.5 ${thieuCay > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                              {thieuCay > 0 ? thieuCay.toLocaleString() : "0"}
-                            </span>
-                          )}
-                          {chenh != null && (
-                            <span className={`text-[10px] px-1 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
-                              {chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)} lá
-                            </span>
                           )}
                         </td>
                         {/* col 14: Trạng thái per-cây toggle */}
