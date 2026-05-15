@@ -347,6 +347,31 @@ export default function SanXuatPage() {
       const method = modalEdit ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error((await res.json()).error);
+
+      // Trừ tồn kho vải nếu người dùng đã chọn cây từ kho (chỉ khi thêm mới)
+      if (!modalEdit && selectedVaiCayIdxs.length > 0 && form.maVai) {
+        const matchedVai = vaiTons.find(v => v.maVai === form.maVai);
+        if (matchedVai) {
+          let cays: { soMet: number }[] = [];
+          if (matchedVai.cayData) { try { cays = JSON.parse(matchedVai.cayData); } catch {} }
+          if (cays.length === 0) cays = [{ soMet: matchedVai.soMet }];
+          // Trừ số mét đã dùng từ từng cây được chọn
+          const newCays = cays.map((c, i) => {
+            const selIdx = selectedVaiCayIdxs.indexOf(i);
+            if (selIdx === -1) return c;
+            const metersUsed = numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0);
+            return { soMet: Math.max(0, c.soMet - metersUsed) };
+          });
+          const newTotalMet = newCays.reduce((s, c) => s + c.soMet, 0);
+          await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cayData: JSON.stringify(newCays), soMet: newTotalMet }),
+          });
+          fetchVaiTon();
+        }
+      }
+
       setModalAdd(false); setModalEdit(null);
       fetchData();
       fetchAllForBalance();
