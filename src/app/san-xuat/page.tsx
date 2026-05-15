@@ -388,11 +388,13 @@ export default function SanXuatPage() {
     try {
       const parsed = JSON.parse(lo.cayData!);
       parsed[ci] = { ...parsed[ci], [field]: val };
-      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      const newCayData = JSON.stringify(parsed);
+      // Optimistic update
+      setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData } : l));
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cayData: JSON.stringify(parsed) }),
-      });
-      fetchData(); fetchAllForBalance();
+        body: JSON.stringify({ cayData: newCayData }),
+      }).catch(() => fetchData()); // chỉ refetch nếu lỗi
     } catch { /* ignore */ }
   };
 
@@ -413,31 +415,33 @@ export default function SanXuatPage() {
 
   const saveGhiChuMay = async (lo: LoCat, val: string) => {
     setEditingGhiChuMay(null);
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+    const ghiChuMay = val.trim() || null;
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, ghiChuMay } : l));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ghiChuMay: val.trim() || null }),
-    });
-    fetchData();
+      body: JSON.stringify({ ghiChuMay }),
+    }).catch(() => fetchData());
   };
 
   const saveMauGiat = async (lo: LoCat, val: string) => {
     setEditingMauGiat(null);
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+    const mauGiat = val || null;
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, mauGiat } : l));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mauGiat: val || null }),
-    });
-    fetchData();
+      body: JSON.stringify({ mauGiat }),
+    }).catch(() => fetchData());
   };
 
   const saveNhanVe = async (lo: LoCat, val: string) => {
     setEditingNhanVe(null);
     const hangThucTe = val === "" ? null : Math.round(Number(val));
     const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hangThucTe, soLuongThieu }),
-    });
-    fetchData(); fetchAllForBalance();
+    }).catch(() => fetchData());
   };
 
   // Inline-edit Lá TT cho lô 1 cây
@@ -448,13 +452,10 @@ export default function SanXuatPage() {
     const soLuongThieu = (soSanPham != null && lo.hangThucTe != null) ? soSanPham - lo.hangThucTe : null;
     // Optimistic update: hiển thị ngay không cần chờ server
     setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, soLaThucTe, soSanPham, soLuongThieu } : l));
-    try {
-      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ soLaThucTe, soSanPham, soLuongThieu }),
-      });
-      fetchData(); fetchAllForBalance();
-    } catch { fetchData(); }
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ soLaThucTe, soSanPham, soLuongThieu }),
+    }).catch(() => fetchData());
   };
 
   // Inline-edit Lá TT per-cây trong lô nhiều cây → cũng cập nhật tổng soLaThucTe
@@ -470,32 +471,29 @@ export default function SanXuatPage() {
       const newCayData = JSON.stringify(parsed);
       // Optimistic update
       setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu } : l));
-      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu }),
-      });
-      fetchData(); fetchAllForBalance();
+      }).catch(() => fetchData());
     } catch { fetchData(); }
   };
 
-  const handleToggleHD = async (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+  const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
+    const newVal = !lo[field];
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, [field]: newVal } : l));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: !lo[field] }),
-    });
-    fetchData(); fetchAllForBalance();
+      body: JSON.stringify({ [field]: newVal }),
+    }).catch(() => fetchData());
   };
 
-  const handleQuickStatus = async (lo: LoCat) => {
+  const handleQuickStatus = (lo: LoCat) => {
     const next = lo.trangThai === "da_nhap" ? "chua_nhap" : "da_nhap";
-    try {
-      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trangThai: next }),
-      });
-    } catch { /* ignore network errors */ }
-    fetchData();
-    fetchAllForBalance();
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: next } : l));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trangThai: next }),
+    }).catch(() => fetchData());
   };
 
   // Toggle "Đã cắt" cho lô 1 cây — xoá cây tương ứng khỏi tồn kho vải
