@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export function proxy(req: NextRequest) {
   const session = req.cookies.get("auth_session")?.value;
-  const secret = process.env.SESSION_SECRET || "meisy-secret";
+  const secret = process.env.SESSION_SECRET || "meisy-inhouse-2026";
   const { pathname } = req.nextUrl;
 
   // Bỏ qua login page và API auth
