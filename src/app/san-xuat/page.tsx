@@ -1233,17 +1233,11 @@ export default function SanXuatPage() {
                     </div>
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Xưởng cắt</label>
-                      <input
-                        list="xuong-list"
-                        value={form.xuong}
-                        onChange={sf("xuong")}
-                        placeholder="Nhập hoặc chọn xưởng..."
-                        className={inp}
-                      />
-                      <datalist id="xuong-list">
+                      <select value={form.xuong} onChange={sf("xuong")} className={inp}>
+                        <option value="">— Chọn xưởng —</option>
                         <option value="meisy">Meisy</option>
                         <option value="dung_linh">Dũng Linh</option>
-                      </datalist>
+                      </select>
                     </div>
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Hàng cắt (SKU) *</label>
