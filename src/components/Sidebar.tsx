@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Package,
@@ -9,38 +9,26 @@ import {
   Star,
   ShoppingBag,
   Scissors,
+  LogOut,
 } from "lucide-react";
 
 const navItems = [
-  {
-    href: "/",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    href: "/kho",
-    label: "Quản lý Kho",
-    icon: Package,
-  },
-  {
-    href: "/san-xuat",
-    label: "Sản xuất",
-    icon: Scissors,
-  },
-  {
-    href: "/doi-tra",
-    label: "Đổi trả / Sự cố",
-    icon: RefreshCcw,
-  },
-  {
-    href: "/koc",
-    label: "KOC Booking",
-    icon: Star,
-  },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/kho", label: "Quản lý Kho", icon: Package },
+  { href: "/san-xuat", label: "Sản xuất", icon: Scissors },
+  { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw },
+  { href: "/koc", label: "KOC Booking", icon: Star },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <aside className="w-60 min-h-screen bg-white border-r border-slate-200 flex flex-col shadow-sm">
@@ -81,8 +69,15 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-slate-200">
+      {/* Footer + Logout */}
+      <div className="p-4 border-t border-slate-200 space-y-3">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"
+        >
+          <LogOut size={16} />
+          Đăng xuất
+        </button>
         <p className="text-xs text-slate-400 text-center">v1.0 · Shopee & TikTok</p>
       </div>
     </aside>
