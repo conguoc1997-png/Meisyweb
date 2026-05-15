@@ -442,6 +442,7 @@ export default function SanXuatPage() {
 
   // Inline-edit Lá TT cho lô 1 cây
   const saveLaTT = async (lo: LoCat, val: string) => {
+    if (!editingLaTT) return; // guard against double-fire (Enter then blur)
     setEditingLaTT(null);
     const soLaThucTe = val === "" ? null : Math.round(Number(val));
     const soSanPham = (soLaThucTe != null && lo.tongSize != null) ? soLaThucTe * lo.tongSize : null;
@@ -455,6 +456,7 @@ export default function SanXuatPage() {
 
   // Inline-edit Lá TT per-cây trong lô nhiều cây → cũng cập nhật tổng soLaThucTe
   const saveCayLaTT = async (lo: LoCat, ci: number, val: string) => {
+    if (!editingCayLaTT) return; // guard against double-fire
     setEditingCayLaTT(null);
     try {
       const parsed = JSON.parse(lo.cayData!);
@@ -907,11 +909,10 @@ export default function SanXuatPage() {
                           <input
                             type="number"
                             autoFocus
-                            value={editingLaTT.val}
-                            onChange={e => setEditingLaTT({ id: lo.id, val: e.target.value })}
-                            onBlur={() => saveLaTT(lo, editingLaTT.val)}
+                            defaultValue={editingLaTT.val}
+                            onBlur={e => saveLaTT(lo, e.currentTarget.value)}
                             onKeyDown={e => {
-                              if (e.key === "Enter") saveLaTT(lo, editingLaTT.val);
+                              if (e.key === "Enter") { saveLaTT(lo, e.currentTarget.value); e.preventDefault(); }
                               if (e.key === "Escape") setEditingLaTT(null);
                             }}
                             className="w-16 text-right border border-rose-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-rose-300 bg-rose-50"
@@ -1100,11 +1101,10 @@ export default function SanXuatPage() {
                             <input
                               type="number"
                               autoFocus
-                              value={editingCayLaTT.val}
-                              onChange={e => setEditingCayLaTT({ id: lo.id, ci, val: e.target.value })}
-                              onBlur={() => saveCayLaTT(lo, ci, editingCayLaTT.val)}
+                              defaultValue={editingCayLaTT.val}
+                              onBlur={e => saveCayLaTT(lo, ci, e.currentTarget.value)}
                               onKeyDown={e => {
-                                if (e.key === "Enter") saveCayLaTT(lo, ci, editingCayLaTT.val);
+                                if (e.key === "Enter") { saveCayLaTT(lo, ci, e.currentTarget.value); e.preventDefault(); }
                                 if (e.key === "Escape") setEditingCayLaTT(null);
                               }}
                               className="w-14 text-right border border-rose-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50"
