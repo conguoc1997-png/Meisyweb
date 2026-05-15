@@ -114,6 +114,8 @@ export default function SanXuatPage() {
   const [editTonVal, setEditTonVal] = useState("");
   const [editTonGhiChu, setEditTonGhiChu] = useState("");
   const [editingNhanVe, setEditingNhanVe] = useState<{ id: string; val: string } | null>(null);
+  const [editingLaTT, setEditingLaTT] = useState<{ id: string; val: string } | null>(null);
+  const [editingCayLaTT, setEditingCayLaTT] = useState<{ id: string; ci: number; val: string } | null>(null);
   const [editingGhiChuMay, setEditingGhiChuMay] = useState<{ id: string; val: string } | null>(null);
   const [editingMauGiat, setEditingMauGiat] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -430,6 +432,37 @@ export default function SanXuatPage() {
     fetchData(); fetchAllForBalance();
   };
 
+  // Inline-edit Lá TT cho lô 1 cây
+  const saveLaTT = async (lo: LoCat, val: string) => {
+    setEditingLaTT(null);
+    const soLaThucTe = val === "" ? null : Math.round(Number(val));
+    const soSanPham = (soLaThucTe != null && lo.tongSize != null) ? soLaThucTe * lo.tongSize : null;
+    const soLuongThieu = (soSanPham != null && lo.hangThucTe != null) ? soSanPham - lo.hangThucTe : null;
+    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ soLaThucTe, soSanPham, soLuongThieu }),
+    });
+    fetchData(); fetchAllForBalance();
+  };
+
+  // Inline-edit Lá TT per-cây trong lô nhiều cây → cũng cập nhật tổng soLaThucTe
+  const saveCayLaTT = async (lo: LoCat, ci: number, val: string) => {
+    setEditingCayLaTT(null);
+    try {
+      const parsed = JSON.parse(lo.cayData!);
+      parsed[ci] = { ...parsed[ci], soLaTT: val };
+      const totalLaTT = parsed.reduce((s: number, c: { soLaTT?: string }) => s + (Number(c.soLaTT) || 0), 0);
+      const soLaThucTe = totalLaTT > 0 ? Math.round(totalLaTT) : null;
+      const soSanPham = (soLaThucTe != null && lo.tongSize != null) ? soLaThucTe * lo.tongSize : null;
+      const soLuongThieu = (soSanPham != null && lo.hangThucTe != null) ? soSanPham - lo.hangThucTe : null;
+      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: JSON.stringify(parsed), soLaThucTe, soSanPham, soLuongThieu }),
+      });
+      fetchData(); fetchAllForBalance();
+    } catch { /* ignore */ }
+  };
+
   const handleToggleHD = async (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
     await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -440,10 +473,12 @@ export default function SanXuatPage() {
 
   const handleQuickStatus = async (lo: LoCat) => {
     const next = lo.trangThai === "da_nhap" ? "chua_nhap" : "da_nhap";
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trangThai: next }),
-    });
+    try {
+      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trangThai: next }),
+      });
+    } catch { /* ignore network errors */ }
     fetchData();
     fetchAllForBalance();
   };
@@ -850,13 +885,42 @@ export default function SanXuatPage() {
                         <span className="text-[10px] text-slate-400">{cayParsed.filter(c => c.daCat).length}/{cayParsed.length}</span>
                       ) : (
                         <button onClick={() => toggleDaCat(lo)}
+                          disabled={lo.soLaThucTe == null}
                           title={lo.soLaThucTe == null ? "Cần điền Lá TT trước" : ""}
                           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.daCat ? "bg-emerald-500 border-emerald-500 text-white" : lo.soLaThucTe != null ? "border-slate-300 hover:border-emerald-400" : "border-slate-200 opacity-40 cursor-not-allowed"}`}>
                           {lo.daCat && <CheckCircle size={12} />}
                         </button>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-right text-slate-600">{lo.soLaThucTe ?? "—"}</td>
+                    {/* Lá TT — inline edit cho lô 1 cây, read-only cho nhiều cây */}
+                    <td className="px-1.5 py-1 text-right">
+                      {!hasCay ? (
+                        editingLaTT?.id === lo.id ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={editingLaTT.val}
+                            onChange={e => setEditingLaTT({ id: lo.id, val: e.target.value })}
+                            onBlur={() => saveLaTT(lo, editingLaTT.val)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") saveLaTT(lo, editingLaTT.val);
+                              if (e.key === "Escape") setEditingLaTT(null);
+                            }}
+                            className="w-16 text-right border border-rose-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-rose-300 bg-rose-50"
+                          />
+                        ) : (
+                          <button
+                            onClick={() => setEditingLaTT({ id: lo.id, val: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "" })}
+                            className="text-rose-700 font-semibold hover:bg-rose-50 rounded px-2 py-1 text-xs w-full text-right transition"
+                            title="Click để nhập số lá thực tế"
+                          >
+                            {lo.soLaThucTe ?? <span className="text-slate-300 font-normal">— nhập</span>}
+                          </button>
+                        )
+                      ) : (
+                        <span className="text-slate-600 text-xs px-2">{lo.soLaThucTe ?? "—"}</span>
+                      )}
+                    </td>
                     {/* Ghi chú may — inline text edit */}
                     <td className="px-1.5 py-1 max-w-[150px]">
                       {editingGhiChuMay?.id === lo.id ? (
@@ -1010,14 +1074,38 @@ export default function SanXuatPage() {
                         {/* col 7: Đã cắt per-cây */}
                         <td className="px-2 py-1.5 text-center">
                           <button onClick={() => toggleCayDaCat(lo, ci)}
+                            disabled={laTT == null}
                             title={laTT == null ? "Cần điền Lá TT trước" : ""}
                             className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.daCat ? "bg-emerald-500 border-emerald-500 text-white" : laTT != null ? "border-slate-300 hover:border-emerald-400" : "border-slate-200 opacity-40 cursor-not-allowed"}`}>
                             {cay.daCat && <CheckCircle size={10} />}
                           </button>
                         </td>
-                        {/* col 8: Lá TT */}
-                        <td className="px-3 py-1.5 text-right text-[11px] text-rose-600 font-semibold">{laTT != null ? laTT : "—"}</td>
-                        {/* col 8: Ghi chú may — per-cây inline edit */}
+                        {/* col 8: Lá TT per-cây — inline edit */}
+                        <td className="px-1 py-1 text-right">
+                          {editingCayLaTT?.id === lo.id && editingCayLaTT.ci === ci ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={editingCayLaTT.val}
+                              onChange={e => setEditingCayLaTT({ id: lo.id, ci, val: e.target.value })}
+                              onBlur={() => saveCayLaTT(lo, ci, editingCayLaTT.val)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") saveCayLaTT(lo, ci, editingCayLaTT.val);
+                                if (e.key === "Escape") setEditingCayLaTT(null);
+                              }}
+                              className="w-14 text-right border border-rose-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => setEditingCayLaTT({ id: lo.id, ci, val: cay.soLaTT ?? "" })}
+                              className="text-rose-600 font-semibold hover:bg-rose-50 rounded px-2 py-0.5 text-[11px] w-full text-right transition"
+                              title="Click để nhập lá thực tế"
+                            >
+                              {laTT != null ? laTT : <span className="text-slate-300 font-normal">—</span>}
+                            </button>
+                          )}
+                        </td>
+                        {/* col 9: Ghi chú may — per-cây inline edit */}
                         <td className="px-1.5 py-1 max-w-[150px]">
                           {editingCayGhiChu?.id === lo.id && editingCayGhiChu.ci === ci ? (
                             <input
