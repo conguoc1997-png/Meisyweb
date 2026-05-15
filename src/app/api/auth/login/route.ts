@@ -19,5 +19,8 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  return NextResponse.json({ error: "Sai tài khoản hoặc mật khẩu" }, { status: 401 });
+  return NextResponse.json({
+    error: "Sai tài khoản hoặc mật khẩu",
+    debug: { receivedEmail: email, expectedEmail: validEmail, match: email === validEmail }
+  }, { status: 401 });
 }
