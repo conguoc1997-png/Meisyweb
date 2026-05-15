@@ -442,21 +442,23 @@ export default function SanXuatPage() {
 
   // Inline-edit Lá TT cho lô 1 cây
   const saveLaTT = async (lo: LoCat, val: string) => {
-    if (!editingLaTT) return; // guard against double-fire (Enter then blur)
     setEditingLaTT(null);
     const soLaThucTe = val === "" ? null : Math.round(Number(val));
     const soSanPham = (soLaThucTe != null && lo.tongSize != null) ? soLaThucTe * lo.tongSize : null;
     const soLuongThieu = (soSanPham != null && lo.hangThucTe != null) ? soSanPham - lo.hangThucTe : null;
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ soLaThucTe, soSanPham, soLuongThieu }),
-    });
-    fetchData(); fetchAllForBalance();
+    // Optimistic update: hiển thị ngay không cần chờ server
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, soLaThucTe, soSanPham, soLuongThieu } : l));
+    try {
+      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soLaThucTe, soSanPham, soLuongThieu }),
+      });
+      fetchData(); fetchAllForBalance();
+    } catch { fetchData(); }
   };
 
   // Inline-edit Lá TT per-cây trong lô nhiều cây → cũng cập nhật tổng soLaThucTe
   const saveCayLaTT = async (lo: LoCat, ci: number, val: string) => {
-    if (!editingCayLaTT) return; // guard against double-fire
     setEditingCayLaTT(null);
     try {
       const parsed = JSON.parse(lo.cayData!);
@@ -465,12 +467,15 @@ export default function SanXuatPage() {
       const soLaThucTe = totalLaTT > 0 ? Math.round(totalLaTT) : null;
       const soSanPham = (soLaThucTe != null && lo.tongSize != null) ? soLaThucTe * lo.tongSize : null;
       const soLuongThieu = (soSanPham != null && lo.hangThucTe != null) ? soSanPham - lo.hangThucTe : null;
+      const newCayData = JSON.stringify(parsed);
+      // Optimistic update
+      setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu } : l));
       await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cayData: JSON.stringify(parsed), soLaThucTe, soSanPham, soLuongThieu }),
+        body: JSON.stringify({ cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu }),
       });
       fetchData(); fetchAllForBalance();
-    } catch { /* ignore */ }
+    } catch { fetchData(); }
   };
 
   const handleToggleHD = async (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
@@ -909,10 +914,11 @@ export default function SanXuatPage() {
                           <input
                             type="number"
                             autoFocus
-                            defaultValue={editingLaTT.val}
-                            onBlur={e => saveLaTT(lo, e.currentTarget.value)}
+                            value={editingLaTT.val}
+                            onChange={e => setEditingLaTT({ id: lo.id, val: e.target.value })}
+                            onBlur={() => saveLaTT(lo, editingLaTT.val)}
                             onKeyDown={e => {
-                              if (e.key === "Enter") { saveLaTT(lo, e.currentTarget.value); e.preventDefault(); }
+                              if (e.key === "Enter") { e.preventDefault(); saveLaTT(lo, editingLaTT.val); }
                               if (e.key === "Escape") setEditingLaTT(null);
                             }}
                             className="w-16 text-right border border-rose-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-rose-300 bg-rose-50"
@@ -1101,10 +1107,11 @@ export default function SanXuatPage() {
                             <input
                               type="number"
                               autoFocus
-                              defaultValue={editingCayLaTT.val}
-                              onBlur={e => saveCayLaTT(lo, ci, e.currentTarget.value)}
+                              value={editingCayLaTT.val}
+                              onChange={e => setEditingCayLaTT({ id: lo.id, ci, val: e.target.value })}
+                              onBlur={() => saveCayLaTT(lo, ci, editingCayLaTT.val)}
                               onKeyDown={e => {
-                                if (e.key === "Enter") { saveCayLaTT(lo, ci, e.currentTarget.value); e.preventDefault(); }
+                                if (e.key === "Enter") { e.preventDefault(); saveCayLaTT(lo, ci, editingCayLaTT.val); }
                                 if (e.key === "Escape") setEditingCayLaTT(null);
                               }}
                               className="w-14 text-right border border-rose-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50"
