@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export default function proxy(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const session = req.cookies.get("auth_session")?.value;
   const secret = process.env.SESSION_SECRET || "meisy-inhouse-2026";
   const { pathname } = req.nextUrl;
 
-  // Bỏ qua login page và API auth
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  // Chưa đăng nhập → redirect về login
   if (session !== secret) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
