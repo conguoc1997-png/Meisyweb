@@ -57,6 +57,12 @@ export default function SanXuatPage() {
   const [vaiCayRows, setVaiCayRows] = useState<{ soMet: string }[]>([{ soMet: "" }]);
   const [editingVaiMet, setEditingVaiMet] = useState<{ id: string; val: string } | null>(null);
   const [editingVaiXuong, setEditingVaiXuong] = useState<string | null>(null);
+  const [expandedVaiRows, setExpandedVaiRows] = useState<Set<string>>(new Set());
+  const toggleVaiExpand = (id: string) => setExpandedVaiRows(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const fetchVaiTon = async () => {
     const data = await fetch("/api/san-xuat/vai-ton").then(r => r.json());
@@ -546,66 +552,97 @@ export default function SanXuatPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {vaiTons.map(v => (
-                    <tr key={v.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2 font-semibold text-slate-800">{v.maVai}</td>
-                      <td className="px-3 py-2 text-slate-500">{v.mauSac ?? <span className="text-slate-300">—</span>}</td>
-                      <td className="px-2 py-1 text-center">
-                        {editingVaiXuong === v.id ? (
-                          <select autoFocus
-                            defaultValue={v.xuong ?? ""}
-                            onChange={async e => {
-                              setEditingVaiXuong(null);
-                              await fetch(`/api/san-xuat/vai-ton/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuong: e.target.value || null }) });
-                              fetchVaiTon();
-                            }}
-                            onBlur={() => setEditingVaiXuong(null)}
-                            className="border border-slate-300 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white">
-                            <option value="">— Chưa chọn —</option>
-                            <option value="meisy">Meisy</option>
-                            <option value="dung_linh">Dũng Linh</option>
-                          </select>
-                        ) : (
-                          <button onClick={() => setEditingVaiXuong(v.id)} className="hover:opacity-80 transition" title="Click để chọn xưởng">
-                            {v.xuong
-                              ? <span className={`px-1.5 py-0.5 rounded text-xs ${v.xuong === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>{XUONG_LABEL[v.xuong] ?? v.xuong}</span>
-                              : <span className="text-slate-300 text-xs">— chọn</span>}
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {v.soCay > 0 && (
-                          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{v.soCay} cây</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {editingVaiMet?.id === v.id ? (
-                          <input autoFocus type="number" step="0.01" value={editingVaiMet.val}
-                            onChange={e => setEditingVaiMet({ id: v.id, val: e.target.value })}
-                            onBlur={() => saveVaiMet(v, editingVaiMet.val)}
-                            onKeyDown={e => { if (e.key === "Enter") saveVaiMet(v, editingVaiMet.val); if (e.key === "Escape") setEditingVaiMet(null); }}
-                            className="w-24 text-right border border-blue-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300 bg-blue-50" />
-                        ) : (
-                          <button onClick={() => setEditingVaiMet({ id: v.id, val: String(v.soMet) })}
-                            className={`font-bold hover:bg-blue-50 rounded px-2 py-0.5 transition ${v.soMet <= 0 ? "text-red-500" : v.soMet < 10 ? "text-amber-600" : "text-blue-700"}`}>
-                            {v.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-slate-500">{v.donVi}</td>
-                      <td className="px-3 py-2 text-slate-400 italic">{v.ghiChu ?? ""}</td>
-                      <td className="px-3 py-2 flex gap-2 items-center">
-                        <button onClick={() => {
-                          setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "" });
-                          try { setVaiCayRows(v.cayData ? JSON.parse(v.cayData).map((c: {soMet: number}) => ({ soMet: String(c.soMet) })) : [{ soMet: String(v.soMet) }]); }
-                          catch { setVaiCayRows([{ soMet: String(v.soMet) }]); }
-                          setModalVai(v);
-                        }}
-                          className="text-rose-500 hover:underline">Sửa</button>
-                        <button onClick={() => deleteVai(v.id)} className="text-slate-300 hover:text-red-500 transition"><X size={12} /></button>
-                      </td>
-                    </tr>
-                  ))}
+                  {vaiTons.map(v => {
+                    const hasCayData = v.soCay > 1 && v.cayData;
+                    const isVaiExpanded = expandedVaiRows.has(v.id);
+                    let cayDataParsed: { soMet: number }[] = [];
+                    if (hasCayData) { try { cayDataParsed = JSON.parse(v.cayData!); } catch {} }
+                    return (
+                      <>
+                      <tr key={v.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-2 font-semibold text-slate-800">{v.maVai}</td>
+                        <td className="px-3 py-2 text-slate-500">{v.mauSac ?? <span className="text-slate-300">—</span>}</td>
+                        <td className="px-2 py-1 text-center">
+                          {editingVaiXuong === v.id ? (
+                            <select autoFocus
+                              defaultValue={v.xuong ?? ""}
+                              onChange={async e => {
+                                setEditingVaiXuong(null);
+                                await fetch(`/api/san-xuat/vai-ton/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ xuong: e.target.value || null }) });
+                                fetchVaiTon();
+                              }}
+                              onBlur={() => setEditingVaiXuong(null)}
+                              className="border border-slate-300 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white">
+                              <option value="">— Chưa chọn —</option>
+                              <option value="meisy">Meisy</option>
+                              <option value="dung_linh">Dũng Linh</option>
+                            </select>
+                          ) : (
+                            <button onClick={() => setEditingVaiXuong(v.id)} className="hover:opacity-80 transition" title="Click để chọn xưởng">
+                              {v.xuong
+                                ? <span className={`px-1.5 py-0.5 rounded text-xs ${v.xuong === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>{XUONG_LABEL[v.xuong] ?? v.xuong}</span>
+                                : <span className="text-slate-300 text-xs">— chọn</span>}
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {v.soCay > 0 && (
+                            hasCayData ? (
+                              <button onClick={() => toggleVaiExpand(v.id)}
+                                className="flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto">
+                                {isVaiExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                                {v.soCay} cây
+                              </button>
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{v.soCay} cây</span>
+                            )
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {editingVaiMet?.id === v.id ? (
+                            <input autoFocus type="number" step="0.01" value={editingVaiMet.val}
+                              onChange={e => setEditingVaiMet({ id: v.id, val: e.target.value })}
+                              onBlur={() => saveVaiMet(v, editingVaiMet.val)}
+                              onKeyDown={e => { if (e.key === "Enter") saveVaiMet(v, editingVaiMet.val); if (e.key === "Escape") setEditingVaiMet(null); }}
+                              className="w-24 text-right border border-blue-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300 bg-blue-50" />
+                          ) : (
+                            <button onClick={() => setEditingVaiMet({ id: v.id, val: String(v.soMet) })}
+                              className={`font-bold hover:bg-blue-50 rounded px-2 py-0.5 transition ${v.soMet <= 0 ? "text-red-500" : v.soMet < 10 ? "text-amber-600" : "text-blue-700"}`}>
+                              {v.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">{v.donVi}</td>
+                        <td className="px-3 py-2 text-slate-400 italic">{v.ghiChu ?? ""}</td>
+                        <td className="px-3 py-2 flex gap-2 items-center">
+                          <button onClick={() => {
+                            setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "" });
+                            try { setVaiCayRows(v.cayData ? JSON.parse(v.cayData).map((c: {soMet: number}) => ({ soMet: String(c.soMet) })) : [{ soMet: String(v.soMet) }]); }
+                            catch { setVaiCayRows([{ soMet: String(v.soMet) }]); }
+                            setModalVai(v);
+                          }}
+                            className="text-rose-500 hover:underline">Sửa</button>
+                          <button onClick={() => deleteVai(v.id)} className="text-slate-300 hover:text-red-500 transition"><X size={12} /></button>
+                        </td>
+                      </tr>
+                      {/* Per-cây detail rows */}
+                      {hasCayData && isVaiExpanded && cayDataParsed.map((cay, ci) => (
+                        <tr key={`${v.id}-vai-cay-${ci}`} className="bg-emerald-50/60 border-l-2 border-emerald-300">
+                          <td className="px-4 py-1.5 text-[11px] text-slate-500 font-semibold">└ Cây #{ci + 1}</td>
+                          <td colSpan={2}></td>
+                          <td className="px-3 py-1.5 text-center text-[11px] text-slate-400">{ci + 1}</td>
+                          <td className="px-3 py-1.5 text-right">
+                            <span className={`text-[11px] font-bold ${cay.soMet <= 0 ? "text-red-500" : cay.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                              {cay.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5 text-[11px] text-slate-400">{v.donVi}</td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      ))}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -991,13 +1028,7 @@ export default function SanXuatPage() {
 
               {/* Bảng từng cây */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs text-slate-600">Số cây & Số mét mỗi cây</label>
-                  <button type="button" onClick={() => setVaiCayRows(r => [...r, { soMet: "" }])}
-                    className="text-xs text-rose-500 hover:underline flex items-center gap-0.5">
-                    <Plus size={11} /> Thêm cây
-                  </button>
-                </div>
+                <label className="text-xs text-slate-600 mb-1 block">Số cây & Số mét mỗi cây</label>
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50 border-b border-slate-100">
@@ -1037,6 +1068,11 @@ export default function SanXuatPage() {
                     </tfoot>
                   </table>
                 </div>
+                {/* Thêm cây — dưới bảng để dễ nhấn dù có nhiều cây */}
+                <button type="button" onClick={() => setVaiCayRows(r => [...r, { soMet: "" }])}
+                  className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-rose-500 border border-dashed border-rose-300 rounded-lg py-1.5 hover:bg-rose-50 transition">
+                  <Plus size={11} /> Thêm cây
+                </button>
               </div>
 
               <div>
@@ -1230,7 +1266,44 @@ export default function SanXuatPage() {
                     </div>
                     <div className="col-span-2">
                       <label className="text-xs text-slate-600 mb-1 block">Mã vải / Khó</label>
-                      <input value={form.maVai} onChange={sf("maVai")} className={inp} />
+                      <input value={form.maVai} onChange={sf("maVai")} className={inp}
+                        list="lo-cat-mavai-list" placeholder="Nhập hoặc chọn từ kho..." />
+                      <datalist id="lo-cat-mavai-list">
+                        {vaiTons.map(v => <option key={v.id} value={v.maVai}>{v.maVai}{v.mauSac ? ` — ${v.mauSac}` : ""} ({v.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} {v.donVi})</option>)}
+                      </datalist>
+                      {/* Hiển thị chi tiết cây khi mã vải khớp với kho */}
+                      {(() => {
+                        const matched = vaiTons.find(v => v.maVai === form.maVai);
+                        if (!matched) return null;
+                        let cays: { soMet: number }[] = [];
+                        if (matched.cayData) { try { cays = JSON.parse(matched.cayData); } catch {} }
+                        if (cays.length === 0) cays = [{ soMet: matched.soMet }];
+                        return (
+                          <div className="mt-2 border border-emerald-200 rounded-lg overflow-hidden">
+                            <div className="bg-emerald-50 px-3 py-1.5 flex items-center justify-between">
+                              <span className="text-xs font-semibold text-emerald-700">Tồn kho: {matched.maVai}</span>
+                              {matched.mauSac && <span className="text-xs text-slate-500">{matched.mauSac}</span>}
+                              <span className="text-xs text-slate-500">{cays.length} cây · {matched.xuong ? (XUONG_LABEL[matched.xuong] ?? matched.xuong) : "—"}</span>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                              {cays.map((c, i) => (
+                                <div key={i} className="flex items-center justify-between px-3 py-1 text-xs">
+                                  <span className="text-slate-500">Cây #{i + 1}</span>
+                                  <span className={`font-semibold ${c.soMet <= 0 ? "text-red-500" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                                    {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="bg-slate-50 px-3 py-1.5 flex justify-between border-t border-slate-100">
+                              <span className="text-xs text-slate-500">Tổng tồn:</span>
+                              <span className={`text-xs font-bold ${matched.soMet <= 0 ? "text-red-600" : "text-slate-700"}`}>
+                                {matched.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Ghi chú may <span className="text-slate-400 font-normal">(kiểu cách)</span></label>
