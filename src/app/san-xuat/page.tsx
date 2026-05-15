@@ -124,8 +124,8 @@ export default function SanXuatPage() {
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
-  type CayRow = { soY: string; soM: string; soLaTT: string; mauGiat: string; ghiChuMay: string; hdMayDa: boolean; hdGiatViSinhDa: boolean; hdGiatMauDa: boolean; daCat: boolean };
-  const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false });
+  type CayRow = { soY: string; soM: string; soLaTT: string; mauGiat: string; ghiChuMay: string; hdMayDa: boolean; hdGiatViSinhDa: boolean; hdGiatMauDa: boolean; daCat: boolean; trangThai: string };
+  const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap" });
   const [cayRows, setCayRows] = useState<CayRow[]>([emptyCayRow()]);
   const [editingCayGhiChu, setEditingCayGhiChu] = useState<{ id: string; ci: number; val: string } | null>(null);
   const [selectedVaiCayIdxs, setSelectedVaiCayIdxs] = useState<number[]>([]);
@@ -321,9 +321,9 @@ export default function SanXuatPage() {
     // Load cayRows from cayData
     const n = lo.soCay ?? 1;
     if (n > 1 && lo.cayData) {
-      try { setCayRows(JSON.parse(lo.cayData).map((r: Partial<CayRow>) => ({ soY: r.soY ?? "", soM: r.soM ?? "", soLaTT: r.soLaTT ?? "", mauGiat: r.mauGiat ?? "", ghiChuMay: r.ghiChuMay ?? "", hdMayDa: r.hdMayDa ?? false, hdGiatViSinhDa: r.hdGiatViSinhDa ?? false, hdGiatMauDa: r.hdGiatMauDa ?? false, daCat: r.daCat ?? false }))); } catch { setCayRows(Array.from({ length: n }, emptyCayRow)); }
+      try { setCayRows(JSON.parse(lo.cayData).map((r: Partial<CayRow>) => ({ soY: r.soY ?? "", soM: r.soM ?? "", soLaTT: r.soLaTT ?? "", mauGiat: r.mauGiat ?? "", ghiChuMay: r.ghiChuMay ?? "", hdMayDa: r.hdMayDa ?? false, hdGiatViSinhDa: r.hdGiatViSinhDa ?? false, hdGiatMauDa: r.hdGiatMauDa ?? false, daCat: r.daCat ?? false, trangThai: r.trangThai ?? "chua_nhap" }))); } catch { setCayRows(Array.from({ length: n }, emptyCayRow)); }
     } else {
-      setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, daCat: lo.daCat }]);
+      setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, daCat: lo.daCat, trangThai: (lo.trangThai === "da_nhap" || lo.trangThai === "da_xuat") ? "da_nhap" : "chua_nhap" }]);
     }
     setSelectedVaiCayIdxs([]);
     setModalEdit(lo);
@@ -393,6 +393,14 @@ export default function SanXuatPage() {
         body: JSON.stringify({ cayData: JSON.stringify(parsed) }),
       });
       fetchData(); fetchAllForBalance();
+    } catch { /* ignore */ }
+  };
+
+  const toggleCayTrangThai = (lo: LoCat, ci: number) => {
+    try {
+      const parsed = JSON.parse(lo.cayData!);
+      const cur = parsed[ci]?.trangThai ?? "chua_nhap";
+      saveCayField(lo, ci, "trangThai", cur === "da_nhap" ? "chua_nhap" : "da_nhap");
     } catch { /* ignore */ }
   };
 
@@ -861,7 +869,7 @@ export default function SanXuatPage() {
               ) : losCat.map(lo => {
                 const thieu = lo.soLuongThieu ?? 0;
                 const hasCay = lo.soCay > 1 && lo.cayData;
-                type CayParsed = { soY: string; soM: string; soLaTT: string; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; daCat?: boolean };
+                type CayParsed = { soY: string; soM: string; soLaTT: string; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; daCat?: boolean; trangThai?: string };
                 const cayParsed: CayParsed[] = hasCay ? (() => { try { return JSON.parse(lo.cayData!); } catch { return []; } })() : [];
                 const isExpanded = expandedRows.has(lo.id);
                 return (
@@ -1002,11 +1010,17 @@ export default function SanXuatPage() {
                         : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <button onClick={() => handleQuickStatus(lo)}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition ${lo.trangThai === "da_nhap" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-                        {lo.trangThai === "da_nhap" ? <CheckCircle size={10} /> : <Clock size={10} />}
-                        {lo.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
-                      </button>
+                      {hasCay ? (
+                        <span className="text-[10px] text-slate-400">
+                          {cayParsed.filter(c => c.trangThai === "da_nhap").length}/{cayParsed.length} nhập
+                        </span>
+                      ) : (
+                        <button onClick={() => handleQuickStatus(lo)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition ${lo.trangThai === "da_nhap" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                          {lo.trangThai === "da_nhap" ? <CheckCircle size={10} /> : <Clock size={10} />}
+                          {lo.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
+                        </button>
+                      )}
                     </td>
                     {/* HĐ May checkbox */}
                     <td className="px-3 py-2.5 text-center">
@@ -1168,8 +1182,14 @@ export default function SanXuatPage() {
                         </td>
                         {/* col 13: Thiếu — empty */}
                         <td></td>
-                        {/* col 14: Trạng thái — empty */}
-                        <td></td>
+                        {/* col 14: Trạng thái per-cây toggle */}
+                        <td className="px-2 py-1.5 text-center">
+                          <button onClick={() => toggleCayTrangThai(lo, ci)}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition ${cay.trangThai === "da_nhap" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                            {cay.trangThai === "da_nhap" ? <CheckCircle size={8} /> : <Clock size={8} />}
+                            {cay.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
+                          </button>
+                        </td>
                         {/* col 15: HĐ May per-cây */}
                         <td className="px-3 py-1.5 text-center">
                           <button onClick={() => toggleCayHD(lo, ci, "hdMayDa")}
@@ -1495,7 +1515,7 @@ export default function SanXuatPage() {
                             ? next.map(idx => ({
                                 soY: "", soM: String(cays[idx]?.soMet ?? ""),
                                 soLaTT: "", mauGiat: "", ghiChuMay: "",
-                                hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false,
+                                hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
                               }))
                             : [emptyCayRow()]
                           );
@@ -1508,7 +1528,7 @@ export default function SanXuatPage() {
                           setCayRows(cays.map(c => ({
                             soY: "", soM: String(c.soMet),
                             soLaTT: "", mauGiat: "", ghiChuMay: "",
-                            hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false,
+                            hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
                           })));
                         };
 
