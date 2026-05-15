@@ -40,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(b.hdGiatMau !== undefined && { hdGiatMau: ni(b.hdGiatMau) }),
         ...(b.tonTruocGiatMau !== undefined && { tonTruocGiatMau: n(b.tonTruocGiatMau) }),
         ...(b.hdGiatMauDa !== undefined && { hdGiatMauDa: Boolean(b.hdGiatMauDa) }),
+        ...(b.daCat !== undefined && { daCat: Boolean(b.daCat) }),
         ...(b.ghiChuMay !== undefined && { ghiChuMay: b.ghiChuMay || null }),
         ...(b.mauGiat !== undefined && { mauGiat: b.mauGiat || null }),
         ...(b.ghiChu !== undefined && { ghiChu: b.ghiChu || null }),

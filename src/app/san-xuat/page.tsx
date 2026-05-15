@@ -15,6 +15,7 @@ type LoCat = {
   soLa: number | null; soLaThucTe: number | null; soSanPham: number | null;
   hangThucTe: number | null; soLuongThieu: number | null; xuongNhanHang: string | null;
   trangThai: string; xuong: string;
+  daCat: boolean;
   hdMay: number | null; tonTruocMay: number | null; hdMayDa: boolean;
   coGiat: string | null;
   hdGiatViSinh: number | null; tonTruocGiatViSinh: number | null; hdGiatViSinhDa: boolean;
@@ -121,8 +122,8 @@ export default function SanXuatPage() {
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
-  type CayRow = { soY: string; soM: string; soLaTT: string; mauGiat: string; ghiChuMay: string; hdMayDa: boolean; hdGiatViSinhDa: boolean; hdGiatMauDa: boolean };
-  const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false });
+  type CayRow = { soY: string; soM: string; soLaTT: string; mauGiat: string; ghiChuMay: string; hdMayDa: boolean; hdGiatViSinhDa: boolean; hdGiatMauDa: boolean; daCat: boolean };
+  const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false });
   const [cayRows, setCayRows] = useState<CayRow[]>([emptyCayRow()]);
   const [editingCayGhiChu, setEditingCayGhiChu] = useState<{ id: string; ci: number; val: string } | null>(null);
   const [selectedVaiCayIdxs, setSelectedVaiCayIdxs] = useState<number[]>([]);
@@ -318,9 +319,9 @@ export default function SanXuatPage() {
     // Load cayRows from cayData
     const n = lo.soCay ?? 1;
     if (n > 1 && lo.cayData) {
-      try { setCayRows(JSON.parse(lo.cayData).map((r: Partial<CayRow>) => ({ soY: r.soY ?? "", soM: r.soM ?? "", soLaTT: r.soLaTT ?? "", mauGiat: r.mauGiat ?? "", ghiChuMay: r.ghiChuMay ?? "", hdMayDa: r.hdMayDa ?? false, hdGiatViSinhDa: r.hdGiatViSinhDa ?? false, hdGiatMauDa: r.hdGiatMauDa ?? false }))); } catch { setCayRows(Array.from({ length: n }, emptyCayRow)); }
+      try { setCayRows(JSON.parse(lo.cayData).map((r: Partial<CayRow>) => ({ soY: r.soY ?? "", soM: r.soM ?? "", soLaTT: r.soLaTT ?? "", mauGiat: r.mauGiat ?? "", ghiChuMay: r.ghiChuMay ?? "", hdMayDa: r.hdMayDa ?? false, hdGiatViSinhDa: r.hdGiatViSinhDa ?? false, hdGiatMauDa: r.hdGiatMauDa ?? false, daCat: r.daCat ?? false }))); } catch { setCayRows(Array.from({ length: n }, emptyCayRow)); }
     } else {
-      setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa }]);
+      setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, daCat: lo.daCat }]);
     }
     setSelectedVaiCayIdxs([]);
     setModalEdit(lo);
@@ -346,27 +347,27 @@ export default function SanXuatPage() {
       const url = modalEdit ? `/api/san-xuat/lo-cat/${modalEdit.id}` : "/api/san-xuat/lo-cat";
       const method = modalEdit ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const resJson = await res.json();
+      if (!res.ok) throw new Error(resJson.error);
+      const savedId: string | undefined = resJson.id;
 
-      // Trừ tồn kho vải nếu người dùng đã chọn cây từ kho (chỉ khi thêm mới)
-      if (!modalEdit && selectedVaiCayIdxs.length > 0 && form.maVai) {
+      // Trừ tồn kho vải + đánh dấu lotId/lotCayIdx để xoá đúng cây sau này
+      if (!modalEdit && savedId && selectedVaiCayIdxs.length > 0 && form.maVai) {
         const matchedVai = vaiTons.find(v => v.maVai === form.maVai);
         if (matchedVai) {
-          let cays: { soMet: number }[] = [];
+          let cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
           if (matchedVai.cayData) { try { cays = JSON.parse(matchedVai.cayData); } catch {} }
           if (cays.length === 0) cays = [{ soMet: matchedVai.soMet }];
-          // Trừ số mét đã dùng và đánh dấu cut=true để hiển thị gạch ngang
           const newCays = cays.map((c, i) => {
             const selIdx = selectedVaiCayIdxs.indexOf(i);
             if (selIdx === -1) return c;
             const metersUsed = numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0);
-            return { soMet: Math.max(0, c.soMet - metersUsed), cut: true };
+            return { soMet: Math.max(0, c.soMet - metersUsed), cut: true, lotId: savedId, lotCayIdx: selIdx };
           });
-          const newTotalMet = newCays.reduce((s, c) => s + c.soMet, 0);
           await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cayData: newCays }),  // API nhận array, tự tính soMet
+            body: JSON.stringify({ cayData: newCays }),
           });
           fetchVaiTon();
         }
@@ -443,27 +444,63 @@ export default function SanXuatPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trangThai: next }),
     });
-    // Khi chuyển sang "Đã nhập" → xoá cây đã gạch (cut=true) khỏi tồn kho vải
-    if (next === "da_nhap" && lo.maVai) {
+    fetchData();
+    fetchAllForBalance();
+  };
+
+  // Toggle "Đã cắt" cho lô 1 cây — xoá cây tương ứng khỏi tồn kho vải
+  const toggleDaCat = async (lo: LoCat) => {
+    const newVal = !lo.daCat;
+    if (newVal && lo.maVai) {
       const matchedVai = vaiTons.find(v => v.maVai === lo.maVai);
       if (matchedVai && matchedVai.cayData) {
         try {
-          const cays: { soMet: number; cut?: boolean }[] = JSON.parse(matchedVai.cayData);
-          const hasCut = cays.some(c => c.cut);
-          if (hasCut) {
-            const remaining = cays.filter(c => !c.cut);
-            const newTotal = remaining.reduce((s, c) => s + c.soMet, 0);
+          const cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(matchedVai.cayData);
+          const newCays = cays.filter(c => !(c.lotId === lo.id));
+          if (newCays.length < cays.length) {
             await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cayData: remaining }),  // API nhận array, tự tính soMet + soCay
+              body: JSON.stringify({ cayData: newCays }),
             });
             fetchVaiTon();
           }
         } catch { /* ignore */ }
       }
     }
+    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daCat: newVal }),
+    });
     fetchData();
-    fetchAllForBalance();
+  };
+
+  // Toggle "Đã cắt" cho từng cây trong lô nhiều cây
+  const toggleCayDaCat = async (lo: LoCat, ci: number) => {
+    if (!lo.cayData) return;
+    try {
+      const parsed: (Partial<CayRow> & { lotId?: string; lotCayIdx?: number })[] = JSON.parse(lo.cayData);
+      const newDaCat = !parsed[ci]?.daCat;
+      parsed[ci] = { ...parsed[ci], daCat: newDaCat };
+      if (newDaCat && lo.maVai) {
+        const matchedVai = vaiTons.find(v => v.maVai === lo.maVai);
+        if (matchedVai && matchedVai.cayData) {
+          const vaiCays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(matchedVai.cayData);
+          const newVaiCays = vaiCays.filter(c => !(c.lotId === lo.id && c.lotCayIdx === ci));
+          if (newVaiCays.length < vaiCays.length) {
+            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cayData: newVaiCays }),
+            });
+            fetchVaiTon();
+          }
+        }
+      }
+      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: JSON.stringify(parsed) }),
+      });
+      fetchData();
+    } catch { /* ignore */ }
   };
 
   // Stats
@@ -761,6 +798,7 @@ export default function SanXuatPage() {
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá KH</th>
+                <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[11px]">Đã cắt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá TT</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ghi chú may</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu giặt</th>
@@ -779,7 +817,7 @@ export default function SanXuatPage() {
             <tbody className="divide-y divide-slate-100">
               {losCat.length === 0 ? (
                 <tr>
-                  <td colSpan={18} className="text-center py-16 text-slate-400">
+                  <td colSpan={19} className="text-center py-16 text-slate-400">
                     <Scissors size={32} className="mx-auto mb-2 opacity-30" />
                     <p>Chưa có lô cắt nào</p>
                     <button onClick={openAdd} className="mt-3 text-rose-500 hover:underline text-sm">+ Thêm lô cắt đầu tiên</button>
@@ -788,7 +826,7 @@ export default function SanXuatPage() {
               ) : losCat.map(lo => {
                 const thieu = lo.soLuongThieu ?? 0;
                 const hasCay = lo.soCay > 1 && lo.cayData;
-                type CayParsed = { soY: string; soM: string; soLaTT: string; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean };
+                type CayParsed = { soY: string; soM: string; soLaTT: string; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; daCat?: boolean };
                 const cayParsed: CayParsed[] = hasCay ? (() => { try { return JSON.parse(lo.cayData!); } catch { return []; } })() : [];
                 const isExpanded = expandedRows.has(lo.id);
                 return (
@@ -806,6 +844,18 @@ export default function SanXuatPage() {
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-600">{lo.soM != null ? lo.soM.toFixed(2) : "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-500">{lo.soLa != null ? lo.soLa.toFixed(1) : "—"}</td>
+                    {/* Đã cắt */}
+                    <td className="px-2 py-2.5 text-center">
+                      {hasCay ? (
+                        <span className="text-[10px] text-slate-400">{cayParsed.filter(c => c.daCat).length}/{cayParsed.length}</span>
+                      ) : (
+                        <button onClick={() => toggleDaCat(lo)}
+                          title={lo.soLaThucTe == null ? "Cần điền Lá TT trước" : ""}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.daCat ? "bg-emerald-500 border-emerald-500 text-white" : lo.soLaThucTe != null ? "border-slate-300 hover:border-emerald-400" : "border-slate-200 opacity-40 cursor-not-allowed"}`}>
+                          {lo.daCat && <CheckCircle size={12} />}
+                        </button>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-right text-slate-600">{lo.soLaThucTe ?? "—"}</td>
                     {/* Ghi chú may — inline text edit */}
                     <td className="px-1.5 py-1 max-w-[150px]">
@@ -957,7 +1007,15 @@ export default function SanXuatPage() {
                         <td className="px-3 py-1.5 text-right text-[11px] text-slate-600">{Number(cay.soM) > 0 ? Number(cay.soM).toFixed(2) : "—"}</td>
                         {/* col 6: Lá KH */}
                         <td className="px-3 py-1.5 text-right text-[11px] text-blue-600 font-semibold">{laKH != null ? laKH.toFixed(1) : "—"}</td>
-                        {/* col 7: Lá TT */}
+                        {/* col 7: Đã cắt per-cây */}
+                        <td className="px-2 py-1.5 text-center">
+                          <button onClick={() => toggleCayDaCat(lo, ci)}
+                            title={laTT == null ? "Cần điền Lá TT trước" : ""}
+                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.daCat ? "bg-emerald-500 border-emerald-500 text-white" : laTT != null ? "border-slate-300 hover:border-emerald-400" : "border-slate-200 opacity-40 cursor-not-allowed"}`}>
+                            {cay.daCat && <CheckCircle size={10} />}
+                          </button>
+                        </td>
+                        {/* col 8: Lá TT */}
                         <td className="px-3 py-1.5 text-right text-[11px] text-rose-600 font-semibold">{laTT != null ? laTT : "—"}</td>
                         {/* col 8: Ghi chú may — per-cây inline edit */}
                         <td className="px-1.5 py-1 max-w-[150px]">
@@ -1057,7 +1115,7 @@ export default function SanXuatPage() {
             {losCat.length > 0 && (
               <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-semibold text-xs">
                 <tr>
-                  <td colSpan={9} className="px-3 py-2 text-slate-500">Tổng</td>
+                  <td colSpan={10} className="px-3 py-2 text-slate-500">Tổng</td>
                   <td className="px-3 py-2 text-right bg-orange-50">{tongSP.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-green-700">{tongNhan.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-red-600">{tongThieu > 0 ? tongThieu.toLocaleString() : <span className="text-green-600">0</span>}</td>
@@ -1349,7 +1407,7 @@ export default function SanXuatPage() {
                             ? next.map(idx => ({
                                 soY: "", soM: String(cays[idx]?.soMet ?? ""),
                                 soLaTT: "", mauGiat: "", ghiChuMay: "",
-                                hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false,
+                                hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false,
                               }))
                             : [emptyCayRow()]
                           );
@@ -1362,7 +1420,7 @@ export default function SanXuatPage() {
                           setCayRows(cays.map(c => ({
                             soY: "", soM: String(c.soMet),
                             soLaTT: "", mauGiat: "", ghiChuMay: "",
-                            hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false,
+                            hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false,
                           })));
                         };
 
