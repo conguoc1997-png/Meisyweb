@@ -366,7 +366,7 @@ export default function SanXuatPage() {
           await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cayData: JSON.stringify(newCays), soMet: newTotalMet }),
+            body: JSON.stringify({ cayData: newCays }),  // API nhận array, tự tính soMet
           });
           fetchVaiTon();
         }
@@ -455,7 +455,7 @@ export default function SanXuatPage() {
             const newTotal = remaining.reduce((s, c) => s + c.soMet, 0);
             await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cayData: JSON.stringify(remaining), soMet: newTotal, soCay: remaining.length }),
+              body: JSON.stringify({ cayData: remaining }),  // API nhận array, tự tính soMet + soCay
             });
             fetchVaiTon();
           }
