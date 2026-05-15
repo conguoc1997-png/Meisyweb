@@ -56,6 +56,7 @@ export default function SanXuatPage() {
   const [vaiForm, setVaiForm] = useState({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "" });
   const [vaiCayRows, setVaiCayRows] = useState<{ soMet: string }[]>([{ soMet: "" }]);
   const [editingVaiMet, setEditingVaiMet] = useState<{ id: string; val: string } | null>(null);
+  const [savingVai, setSavingVai] = useState(false);
   const [editingVaiXuong, setEditingVaiXuong] = useState<string | null>(null);
   const [expandedVaiRows, setExpandedVaiRows] = useState<Set<string>>(new Set());
   const toggleVaiExpand = (id: string) => setExpandedVaiRows(prev => {
@@ -70,11 +71,17 @@ export default function SanXuatPage() {
   };
 
   const saveVai = async () => {
-    const url = modalVai && modalVai !== "new" ? `/api/san-xuat/vai-ton/${modalVai.id}` : "/api/san-xuat/vai-ton";
-    const method = modalVai && modalVai !== "new" ? "PATCH" : "POST";
-    const cayData = vaiCayRows.map(r => ({ soMet: Number(r.soMet) || 0 }));
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...vaiForm, cayData }) });
-    setModalVai(null); fetchVaiTon();
+    if (savingVai) return;
+    setSavingVai(true);
+    try {
+      const url = modalVai && modalVai !== "new" ? `/api/san-xuat/vai-ton/${modalVai.id}` : "/api/san-xuat/vai-ton";
+      const method = modalVai && modalVai !== "new" ? "PATCH" : "POST";
+      const cayData = vaiCayRows.map(r => ({ soMet: Number(r.soMet) || 0 }));
+      await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...vaiForm, cayData }) });
+      setModalVai(null); fetchVaiTon();
+    } finally {
+      setSavingVai(false);
+    }
   };
 
   const deleteVai = async (id: string) => {
@@ -1114,9 +1121,9 @@ export default function SanXuatPage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setModalVai(null)} className="flex-1 px-4 py-2 border rounded-lg text-sm hover:bg-slate-50">Huỷ</button>
-              <button onClick={saveVai} disabled={!vaiForm.maVai}
+              <button onClick={saveVai} disabled={!vaiForm.maVai || savingVai}
                 className="flex-1 px-4 py-2 bg-rose-500 text-white rounded-lg text-sm hover:bg-rose-600 disabled:opacity-50">
-                {modalVai === "new" ? "Thêm" : "Lưu"}
+                {savingVai ? "Đang lưu..." : modalVai === "new" ? "Thêm" : "Lưu"}
               </button>
             </div>
           </div>
