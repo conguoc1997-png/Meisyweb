@@ -124,10 +124,11 @@ export default function SanXuatPage() {
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
-  type CayRow = { soY: string; soM: string; soLaTT: string; mauGiat: string; ghiChuMay: string; hdMayDa: boolean; hdGiatViSinhDa: boolean; hdGiatMauDa: boolean; daCat: boolean; trangThai: string };
-  const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap" });
+  type CayRow = { soY: string; soM: string; soLaTT: string; hangThucTe: string; mauGiat: string; ghiChuMay: string; hdMayDa: boolean; hdGiatViSinhDa: boolean; hdGiatMauDa: boolean; daCat: boolean; trangThai: string };
+  const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", hangThucTe: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap" });
   const [cayRows, setCayRows] = useState<CayRow[]>([emptyCayRow()]);
   const [editingCayGhiChu, setEditingCayGhiChu] = useState<{ id: string; ci: number; val: string } | null>(null);
+  const [editingCayNhanVe, setEditingCayNhanVe] = useState<{ id: string; ci: number; val: string } | null>(null);
   const [selectedVaiCayIdxs, setSelectedVaiCayIdxs] = useState<number[]>([]);
   const [editingCayMau, setEditingCayMau] = useState<{ id: string; ci: number } | null>(null);
 
@@ -321,9 +322,9 @@ export default function SanXuatPage() {
     // Load cayRows from cayData
     const n = lo.soCay ?? 1;
     if (n > 1 && lo.cayData) {
-      try { setCayRows(JSON.parse(lo.cayData).map((r: Partial<CayRow>) => ({ soY: r.soY ?? "", soM: r.soM ?? "", soLaTT: r.soLaTT ?? "", mauGiat: r.mauGiat ?? "", ghiChuMay: r.ghiChuMay ?? "", hdMayDa: r.hdMayDa ?? false, hdGiatViSinhDa: r.hdGiatViSinhDa ?? false, hdGiatMauDa: r.hdGiatMauDa ?? false, daCat: r.daCat ?? false, trangThai: r.trangThai ?? "chua_nhap" }))); } catch { setCayRows(Array.from({ length: n }, emptyCayRow)); }
+      try { setCayRows(JSON.parse(lo.cayData).map((r: Partial<CayRow>) => ({ soY: r.soY ?? "", soM: r.soM ?? "", soLaTT: r.soLaTT ?? "", hangThucTe: r.hangThucTe != null ? String(r.hangThucTe) : "", mauGiat: r.mauGiat ?? "", ghiChuMay: r.ghiChuMay ?? "", hdMayDa: r.hdMayDa ?? false, hdGiatViSinhDa: r.hdGiatViSinhDa ?? false, hdGiatMauDa: r.hdGiatMauDa ?? false, daCat: r.daCat ?? false, trangThai: r.trangThai ?? "chua_nhap" }))); } catch { setCayRows(Array.from({ length: n }, emptyCayRow)); }
     } else {
-      setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, daCat: lo.daCat, trangThai: (lo.trangThai === "da_nhap" || lo.trangThai === "da_xuat") ? "da_nhap" : "chua_nhap" }]);
+      setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", hangThucTe: lo.hangThucTe != null ? String(lo.hangThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, daCat: lo.daCat, trangThai: (lo.trangThai === "da_nhap" || lo.trangThai === "da_xuat") ? "da_nhap" : "chua_nhap" }]);
     }
     setSelectedVaiCayIdxs([]);
     setModalEdit(lo);
@@ -476,6 +477,26 @@ export default function SanXuatPage() {
         body: JSON.stringify({ cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu }),
       }).catch(() => fetchData());
     } catch { fetchData(); }
+  };
+
+  // Inline-edit Nhận về per-cây → tổng auto tính lên main row
+  const saveCayNhanVe = (lo: LoCat, ci: number, val: string) => {
+    setEditingCayNhanVe(null);
+    try {
+      const parsed = JSON.parse(lo.cayData!);
+      const htVal = val === "" ? null : Math.round(Number(val));
+      parsed[ci] = { ...parsed[ci], hangThucTe: htVal };
+      const totalHT = parsed.reduce((s: number, c: { hangThucTe?: number | null }) =>
+        s + (c.hangThucTe != null ? c.hangThucTe : 0), 0);
+      const hangThucTe = totalHT > 0 ? totalHT : null;
+      const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
+      const newCayData = JSON.stringify(parsed);
+      setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, hangThucTe, soLuongThieu } : l));
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newCayData, hangThucTe, soLuongThieu }),
+      }).catch(() => fetchData());
+    } catch { /* ignore */ }
   };
 
   const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
@@ -880,7 +901,7 @@ export default function SanXuatPage() {
               ) : losCat.map(lo => {
                 const thieu = lo.soLuongThieu ?? 0;
                 const hasCay = lo.soCay > 1 && lo.cayData;
-                type CayParsed = { soY: string; soM: string; soLaTT: string; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; daCat?: boolean; trangThai?: string };
+                type CayParsed = { soY: string; soM: string; soLaTT: string; hangThucTe?: number; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; daCat?: boolean; trangThai?: string };
                 const cayParsed: CayParsed[] = hasCay ? (() => { try { return JSON.parse(lo.cayData!); } catch { return []; } })() : [];
                 const isExpanded = expandedRows.has(lo.id);
                 return (
@@ -1082,6 +1103,8 @@ export default function SanXuatPage() {
                     const laTT = cay.soLaTT !== "" && cay.soLaTT != null ? Number(cay.soLaTT) : null;
                     const chenh = laKH != null && laTT != null ? laTT - laKH : null;
                     const spPerCay = laTT != null && lo.tongSize != null ? laTT * lo.tongSize : null;
+                    const nhanVeCay = cay.hangThucTe != null ? cay.hangThucTe : null;
+                    const thieuCay = spPerCay != null && nhanVeCay != null ? spPerCay - nhanVeCay : null;
                     return (
                       <tr key={`${lo.id}-cay-${ci}`} className="bg-slate-50/80 border-l-2 border-rose-200">
                         {/* col 1: expand */}
@@ -1183,16 +1206,44 @@ export default function SanXuatPage() {
                         <td></td>
                         {/* col 11: Số SP per cây */}
                         <td className="px-3 py-1.5 text-right text-[11px] font-bold text-slate-700 bg-orange-50">{spPerCay != null ? spPerCay.toLocaleString() : "—"}</td>
-                        {/* col 12: Nhận về — chênh lệch badge */}
-                        <td className="px-3 py-1.5 text-right">
+                        {/* col 12: Nhận về per-cây — inline edit */}
+                        <td className="px-1 py-1 text-right">
+                          {editingCayNhanVe?.id === lo.id && editingCayNhanVe.ci === ci ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={editingCayNhanVe.val}
+                              onChange={e => setEditingCayNhanVe({ id: lo.id, ci, val: e.target.value })}
+                              onBlur={() => saveCayNhanVe(lo, ci, editingCayNhanVe.val)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") { e.preventDefault(); saveCayNhanVe(lo, ci, editingCayNhanVe.val); }
+                                if (e.key === "Escape") setEditingCayNhanVe(null);
+                              }}
+                              className="w-14 text-right border border-green-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-green-300 bg-green-50"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => setEditingCayNhanVe({ id: lo.id, ci, val: nhanVeCay != null ? String(nhanVeCay) : "" })}
+                              className="text-green-700 font-semibold hover:bg-green-50 rounded px-2 py-0.5 text-[11px] w-full text-right transition"
+                              title="Click để nhập số nhận về"
+                            >
+                              {nhanVeCay != null ? nhanVeCay.toLocaleString() : <span className="text-slate-300 font-normal">—</span>}
+                            </button>
+                          )}
+                        </td>
+                        {/* col 13: Thiếu per-cây + chênh lệch lá */}
+                        <td className="px-2 py-1.5 text-right">
+                          {thieuCay != null && (
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded block mb-0.5 ${thieuCay > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                              {thieuCay > 0 ? thieuCay.toLocaleString() : "0"}
+                            </span>
+                          )}
                           {chenh != null && (
-                            <span className={`text-[11px] px-1.5 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                            <span className={`text-[10px] px-1 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
                               {chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)} lá
                             </span>
                           )}
                         </td>
-                        {/* col 13: Thiếu — empty */}
-                        <td></td>
                         {/* col 14: Trạng thái per-cây toggle */}
                         <td className="px-2 py-1.5 text-center">
                           <button onClick={() => toggleCayTrangThai(lo, ci)}
@@ -1525,7 +1576,7 @@ export default function SanXuatPage() {
                           setCayRows(next.length > 0
                             ? next.map(idx => ({
                                 soY: "", soM: String(cays[idx]?.soMet ?? ""),
-                                soLaTT: "", mauGiat: "", ghiChuMay: "",
+                                soLaTT: "", hangThucTe: "", mauGiat: "", ghiChuMay: "",
                                 hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
                               }))
                             : [emptyCayRow()]
@@ -1538,7 +1589,7 @@ export default function SanXuatPage() {
                           setForm(f => ({ ...f, soCay: String(all.length) }));
                           setCayRows(cays.map(c => ({
                             soY: "", soM: String(c.soMet),
-                            soLaTT: "", mauGiat: "", ghiChuMay: "",
+                            soLaTT: "", hangThucTe: "", mauGiat: "", ghiChuMay: "",
                             hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
                           })));
                         };
