@@ -355,12 +355,12 @@ export default function SanXuatPage() {
           let cays: { soMet: number }[] = [];
           if (matchedVai.cayData) { try { cays = JSON.parse(matchedVai.cayData); } catch {} }
           if (cays.length === 0) cays = [{ soMet: matchedVai.soMet }];
-          // Trừ số mét đã dùng từ từng cây được chọn
+          // Trừ số mét đã dùng và đánh dấu cut=true để hiển thị gạch ngang
           const newCays = cays.map((c, i) => {
             const selIdx = selectedVaiCayIdxs.indexOf(i);
             if (selIdx === -1) return c;
             const metersUsed = numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0);
-            return { soMet: Math.max(0, c.soMet - metersUsed) };
+            return { soMet: Math.max(0, c.soMet - metersUsed), cut: true };
           });
           const newTotalMet = newCays.reduce((s, c) => s + c.soMet, 0);
           await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
@@ -443,6 +443,25 @@ export default function SanXuatPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trangThai: next }),
     });
+    // Khi chuyển sang "Đã nhập" → xoá cây đã gạch (cut=true) khỏi tồn kho vải
+    if (next === "da_nhap" && lo.maVai) {
+      const matchedVai = vaiTons.find(v => v.maVai === lo.maVai);
+      if (matchedVai && matchedVai.cayData) {
+        try {
+          const cays: { soMet: number; cut?: boolean }[] = JSON.parse(matchedVai.cayData);
+          const hasCut = cays.some(c => c.cut);
+          if (hasCut) {
+            const remaining = cays.filter(c => !c.cut);
+            const newTotal = remaining.reduce((s, c) => s + c.soMet, 0);
+            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cayData: JSON.stringify(remaining), soMet: newTotal, soCay: remaining.length }),
+            });
+            fetchVaiTon();
+          }
+        } catch { /* ignore */ }
+      }
+    }
     fetchData();
     fetchAllForBalance();
   };
@@ -591,7 +610,7 @@ export default function SanXuatPage() {
                   {vaiTons.map(v => {
                     const hasCayData = v.soCay > 1 && v.cayData;
                     const isVaiExpanded = expandedVaiRows.has(v.id);
-                    let cayDataParsed: { soMet: number }[] = [];
+                    let cayDataParsed: { soMet: number; cut?: boolean }[] = [];
                     if (hasCayData) { try { cayDataParsed = JSON.parse(v.cayData!); } catch {} }
                     return (
                       <>
@@ -663,16 +682,19 @@ export default function SanXuatPage() {
                       </tr>
                       {/* Per-cây detail rows */}
                       {hasCayData && isVaiExpanded && cayDataParsed.map((cay, ci) => (
-                        <tr key={`${v.id}-vai-cay-${ci}`} className="bg-emerald-50/60 border-l-2 border-emerald-300">
-                          <td className="px-4 py-1.5 text-[11px] text-slate-500 font-semibold">└ Cây #{ci + 1}</td>
+                        <tr key={`${v.id}-vai-cay-${ci}`}
+                          className={`border-l-2 ${cay.cut ? "bg-slate-100/80 border-slate-300 opacity-60" : "bg-emerald-50/60 border-emerald-300"}`}>
+                          <td className={`px-4 py-1.5 text-[11px] font-semibold ${cay.cut ? "text-slate-400 line-through" : "text-slate-500"}`}>
+                            └ Cây #{ci + 1}{cay.cut && " ✂️"}
+                          </td>
                           <td colSpan={2}></td>
                           <td className="px-3 py-1.5 text-center text-[11px] text-slate-400">{ci + 1}</td>
                           <td className="px-3 py-1.5 text-right">
-                            <span className={`text-[11px] font-bold ${cay.soMet <= 0 ? "text-red-500" : cay.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                            <span className={`text-[11px] font-bold ${cay.cut ? "text-slate-400 line-through" : cay.soMet <= 0 ? "text-red-500" : cay.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
                               {cay.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
                             </span>
                           </td>
-                          <td className="px-3 py-1.5 text-[11px] text-slate-400">{v.donVi}</td>
+                          <td className={`px-3 py-1.5 text-[11px] ${cay.cut ? "text-slate-400 line-through" : "text-slate-400"}`}>{v.donVi}</td>
                           <td colSpan={2}></td>
                         </tr>
                       ))}
