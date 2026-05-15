@@ -940,9 +940,9 @@ export default function SanXuatPage() {
                         <span className="text-slate-600 text-xs px-2">{lo.soLaThucTe ?? "—"}</span>
                       )}
                     </td>
-                    {/* Ghi chú may — inline text edit */}
+                    {/* Ghi chú may — chỉ hiện cho lô 1 cây; lô nhiều cây dùng per-cây */}
                     <td className="px-1.5 py-1 max-w-[150px]">
-                      {editingGhiChuMay?.id === lo.id ? (
+                      {!hasCay ? (editingGhiChuMay?.id === lo.id ? (
                         <input
                           autoFocus
                           value={editingGhiChuMay.val}
@@ -962,7 +962,7 @@ export default function SanXuatPage() {
                         >
                           {lo.ghiChuMay ?? <span className="text-slate-300">— nhập</span>}
                         </button>
-                      )}
+                      )) : null}
                     </td>
                     {/* Màu giặt — inline select */}
                     <td className="px-1.5 py-1 text-center">
