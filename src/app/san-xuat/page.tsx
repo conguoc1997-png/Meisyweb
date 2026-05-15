@@ -118,6 +118,7 @@ export default function SanXuatPage() {
   const emptyCayRow = (): CayRow => ({ soY: "", soM: "", soLaTT: "", mauGiat: "", ghiChuMay: "", hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false });
   const [cayRows, setCayRows] = useState<CayRow[]>([emptyCayRow()]);
   const [editingCayGhiChu, setEditingCayGhiChu] = useState<{ id: string; ci: number; val: string } | null>(null);
+  const [selectedVaiCayIdxs, setSelectedVaiCayIdxs] = useState<number[]>([]);
   const [editingCayMau, setEditingCayMau] = useState<{ id: string; ci: number } | null>(null);
 
   // ── Size picker ──
@@ -171,11 +172,12 @@ export default function SanXuatPage() {
   };
 
   // Multi-cây helpers
-  const numCay = Math.max(1, Math.min(9, Number(form.soCay) || 1));
+  const numCay = Math.max(1, Number(form.soCay) || 1);
 
   const handleSoCayChange = (n: number) => {
     setForm(f => ({ ...f, soCay: String(n) }));
     setCayRows(prev => Array.from({ length: n }, (_, i) => prev[i] ?? emptyCayRow()));
+    setSelectedVaiCayIdxs([]); // manual change clears fabric selection
   };
 
   const updateCayRow = (idx: number, field: "soY" | "soM" | "soLaTT" | "mauGiat" | "ghiChuMay" | "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa", val: string | boolean) => {
@@ -277,6 +279,7 @@ export default function SanXuatPage() {
     setForm({ ...emptyForm, ngay: new Date().toISOString().slice(0, 10) });
     setCayRows([emptyCayRow()]);
     setSizeItems(SIZES.map(s => ({ size: s, qty: 1, checked: false })));
+    setSelectedVaiCayIdxs([]);
     setModalAdd(true);
   };
 
@@ -312,6 +315,7 @@ export default function SanXuatPage() {
     } else {
       setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa }]);
     }
+    setSelectedVaiCayIdxs([]);
     setModalEdit(lo);
   };
 
@@ -1236,7 +1240,13 @@ export default function SanXuatPage() {
                     </div>
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Hàng cắt (SKU) *</label>
-                      <input required value={form.hangCat} onChange={sf("hangCat")} className={inp} />
+                      <input required value={form.hangCat} onChange={sf("hangCat")} className={inp}
+                        list="hang-cat-list" placeholder="Nhập hoặc chọn mã hàng..." />
+                      <datalist id="hang-cat-list">
+                        {[...new Set(allLoCat.map(l => l.hangCat))].sort().map(h => (
+                          <option key={h} value={h} />
+                        ))}
+                      </datalist>
                     </div>
                     <div className="col-span-2">
                       <label className="text-xs text-slate-600 mb-1 block">Size & Số lượng mỗi size</label>
@@ -1266,40 +1276,103 @@ export default function SanXuatPage() {
                     </div>
                     <div className="col-span-2">
                       <label className="text-xs text-slate-600 mb-1 block">Mã vải / Khó</label>
-                      <input value={form.maVai} onChange={sf("maVai")} className={inp}
-                        list="lo-cat-mavai-list" placeholder="Nhập hoặc chọn từ kho..." />
+                      <input value={form.maVai}
+                        onChange={e => { setForm(f => ({ ...f, maVai: e.target.value })); setSelectedVaiCayIdxs([]); }}
+                        className={inp} list="lo-cat-mavai-list" placeholder="Nhập hoặc chọn từ kho..." />
                       <datalist id="lo-cat-mavai-list">
                         {vaiTons.map(v => <option key={v.id} value={v.maVai}>{v.maVai}{v.mauSac ? ` — ${v.mauSac}` : ""} ({v.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} {v.donVi})</option>)}
                       </datalist>
-                      {/* Hiển thị chi tiết cây khi mã vải khớp với kho */}
+                      {/* Chọn cây từ kho khi mã vải khớp */}
                       {(() => {
                         const matched = vaiTons.find(v => v.maVai === form.maVai);
                         if (!matched) return null;
                         let cays: { soMet: number }[] = [];
                         if (matched.cayData) { try { cays = JSON.parse(matched.cayData); } catch {} }
                         if (cays.length === 0) cays = [{ soMet: matched.soMet }];
+
+                        const toggleCay = (ci: number) => {
+                          const next = selectedVaiCayIdxs.includes(ci)
+                            ? selectedVaiCayIdxs.filter(i => i !== ci)
+                            : [...selectedVaiCayIdxs, ci].sort((a, b) => a - b);
+                          setSelectedVaiCayIdxs(next);
+                          const n = Math.max(1, next.length);
+                          setForm(f => ({ ...f, soCay: String(n) }));
+                          setCayRows(next.length > 0
+                            ? next.map(idx => ({
+                                soY: "", soM: String(cays[idx]?.soMet ?? ""),
+                                soLaTT: "", mauGiat: "", ghiChuMay: "",
+                                hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false,
+                              }))
+                            : [emptyCayRow()]
+                          );
+                        };
+
+                        const selectAll = () => {
+                          const all = cays.map((_, i) => i);
+                          setSelectedVaiCayIdxs(all);
+                          setForm(f => ({ ...f, soCay: String(all.length) }));
+                          setCayRows(cays.map(c => ({
+                            soY: "", soM: String(c.soMet),
+                            soLaTT: "", mauGiat: "", ghiChuMay: "",
+                            hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false,
+                          })));
+                        };
+
+                        const clearAll = () => {
+                          setSelectedVaiCayIdxs([]);
+                          setForm(f => ({ ...f, soCay: "1" }));
+                          setCayRows([emptyCayRow()]);
+                        };
+
+                        const selectedTotal = selectedVaiCayIdxs.reduce((s, i) => s + (cays[i]?.soMet ?? 0), 0);
+
                         return (
                           <div className="mt-2 border border-emerald-200 rounded-lg overflow-hidden">
-                            <div className="bg-emerald-50 px-3 py-1.5 flex items-center justify-between">
-                              <span className="text-xs font-semibold text-emerald-700">Tồn kho: {matched.maVai}</span>
-                              {matched.mauSac && <span className="text-xs text-slate-500">{matched.mauSac}</span>}
-                              <span className="text-xs text-slate-500">{cays.length} cây · {matched.xuong ? (XUONG_LABEL[matched.xuong] ?? matched.xuong) : "—"}</span>
+                            <div className="bg-emerald-50 px-3 py-2 flex items-center justify-between gap-2">
+                              <div>
+                                <span className="text-xs font-semibold text-emerald-700">{matched.maVai}</span>
+                                {matched.mauSac && <span className="text-xs text-slate-500 ml-1.5">{matched.mauSac}</span>}
+                                <span className="text-xs text-slate-400 ml-1.5">· {cays.length} cây · {matched.xuong ? (XUONG_LABEL[matched.xuong] ?? matched.xuong) : "—"}</span>
+                              </div>
+                              <div className="flex gap-2 flex-shrink-0">
+                                <button type="button" onClick={selectAll}
+                                  className="text-[10px] text-emerald-600 hover:underline">Chọn tất</button>
+                                {selectedVaiCayIdxs.length > 0 && (
+                                  <button type="button" onClick={clearAll}
+                                    className="text-[10px] text-slate-400 hover:underline">Bỏ chọn</button>
+                                )}
+                              </div>
                             </div>
-                            <div className="divide-y divide-slate-100">
-                              {cays.map((c, i) => (
-                                <div key={i} className="flex items-center justify-between px-3 py-1 text-xs">
-                                  <span className="text-slate-500">Cây #{i + 1}</span>
-                                  <span className={`font-semibold ${c.soMet <= 0 ? "text-red-500" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
-                                    {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
-                                  </span>
-                                </div>
-                              ))}
+                            <div className="divide-y divide-slate-100 max-h-52 overflow-y-auto">
+                              {cays.map((c, i) => {
+                                const checked = selectedVaiCayIdxs.includes(i);
+                                return (
+                                  <label key={i}
+                                    className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition ${checked ? "bg-emerald-50" : "hover:bg-slate-50"}`}>
+                                    <div className="flex items-center gap-2">
+                                      <input type="checkbox" checked={checked} onChange={() => toggleCay(i)}
+                                        className="accent-emerald-600 w-3.5 h-3.5" />
+                                      <span className={`font-medium ${checked ? "text-emerald-700" : "text-slate-500"}`}>Cây #{i + 1}</span>
+                                    </div>
+                                    <span className={`font-semibold ${c.soMet <= 0 ? "text-red-500" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                                      {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
+                                    </span>
+                                  </label>
+                                );
+                              })}
                             </div>
                             <div className="bg-slate-50 px-3 py-1.5 flex justify-between border-t border-slate-100">
-                              <span className="text-xs text-slate-500">Tổng tồn:</span>
-                              <span className={`text-xs font-bold ${matched.soMet <= 0 ? "text-red-600" : "text-slate-700"}`}>
-                                {matched.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
-                              </span>
+                              {selectedVaiCayIdxs.length > 0 ? (
+                                <>
+                                  <span className="text-xs text-emerald-600 font-semibold">✓ Đã chọn {selectedVaiCayIdxs.length} cây · {selectedTotal.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}</span>
+                                  <span className="text-xs text-slate-400">→ Số cây cắt: <strong className="text-slate-700">{selectedVaiCayIdxs.length}</strong></span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-xs text-slate-400">Tổng tồn: <strong className="text-slate-600">{matched.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}</strong></span>
+                                  <span className="text-xs text-slate-400">Tick cây để chọn</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
