@@ -497,8 +497,16 @@ export default function SanXuatPage() {
   };
 
   // Toggle "Đã cắt" cho lô 1 cây — xoá cây tương ứng khỏi tồn kho vải
-  const toggleDaCat = async (lo: LoCat) => {
+  const toggleDaCat = (lo: LoCat) => {
     const newVal = !lo.daCat;
+    // Optimistic update ngay lập tức
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, daCat: newVal } : l));
+    // Fire-and-forget PATCH loCat
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daCat: newVal }),
+    }).catch(() => fetchData());
+    // Xoá cây khỏi tồn kho vải (background, không block UI)
     if (newVal && lo.maVai) {
       const matchedVai = vaiTons.find(v => v.maVai === lo.maVai);
       if (matchedVai && matchedVai.cayData) {
@@ -506,48 +514,46 @@ export default function SanXuatPage() {
           const cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(matchedVai.cayData);
           const newCays = cays.filter(c => !(c.lotId === lo.id));
           if (newCays.length < cays.length) {
-            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+            setVaiTons(prev => prev.map(v => v.id === matchedVai.id ? { ...v, cayData: JSON.stringify(newCays) } : v));
+            fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ cayData: newCays }),
-            });
-            fetchVaiTon();
+            }).catch(() => fetchVaiTon());
           }
         } catch { /* ignore */ }
       }
     }
-    await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ daCat: newVal }),
-    });
-    fetchData();
   };
 
   // Toggle "Đã cắt" cho từng cây trong lô nhiều cây
-  const toggleCayDaCat = async (lo: LoCat, ci: number) => {
+  const toggleCayDaCat = (lo: LoCat, ci: number) => {
     if (!lo.cayData) return;
     try {
       const parsed: (Partial<CayRow> & { lotId?: string; lotCayIdx?: number })[] = JSON.parse(lo.cayData);
       const newDaCat = !parsed[ci]?.daCat;
       parsed[ci] = { ...parsed[ci], daCat: newDaCat };
+      const newCayData = JSON.stringify(parsed);
+      // Optimistic update ngay lập tức
+      setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData } : l));
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newCayData }),
+      }).catch(() => fetchData());
+      // Xoá cây khỏi tồn kho vải (background)
       if (newDaCat && lo.maVai) {
         const matchedVai = vaiTons.find(v => v.maVai === lo.maVai);
         if (matchedVai && matchedVai.cayData) {
           const vaiCays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(matchedVai.cayData);
           const newVaiCays = vaiCays.filter(c => !(c.lotId === lo.id && c.lotCayIdx === ci));
           if (newVaiCays.length < vaiCays.length) {
-            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+            setVaiTons(prev => prev.map(v => v.id === matchedVai.id ? { ...v, cayData: JSON.stringify(newVaiCays) } : v));
+            fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ cayData: newVaiCays }),
-            });
-            fetchVaiTon();
+            }).catch(() => fetchVaiTon());
           }
         }
       }
-      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cayData: JSON.stringify(parsed) }),
-      });
-      fetchData();
     } catch { /* ignore */ }
   };
 
