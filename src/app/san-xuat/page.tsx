@@ -1000,6 +1000,17 @@ export default function SanXuatPage() {
                 const hasCay = lo.soCay > 1 && lo.cayData;
                 type CayParsed = { soY: string; soM: string; soLaTT: string; hangThucTe?: number; mauGiat?: string; ghiChuMay?: string; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; daCat?: boolean; trangThai?: string };
                 const cayParsed: CayParsed[] = hasCay ? (() => { try { return JSON.parse(lo.cayData!); } catch { return []; } })() : [];
+                // Tổng Thiếu từ per-cây (dùng cho multi-cây khi lo.soLuongThieu chưa có)
+                const cayThieuAgg: number | null = (() => {
+                  if (!hasCay || cayParsed.length === 0) return null;
+                  const anyHTFilled = cayParsed.some(c => c.hangThucTe != null);
+                  if (!anyHTFilled) return null;
+                  return cayParsed.reduce((s, c) => {
+                    const laTT = c.soLaTT !== "" && c.soLaTT != null ? Number(c.soLaTT) : null;
+                    const sp = laTT != null && lo.tongSize != null ? laTT * lo.tongSize : 0;
+                    return s + (sp - (c.hangThucTe ?? 0));
+                  }, 0);
+                })();
                 const isExpanded = expandedRows.has(lo.id);
                 return (
                   <>
@@ -1060,9 +1071,11 @@ export default function SanXuatPage() {
                     </td>
                     {/* Thiếu — ngay sau Lá TT */}
                     <td className="px-3 py-2.5 text-right">
-                      {lo.soSanPham != null && lo.hangThucTe != null
-                        ? <span className={thieu > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}>{thieu > 0 ? thieu.toLocaleString() : "0"}</span>
-                        : <span className="text-slate-300">—</span>}
+                      {(() => {
+                        const val = cayThieuAgg ?? (lo.soSanPham != null && lo.hangThucTe != null ? thieu : null);
+                        if (val == null) return <span className="text-slate-300">—</span>;
+                        return <span className={val > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}>{val > 0 ? val.toLocaleString() : "0"}</span>;
+                      })()}
                     </td>
                     {/* Ghi chú may — chỉ hiện cho lô 1 cây; lô nhiều cây dùng per-cây */}
                     <td className="px-1.5 py-1 max-w-[150px]">
