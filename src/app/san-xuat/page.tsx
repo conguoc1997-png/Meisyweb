@@ -337,7 +337,21 @@ export default function SanXuatPage() {
     } else {
       setCayRows([{ soY: lo.soY != null ? String(lo.soY) : "", soM: lo.soM != null ? String(lo.soM) : "", soLaTT: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "", hangThucTe: lo.hangThucTe != null ? String(lo.hangThucTe) : "", mauGiat: lo.mauGiat ?? "", ghiChuMay: lo.ghiChuMay ?? "", hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, daCat: lo.daCat, trangThai: (lo.trangThai === "da_nhap" || lo.trangThai === "da_xuat") ? "da_nhap" : "chua_nhap" }]);
     }
-    setSelectedVaiCayIdxs([]);
+    // Pre-load cây đã chọn từ tồn kho vải
+    if (lo.maVai) {
+      const matchedVai = vaiTons.find(v => v.maVai === lo.maVai);
+      if (matchedVai?.cayData) {
+        try {
+          const vCays: { soMet: number; cut?: boolean; lotId?: string }[] = JSON.parse(matchedVai.cayData);
+          const preSelected = vCays.map((c, i) => c.lotId === lo.id ? i : -1).filter(i => i >= 0);
+          setSelectedVaiCayIdxs(preSelected);
+        } catch { setSelectedVaiCayIdxs([]); }
+      } else {
+        setSelectedVaiCayIdxs([]);
+      }
+    } else {
+      setSelectedVaiCayIdxs([]);
+    }
     setModalEdit(lo);
   };
 
@@ -365,23 +379,42 @@ export default function SanXuatPage() {
       if (!res.ok) throw new Error(resJson.error);
       const savedId: string | undefined = resJson.id;
 
-      // Trừ tồn kho vải + đánh dấu lotId/lotCayIdx để xoá đúng cây sau này
-      if (!modalEdit && savedId && selectedVaiCayIdxs.length > 0 && form.maVai) {
+      // Cập nhật tồn kho vải
+      if (form.maVai) {
         const matchedVai = vaiTons.find(v => v.maVai === form.maVai);
         if (matchedVai) {
-          let cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
-          if (matchedVai.cayData) { try { cays = JSON.parse(matchedVai.cayData); } catch {} }
-          if (cays.length === 0) cays = [{ soMet: matchedVai.soMet }];
-          const newCays = cays.map((c, i) => {
-            const selIdx = selectedVaiCayIdxs.indexOf(i);
-            if (selIdx === -1) return c;
-            const metersUsed = numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0);
-            return { soMet: Math.max(0, c.soMet - metersUsed), cut: true, lotId: savedId, lotCayIdx: selIdx };
-          });
+          let vCays: { soMet: number; soMetUsed?: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
+          if (matchedVai.cayData) { try { vCays = JSON.parse(matchedVai.cayData); } catch {} }
+          if (vCays.length === 0) vCays = [{ soMet: matchedVai.soMet }];
+
+          // Nếu SỬA: restore các cây cũ của lô này trước
+          if (modalEdit) {
+            vCays = vCays.map(c => {
+              if (c.lotId !== modalEdit.id) return c;
+              const { cut: _c, lotId: _l, lotCayIdx: _lci, soMetUsed, ...rest } = c;
+              void _c; void _l; void _lci;
+              let restoreM = soMetUsed ?? 0;
+              if (!restoreM && modalEdit.cayData) {
+                try { restoreM = Number((JSON.parse(modalEdit.cayData))[c.lotCayIdx ?? 0]?.soM) || 0; } catch {}
+              }
+              if (!restoreM && modalEdit.soCay === 1) restoreM = modalEdit.soM ?? 0;
+              return { ...rest, soMet: c.soMet + restoreM };
+            });
+          }
+
+          // Đánh dấu cây mới được chọn
+          if (selectedVaiCayIdxs.length > 0 && savedId) {
+            vCays = vCays.map((c, i) => {
+              const selIdx = selectedVaiCayIdxs.indexOf(i);
+              if (selIdx === -1) return c;
+              const metersUsed = numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0);
+              return { ...c, soMet: Math.max(0, c.soMet - metersUsed), soMetUsed: metersUsed, cut: true, lotId: savedId, lotCayIdx: selIdx };
+            });
+          }
+
           await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cayData: newCays }),
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cayData: vCays }),
           });
           fetchVaiTon();
         }
@@ -514,13 +547,13 @@ export default function SanXuatPage() {
   const hoantacVaiCay = async (vai: VaiTon, cayIdx: number) => {
     if (!vai.cayData) return;
     try {
-      const cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(vai.cayData);
+      const cays: { soMet: number; soMetUsed?: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(vai.cayData);
       const cay = cays[cayIdx];
       if (!cay || !cay.cut) return;
       if (!confirm(`Hoàn tác cây #${cayIdx + 1}? Số mét sẽ được khôi phục vào kho vải.`)) return;
-      // Tìm số mét gốc từ lô cắt liên kết
-      let originalSoM = 0;
-      if (cay.lotId) {
+      // Ưu tiên soMetUsed, fallback lookup lô cắt
+      let originalSoM = cay.soMetUsed ?? 0;
+      if (!originalSoM && cay.lotId) {
         const linkedLo = [...losCat, ...allLoCat].find(l => l.id === cay.lotId);
         if (linkedLo) {
           if (linkedLo.soCay > 1 && linkedLo.cayData) {
