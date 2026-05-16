@@ -510,6 +510,44 @@ export default function SanXuatPage() {
     } catch { /* ignore */ }
   };
 
+  // Hoàn tác cây đã cắt → khôi phục số mét vào kho vải
+  const hoantacVaiCay = async (vai: VaiTon, cayIdx: number) => {
+    if (!vai.cayData) return;
+    try {
+      const cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = JSON.parse(vai.cayData);
+      const cay = cays[cayIdx];
+      if (!cay || !cay.cut) return;
+      if (!confirm(`Hoàn tác cây #${cayIdx + 1}? Số mét sẽ được khôi phục vào kho vải.`)) return;
+      // Tìm số mét gốc từ lô cắt liên kết
+      let originalSoM = 0;
+      if (cay.lotId) {
+        const linkedLo = [...losCat, ...allLoCat].find(l => l.id === cay.lotId);
+        if (linkedLo) {
+          if (linkedLo.soCay > 1 && linkedLo.cayData) {
+            try {
+              const loCays = JSON.parse(linkedLo.cayData);
+              originalSoM = Number(loCays[cay.lotCayIdx ?? 0]?.soM) || 0;
+            } catch { /* ignore */ }
+          } else {
+            originalSoM = linkedLo.soM ?? 0;
+          }
+        }
+      }
+      const newCays = cays.map((c, i) => {
+        if (i !== cayIdx) return c;
+        const { cut: _cut, lotId: _lotId, lotCayIdx: _lotCayIdx, ...rest } = c;
+        void _cut; void _lotId; void _lotCayIdx;
+        return { ...rest, soMet: c.soMet + originalSoM };
+      });
+      setVaiTons(prev => prev.map(v => v.id === vai.id ? { ...v, cayData: JSON.stringify(newCays) } : v));
+      await fetch(`/api/san-xuat/vai-ton/${vai.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newCays }),
+      });
+      fetchVaiTon();
+    } catch { /* ignore */ }
+  };
+
   const deleteLoCat = (lo: LoCat) => {
     setOpenActionMenu(null);
     if (!confirm(`Xoá lô cắt "${lo.hangCat}" ngày ${formatDate(lo.ngay)}?`)) return;
@@ -1656,9 +1694,19 @@ export default function SanXuatPage() {
                                       </span>
                                       {isCut && <span className="text-[9px] bg-red-100 text-red-500 px-1 py-0.5 rounded font-semibold">đã cắt</span>}
                                     </div>
-                                    <span className={`font-semibold ${checked ? "text-emerald-700" : isCut ? "text-red-400" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
-                                      {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-semibold ${checked ? "text-emerald-700" : isCut ? "text-red-400" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                                        {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
+                                      </span>
+                                      {isCut && (
+                                        <button type="button"
+                                          onClick={e => { e.preventDefault(); hoantacVaiCay(matched, i); }}
+                                          className="text-[9px] bg-white border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 px-1.5 py-0.5 rounded transition font-semibold"
+                                          title="Hoàn tác — khôi phục số mét vào kho">
+                                          ↩ Hoàn tác
+                                        </button>
+                                      )}
+                                    </div>
                                   </label>
                                 );
                               })}
