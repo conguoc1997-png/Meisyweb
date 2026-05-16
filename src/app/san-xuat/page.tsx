@@ -1583,7 +1583,7 @@ export default function SanXuatPage() {
                       {(() => {
                         const matched = vaiTons.find(v => v.maVai === form.maVai);
                         if (!matched) return null;
-                        let cays: { soMet: number }[] = [];
+                        let cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
                         if (matched.cayData) { try { cays = JSON.parse(matched.cayData); } catch {} }
                         if (cays.length === 0) cays = [{ soMet: matched.soMet }];
 
@@ -1643,15 +1643,20 @@ export default function SanXuatPage() {
                             <div className="divide-y divide-slate-100 max-h-52 overflow-y-auto">
                               {cays.map((c, i) => {
                                 const checked = selectedVaiCayIdxs.includes(i);
+                                const isCut = !!c.cut;
                                 return (
                                   <label key={i}
-                                    className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition ${checked ? "bg-emerald-50" : "hover:bg-slate-50"}`}>
+                                    className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition
+                                      ${checked ? "bg-emerald-50" : isCut ? "bg-red-50 hover:bg-red-100" : "hover:bg-slate-50"}`}>
                                     <div className="flex items-center gap-2">
                                       <input type="checkbox" checked={checked} onChange={() => toggleCay(i)}
                                         className="accent-emerald-600 w-3.5 h-3.5" />
-                                      <span className={`font-medium ${checked ? "text-emerald-700" : "text-slate-500"}`}>Cây #{i + 1}</span>
+                                      <span className={`font-medium ${checked ? "text-emerald-700" : isCut ? "text-red-400" : "text-slate-500"}`}>
+                                        Cây #{i + 1}
+                                      </span>
+                                      {isCut && <span className="text-[9px] bg-red-100 text-red-500 px-1 py-0.5 rounded font-semibold">đã cắt</span>}
                                     </div>
-                                    <span className={`font-semibold ${c.soMet <= 0 ? "text-red-500" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                                    <span className={`font-semibold ${checked ? "text-emerald-700" : isCut ? "text-red-400" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
                                       {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
                                     </span>
                                   </label>
