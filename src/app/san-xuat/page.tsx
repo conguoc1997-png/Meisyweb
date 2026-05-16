@@ -512,7 +512,12 @@ export default function SanXuatPage() {
       const totalLaTT = parsed.reduce((s: number, c: { soLaTT?: string }) => s + (Number(c.soLaTT) || 0), 0);
       const soLaThucTe = totalLaTT > 0 ? Math.round(totalLaTT) : null;
       const soSanPham = (soLaThucTe != null && lo.tongSize != null) ? soLaThucTe * lo.tongSize : null;
-      const soLuongThieu = (soSanPham != null && lo.hangThucTe != null) ? soSanPham - lo.hangThucTe : null;
+      // Tính hangThucTe aggregate từ parsed (không dùng lo.hangThucTe có thể stale)
+      const anyHTFilled = parsed.some((c: { hangThucTe?: number | null }) => c.hangThucTe != null);
+      const hangThucTeAgg = anyHTFilled
+        ? parsed.reduce((s: number, c: { hangThucTe?: number | null }) => s + (c.hangThucTe != null ? c.hangThucTe : 0), 0)
+        : lo.hangThucTe;
+      const soLuongThieu = (soSanPham != null && hangThucTeAgg != null) ? soSanPham - hangThucTeAgg : null;
       const newCayData = JSON.stringify(parsed);
       // Optimistic update
       setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu } : l));
@@ -532,7 +537,9 @@ export default function SanXuatPage() {
       parsed[ci] = { ...parsed[ci], hangThucTe: htVal };
       const totalHT = parsed.reduce((s: number, c: { hangThucTe?: number | null }) =>
         s + (c.hangThucTe != null ? c.hangThucTe : 0), 0);
-      const hangThucTe = totalHT > 0 ? totalHT : null;
+      // Nếu ít nhất 1 cây đã nhập hangThucTe → aggregate = totalHT (kể cả 0)
+      const anyFilled = parsed.some((c: { hangThucTe?: number | null }) => c.hangThucTe != null);
+      const hangThucTe = anyFilled ? totalHT : null;
       const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
       const newCayData = JSON.stringify(parsed);
       setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, hangThucTe, soLuongThieu } : l));
