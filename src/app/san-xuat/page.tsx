@@ -1072,9 +1072,20 @@ export default function SanXuatPage() {
                     {/* Thiếu — ngay sau Lá TT */}
                     <td className="px-3 py-2.5 text-right">
                       {(() => {
-                        const val = cayThieuAgg ?? (lo.soSanPham != null && lo.hangThucTe != null ? thieu : null);
-                        if (val == null) return <span className="text-slate-300">—</span>;
-                        return <span className={val > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}>{val > 0 ? val.toLocaleString() : "0"}</span>;
+                        const val = cayThieuAgg ?? (lo.soSanPham != null ? lo.soSanPham - (lo.hangThucTe ?? 0) : null);
+                        const laChenh = lo.soLaThucTe != null && lo.soLa != null ? lo.soLaThucTe - lo.soLa : null;
+                        return (
+                          <>
+                            {val != null
+                              ? <span className={`block ${val > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}`}>{val > 0 ? val.toLocaleString() : "0"}</span>
+                              : <span className="text-slate-300">—</span>}
+                            {laChenh != null && (
+                              <span className={`text-[10px] px-1 py-0.5 rounded ${laChenh < -1.5 ? "bg-red-100 text-red-700" : laChenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                                {laChenh >= 0 ? `+${laChenh.toFixed(1)}` : laChenh.toFixed(1)} lá
+                              </span>
+                            )}
+                          </>
+                        );
                       })()}
                     </td>
                     {/* Ghi chú may — chỉ hiện cho lô 1 cây; lô nhiều cây dùng per-cây */}
