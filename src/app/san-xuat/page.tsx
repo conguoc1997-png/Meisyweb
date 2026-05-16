@@ -1654,9 +1654,12 @@ export default function SanXuatPage() {
                       {(() => {
                         const matched = vaiTons.find(v => v.maVai === form.maVai);
                         if (!matched) return null;
-                        let cays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
+                        let cays: { soMet: number; soMetUsed?: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
                         if (matched.cayData) { try { cays = JSON.parse(matched.cayData); } catch {} }
                         if (cays.length === 0) cays = [{ soMet: matched.soMet }];
+
+                        // Lấy soM thực tế của cây: cây đã cắt dùng soMetUsed, còn lại dùng soMet
+                        const getCaySoM = (c: typeof cays[0]) => c.soMetUsed ?? c.soMet;
 
                         const toggleCay = (ci: number) => {
                           const next = selectedVaiCayIdxs.includes(ci)
@@ -1664,15 +1667,17 @@ export default function SanXuatPage() {
                             : [...selectedVaiCayIdxs, ci].sort((a, b) => a - b);
                           setSelectedVaiCayIdxs(next);
                           const n = Math.max(1, next.length);
-                          setForm(f => ({ ...f, soCay: String(n) }));
-                          setCayRows(next.length > 0
+                          const newRows = next.length > 0
                             ? next.map(idx => ({
-                                soY: "", soM: String(cays[idx]?.soMet ?? ""),
+                                soY: "", soM: String(getCaySoM(cays[idx]) || ""),
                                 soLaTT: "", hangThucTe: "", mauGiat: "", ghiChuMay: "",
                                 hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
                               }))
-                            : [emptyCayRow()]
-                          );
+                            : [emptyCayRow()];
+                          setCayRows(newRows);
+                          // Sync form.soM khi 1 cây
+                          const soMVal = n === 1 && next.length === 1 ? String(getCaySoM(cays[next[0]]) || "") : "";
+                          setForm(f => ({ ...f, soCay: String(n), ...(n === 1 ? { soM: soMVal } : {}) }));
                         };
 
                         const selectAll = () => {
@@ -1680,7 +1685,7 @@ export default function SanXuatPage() {
                           setSelectedVaiCayIdxs(all);
                           setForm(f => ({ ...f, soCay: String(all.length) }));
                           setCayRows(cays.map(c => ({
-                            soY: "", soM: String(c.soMet),
+                            soY: "", soM: String(getCaySoM(c) || ""),
                             soLaTT: "", hangThucTe: "", mauGiat: "", ghiChuMay: "",
                             hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
                           })));
@@ -1692,7 +1697,7 @@ export default function SanXuatPage() {
                           setCayRows([emptyCayRow()]);
                         };
 
-                        const selectedTotal = selectedVaiCayIdxs.reduce((s, i) => s + (cays[i]?.soMet ?? 0), 0);
+                        const selectedTotal = selectedVaiCayIdxs.reduce((s, i) => s + getCaySoM(cays[i] ?? { soMet: 0 }), 0);
 
                         return (
                           <div className="mt-2 border border-emerald-200 rounded-lg overflow-hidden">
