@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 type VaiTon = {
@@ -131,6 +131,7 @@ export default function SanXuatPage() {
   const [editingCayNhanVe, setEditingCayNhanVe] = useState<{ id: string; ci: number; val: string } | null>(null);
   const [selectedVaiCayIdxs, setSelectedVaiCayIdxs] = useState<number[]>([]);
   const [editingCayMau, setEditingCayMau] = useState<{ id: string; ci: number } | null>(null);
+  const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
 
   // ── Size picker ──
   const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL"];
@@ -269,6 +270,16 @@ export default function SanXuatPage() {
 
   useEffect(() => { fetchData(); fetchHoaDonTon(); fetchAllForBalance(); }, [filterThang, filterXuong, filterTrangThai]);
   useEffect(() => { fetchVaiTon(); }, []);
+  // Close action menu when clicking outside
+  useEffect(() => {
+    if (!openActionMenu) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-action-menu]")) setOpenActionMenu(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openActionMenu]);
 
   // Global running balances
   const calcUsed = (field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") =>
@@ -497,6 +508,14 @@ export default function SanXuatPage() {
         body: JSON.stringify({ cayData: newCayData, hangThucTe, soLuongThieu }),
       }).catch(() => fetchData());
     } catch { /* ignore */ }
+  };
+
+  const deleteLoCat = (lo: LoCat) => {
+    setOpenActionMenu(null);
+    if (!confirm(`Xoá lô cắt "${lo.hangCat}" ngày ${formatDate(lo.ngay)}?`)) return;
+    // Optimistic remove
+    setLosCat(prev => prev.filter(l => l.id !== lo.id));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, { method: "DELETE" }).catch(() => fetchData());
   };
 
   const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
@@ -1093,8 +1112,9 @@ export default function SanXuatPage() {
                         {XUONG_LABEL[lo.xuong] ?? lo.xuong}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 flex items-center gap-2">
                       <button onClick={() => openEdit(lo)} className="text-rose-500 hover:underline">Sửa</button>
+                      <button onClick={() => deleteLoCat(lo)} className="text-slate-300 hover:text-red-500 transition" title="Xoá lô cắt"><Trash2 size={13} /></button>
                     </td>
                   </tr>
                   {/* Expanded cây rows */}
