@@ -840,7 +840,8 @@ export default function SanXuatPage() {
                     const hasCayData = v.soCay > 1 && v.cayData;
                     const isVaiExpanded = expandedVaiRows.has(v.id);
                     let cayDataParsed: { soMet: number; cut?: boolean }[] = [];
-                    if (hasCayData) { try { cayDataParsed = JSON.parse(v.cayData!); } catch {} }
+                    // Parse cayData for ALL vải (not just soCay>1) so cut status shows for single-cây
+                    if (v.cayData) { try { cayDataParsed = JSON.parse(v.cayData!); } catch {} }
                     return (
                       <>
                       <tr key={v.id} className="hover:bg-slate-50">
@@ -874,18 +875,21 @@ export default function SanXuatPage() {
                             const cutCount = cayDataParsed.filter((c: { cut?: boolean }) => c.cut).length;
                             const remainingCay = totalCay - cutCount;
                             const hasAnyCut = cutCount > 0;
+                            const cayLabel = hasAnyCut ? (
+                              <><span className="line-through opacity-50 mr-0.5">{totalCay}</span><span>{remainingCay} cây</span></>
+                            ) : (
+                              <>{totalCay} cây</>
+                            );
                             return hasCayData ? (
                               <button onClick={() => toggleVaiExpand(v.id)}
                                 className="flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto">
                                 {isVaiExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-                                {hasAnyCut ? (
-                                  <><span className="text-rose-400 line-through mr-0.5">{totalCay}</span><span>{remainingCay} cây</span></>
-                                ) : (
-                                  <>{totalCay} cây</>
-                                )}
+                                {cayLabel}
                               </button>
                             ) : (
-                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{totalCay} cây</span>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${hasAnyCut ? "text-rose-500 bg-rose-50" : "text-slate-600 bg-slate-100"}`}>
+                                {cayLabel}
+                              </span>
                             );
                           })()}
                         </td>
