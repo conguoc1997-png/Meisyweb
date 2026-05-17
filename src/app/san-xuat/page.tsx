@@ -935,18 +935,13 @@ export default function SanXuatPage() {
           <option value="">Tất cả tháng</option>
           {thangOptions.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
         </select>
-        <input
-          list="filter-xuong-list"
-          value={filterXuong}
-          onChange={e => setFilterXuong(e.target.value)}
-          placeholder="Lọc xưởng..."
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200 w-36"
-        />
-        <datalist id="filter-xuong-list">
-          {[...new Set(losCat.map(l => l.xuong))].map(x => (
+        <select value={filterXuong} onChange={e => setFilterXuong(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
+          <option value="">Tất cả xưởng</option>
+          {[...new Set(losCat.map(l => l.xuong).filter(Boolean))].map(x => (
             <option key={x} value={x}>{XUONG_LABEL[x] ?? x}</option>
           ))}
-        </datalist>
+        </select>
         <select value={filterTrangThai} onChange={e => setFilterTrangThai(e.target.value)}
           className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
           <option value="">Tất cả trạng thái</option>
