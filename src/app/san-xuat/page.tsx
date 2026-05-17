@@ -796,7 +796,9 @@ export default function SanXuatPage() {
             if (!byXuong[key]) byXuong[key] = { soMet: 0, donVi: v.donVi, count: 0, soCay: 0 };
             byXuong[key].soMet += v.soMet;
             byXuong[key].count += 1;
-            byXuong[key].soCay += v.soCay ?? 1;
+            const vCayParsed = (() => { try { return v.cayData ? JSON.parse(v.cayData) : []; } catch { return []; } })();
+            const uncutCount = vCayParsed.length > 0 ? vCayParsed.filter((c: { cut?: boolean }) => !c.cut).length : (v.soCay ?? 1);
+            byXuong[key].soCay += uncutCount;
           });
           return (
             <div className="px-4 py-2.5 border-b border-slate-100 flex flex-wrap gap-3">
@@ -867,17 +869,25 @@ export default function SanXuatPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {v.soCay > 0 && (
-                            hasCayData ? (
+                          {v.soCay > 0 && (() => {
+                            const totalCay = v.soCay;
+                            const cutCount = cayDataParsed.filter((c: { cut?: boolean }) => c.cut).length;
+                            const remainingCay = totalCay - cutCount;
+                            const hasAnyCut = cutCount > 0;
+                            return hasCayData ? (
                               <button onClick={() => toggleVaiExpand(v.id)}
                                 className="flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto">
                                 {isVaiExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-                                {v.soCay} cây
+                                {hasAnyCut ? (
+                                  <><span className="text-rose-400 line-through mr-0.5">{totalCay}</span><span>{remainingCay} cây</span></>
+                                ) : (
+                                  <>{totalCay} cây</>
+                                )}
                               </button>
                             ) : (
-                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{v.soCay} cây</span>
-                            )
-                          )}
+                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{totalCay} cây</span>
+                            );
+                          })()}
                         </td>
                         <td className="px-3 py-2 text-right">
                           {editingVaiMet?.id === v.id ? (
