@@ -784,12 +784,13 @@ export default function SanXuatPage() {
 
         {showVaiTon && (() => {
           // Tổng hợp theo xưởng
-          const byXuong: Record<string, { soMet: number; donVi: string; count: number }> = {};
+          const byXuong: Record<string, { soMet: number; donVi: string; count: number; soCay: number }> = {};
           vaiTons.forEach(v => {
             const key = v.xuong || "__chua_chon__";
-            if (!byXuong[key]) byXuong[key] = { soMet: 0, donVi: v.donVi, count: 0 };
+            if (!byXuong[key]) byXuong[key] = { soMet: 0, donVi: v.donVi, count: 0, soCay: 0 };
             byXuong[key].soMet += v.soMet;
             byXuong[key].count += 1;
+            byXuong[key].soCay += v.soCay ?? 1;
           });
           return (
             <div className="px-4 py-2.5 border-b border-slate-100 flex flex-wrap gap-3">
@@ -800,7 +801,7 @@ export default function SanXuatPage() {
                   </span>
                   <span className="text-slate-400">·</span>
                   <span className="font-bold text-slate-700">{info.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} {info.donVi}</span>
-                  <span className="text-slate-400 font-normal">({info.count} loại)</span>
+                  <span className="text-slate-400 font-normal">({info.count} loại · {info.soCay} cây)</span>
                 </div>
               ))}
               {vaiTons.length === 0 && <span className="text-xs text-slate-400">Chưa có dữ liệu</span>}
