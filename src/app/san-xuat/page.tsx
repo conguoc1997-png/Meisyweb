@@ -96,6 +96,27 @@ export default function SanXuatPage() {
     }
   };
 
+  // Cộng số mét mới vào entry vải đã tồn tại
+  const congVaoVai = async (target: VaiTon) => {
+    if (savingVai) return;
+    setSavingVai(true);
+    try {
+      let existingCays: { soMet: number; cut?: boolean; lotId?: string; lotCayIdx?: number; soMetUsed?: number }[] = [];
+      if (target.cayData) { try { existingCays = JSON.parse(target.cayData); } catch {} }
+      if (existingCays.length === 0) existingCays = [{ soMet: target.soMet }];
+      const newCays = vaiCayRows.map(r => ({ soMet: Number(r.soMet) || 0 }));
+      const mergedCays = [...existingCays, ...newCays];
+      const newSoMet = mergedCays.reduce((s, c) => s + (c.soMet ?? 0), 0);
+      await fetch(`/api/san-xuat/vai-ton/${target.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: mergedCays, soMet: newSoMet, soCay: mergedCays.length }),
+      });
+      setModalVai(null); fetchVaiTon();
+    } finally {
+      setSavingVai(false);
+    }
+  };
+
   const deleteVai = async (id: string) => {
     if (!confirm("Xoá loại vải này?")) return;
     await fetch(`/api/san-xuat/vai-ton/${id}`, { method: "DELETE" });
@@ -1460,6 +1481,45 @@ export default function SanXuatPage() {
                 <input value={vaiForm.maVai} onChange={e => setVaiForm(f => ({ ...f, maVai: e.target.value }))}
                   className={inp} placeholder="VD: Vải cotton trắng, MV001..." autoFocus />
               </div>
+
+              {/* Hiển thị mã vải trùng để cộng vào */}
+              {modalVai === "new" && vaiForm.maVai.trim() && (() => {
+                const matches = vaiTons.filter(v => v.maVai.trim().toLowerCase() === vaiForm.maVai.trim().toLowerCase());
+                if (matches.length === 0) return null;
+                return (
+                  <div className="border border-amber-200 rounded-lg overflow-hidden bg-amber-50">
+                    <div className="px-3 py-2 bg-amber-100 border-b border-amber-200 flex items-center gap-2">
+                      <span className="text-[11px] font-semibold text-amber-700">⚠ Mã "{vaiForm.maVai}" đã tồn tại — chọn để cộng vào hoặc thêm mới bên dưới</span>
+                    </div>
+                    <div className="divide-y divide-amber-100">
+                      {matches.map(m => {
+                        let mCays: { soMet: number }[] = [];
+                        if (m.cayData) { try { mCays = JSON.parse(m.cayData); } catch {} }
+                        const newTotal = vaiCayRows.reduce((s, r) => s + (Number(r.soMet) || 0), 0);
+                        return (
+                          <div key={m.id} className="flex items-center justify-between px-3 py-2">
+                            <div className="text-xs">
+                              <span className="font-semibold text-slate-700">{m.maVai}</span>
+                              {m.mauSac && <span className="ml-1.5 text-slate-500">{m.mauSac}</span>}
+                              {m.xuong && <span className="ml-1.5 text-slate-400">· {XUONG_LABEL[m.xuong] ?? m.xuong}</span>}
+                              <div className="text-slate-400 mt-0.5">
+                                Tồn: <strong className="text-blue-700">{m.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {m.donVi}</strong>
+                                {mCays.length > 0 && <span className="ml-1">· {mCays.length} cây</span>}
+                                {newTotal > 0 && <span className="ml-1 text-emerald-600">→ cộng thêm {newTotal.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {m.donVi} = <strong>{(m.soMet + newTotal).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {m.donVi}</strong></span>}
+                              </div>
+                            </div>
+                            <button type="button" onClick={() => congVaoVai(m)}
+                              disabled={savingVai || newTotal <= 0}
+                              className="ml-2 flex-shrink-0 text-[11px] font-semibold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                              Cộng vào
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Bảng từng cây */}
               <div>
