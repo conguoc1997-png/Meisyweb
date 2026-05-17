@@ -24,7 +24,7 @@ type LoCat = {
   ghiChu: string | null;
 };
 
-const XUONG_LABEL: Record<string, string> = { meisy: "Meisy", dung_linh: "Dũng Linh" };
+const DEFAULT_XUONG = [{ key: "meisy", label: "Meisy" }, { key: "dung_linh", label: "Dũng Linh" }];
 const MAU_GIAT_OPTIONS = ["NHẠT", "ĐẬM", "VI SINH", "KHÓI", "CHÀM"];
 const MAU_GIAT_CLS: Record<string, string> = {
   "NHẠT":    "bg-sky-100 text-sky-700",
@@ -50,6 +50,17 @@ const inp = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:o
 const inpRo = "w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-500 select-none";
 
 export default function SanXuatPage() {
+  // ── Xưởng list (localStorage) ──
+  const [xuongList, setXuongListRaw] = useState<{ key: string; label: string }[]>(() => {
+    try { const s = localStorage.getItem("xuong_list"); return s ? JSON.parse(s) : DEFAULT_XUONG; } catch { return DEFAULT_XUONG; }
+  });
+  const [xuongAddInput, setXuongAddInput] = useState("");
+  const setXuongList = (list: { key: string; label: string }[]) => {
+    setXuongListRaw(list);
+    try { localStorage.setItem("xuong_list", JSON.stringify(list)); } catch {}
+  };
+  const XUONG_LABEL: Record<string, string> = Object.fromEntries(xuongList.map(x => [x.key, x.label]));
+
   // ── Vải tồn ──
   const [vaiTons, setVaiTons] = useState<VaiTon[]>([]);
   const [showVaiTon, setShowVaiTon] = useState(true);
@@ -838,8 +849,7 @@ export default function SanXuatPage() {
                               onBlur={() => setEditingVaiXuong(null)}
                               className="border border-slate-300 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white">
                               <option value="">— Chưa chọn —</option>
-                              <option value="meisy">Meisy</option>
-                              <option value="dung_linh">Dũng Linh</option>
+                              {xuongList.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
                             </select>
                           ) : (
                             <button onClick={() => setEditingVaiXuong(v.id)} className="hover:opacity-80 transition" title="Click để chọn xưởng">
@@ -1506,9 +1516,47 @@ export default function SanXuatPage() {
                     onChange={e => setVaiForm(f => ({ ...f, xuong: e.target.value }))}
                     className={inp} placeholder="Nhập hoặc chọn..." />
                   <datalist id="vai-xuong-list">
-                    <option value="meisy">Meisy</option>
-                    <option value="dung_linh">Dũng Linh</option>
+                    {xuongList.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
                   </datalist>
+                  {/* Quản lý xưởng */}
+                  <div className="mt-2 border border-slate-100 rounded-lg p-2 bg-slate-50">
+                    <p className="text-[10px] text-slate-400 mb-1.5 font-medium">Quản lý danh sách xưởng</p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {xuongList.map(x => (
+                        <span key={x.key} className="flex items-center gap-1 text-xs bg-white border border-slate-200 rounded-full px-2 py-0.5">
+                          {x.label}
+                          <button type="button" onClick={() => setXuongList(xuongList.filter(i => i.key !== x.key))}
+                            className="text-slate-300 hover:text-red-500 transition ml-0.5"><X size={10} /></button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={xuongAddInput}
+                        onChange={e => setXuongAddInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && xuongAddInput.trim()) {
+                            e.preventDefault();
+                            const key = xuongAddInput.trim().toLowerCase().replace(/\s+/g, "_");
+                            if (!xuongList.find(x => x.key === key)) setXuongList([...xuongList, { key, label: xuongAddInput.trim() }]);
+                            setXuongAddInput("");
+                          }
+                        }}
+                        placeholder="Tên xưởng mới..."
+                        className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white" />
+                      <button type="button"
+                        onClick={() => {
+                          if (!xuongAddInput.trim()) return;
+                          const key = xuongAddInput.trim().toLowerCase().replace(/\s+/g, "_");
+                          if (!xuongList.find(x => x.key === key)) setXuongList([...xuongList, { key, label: xuongAddInput.trim() }]);
+                          setXuongAddInput("");
+                        }}
+                        className="px-2 py-1 bg-rose-500 text-white rounded text-xs hover:bg-rose-600 transition">
+                        <Plus size={11} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div>
@@ -1633,8 +1681,7 @@ export default function SanXuatPage() {
                       <label className="text-xs text-slate-600 mb-1 block">Xưởng cắt</label>
                       <select value={form.xuong} onChange={sf("xuong")} className={inp}>
                         <option value="">— Chọn xưởng —</option>
-                        <option value="meisy">Meisy</option>
-                        <option value="dung_linh">Dũng Linh</option>
+                        {xuongList.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
                       </select>
                     </div>
                     <div>
