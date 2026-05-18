@@ -761,7 +761,7 @@ export default function SanXuatPage() {
             {x.label}
           </button>
         ))}
-        {filterXuong && <span className="text-[11px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
+        {filterXuong && <span className="text-[14px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
       </div>
 
       {/* Stats — 4 existing + 2 HoaDonTon */}
@@ -789,7 +789,7 @@ export default function SanXuatPage() {
         <div className={`rounded-xl p-4 border relative ${mayDuTong < 0 ? "bg-red-50 border-red-200" : "bg-purple-50 border-purple-200"}`}>
           <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
           <p className={`text-2xl font-bold ${mayDuTong < 0 ? "text-red-600" : "text-purple-700"}`}>{mayDuTong.toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.may.toLocaleString()}</p>
+          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.may.toLocaleString()}</p>
           <div className="absolute top-3 right-3 flex gap-1.5">
             <button onClick={() => openHistory("may")} className="text-slate-300 hover:text-purple-500 transition" title="Lịch sử"><History size={13} /></button>
             <button onClick={() => { setEditTonVal(String(hoaDonTon.may)); setEditTonGhiChu(""); setModalTon("may"); }} className="text-slate-300 hover:text-purple-600 transition" title="Sửa"><Pencil size={13} /></button>
@@ -800,7 +800,7 @@ export default function SanXuatPage() {
         <div className={`rounded-xl p-4 border relative ${viSinhDuTong < 0 ? "bg-red-50 border-red-200" : "bg-teal-50 border-teal-200"}`}>
           <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
           <p className={`text-2xl font-bold ${viSinhDuTong < 0 ? "text-red-600" : "text-teal-700"}`}>{viSinhDuTong.toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
+          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
           <div className="absolute top-3 right-3 flex gap-1.5">
             <button onClick={() => openHistory("giat_vi_sinh")} className="text-slate-300 hover:text-teal-500 transition" title="Lịch sử"><History size={13} /></button>
             <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_vi_sinh)); setEditTonGhiChu(""); setModalTon("giat_vi_sinh"); }} className="text-slate-300 hover:text-teal-600 transition" title="Sửa"><Pencil size={13} /></button>
@@ -811,7 +811,7 @@ export default function SanXuatPage() {
         <div className={`rounded-xl p-4 border relative ${mauDuTong < 0 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
           <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
           <p className={`text-2xl font-bold ${mauDuTong < 0 ? "text-red-600" : "text-blue-700"}`}>{mauDuTong.toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_mau.toLocaleString()}</p>
+          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_mau.toLocaleString()}</p>
           <div className="absolute top-3 right-3 flex gap-1.5">
             <button onClick={() => openHistory("giat_mau")} className="text-slate-300 hover:text-blue-500 transition" title="Lịch sử"><History size={13} /></button>
             <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_mau)); setEditTonGhiChu(""); setModalTon("giat_mau"); }} className="text-slate-300 hover:text-blue-600 transition" title="Sửa"><Pencil size={13} /></button>
@@ -985,17 +985,17 @@ export default function SanXuatPage() {
                       {hasCayData && isVaiExpanded && cayDataParsed.map((cay, ci) => (
                         <tr key={`${v.id}-vai-cay-${ci}`}
                           className={`border-l-2 ${cay.cut ? "bg-slate-100/80 border-slate-300 opacity-60" : "bg-emerald-50/60 border-emerald-300"}`}>
-                          <td className={`px-4 py-1.5 text-[11px] font-semibold ${cay.cut ? "text-slate-400 line-through" : "text-slate-500"}`}>
+                          <td className={`px-4 py-1.5 text-[14px] font-semibold ${cay.cut ? "text-slate-400 line-through" : "text-slate-500"}`}>
                             └ Cây #{ci + 1}{cay.cut && " ✂️"}
                           </td>
                           <td colSpan={2}></td>
-                          <td className="px-3 py-1.5 text-center text-[11px] text-slate-400">{ci + 1}</td>
+                          <td className="px-3 py-1.5 text-center text-[14px] text-slate-400">{ci + 1}</td>
                           <td className="px-3 py-1.5 text-right">
-                            <span className={`text-[11px] font-bold ${cay.cut ? "text-slate-400 line-through" : cay.soMet <= 0 ? "text-red-500" : cay.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                            <span className={`text-[14px] font-bold ${cay.cut ? "text-slate-400 line-through" : cay.soMet <= 0 ? "text-red-500" : cay.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
                               {cay.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
                             </span>
                           </td>
-                          <td className={`px-3 py-1.5 text-[11px] ${cay.cut ? "text-slate-400 line-through" : "text-slate-400"}`}>{v.donVi}</td>
+                          <td className={`px-3 py-1.5 text-[14px] ${cay.cut ? "text-slate-400 line-through" : "text-slate-400"}`}>{v.donVi}</td>
                           <td colSpan={2}></td>
                         </tr>
                       ))}
@@ -1048,7 +1048,7 @@ export default function SanXuatPage() {
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs whitespace-nowrap">
+          <table className="w-full text-[15px] whitespace-nowrap">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-2 py-2.5 w-6"></th>
@@ -1058,7 +1058,7 @@ export default function SanXuatPage() {
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá KH</th>
-                <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[11px]">Đã cắt</th>
+                <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[14px]">Đã cắt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá TT</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Thiếu</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ghi chú may</th>
@@ -1118,7 +1118,7 @@ export default function SanXuatPage() {
                     {/* Đã cắt */}
                     <td className="px-2 py-2.5 text-center">
                       {hasCay ? (
-                        <span className="text-[10px] text-slate-400">{cayParsed.filter(c => c.daCat).length}/{cayParsed.length}</span>
+                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.daCat).length}/{cayParsed.length}</span>
                       ) : (
                         <button onClick={() => toggleDaCat(lo)}
                           disabled={lo.soLaThucTe == null}
@@ -1171,7 +1171,7 @@ export default function SanXuatPage() {
                               ? <span className={`block ${val > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}`}>{val > 0 ? val.toLocaleString() : "0"}</span>
                               : <span className="text-slate-300">—</span>}
                             {laChenh != null && (
-                              <span className={`text-[10px] px-1 py-0.5 rounded ${laChenh < -1.5 ? "bg-red-100 text-red-700" : laChenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                              <span className={`text-[13px] px-1 py-0.5 rounded ${laChenh < -1.5 ? "bg-red-100 text-red-700" : laChenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
                                 {laChenh >= 0 ? `+${laChenh.toFixed(1)}` : laChenh.toFixed(1)} lá
                               </span>
                             )}
@@ -1223,7 +1223,7 @@ export default function SanXuatPage() {
                           title="Click để chọn màu giặt"
                         >
                           {lo.mauGiat
-                            ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${MAU_GIAT_CLS[lo.mauGiat] ?? "bg-slate-100 text-slate-600"}`}>{lo.mauGiat}</span>
+                            ? <span className={`px-2 py-0.5 rounded-full text-[13px] font-semibold ${MAU_GIAT_CLS[lo.mauGiat] ?? "bg-slate-100 text-slate-600"}`}>{lo.mauGiat}</span>
                             : <span className="text-slate-300 text-xs">— chọn</span>}
                         </button>
                       )}
@@ -1255,7 +1255,7 @@ export default function SanXuatPage() {
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       {hasCay ? (
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[13px] text-slate-400">
                           {cayParsed.filter(c => c.trangThai === "da_nhap").length}/{cayParsed.length} nhập
                         </span>
                       ) : (
@@ -1269,7 +1269,7 @@ export default function SanXuatPage() {
                     {/* HĐ May checkbox */}
                     <td className="px-3 py-2.5 text-center">
                       {hasCay ? (
-                        <span className="text-[10px] text-slate-400">{cayParsed.filter(c => c.hdMayDa).length}/{cayParsed.length}</span>
+                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdMayDa).length}/{cayParsed.length}</span>
                       ) : (
                         <button onClick={() => handleToggleHD(lo, "hdMayDa")}
                           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdMayDa ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 hover:border-purple-400"}`}>
@@ -1280,7 +1280,7 @@ export default function SanXuatPage() {
                     {/* Vi sinh checkbox */}
                     <td className="px-3 py-2.5 text-center">
                       {hasCay ? (
-                        <span className="text-[10px] text-slate-400">{cayParsed.filter(c => c.hdGiatViSinhDa).length}/{cayParsed.length}</span>
+                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdGiatViSinhDa).length}/{cayParsed.length}</span>
                       ) : (
                         <button onClick={() => handleToggleHD(lo, "hdGiatViSinhDa")}
                           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdGiatViSinhDa ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 hover:border-teal-400"}`}>
@@ -1291,7 +1291,7 @@ export default function SanXuatPage() {
                     {/* Màu checkbox */}
                     <td className="px-3 py-2.5 text-center">
                       {hasCay ? (
-                        <span className="text-[10px] text-slate-400">{cayParsed.filter(c => c.hdGiatMauDa).length}/{cayParsed.length}</span>
+                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdGiatMauDa).length}/{cayParsed.length}</span>
                       ) : (
                         <button onClick={() => handleToggleHD(lo, "hdGiatMauDa")}
                           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdGiatMauDa ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300 hover:border-blue-400"}`}>
@@ -1325,15 +1325,15 @@ export default function SanXuatPage() {
                         {/* col 2: Ngày — empty */}
                         <td></td>
                         {/* col 3: Hàng cắt — label */}
-                        <td className="px-3 py-1.5 text-[11px] text-slate-400 font-semibold">└ Cây #{ci + 1}</td>
+                        <td className="px-3 py-1.5 text-[14px] text-slate-400 font-semibold">└ Cây #{ci + 1}</td>
                         {/* col 4: Size — empty */}
                         <td></td>
                         {/* col 5: T.Size — empty */}
                         <td></td>
                         {/* col 6: Số M */}
-                        <td className="px-3 py-1.5 text-right text-[11px] text-slate-600">{Number(cay.soM) > 0 ? Number(cay.soM).toFixed(2) : "—"}</td>
+                        <td className="px-3 py-1.5 text-right text-[14px] text-slate-600">{Number(cay.soM) > 0 ? Number(cay.soM).toFixed(2) : "—"}</td>
                         {/* col 6: Lá KH */}
-                        <td className="px-3 py-1.5 text-right text-[11px] text-blue-600 font-semibold">{laKH != null ? laKH.toFixed(1) : "—"}</td>
+                        <td className="px-3 py-1.5 text-right text-[14px] text-blue-600 font-semibold">{laKH != null ? laKH.toFixed(1) : "—"}</td>
                         {/* col 7: Đã cắt per-cây */}
                         <td className="px-2 py-1.5 text-center">
                           <button onClick={() => toggleCayDaCat(lo, ci)}
@@ -1356,12 +1356,12 @@ export default function SanXuatPage() {
                                 if (e.key === "Enter") { e.preventDefault(); saveCayLaTT(lo, ci, editingCayLaTT.val); }
                                 if (e.key === "Escape") setEditingCayLaTT(null);
                               }}
-                              className="w-14 text-right border border-rose-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50"
+                              className="w-14 text-right border border-rose-300 rounded px-1 py-0.5 text-[14px] focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50"
                             />
                           ) : (
                             <button
                               onClick={() => setEditingCayLaTT({ id: lo.id, ci, val: cay.soLaTT ?? "" })}
-                              className="text-rose-600 font-semibold hover:bg-rose-50 rounded px-2 py-0.5 text-[11px] w-full text-right transition"
+                              className="text-rose-600 font-semibold hover:bg-rose-50 rounded px-2 py-0.5 text-[14px] w-full text-right transition"
                               title="Click để nhập lá thực tế"
                             >
                               {laTT != null ? laTT : <span className="text-slate-300 font-normal">—</span>}
@@ -1371,12 +1371,12 @@ export default function SanXuatPage() {
                         {/* col 9: Thiếu per-cây + chênh lệch lá */}
                         <td className="px-2 py-1.5 text-right">
                           {thieuCay != null && (
-                            <span className={`text-[11px] px-1.5 py-0.5 rounded block mb-0.5 ${thieuCay > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                            <span className={`text-[14px] px-1.5 py-0.5 rounded block mb-0.5 ${thieuCay > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
                               {thieuCay > 0 ? thieuCay.toLocaleString() : "0"}
                             </span>
                           )}
                           {chenh != null && (
-                            <span className={`text-[10px] px-1 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                            <span className={`text-[13px] px-1 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
                               {chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)} lá
                             </span>
                           )}
@@ -1393,12 +1393,12 @@ export default function SanXuatPage() {
                                 if (e.key === "Enter") saveCayField(lo, ci, "ghiChuMay", editingCayGhiChu.val);
                                 if (e.key === "Escape") setEditingCayGhiChu(null);
                               }}
-                              className="w-full border border-slate-300 rounded px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-slate-300 bg-white"
+                              className="w-full border border-slate-300 rounded px-2 py-0.5 text-[14px] focus:outline-none focus:ring-1 focus:ring-slate-300 bg-white"
                             />
                           ) : (
                             <button
                               onClick={() => setEditingCayGhiChu({ id: lo.id, ci, val: cay.ghiChuMay ?? "" })}
-                              className="text-slate-500 hover:bg-slate-100 rounded px-2 py-0.5 text-[11px] w-full text-left transition truncate block max-w-[140px]"
+                              className="text-slate-500 hover:bg-slate-100 rounded px-2 py-0.5 text-[14px] w-full text-left transition truncate block max-w-[140px]"
                               title={cay.ghiChuMay ?? "Click để nhập"}
                             >
                               {cay.ghiChuMay ?? <span className="text-slate-300">— nhập</span>}
@@ -1413,7 +1413,7 @@ export default function SanXuatPage() {
                               defaultValue={cay.mauGiat ?? ""}
                               onChange={e => saveCayField(lo, ci, "mauGiat", e.target.value)}
                               onBlur={() => setEditingCayMau(null)}
-                              className="border border-slate-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white"
+                              className="border border-slate-300 rounded px-1 py-0.5 text-[14px] focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white"
                             >
                               <option value="">—</option>
                               {MAU_GIAT_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -1425,13 +1425,13 @@ export default function SanXuatPage() {
                               title="Click để chọn màu giặt"
                             >
                               {cay.mauGiat
-                                ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${MAU_GIAT_CLS[cay.mauGiat] ?? "bg-slate-100 text-slate-600"}`}>{cay.mauGiat}</span>
-                                : <span className="text-slate-300 text-[11px]">— chọn</span>}
+                                ? <span className={`px-2 py-0.5 rounded-full text-[13px] font-semibold ${MAU_GIAT_CLS[cay.mauGiat] ?? "bg-slate-100 text-slate-600"}`}>{cay.mauGiat}</span>
+                                : <span className="text-slate-300 text-[14px]">— chọn</span>}
                             </button>
                           )}
                         </td>
                         {/* col 11: Số SP per cây */}
-                        <td className="px-3 py-1.5 text-right text-[11px] font-bold text-slate-700 bg-orange-50 hidden">{spPerCay != null ? spPerCay.toLocaleString() : "—"}</td>
+                        <td className="px-3 py-1.5 text-right text-[14px] font-bold text-slate-700 bg-orange-50 hidden">{spPerCay != null ? spPerCay.toLocaleString() : "—"}</td>
                         {/* col 12: Nhận về per-cây — inline edit */}
                         <td className="px-1 py-1 text-right">
                           {editingCayNhanVe?.id === lo.id && editingCayNhanVe.ci === ci ? (
@@ -1445,12 +1445,12 @@ export default function SanXuatPage() {
                                 if (e.key === "Enter") { e.preventDefault(); saveCayNhanVe(lo, ci, editingCayNhanVe.val); }
                                 if (e.key === "Escape") setEditingCayNhanVe(null);
                               }}
-                              className="w-14 text-right border border-green-300 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-green-300 bg-green-50"
+                              className="w-14 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] focus:outline-none focus:ring-1 focus:ring-green-300 bg-green-50"
                             />
                           ) : (
                             <button
                               onClick={() => setEditingCayNhanVe({ id: lo.id, ci, val: nhanVeCay != null ? String(nhanVeCay) : "" })}
-                              className="text-green-700 font-semibold hover:bg-green-50 rounded px-2 py-0.5 text-[11px] w-full text-right transition"
+                              className="text-green-700 font-semibold hover:bg-green-50 rounded px-2 py-0.5 text-[14px] w-full text-right transition"
                               title="Click để nhập số nhận về"
                             >
                               {nhanVeCay != null ? nhanVeCay.toLocaleString() : <span className="text-slate-300 font-normal">—</span>}
@@ -1460,7 +1460,7 @@ export default function SanXuatPage() {
                         {/* col 14: Trạng thái per-cây toggle */}
                         <td className="px-2 py-1.5 text-center">
                           <button onClick={() => toggleCayTrangThai(lo, ci)}
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition ${cay.trangThai === "da_nhap" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[13px] font-medium transition ${cay.trangThai === "da_nhap" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                             {cay.trangThai === "da_nhap" ? <CheckCircle size={8} /> : <Clock size={8} />}
                             {cay.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
                           </button>
@@ -1532,7 +1532,7 @@ export default function SanXuatPage() {
                 return (
                   <div className="border border-amber-200 rounded-lg overflow-hidden bg-amber-50">
                     <div className="px-3 py-2 bg-amber-100 border-b border-amber-200 flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-amber-700">⚠ Mã "{vaiForm.maVai}" đã tồn tại — chọn để cộng vào hoặc thêm mới bên dưới</span>
+                      <span className="text-[14px] font-semibold text-amber-700">⚠ Mã "{vaiForm.maVai}" đã tồn tại — chọn để cộng vào hoặc thêm mới bên dưới</span>
                     </div>
                     <div className="divide-y divide-amber-100">
                       {matches.map(m => {
@@ -1553,7 +1553,7 @@ export default function SanXuatPage() {
                             </div>
                             <button type="button" onClick={() => congVaoVai(m)}
                               disabled={savingVai || newTotal <= 0}
-                              className="ml-2 flex-shrink-0 text-[11px] font-semibold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                              className="ml-2 flex-shrink-0 text-[14px] font-semibold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
                               Cộng vào
                             </button>
                           </div>
@@ -1639,7 +1639,7 @@ export default function SanXuatPage() {
                   </datalist>
                   {/* Quản lý xưởng */}
                   <div className="mt-2 border border-slate-100 rounded-lg p-2 bg-slate-50">
-                    <p className="text-[10px] text-slate-400 mb-1.5 font-medium">Quản lý danh sách xưởng</p>
+                    <p className="text-[13px] text-slate-400 mb-1.5 font-medium">Quản lý danh sách xưởng</p>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {xuongList.map(x => (
                         <span key={x.key} className="flex items-center gap-1 text-xs bg-white border border-slate-200 rounded-full px-2 py-0.5">
@@ -1919,10 +1919,10 @@ export default function SanXuatPage() {
                               </div>
                               <div className="flex gap-2 flex-shrink-0">
                                 <button type="button" onClick={selectAll}
-                                  className="text-[10px] text-emerald-600 hover:underline">Chọn tất</button>
+                                  className="text-[13px] text-emerald-600 hover:underline">Chọn tất</button>
                                 {selectedVaiCayIdxs.length > 0 && (
                                   <button type="button" onClick={clearAll}
-                                    className="text-[10px] text-slate-400 hover:underline">Bỏ chọn</button>
+                                    className="text-[13px] text-slate-400 hover:underline">Bỏ chọn</button>
                                 )}
                               </div>
                             </div>
@@ -2029,7 +2029,7 @@ export default function SanXuatPage() {
                       <div>
                         <label className="text-xs text-slate-600 mb-1 block">
                           Số M (mét vải)
-                          {form.soY && <span className="ml-1 text-blue-500 font-normal text-[10px]">= 0.9144×0.98×Y</span>}
+                          {form.soY && <span className="ml-1 text-blue-500 font-normal text-[13px]">= 0.9144×0.98×Y</span>}
                         </label>
                         <input type="number" step="0.01" value={form.soM} onChange={sf("soM")} className={inp} />
                       </div>
@@ -2136,7 +2136,7 @@ export default function SanXuatPage() {
                       <label className="text-xs text-slate-600 mb-1 block">
                         Số lá thực tế
                         {numCay > 1
-                          ? <span className="ml-1 text-blue-500 font-normal text-[10px]">(tổng từng cây)</span>
+                          ? <span className="ml-1 text-blue-500 font-normal text-[13px]">(tổng từng cây)</span>
                           : <span className="text-rose-400"> *thủ công</span>}
                       </label>
                       {numCay > 1
@@ -2242,7 +2242,7 @@ export default function SanXuatPage() {
                   <div>
                     <p className="text-xs font-bold text-rose-500 uppercase tracking-wide mb-3 pb-1 border-b border-slate-100">
                       Hoá đơn
-                      <span className="ml-2 text-[10px] font-normal text-slate-400 normal-case">Hiển thị vì trạng thái: Đã nhập</span>
+                      <span className="ml-2 text-[13px] font-normal text-slate-400 normal-case">Hiển thị vì trạng thái: Đã nhập</span>
                     </p>
                     <div className="space-y-4">
 
