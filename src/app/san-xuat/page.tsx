@@ -738,6 +738,25 @@ export default function SanXuatPage() {
         <p className="text-slate-500 text-sm mt-1">Quản lý lô cắt và theo dõi tiến độ sản xuất</p>
       </div>
 
+      {/* Stats xưởng filter */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-slate-400 font-medium">Lọc xưởng:</span>
+        <button onClick={() => setFilterXuong("")}
+          className={`text-xs px-3 py-1 rounded-full border transition font-medium ${filterXuong === "" ? "bg-slate-700 text-white border-slate-700" : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"}`}>
+          Tất cả
+        </button>
+        {xuongList.map(x => (
+          <button key={x.key} onClick={() => setFilterXuong(x.key)}
+            className={`text-xs px-3 py-1 rounded-full border transition font-medium ${filterXuong === x.key
+              ? x.key === "dung_linh" ? "bg-amber-500 text-white border-amber-500" : "bg-rose-500 text-white border-rose-500"
+              : x.key === "dung_linh" ? "bg-white text-amber-600 border-amber-200 hover:border-amber-400" : "bg-white text-rose-500 border-rose-200 hover:border-rose-400"
+            }`}>
+            {x.label}
+          </button>
+        ))}
+        {filterXuong && <span className="text-[11px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
+      </div>
+
       {/* Stats — 4 existing + 2 HoaDonTon */}
       <div className="grid grid-cols-3 xl:grid-cols-7 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
