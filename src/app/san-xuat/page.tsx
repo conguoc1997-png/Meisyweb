@@ -428,26 +428,32 @@ export default function SanXuatPage() {
 
           // Nếu SỬA: restore các cây cũ của lô này trước
           if (modalEdit) {
+            const isYardVaiRestore = matchedVai.donVi === "yard";
             vCays = vCays.map(c => {
               if (c.lotId !== modalEdit.id) return c;
               const { cut: _c, lotId: _l, lotCayIdx: _lci, soMetUsed, ...rest } = c;
               void _c; void _l; void _lci;
               let restoreM = soMetUsed ?? 0;
               if (!restoreM && modalEdit.cayData) {
-                try { restoreM = Number((JSON.parse(modalEdit.cayData))[c.lotCayIdx ?? 0]?.soM) || 0; } catch {}
+                const restoreField = isYardVaiRestore ? "soY" : "soM";
+                try { restoreM = Number((JSON.parse(modalEdit.cayData))[c.lotCayIdx ?? 0]?.[restoreField]) || 0; } catch {}
               }
-              if (!restoreM && modalEdit.soCay === 1) restoreM = modalEdit.soM ?? 0;
+              if (!restoreM && modalEdit.soCay === 1) restoreM = (isYardVaiRestore ? modalEdit.soY : modalEdit.soM) ?? 0;
               return { ...rest, soMet: c.soMet + restoreM };
             });
           }
 
           // Đánh dấu cây mới được chọn
           if (selectedVaiCayIdxs.length > 0 && savedId) {
+            const isYardVai = matchedVai.donVi === "yard";
             vCays = vCays.map((c, i) => {
               const selIdx = selectedVaiCayIdxs.indexOf(i);
               if (selIdx === -1) return c;
-              const metersUsed = numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0);
-              return { ...c, soMet: Math.max(0, c.soMet - metersUsed), soMetUsed: metersUsed, cut: true, lotId: savedId, lotCayIdx: selIdx };
+              // Nếu vải tính theo yard → trừ bằng soY; ngược lại dùng soM
+              const amountUsed = isYardVai
+                ? (numCay === 1 ? (Number(form.soY) || 0) : (Number(cayRows[selIdx]?.soY) || 0))
+                : (numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0));
+              return { ...c, soMet: Math.max(0, c.soMet - amountUsed), soMetUsed: amountUsed, cut: true, lotId: savedId, lotCayIdx: selIdx };
             });
           }
 
