@@ -927,9 +927,9 @@ export default function SanXuatPage() {
                             const remainingCay = totalCay - cutCount;
                             const hasAnyCut = cutCount > 0;
                             const cayLabel = hasAnyCut ? (
-                              <><span className="line-through opacity-50 mr-0.5">{totalCay}</span><span>{remainingCay} cây</span></>
+                              <><span className="line-through opacity-50 mr-0.5">{totalCay}</span><span>{remainingCay}</span></>
                             ) : (
-                              <>{totalCay} cây</>
+                              <>{totalCay}</>
                             );
                             const badgeClass = totalCay === 0
                               ? "text-slate-400 bg-slate-100"
