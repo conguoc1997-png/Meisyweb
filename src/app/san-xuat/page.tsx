@@ -1160,7 +1160,10 @@ export default function SanXuatPage() {
                     {/* Thiếu — ngay sau Lá TT */}
                     <td className="px-3 py-2.5 text-right">
                       {(() => {
-                        const val = cayThieuAgg ?? (lo.soSanPham != null ? lo.soSanPham - (lo.hangThucTe ?? 0) : null);
+                        // Nếu main row hangThucTe đã điền → dùng nó; cayThieuAgg chỉ dùng khi chưa có main row value
+                        const val = lo.hangThucTe != null
+                          ? (lo.soSanPham != null ? lo.soSanPham - lo.hangThucTe : null)
+                          : (cayThieuAgg ?? (lo.soSanPham != null ? lo.soSanPham : null));
                         const laChenh = lo.soLaThucTe != null && lo.soLa != null ? lo.soLaThucTe - lo.soLa : null;
                         return (
                           <>
