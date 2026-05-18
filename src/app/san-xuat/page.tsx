@@ -891,8 +891,8 @@ export default function SanXuatPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {v.soCay > 0 && (() => {
-                            const totalCay = v.soCay;
+                          {(() => {
+                            const totalCay = v.soCay ?? 0;
                             const cutCount = cayDataParsed.filter((c: { cut?: boolean }) => c.cut).length;
                             const remainingCay = totalCay - cutCount;
                             const hasAnyCut = cutCount > 0;
@@ -901,14 +901,18 @@ export default function SanXuatPage() {
                             ) : (
                               <>{totalCay} cây</>
                             );
+                            const badgeClass = totalCay === 0
+                              ? "text-slate-400 bg-slate-100"
+                              : hasAnyCut ? "text-rose-500 bg-rose-50"
+                              : "text-rose-600 bg-rose-50";
                             return hasCayData ? (
                               <button onClick={() => toggleVaiExpand(v.id)}
-                                className="flex items-center gap-1 text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto">
+                                className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto ${badgeClass}`}>
                                 {isVaiExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                                 {cayLabel}
                               </button>
                             ) : (
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${hasAnyCut ? "text-rose-500 bg-rose-50" : "text-slate-600 bg-slate-100"}`}>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
                                 {cayLabel}
                               </span>
                             );
