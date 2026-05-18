@@ -937,12 +937,12 @@ export default function SanXuatPage() {
                               : "text-rose-600 bg-rose-50";
                             return hasCayData ? (
                               <button onClick={() => toggleVaiExpand(v.id)}
-                                className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto ${badgeClass}`}>
-                                {isVaiExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                                className={`flex items-center gap-1 text-[14px] font-semibold px-2.5 py-0.5 rounded-full hover:bg-rose-100 transition mx-auto ${badgeClass}`}>
+                                {isVaiExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                                 {cayLabel}
                               </button>
                             ) : (
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
+                              <span className={`text-[14px] font-semibold px-2.5 py-0.5 rounded-full ${badgeClass}`}>
                                 {cayLabel}
                               </span>
                             );
