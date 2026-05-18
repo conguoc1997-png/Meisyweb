@@ -70,6 +70,7 @@ export default function SanXuatPage() {
   const [editingVaiMet, setEditingVaiMet] = useState<{ id: string; val: string } | null>(null);
   const [savingVai, setSavingVai] = useState(false);
   const [editingVaiXuong, setEditingVaiXuong] = useState<string | null>(null);
+  const [filterVaiXuong, setFilterVaiXuong] = useState<string>("");
   const [expandedVaiRows, setExpandedVaiRows] = useState<Set<string>>(new Set());
   const toggleVaiExpand = (id: string) => setExpandedVaiRows(prev => {
     const next = new Set(prev);
@@ -841,17 +842,27 @@ export default function SanXuatPage() {
             byXuong[key].soCay += uncutCount;
           });
           return (
-            <div className="px-4 py-2.5 border-b border-slate-100 flex flex-wrap gap-3">
-              {Object.entries(byXuong).map(([xuong, info]) => (
-                <div key={xuong} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${xuong === "dung_linh" ? "bg-amber-50 border-amber-200" : xuong === "__chua_chon__" ? "bg-slate-50 border-slate-200" : "bg-rose-50 border-rose-200"}`}>
-                  <span className={`font-semibold ${xuong === "dung_linh" ? "text-amber-700" : xuong === "__chua_chon__" ? "text-slate-500" : "text-rose-700"}`}>
-                    {xuong === "__chua_chon__" ? "Chưa xác định" : (XUONG_LABEL[xuong] ?? xuong)}
-                  </span>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-bold text-slate-700">{info.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} {info.donVi}</span>
-                  <span className="text-slate-400 font-normal">({info.count} loại · {info.soCay} cây)</span>
-                </div>
-              ))}
+            <div className="px-4 py-2.5 border-b border-slate-100 flex flex-wrap gap-2 items-center">
+              {/* Nút Tất cả */}
+              <button onClick={() => setFilterVaiXuong("")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition font-medium ${filterVaiXuong === "" ? "bg-slate-700 text-white border-slate-700" : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400 hover:bg-slate-100"}`}>
+                Tất cả
+                <span className={`font-normal ${filterVaiXuong === "" ? "text-slate-300" : "text-slate-400"}`}>({vaiTons.length} loại)</span>
+              </button>
+              {Object.entries(byXuong).map(([xuong, info]) => {
+                const isActive = filterVaiXuong === xuong;
+                const colorActive = xuong === "dung_linh" ? "bg-amber-500 text-white border-amber-500" : xuong === "__chua_chon__" ? "bg-slate-500 text-white border-slate-500" : "bg-rose-500 text-white border-rose-500";
+                const colorInactive = xuong === "dung_linh" ? "bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-400" : xuong === "__chua_chon__" ? "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400" : "bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-400";
+                return (
+                  <button key={xuong} onClick={() => setFilterVaiXuong(isActive ? "" : xuong)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition font-medium ${isActive ? colorActive : colorInactive}`}>
+                    <span>{xuong === "__chua_chon__" ? "Chưa xác định" : (XUONG_LABEL[xuong] ?? xuong)}</span>
+                    <span className={`font-normal ${isActive ? "opacity-70" : "text-slate-400"}`}>·</span>
+                    <span className="font-bold">{info.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} {info.donVi}</span>
+                    <span className={`font-normal ${isActive ? "opacity-70" : "text-slate-400"}`}>({info.count} loại · {info.soCay} cây)</span>
+                  </button>
+                );
+              })}
               {vaiTons.length === 0 && <span className="text-xs text-slate-400">Chưa có dữ liệu</span>}
             </div>
           );
@@ -876,7 +887,7 @@ export default function SanXuatPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {vaiTons.map(v => {
+                  {vaiTons.filter(v => !filterVaiXuong || (v.xuong || "__chua_chon__") === filterVaiXuong).map(v => {
                     const hasCayData = v.soCay > 1 && v.cayData;
                     const isVaiExpanded = expandedVaiRows.has(v.id);
                     let cayDataParsed: { soMet: number; cut?: boolean }[] = [];
