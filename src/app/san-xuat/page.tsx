@@ -1869,14 +1869,16 @@ export default function SanXuatPage() {
                         };
 
                         const selectAll = () => {
-                          const all = cays.map((_, i) => i);
+                          // Chỉ chọn các cây CHƯA cắt
+                          const available = cays.map((c, i) => ({ c, i })).filter(({ c }) => !c.cut);
+                          const all = available.map(({ i }) => i);
                           setSelectedVaiCayIdxs(all);
-                          setForm(f => ({ ...f, soCay: String(all.length) }));
-                          setCayRows(cays.map(c => ({
+                          setForm(f => ({ ...f, soCay: String(all.length || 1) }));
+                          setCayRows(available.length > 0 ? available.map(({ c }) => ({
                             soY: "", soM: String(getCaySoM(c) || ""),
                             soLaTT: "", hangThucTe: "", mauGiat: "", ghiChuMay: "",
                             hdMayDa: false, hdGiatViSinhDa: false, hdGiatMauDa: false, daCat: false, trangThai: "chua_nhap",
-                          })));
+                          })) : [emptyCayRow()]);
                         };
 
                         const clearAll = () => {
@@ -1910,12 +1912,12 @@ export default function SanXuatPage() {
                                 const isCut = !!c.cut;
                                 return (
                                   <label key={i}
-                                    className={`flex items-center justify-between px-3 py-1.5 text-xs cursor-pointer transition
-                                      ${checked ? "bg-emerald-50" : isCut ? "bg-red-50 hover:bg-red-100" : "hover:bg-slate-50"}`}>
+                                    className={`flex items-center justify-between px-3 py-1.5 text-xs transition
+                                      ${isCut ? "bg-red-50 cursor-not-allowed opacity-60" : checked ? "bg-emerald-50 cursor-pointer" : "hover:bg-slate-50 cursor-pointer"}`}>
                                     <div className="flex items-center gap-2">
-                                      <input type="checkbox" checked={checked} onChange={() => toggleCay(i)}
-                                        className="accent-emerald-600 w-3.5 h-3.5" />
-                                      <span className={`font-medium ${checked ? "text-emerald-700" : isCut ? "text-red-400" : "text-slate-500"}`}>
+                                      <input type="checkbox" checked={checked} disabled={isCut} onChange={() => !isCut && toggleCay(i)}
+                                        className="accent-emerald-600 w-3.5 h-3.5 disabled:cursor-not-allowed" />
+                                      <span className={`font-medium ${checked ? "text-emerald-700" : isCut ? "text-red-400 line-through" : "text-slate-500"}`}>
                                         Cây #{i + 1}
                                       </span>
                                       {isCut && <span className="text-[9px] bg-red-100 text-red-500 px-1 py-0.5 rounded font-semibold">đã cắt</span>}
