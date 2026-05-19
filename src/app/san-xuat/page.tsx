@@ -63,7 +63,7 @@ export default function SanXuatPage() {
 
   // ── Vải tồn ──
   const [vaiTons, setVaiTons] = useState<VaiTon[]>([]);
-  const [showVaiTon, setShowVaiTon] = useState(true);
+  const [showVaiTon, setShowVaiTon] = useState(false);
   const [modalVai, setModalVai] = useState<VaiTon | "new" | null>(null);
   const [vaiForm, setVaiForm] = useState({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "" });
   const [vaiCayRows, setVaiCayRows] = useState<{ soMet: string }[]>([{ soMet: "" }]);
