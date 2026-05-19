@@ -1196,10 +1196,10 @@ export default function SanXuatPage() {
                       ) : (
                         <button
                           onClick={() => setEditingGhiChuMay({ id: lo.id, val: lo.ghiChuMay ?? "" })}
-                          className="text-slate-600 hover:bg-slate-100 rounded px-2 py-1 text-xs w-full text-left transition truncate block max-w-[140px]"
+                          className="text-rose-600 font-bold hover:bg-rose-50 rounded px-2 py-1 text-sm w-full text-left transition truncate block max-w-[140px]"
                           title={lo.ghiChuMay ?? "Click để nhập ghi chú"}
                         >
-                          {lo.ghiChuMay ?? <span className="text-slate-300">— nhập</span>}
+                          {lo.ghiChuMay ?? <span className="text-slate-300 font-normal text-xs">— nhập</span>}
                         </button>
                       )) : null}
                     </td>
