@@ -8,15 +8,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const b = await req.json();
     // cayData có thể là array (với extra fields như cut:true) hoặc undefined
     const cays: Record<string, unknown>[] | undefined = Array.isArray(b.cayData) ? b.cayData : undefined;
-    const soMet = cays
-      ? cays.reduce((s, c) => s + (Number(c.soMet) || 0), 0)
+    const activeCays = cays ? cays.filter(c => !c.deleted) : undefined;
+    const soMet = activeCays
+      ? activeCays.reduce((s, c) => s + (Number(c.soMet) || 0), 0)
       : b.soMet !== undefined ? Number(b.soMet) : undefined;
     const row = await prisma.vaiTon.update({
       where: { id },
       data: {
         ...(b.maVai !== undefined && { maVai: b.maVai }),
         ...(soMet !== undefined && { soMet }),
-        ...(cays !== undefined && { soCay: cays.length, cayData: JSON.stringify(cays) }),
+        ...(cays !== undefined && { soCay: activeCays!.length, cayData: JSON.stringify(cays) }),
         ...(b.donVi !== undefined && { donVi: b.donVi }),
         ...(b.mauSac !== undefined && { mauSac: b.mauSac || null }),
         ...(b.xuong !== undefined && { xuong: b.xuong || null }),

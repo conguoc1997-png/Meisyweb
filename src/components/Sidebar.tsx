@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Scissors,
   LogOut,
+  Calculator,
 } from "lucide-react";
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/san-xuat", label: "Sản xuất", icon: Scissors },
   { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw },
   { href: "/koc", label: "KOC Booking", icon: Star },
+  { href: "/gia-ban", label: "Giá bán sản phẩm", icon: Calculator },
 ];
 
 export default function Sidebar() {

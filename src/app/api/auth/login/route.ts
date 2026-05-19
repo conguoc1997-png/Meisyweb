@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ ok: true });
     res.cookies.set("auth_session", secret, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" && !req.headers.get("host")?.includes("localhost"),
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 30,
       path: "/",
