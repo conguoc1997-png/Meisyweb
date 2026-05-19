@@ -1398,10 +1398,10 @@ export default function SanXuatPage() {
                           ) : (
                             <button
                               onClick={() => setEditingCayGhiChu({ id: lo.id, ci, val: cay.ghiChuMay ?? "" })}
-                              className="text-slate-500 hover:bg-slate-100 rounded px-2 py-0.5 text-[14px] w-full text-left transition truncate block max-w-[140px]"
+                              className="text-rose-600 font-bold hover:bg-rose-50 rounded px-2 py-0.5 text-[15px] w-full text-left transition truncate block max-w-[140px]"
                               title={cay.ghiChuMay ?? "Click để nhập"}
                             >
-                              {cay.ghiChuMay ?? <span className="text-slate-300">— nhập</span>}
+                              {cay.ghiChuMay ?? <span className="text-slate-300 font-normal text-xs">— nhập</span>}
                             </button>
                           )}
                         </td>
@@ -1453,7 +1453,7 @@ export default function SanXuatPage() {
                               className="text-green-700 font-semibold hover:bg-green-50 rounded px-2 py-0.5 text-[14px] w-full text-right transition"
                               title="Click để nhập số nhận về"
                             >
-                              {nhanVeCay != null ? nhanVeCay.toLocaleString() : <span className="text-slate-300 font-normal">—</span>}
+                              {nhanVeCay != null ? nhanVeCay.toLocaleString() : <span className="text-slate-400 font-normal text-xs">— nhập</span>}
                             </button>
                           )}
                         </td>
