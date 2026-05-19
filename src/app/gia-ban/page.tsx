@@ -4,15 +4,15 @@ import { useState, useMemo } from "react";
 import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
-  { label: "Thời trang nữ", thuong: 15.5, mall: 17.0 },
-  { label: "Thời trang nam", thuong: 15.5, mall: 17.0 },
-  { label: "Thời trang trẻ em & trẻ sơ sinh", thuong: 15.5, mall: 17.0 },
-  { label: "Giày dép nữ", thuong: 15.5, mall: 17.0 },
-  { label: "Giày dép nam", thuong: 15.5, mall: 17.0 },
-  { label: "Túi ví nữ", thuong: 15.5, mall: 17.0 },
-  { label: "Túi ví nam", thuong: 15.5, mall: 17.0 },
-  { label: "Phụ kiện thời trang", thuong: 15.5, mall: 17.0 },
-  { label: "Làm đẹp / Chăm sóc cá nhân", thuong: 15.5, mall: 17.0 },
+  { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
+  { label: "Thời trang nam", thuong: 16.5, mall: 17.0 },
+  { label: "Thời trang trẻ em & trẻ sơ sinh", thuong: 16.5, mall: 17.0 },
+  { label: "Giày dép nữ", thuong: 16.5, mall: 17.0 },
+  { label: "Giày dép nam", thuong: 16.5, mall: 17.0 },
+  { label: "Túi ví nữ", thuong: 16.5, mall: 17.0 },
+  { label: "Túi ví nam", thuong: 16.5, mall: 17.0 },
+  { label: "Phụ kiện thời trang", thuong: 16.5, mall: 17.0 },
+  { label: "Làm đẹp / Chăm sóc cá nhân", thuong: 16.5, mall: 17.0 },
   { label: "Đồ chơi trẻ em", thuong: 15.5, mall: 17.0 },
   { label: "Nhà cửa & Đời sống", thuong: 10.0, mall: 12.0 },
   { label: "Thể thao & Du lịch", thuong: 10.0, mall: 12.0 },
@@ -41,9 +41,9 @@ const FEE_DEFS: { key: string; label: string; defaultPct: number; amount: number
   { key: "hoan_huy",    label: "Phí hoàn / huỷ",                             defaultPct: 0,    amount: 0,     maxAmount: 0,     editable: true,  isFixed: false, locked: false },
   { key: "nhan_su",     label: "Phí nhân sự + mặt bằng",                     defaultPct: 0,    amount: 0,     maxAmount: 0,     editable: true,  isFixed: false, locked: false },
   { key: "dong_goi",    label: "Phí đóng gói",                               defaultPct: 0,    amount: 0,     maxAmount: 0,     editable: true,  isFixed: false, locked: false },
-  { key: "quang_cao",   label: "Quảng cáo",                                  defaultPct: 10,   amount: 0,     maxAmount: 0,     editable: true,  isFixed: false, locked: false },
+  { key: "quang_cao",   label: "Quảng cáo",                                  defaultPct: 7,    amount: 0,     maxAmount: 0,     editable: true,  isFixed: false, locked: false },
   { key: "piship",      label: "Phí Piship",                                 defaultPct: 0,    amount: 2700,  maxAmount: 0,     editable: true,  isFixed: true,  locked: false },
-  { key: "van_chuyen",  label: "Phí vận chuyển tạm tính / 1 đơn",            defaultPct: 0,    amount: 15000, maxAmount: 0,     editable: true,  isFixed: true,  locked: false },
+  { key: "van_chuyen",  label: "Phí vận chuyển tạm tính / 1 đơn",            defaultPct: 0,    amount: 0,     maxAmount: 0,     editable: true,  isFixed: true,  locked: false },
   { key: "nen_tang",    label: "Phí nền tảng",                               defaultPct: 0,    amount: 3000,  maxAmount: 0,     editable: true,  isFixed: true,  locked: false },
 ];
 
