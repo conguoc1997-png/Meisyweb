@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import { UserProvider } from "@/lib/user-context";
 
 export const metadata: Metadata = {
   title: "Meisy Inhouse",
@@ -15,10 +16,12 @@ export default function RootLayout({
   return (
     <html lang="vi" className="h-full">
       <body className="min-h-full flex bg-slate-50">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <UserProvider>
+          <Sidebar />
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </UserProvider>
       </body>
     </html>
   );

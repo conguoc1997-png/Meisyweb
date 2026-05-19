@@ -11,22 +11,26 @@ import {
   Scissors,
   LogOut,
   Calculator,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
+import { useUser } from "@/lib/user-context";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/kho", label: "Quản lý Kho", icon: Package },
-  { href: "/san-xuat", label: "Sản xuất", icon: Scissors },
-  { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw },
-  { href: "/koc", label: "KOC Booking", icon: Star },
-  { href: "/gia-ban", label: "Giá bán sản phẩm", icon: Calculator },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "kho", "san_xuat"] },
+  { href: "/kho", label: "Quản lý Kho", icon: Package, roles: ["admin", "kho"] },
+  { href: "/san-xuat", label: "Sản xuất", icon: Scissors, roles: ["admin", "san_xuat"] },
+  { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw, roles: ["admin", "kho"] },
+  { href: "/koc", label: "KOC Booking", icon: Star, roles: ["admin"] },
+  { href: "/gia-ban", label: "Giá bán sản phẩm", icon: Calculator, roles: ["admin"] },
+  { href: "/admin/users", label: "Quản lý User", icon: Users, roles: ["admin"] },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const { user } = useUser();
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -53,7 +57,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 p-2 space-y-1">
-        {navItems.map((item) => {
+        {navItems.filter(item => !user || item.roles.includes(user.role)).map((item) => {
           const Icon = item.icon;
           const isActive =
             item.href === "/"
@@ -88,7 +92,12 @@ export default function Sidebar() {
           <LogOut size={16} className="flex-shrink-0" />
           {expanded && <span>Đăng xuất</span>}
         </button>
-        {expanded && <p className="text-xs text-slate-400 text-center">v1.0 · Shopee & TikTok</p>}
+        {expanded && user && (
+          <p className="text-xs text-slate-500 text-center truncate px-1">
+            {user.name} <span className="text-slate-400">({user.role})</span>
+          </p>
+        )}
+        {expanded && <p className="text-xs text-slate-400 text-center">v1.0 · Meisy Inhouse</p>}
       </div>
     </aside>
   );
