@@ -166,6 +166,7 @@ model LoCat {
   soLaThucTe         Int?
   soSanPham          Int?
   hangThucTe         Int?
+  ngayNhanHang       DateTime? // ngày nhận hàng thực tế (tách khỏi ngày cắt)
   soLuongThieu       Int?
   xuongNhanHang      String?
   trangThai          String    @default("chua_xuat")

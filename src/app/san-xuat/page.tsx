@@ -13,7 +13,7 @@ type LoCat = {
   id: string; ngay: string; hangCat: string; soSize: string | null; maVai: string | null;
   soMSoDo: number | null; soCay: number; cayData: string | null; soY: number | null; soM: number | null; tongSize: number | null;
   soLa: number | null; soLaThucTe: number | null; soSanPham: number | null;
-  hangThucTe: number | null; soLuongThieu: number | null; xuongNhanHang: string | null;
+  hangThucTe: number | null; ngayNhanHang: string | null; soLuongThieu: number | null; xuongNhanHang: string | null;
   trangThai: string; xuong: string;
   daCat: boolean;
   hdMay: number | null; tonTruocMay: number | null; hdMayDa: boolean;
@@ -588,10 +588,15 @@ export default function SanXuatPage() {
     setEditingNhanVe(null);
     const hangThucTe = val === "" ? null : Math.round(Number(val));
     const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
-    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
+    // Tự động ghi ngày nhận khi lần đầu điền (không ghi đè nếu đã có)
+    const ngayNhanHang = hangThucTe != null && !lo.ngayNhanHang
+      ? new Date().toISOString()
+      : (hangThucTe == null ? null : lo.ngayNhanHang);
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu, ngayNhanHang } : l));
+    setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu, ngayNhanHang } : l));
     fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hangThucTe, soLuongThieu }),
+      body: JSON.stringify({ hangThucTe, soLuongThieu, ngayNhanHang }),
     }).catch(() => fetchData());
   };
 
@@ -783,10 +788,26 @@ export default function SanXuatPage() {
   };
 
   // Stats
-  const tongSP  = losCat.reduce((s, l) => s + (l.soSanPham ?? 0), 0);
-  const tongNhan = losCat.reduce((s, l) => s + (l.hangThucTe ?? 0), 0);
-  // Chỉ tính thiếu khi đã có giá trị "Nhận về" (hangThucTe != null)
-  const tongThieu = losCat.reduce((s, l) => s + (l.hangThucTe != null ? Math.max(0, l.soLuongThieu ?? 0) : 0), 0);
+  // tongSP: tính theo tháng CẮT (losCat đã filter theo ngay)
+  const tongSP = losCat.reduce((s, l) => s + (l.soSanPham ?? 0), 0);
+
+  // tongNhan + tongThieu: tính theo tháng NHẬN (ngayNhanHang), filter từ allLoCat
+  const { tongNhan, tongThieu } = useMemo(() => {
+    let rows = allLoCat;
+    if (filterXuong) rows = rows.filter(l => l.xuong === filterXuong);
+    if (filterThang) {
+      const [y, m] = filterThang.split("-").map(Number);
+      rows = rows.filter(l => {
+        if (!l.ngayNhanHang) return false;
+        const d = new Date(l.ngayNhanHang);
+        return d.getFullYear() === y && d.getMonth() + 1 === m;
+      });
+    }
+    return {
+      tongNhan: rows.reduce((s, l) => s + (l.hangThucTe ?? 0), 0),
+      tongThieu: rows.reduce((s, l) => s + (l.hangThucTe != null ? Math.max(0, l.soLuongThieu ?? 0) : 0), 0),
+    };
+  }, [allLoCat, filterThang, filterXuong]);
   const daNhapCount = losCat.filter(l => l.trangThai === "da_nhap").length;
 
   const thangOptions = useMemo(() => {
@@ -832,15 +853,17 @@ export default function SanXuatPage() {
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <p className="text-xs text-slate-500 mb-1">Tổng sản phẩm</p>
           <p className="text-2xl font-bold text-slate-800">{tongSP.toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-1">{losCat.length} lô cắt</p>
+          <p className="text-xs text-slate-400 mt-1">{losCat.length} lô · {filterThang ? <span className="text-rose-400">tháng cắt</span> : "tất cả"}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <p className="text-xs text-slate-500 mb-1">Đã nhận về</p>
           <p className="text-2xl font-bold text-green-600">{tongNhan.toLocaleString()}</p>
+          <p className="text-xs text-slate-400 mt-1">{filterThang ? <span className="text-green-500">tháng nhận</span> : "tất cả"}</p>
         </div>
         <div className={`rounded-xl p-4 border ${tongThieu > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
           <p className="text-xs text-slate-500 mb-1">Tổng thiếu</p>
           <p className={`text-2xl font-bold ${tongThieu > 0 ? "text-red-600" : "text-green-600"}`}>{tongThieu.toLocaleString()}</p>
+          <p className="text-xs text-slate-400 mt-1">{filterThang ? <span className={tongThieu > 0 ? "text-red-400" : "text-slate-400"}>tháng nhận</span> : "tất cả"}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <p className="text-xs text-slate-500 mb-1">Đã nhập</p>

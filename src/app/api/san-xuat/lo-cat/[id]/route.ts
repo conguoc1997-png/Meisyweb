@@ -26,6 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(b.soLaThucTe !== undefined && { soLaThucTe: ni(b.soLaThucTe) }),
         ...(b.soSanPham !== undefined && { soSanPham: ni(b.soSanPham) }),
         ...(b.hangThucTe !== undefined && { hangThucTe: ni(b.hangThucTe) }),
+        ...(b.ngayNhanHang !== undefined && { ngayNhanHang: b.ngayNhanHang ? new Date(b.ngayNhanHang) : null }),
         ...(b.soLuongThieu !== undefined && { soLuongThieu: ni(b.soLuongThieu) }),
         ...(b.xuongNhanHang !== undefined && { xuongNhanHang: b.xuongNhanHang || null }),
         ...(b.trangThai !== undefined && { trangThai: b.trangThai }),
