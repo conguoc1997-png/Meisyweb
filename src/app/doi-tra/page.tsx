@@ -38,6 +38,7 @@ type Feedback = {
   noiDung: string;
   danhGia: number | null;
   nguoiGhiNhan: string | null;
+  daXem: boolean;
   createdAt: string;
 };
 
@@ -114,10 +115,30 @@ export default function DoiTraPage() {
   const [fbDeleteTarget, setFbDeleteTarget] = useState<Feedback | null>(null);
   const [fbDeleteInput, setFbDeleteInput] = useState("");
   const [showFbForm, setShowFbForm] = useState(false);
+  const [fbShowAll, setFbShowAll] = useState(false);
 
   const fetchFeedbacks = async () => {
     const data = await fetch("/api/feedback").then((r) => r.json());
     setFeedbacks(Array.isArray(data) ? data : []);
+  };
+
+  const markDaXem = async (id: string) => {
+    setFeedbacks(prev => prev.map(f => f.id === id ? { ...f, daXem: true } : f));
+    await fetch(`/api/feedback/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daXem: true }),
+    });
+  };
+
+  const markAllDaXem = async () => {
+    const chuaXemIds = feedbacks.filter(f => !f.daXem).map(f => f.id);
+    setFeedbacks(prev => prev.map(f => ({ ...f, daXem: true })));
+    await Promise.all(chuaXemIds.map(id =>
+      fetch(`/api/feedback/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daXem: true }),
+      })
+    ));
   };
 
   // ─── BuTien state ──────────────────────────────────────
@@ -445,6 +466,8 @@ export default function DoiTraPage() {
   }, [buTiens, ungTiens]);
 
   // ─── Feedback computed ─────────────────────────────────
+  const fbChuaXemCount = useMemo(() => feedbacks.filter(f => !f.daXem).length, [feedbacks]);
+
   const fbFiltered = useMemo(() => feedbacks.filter((f) => {
     const s = fbSearch.toLowerCase();
     const matchSearch = !s || (f.noiDung.toLowerCase().includes(s)) ||
@@ -452,8 +475,9 @@ export default function DoiTraPage() {
       (f.tenKhach || "").toLowerCase().includes(s);
     const matchLoai = !fbFilterLoai || f.loai === fbFilterLoai;
     const matchKenh = !fbFilterKenh || f.kenh === fbFilterKenh;
-    return matchSearch && matchLoai && matchKenh;
-  }), [feedbacks, fbSearch, fbFilterLoai, fbFilterKenh]);
+    const matchXem = fbShowAll || !f.daXem;
+    return matchSearch && matchLoai && matchKenh && matchXem;
+  }), [feedbacks, fbSearch, fbFilterLoai, fbFilterKenh, fbShowAll]);
 
   const fbStatsByLoai = useMemo(() => {
     const m: Record<string, { count: number; totalStar: number; starCount: number }> = {};
@@ -533,7 +557,11 @@ export default function DoiTraPage() {
         <button onClick={() => setTab("feedback")}
           className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition ${tab === "feedback" ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
           <MessageSquare size={15} /> Feedback
-          {feedbacks.length > 0 && <span className="bg-teal-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{feedbacks.length}</span>}
+          {feedbacks.filter(f => !f.daXem).length > 0 && (
+            <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">
+              {feedbacks.filter(f => !f.daXem).length}
+            </span>
+          )}
         </button>
         <button onClick={() => setTab("bu_tien")}
           className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition ${tab === "bu_tien" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
@@ -900,7 +928,19 @@ export default function DoiTraPage() {
                 <X size={13} /> Xoá lọc
               </button>
             )}
-            <p className="text-xs text-slate-400 ml-auto">{fbFiltered.length} / {feedbacks.length} feedback</p>
+            <div className="ml-auto flex items-center gap-2">
+              {fbChuaXemCount > 0 && (
+                <button onClick={markAllDaXem}
+                  className="text-xs text-teal-600 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition">
+                  ✓ Duyệt tất cả ({fbChuaXemCount})
+                </button>
+              )}
+              <button onClick={() => setFbShowAll(v => !v)}
+                className={`text-xs px-2.5 py-1.5 rounded-lg border transition ${fbShowAll ? "bg-slate-100 text-slate-600 border-slate-200" : "bg-teal-50 text-teal-700 border-teal-200 font-medium"}`}>
+                {fbShowAll ? "Tất cả" : `Chưa xem (${fbChuaXemCount})`}
+              </button>
+              <p className="text-xs text-slate-400">{fbFiltered.length}/{feedbacks.length}</p>
+            </div>
           </div>
 
           {/* Danh sách feedback */}
@@ -912,14 +952,24 @@ export default function DoiTraPage() {
                 className="mt-3 text-sm text-teal-500 hover:underline">+ Thêm feedback đầu tiên</button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
               {fbFiltered.map((f) => {
                 const loaiInfo = LOAI_FEEDBACK[f.loai];
+                const ngay = new Date(f.createdAt);
+                const ngayStr = ngay.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+                const gioStr = ngay.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
                 return (
-                  <div key={f.id} className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-start gap-4">
+                  <div key={f.id} className={`rounded-xl border px-4 py-3 flex items-start gap-4 transition ${f.daXem ? "bg-slate-50 border-slate-100 opacity-70" : "bg-white border-slate-200 shadow-sm"}`}>
                     <div className="text-2xl shrink-0 mt-0.5">{loaiInfo?.icon}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {/* Ngày giờ nổi bật */}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                          📅 {ngayStr} · {gioStr}
+                        </span>
+                        {f.daXem && <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">✓ Đã xem</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${KENH_FEEDBACK[f.kenh]?.color}`}>{KENH_FEEDBACK[f.kenh]?.label}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${loaiInfo?.color}`}>{loaiInfo?.label}</span>
                         {f.sku && <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{f.sku}</span>}
@@ -929,13 +979,20 @@ export default function DoiTraPage() {
                         {f.tenKhach && <span>👤 {f.tenKhach}</span>}
                         {f.sdtKhach && <span>📞 {f.sdtKhach}</span>}
                         {f.nguoiGhiNhan && <span>✍️ {f.nguoiGhiNhan}</span>}
-                        <span className="ml-auto">{formatDateTime(f.createdAt)}</span>
                       </div>
                     </div>
-                    <button onClick={() => { setFbDeleteTarget(f); setFbDeleteInput(""); }}
-                      className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition shrink-0">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {!f.daXem && (
+                        <button onClick={() => markDaXem(f.id)}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition font-medium whitespace-nowrap">
+                          ✓ Đã xem
+                        </button>
+                      )}
+                      <button onClick={() => { setFbDeleteTarget(f); setFbDeleteInput(""); }}
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 );
               })}

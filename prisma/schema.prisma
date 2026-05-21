@@ -102,6 +102,7 @@ model Feedback {
   noiDung      String
   danhGia      Int?     // 1-5 sao (tuỳ chọn)
   nguoiGhiNhan String?
+  daXem        Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
 
