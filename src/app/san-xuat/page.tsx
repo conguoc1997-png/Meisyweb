@@ -138,6 +138,7 @@ export default function SanXuatPage() {
   });
   const [filterXuong, setFilterXuong] = useState("");
   const [filterTrangThai, setFilterTrangThai] = useState("");
+  const [activeMainTab, setActiveMainTab] = useState<"lo-cat" | "hoa-don">("lo-cat");
   const [modalAdd, setModalAdd] = useState(false);
   const [modalEdit, setModalEdit] = useState<LoCat | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -653,6 +654,7 @@ export default function SanXuatPage() {
   const handleQuickStatus = (lo: LoCat) => {
     const next = lo.trangThai === "da_nhap" ? "chua_nhap" : "da_nhap";
     setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: next } : l));
+    if (next === "da_nhap") setActiveMainTab("hoa-don");
     fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trangThai: next }),
@@ -1036,6 +1038,33 @@ export default function SanXuatPage() {
         <span className="text-xs text-slate-400 ml-auto">{losCat.length} lô cắt</span>
       </div>
 
+      {/* Main tabs: Lô Cắt | Xuất Hóa Đơn */}
+      {(() => {
+        const hoaDonCount = allLoCat.filter(l => l.trangThai === "da_nhap").length;
+        return (
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setActiveMainTab("lo-cat")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeMainTab === "lo-cat" ? "bg-rose-500 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+            >
+              ✂️ Lô Cắt
+            </button>
+            <button
+              onClick={() => setActiveMainTab("hoa-don")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5 ${activeMainTab === "hoa-don" ? "bg-blue-500 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+            >
+              📄 Xuất Hóa Đơn
+              {hoaDonCount > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${activeMainTab === "hoa-don" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-700"}`}>
+                  {hoaDonCount}
+                </span>
+              )}
+            </button>
+          </div>
+        );
+      })()}
+
+      {activeMainTab === "lo-cat" && <>
       {/* Table header row */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-slate-700">Lô cắt</span>
@@ -1509,6 +1538,74 @@ export default function SanXuatPage() {
           </table>
         </div>
       </div>
+      </>}
+
+      {/* ═══ TAB: XUẤT HÓA ĐƠN ═══ */}
+      {activeMainTab === "hoa-don" && (() => {
+        const hoaDonRows = allLoCat.filter(l => l.trangThai === "da_nhap").sort((a, b) => {
+          const da = a.ngay ? new Date(a.ngay).getTime() : 0;
+          const db = b.ngay ? new Date(b.ngay).getTime() : 0;
+          return db - da;
+        });
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-slate-700">Hóa đơn đã nhận ({hoaDonRows.length})</span>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[15px] whitespace-nowrap">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Ngày</th>
+                      <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Tên hàng cắt</th>
+                      <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Size</th>
+                      <th className="text-right px-4 py-2.5 text-slate-500 font-medium">Số lượng</th>
+                      <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Xưởng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {hoaDonRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-16 text-slate-400">
+                          <p className="text-2xl mb-2">📄</p>
+                          <p>Chưa có lô nào được đánh dấu "Đã nhận"</p>
+                        </td>
+                      </tr>
+                    ) : hoaDonRows.map(lo => {
+                      const soLuong = lo.hangThucTe ?? lo.soSanPham ?? 0;
+                      return (
+                        <tr key={lo.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 text-slate-600">
+                            {lo.ngay ? new Date(lo.ngay).toLocaleDateString("vi-VN") : "—"}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">{lo.hangCat ?? "—"}</td>
+                          <td className="px-4 py-3 text-slate-600">{lo.soSize ?? "—"}</td>
+                          <td className="px-4 py-3 text-right font-bold text-emerald-700">
+                            {soLuong > 0 ? soLuong.toLocaleString() : <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{lo.xuong ? (XUONG_LABEL[lo.xuong] ?? lo.xuong) : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {hoaDonRows.length > 0 && (
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-semibold text-sm">
+                      <tr>
+                        <td colSpan={3} className="px-4 py-2.5 text-slate-500">Tổng</td>
+                        <td className="px-4 py-2.5 text-right text-emerald-700">
+                          {hoaDonRows.reduce((s, l) => s + (l.hangThucTe ?? l.soSanPham ?? 0), 0).toLocaleString()}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══ MODAL Vải tồn ═══ */}
       {modalVai && (
