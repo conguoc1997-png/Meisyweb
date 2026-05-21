@@ -54,6 +54,14 @@ type BuTien = {
   createdAt: string;
 };
 
+type UngTien = {
+  id: string;
+  soTien: number;
+  thang: string; // YYYY-MM
+  ghiChu: string | null;
+  createdAt: string;
+};
+
 const NGUON_BU_OPTIONS = [
   { value: "shopee",  label: "Shopee",  cls: "bg-orange-100 text-orange-700" },
   { value: "tiktok",  label: "Tiktok",  cls: "bg-pink-100 text-pink-700" },
@@ -121,9 +129,22 @@ export default function DoiTraPage() {
   const [btDeleteTarget, setBtDeleteTarget] = useState<BuTien | null>(null);
   const [btDeleteInput, setBtDeleteInput] = useState("");
 
+  // ─── UngTien state ─────────────────────────────────────
+  const [ungTiens, setUngTiens] = useState<UngTien[]>([]);
+  const [showUngModal, setShowUngModal] = useState(false);
+  const [ungEditRecord, setUngEditRecord] = useState<UngTien | null>(null);
+  const [ungForm, setUngForm] = useState({ soTien: "", thang: "", ghiChu: "" });
+  const [ungLoading, setUngLoading] = useState(false);
+  const [showUngHistory, setShowUngHistory] = useState(false);
+
   const fetchBuTiens = async () => {
     const data = await fetch("/api/bu-tien").then((r) => r.json());
     setBuTiens(Array.isArray(data) ? data : []);
+  };
+
+  const fetchUngTiens = async () => {
+    const data = await fetch("/api/ung-tien").then(r => r.json());
+    setUngTiens(Array.isArray(data) ? data : []);
   };
 
   const fetchData = async () => {
@@ -131,7 +152,7 @@ export default function DoiTraPage() {
     setRecords(Array.isArray(data) ? data : []);
   };
 
-  useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); }, []);
+  useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); fetchUngTiens(); }, []);
 
   // ─── Helpers ───────────────────────────────────────────
   const daDuocXuLy = (r: DoiTra) => !!r.maVanDon;
@@ -268,6 +289,28 @@ export default function DoiTraPage() {
     fetchBuTiens();
   };
 
+  // ─── UngTien handlers ──────────────────────────────────
+  const handleUngSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUngLoading(true);
+    try {
+      const url = ungEditRecord ? `/api/ung-tien/${ungEditRecord.id}` : "/api/ung-tien";
+      const method = ungEditRecord ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...ungForm, soTien: Number(ungForm.soTien) }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setShowUngModal(false);
+      setUngEditRecord(null);
+      setUngForm({ soTien: "", thang: "", ghiChu: "" });
+      fetchUngTiens();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Lỗi");
+    } finally { setUngLoading(false); }
+  };
+
   const openBtEdit = (r: BuTien) => {
     setBtForm({
       tenKhach: r.tenKhach, sdtKhach: r.sdtKhach || "", nguon: r.nguon || "shopee", loiBu: r.loiBu,
@@ -379,6 +422,27 @@ export default function DoiTraPage() {
     });
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [buTiens]);
+
+  // ─── UngTien computed ──────────────────────────────────
+  const tongUngAllTime = useMemo(() => ungTiens.reduce((s, u) => s + u.soTien, 0), [ungTiens]);
+  const tongBuAllTime = useMemo(() => buTiens.reduce((s, b) => s + b.soTien, 0), [buTiens]);
+  const duLuyKe = tongUngAllTime - tongBuAllTime;
+
+  const btStatsEnhanced = useMemo(() => {
+    const map: Record<string, { total: number; tongBu: number; tongUng: number }> = {};
+    buTiens.forEach(r => {
+      const d = new Date(r.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map[key]) map[key] = { total: 0, tongBu: 0, tongUng: 0 };
+      map[key].total++;
+      map[key].tongBu += r.soTien;
+    });
+    ungTiens.forEach(u => {
+      if (!map[u.thang]) map[u.thang] = { total: 0, tongBu: 0, tongUng: 0 };
+      map[u.thang].tongUng += u.soTien;
+    });
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [buTiens, ungTiens]);
 
   // ─── Feedback computed ─────────────────────────────────
   const fbFiltered = useMemo(() => feedbacks.filter((f) => {
@@ -1103,28 +1167,54 @@ export default function DoiTraPage() {
       {tab === "bu_tien" && (
         <div className="space-y-5">
 
-          {/* Bảng tổng hợp theo tháng */}
-          {btStatsByMonth.length > 0 && (
+          {/* Summary cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
+              <p className="text-xs text-slate-500 mb-1">Tổng đã ứng</p>
+              <p className="text-xl font-bold text-indigo-600">{formatCurrency(tongUngAllTime)}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
+              <p className="text-xs text-slate-500 mb-1">Tổng đã bù</p>
+              <p className="text-xl font-bold text-red-600">{formatCurrency(tongBuAllTime)}</p>
+            </div>
+            <div className={`rounded-xl border px-5 py-4 ${duLuyKe >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+              <p className="text-xs text-slate-500 mb-1">Dư lũy kế</p>
+              <p className={`text-xl font-bold ${duLuyKe >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {duLuyKe >= 0 ? "+" : ""}{formatCurrency(duLuyKe)}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Ứng − Bù (cộng dồn tất cả tháng)</p>
+            </div>
+          </div>
+
+          {/* Stats table per month */}
+          {btStatsEnhanced.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100">
-                <span className="text-sm font-semibold text-slate-700">📊 Tổng tiền bù theo tháng</span>
+                <span className="text-sm font-semibold text-slate-700">📊 Thống kê theo tháng</span>
               </div>
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
                   <tr>
                     <th className="px-4 py-2.5 text-left">Tháng</th>
                     <th className="px-4 py-2.5 text-center">Số case</th>
-                    <th className="px-4 py-2.5 text-right text-red-500">Tổng tiền bù</th>
+                    <th className="px-4 py-2.5 text-right text-indigo-500">Đã ứng</th>
+                    <th className="px-4 py-2.5 text-right text-red-500">Tổng bù</th>
+                    <th className="px-4 py-2.5 text-right">Dư tháng</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {btStatsByMonth.map(([key, s]) => {
+                  {btStatsEnhanced.map(([key, s]) => {
                     const [yr, mo] = key.split("-");
+                    const du = s.tongUng - s.tongBu;
                     return (
                       <tr key={key} className="hover:bg-indigo-50 transition">
                         <td className="px-4 py-2.5 font-semibold text-slate-700">T{parseInt(mo)} {yr}</td>
                         <td className="px-4 py-2.5 text-center font-bold text-slate-800">{s.total}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-red-600">{formatCurrency(s.tongTien)}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-indigo-600">{s.tongUng > 0 ? formatCurrency(s.tongUng) : <span className="text-slate-300">—</span>}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-red-600">{s.tongBu > 0 ? formatCurrency(s.tongBu) : <span className="text-slate-300">—</span>}</td>
+                        <td className={`px-4 py-2.5 text-right font-bold ${du >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {du >= 0 ? "+" : ""}{formatCurrency(du)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -1133,7 +1223,69 @@ export default function DoiTraPage() {
             </div>
           )}
 
-          {/* Danh sách */}
+          {/* Đã ứng tiền section */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700">💰 Đã ứng tiền</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowUngHistory(v => !v)}
+                  className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition">
+                  {showUngHistory ? "Ẩn lịch sử" : "Lịch sử"}
+                </button>
+                <button onClick={() => { setUngEditRecord(null); const now = new Date(); setUngForm({ soTien: "", thang: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`, ghiChu: "" }); setShowUngModal(true); }}
+                  className="flex items-center gap-1 text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-600 transition">
+                  <span>+ Thêm tiền ứng</span>
+                </button>
+              </div>
+            </div>
+            {showUngHistory && (
+              ungTiens.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 text-sm">Chưa có lần ứng tiền nào</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Tháng</th>
+                      <th className="px-4 py-2.5 text-right text-indigo-500">Số tiền ứng</th>
+                      <th className="px-4 py-2.5 text-left">Ghi chú</th>
+                      <th className="px-4 py-2.5 text-left">Ngày tạo</th>
+                      <th className="px-4 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ungTiens.map(u => {
+                      const [yr, mo] = u.thang.split("-");
+                      return (
+                        <tr key={u.id} className="hover:bg-indigo-50 transition">
+                          <td className="px-4 py-2.5 font-semibold text-slate-700">T{parseInt(mo)} {yr}</td>
+                          <td className="px-4 py-2.5 text-right font-bold text-indigo-600">{formatCurrency(u.soTien)}</td>
+                          <td className="px-4 py-2.5 text-slate-500 text-xs">{u.ghiChu || "—"}</td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400">{formatDateTime(u.createdAt)}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => { setUngEditRecord(u); setUngForm({ soTien: String(u.soTien), thang: u.thang, ghiChu: u.ghiChu || "" }); setShowUngModal(true); }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition">
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={async () => { if (!confirm("Xoá lần ứng này?")) return; await fetch(`/api/ung-tien/${u.id}`, { method: "DELETE" }); fetchUngTiens(); }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            )}
+            {!showUngHistory && ungTiens.length > 0 && (
+              <p className="text-xs text-slate-400 px-4 py-2">{ungTiens.length} lần ứng · bấm &quot;Lịch sử&quot; để xem</p>
+            )}
+          </div>
+
+          {/* Danh sách bù tiền */}
           {buTiens.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 py-16 text-center">
               <p className="text-slate-400 text-sm">Chưa có case bù tiền nào</p>
@@ -1319,6 +1471,47 @@ export default function DoiTraPage() {
                 <button type="submit" disabled={btLoading}
                   className="flex-1 px-4 py-2.5 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 font-medium">
                   {btLoading ? "Đang lưu..." : btEditRecord ? "Lưu thay đổi" : "Tạo case"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Thêm / Sửa Ứng tiền ── */}
+      {showUngModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 text-lg">
+                {ungEditRecord ? "Sửa tiền ứng" : "Thêm tiền ứng"}
+              </h2>
+              <button onClick={() => { setShowUngModal(false); setUngEditRecord(null); }}
+                className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleUngSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Tháng *</label>
+                <input required type="month" value={ungForm.thang} onChange={e => setUngForm({ ...ungForm, thang: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Số tiền ứng (VNĐ) *</label>
+                <input required type="number" min="0" value={ungForm.soTien} onChange={e => setUngForm({ ...ungForm, soTien: e.target.value })}
+                  placeholder="1000000"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
+                <input value={ungForm.ghiChu} onChange={e => setUngForm({ ...ungForm, ghiChu: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => { setShowUngModal(false); setUngEditRecord(null); }}
+                  className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={ungLoading}
+                  className="flex-1 px-4 py-2.5 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 font-medium">
+                  {ungLoading ? "Đang lưu..." : ungEditRecord ? "Lưu" : "Thêm"}
                 </button>
               </div>
             </form>

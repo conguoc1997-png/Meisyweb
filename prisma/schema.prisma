@@ -121,6 +121,15 @@ model BuTien {
   updatedAt    DateTime @updatedAt
 }
 
+model UngTien {
+  id        String   @id @default(cuid())
+  soTien    Float    @default(0)
+  thang     String   // YYYY-MM
+  ghiChu    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ===================== MODULE KOC =====================
 
 model KOC {
