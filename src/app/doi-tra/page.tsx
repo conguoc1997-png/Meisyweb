@@ -599,6 +599,7 @@ export default function DoiTraPage() {
               <th className="px-3 py-3 text-left">Tên KH</th>
               <th className="px-3 py-3 text-left">Địa chỉ</th>
               <th className="px-3 py-3 text-left">SKU đổi sang</th>
+              <th className="px-3 py-3 text-left">Ghi chú</th>
               <th className="px-3 py-3 text-right">Giá trị</th>
               <th className="px-3 py-3 text-left">Loại lỗi</th>
               <th className="px-3 py-3 text-right">Thu KH</th>
@@ -660,6 +661,11 @@ export default function DoiTraPage() {
                   <td className="px-3 py-2.5">
                     <div className="text-xs text-slate-400">{r.skuHienTai}</div>
                     <div className="font-medium text-slate-800">{r.skuDoiSang || "—"}</div>
+                  </td>
+
+                  {/* Ghi chú */}
+                  <td className="px-3 py-2.5 max-w-[180px] truncate text-slate-500 text-xs" title={r.ghiChu || ""}>
+                    {r.ghiChu || <span className="text-slate-300">—</span>}
                   </td>
 
                   {/* Giá trị */}
