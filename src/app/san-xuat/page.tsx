@@ -1095,9 +1095,6 @@ export default function SanXuatPage() {
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50 hidden">Số SP</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Nhận về</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Trạng thái</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">HĐ May</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Vi sinh</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Xưởng</th>
                 <th className="px-3 py-2.5"></th>
               </tr>
@@ -1295,39 +1292,6 @@ export default function SanXuatPage() {
                         </button>
                       )}
                     </td>
-                    {/* HĐ May checkbox */}
-                    <td className="px-3 py-2.5 text-center">
-                      {hasCay ? (
-                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdMayDa).length}/{cayParsed.length}</span>
-                      ) : (
-                        <button onClick={() => handleToggleHD(lo, "hdMayDa")}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdMayDa ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 hover:border-purple-400"}`}>
-                          {lo.hdMayDa && <CheckCircle size={12} />}
-                        </button>
-                      )}
-                    </td>
-                    {/* Vi sinh checkbox */}
-                    <td className="px-3 py-2.5 text-center">
-                      {hasCay ? (
-                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdGiatViSinhDa).length}/{cayParsed.length}</span>
-                      ) : (
-                        <button onClick={() => handleToggleHD(lo, "hdGiatViSinhDa")}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdGiatViSinhDa ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 hover:border-teal-400"}`}>
-                          {lo.hdGiatViSinhDa && <CheckCircle size={12} />}
-                        </button>
-                      )}
-                    </td>
-                    {/* Màu checkbox */}
-                    <td className="px-3 py-2.5 text-center">
-                      {hasCay ? (
-                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdGiatMauDa).length}/{cayParsed.length}</span>
-                      ) : (
-                        <button onClick={() => handleToggleHD(lo, "hdGiatMauDa")}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdGiatMauDa ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300 hover:border-blue-400"}`}>
-                          {lo.hdGiatMauDa && <CheckCircle size={12} />}
-                        </button>
-                      )}
-                    </td>
                     <td className="px-3 py-2.5">
                       <span className={`px-1.5 py-0.5 rounded text-xs ${lo.xuong === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>
                         {XUONG_LABEL[lo.xuong] ?? lo.xuong}
@@ -1494,28 +1458,7 @@ export default function SanXuatPage() {
                             {cay.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
                           </button>
                         </td>
-                        {/* col 15: HĐ May per-cây */}
-                        <td className="px-3 py-1.5 text-center">
-                          <button onClick={() => toggleCayHD(lo, ci, "hdMayDa")}
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.hdMayDa ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 hover:border-purple-400"}`}>
-                            {cay.hdMayDa && <CheckCircle size={10} />}
-                          </button>
-                        </td>
-                        {/* col 16: Vi sinh per-cây */}
-                        <td className="px-3 py-1.5 text-center">
-                          <button onClick={() => toggleCayHD(lo, ci, "hdGiatViSinhDa")}
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.hdGiatViSinhDa ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 hover:border-teal-400"}`}>
-                            {cay.hdGiatViSinhDa && <CheckCircle size={10} />}
-                          </button>
-                        </td>
-                        {/* col 17: Màu per-cây */}
-                        <td className="px-3 py-1.5 text-center">
-                          <button onClick={() => toggleCayHD(lo, ci, "hdGiatMauDa")}
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.hdGiatMauDa ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300 hover:border-blue-400"}`}>
-                            {cay.hdGiatMauDa && <CheckCircle size={10} />}
-                          </button>
-                        </td>
-                        {/* cols 18-19 */}
+                        {/* cols 15-16 */}
                         <td colSpan={2}></td>
                       </tr>
                     );
