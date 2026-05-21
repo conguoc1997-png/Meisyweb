@@ -989,7 +989,7 @@ export default function SanXuatPage() {
                       <>
                       <tr key={v.id} className="hover:bg-slate-50">
                         <td className="px-4 py-2 font-semibold text-slate-800">{v.maVai}</td>
-                        <td className="px-3 py-2 text-slate-500">{v.mauSac ?? <span className="text-slate-300">—</span>}</td>
+                        <td className="px-3 py-2 font-bold text-[1.2em] text-slate-700">{v.mauSac ?? <span className="text-slate-300 font-normal text-sm">—</span>}</td>
                         <td className="px-2 py-1 text-center">
                           {editingVaiXuong === v.id ? (
                             <select autoFocus
