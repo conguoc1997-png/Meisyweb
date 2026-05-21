@@ -1148,7 +1148,6 @@ export default function DoiTraPage() {
                     <th className="px-3 py-3 text-left">Thời gian</th>
                     <th className="px-3 py-3 text-left">Nguồn</th>
                     <th className="px-3 py-3 text-left">Tên KH</th>
-                    <th className="px-3 py-3 text-left">SĐT</th>
                     <th className="px-3 py-3 text-left">Lỗi bù</th>
                     <th className="px-3 py-3 text-right">Số tiền bù</th>
                     <th className="px-3 py-3 text-left">Ghi chú</th>
@@ -1168,7 +1167,6 @@ export default function DoiTraPage() {
                         })()}
                       </td>
                       <td className="px-3 py-2.5 font-medium text-slate-800">{r.tenKhach}</td>
-                      <td className="px-3 py-2.5 font-mono text-sm text-slate-600">{r.sdtKhach || <span className="text-slate-300">—</span>}</td>
                       <td className="px-3 py-2.5">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${LOI_BU[r.loiBu]?.color}`}>{LOI_BU[r.loiBu]?.label}</span>
                       </td>
