@@ -49,14 +49,22 @@ const emptyForm = {
 const inp = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200";
 const inpRo = "w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-500 select-none";
 
-// Trả về true nếu lô đã nhập: trangThai = "da_nhap" HOẶC tất cả cây đã đánh dấu "da_nhap"
-const isLoDaNhap = (l: LoCat): boolean => {
-  if (l.trangThai === "da_nhap") return true;
-  if (!l.cayData) return false;
+// Chuẩn hoá trangThai của lô từ cayData (chạy 1 lần khi fetch, không cần tính lại trong render)
+// Nếu tất cả cây đã "da_nhap" mà parent vẫn "chua_nhap" → tự sửa + patch DB ngầm
+const normalizeLo = (lo: LoCat): LoCat => {
+  if (lo.trangThai === "da_nhap" || !lo.cayData) return lo;
   try {
-    const parsed: { trangThai?: string }[] = JSON.parse(l.cayData);
-    return parsed.length > 0 && parsed.every(c => c.trangThai === "da_nhap");
-  } catch { return false; }
+    const parsed: { trangThai?: string }[] = JSON.parse(lo.cayData);
+    if (parsed.length > 0 && parsed.every(c => c.trangThai === "da_nhap")) {
+      // Patch DB ngầm (fire-and-forget) để giữ sạch data
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trangThai: "da_nhap" }),
+      }).catch(() => {});
+      return { ...lo, trangThai: "da_nhap" };
+    }
+  } catch { /* ignore */ }
+  return lo;
 };
 
 export default function SanXuatPage() {
@@ -292,13 +300,13 @@ export default function SanXuatPage() {
     if (filterXuong) p.set("xuong", filterXuong);
     if (filterTrangThai) p.set("trangThai", filterTrangThai);
     const data = await fetch(`/api/san-xuat/lo-cat?${p}`).then(r => r.json());
-    setLosCat(Array.isArray(data) ? data : []);
+    setLosCat(Array.isArray(data) ? data.map(normalizeLo) : []);
   };
 
   // Fetch ALL lo-cat (no filter) for global balance computation
   const fetchAllForBalance = async () => {
     const data = await fetch("/api/san-xuat/lo-cat").then(r => r.json());
-    setAllLoCat(Array.isArray(data) ? data : []);
+    setAllLoCat(Array.isArray(data) ? data.map(normalizeLo) : []);
   };
 
   // Fetch HoaDonTon global totals
@@ -315,28 +323,6 @@ export default function SanXuatPage() {
 
   useEffect(() => { fetchData(); fetchHoaDonTon(); fetchAllForBalance(); }, [filterThang, filterXuong, filterTrangThai]);
   useEffect(() => { fetchVaiTon(); }, []);
-
-  // Auto-sync: nếu tất cả cây đã nhập nhưng parent trangThai vẫn là chua_nhap → patch DB
-  useEffect(() => {
-    if (losCat.length === 0) return;
-    losCat.forEach(lo => {
-      if (lo.trangThai !== "da_nhap" && lo.cayData) {
-        try {
-          const parsed: { trangThai?: string }[] = JSON.parse(lo.cayData);
-          if (parsed.length > 0 && parsed.every(c => c.trangThai === "da_nhap")) {
-            // Optimistic update
-            setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: "da_nhap" } : l));
-            setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: "da_nhap" } : l));
-            // Patch DB
-            fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-              method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ trangThai: "da_nhap" }),
-            }).catch(() => {});
-          }
-        } catch { /* ignore */ }
-      }
-    });
-  }, [losCat.length]);
   // Close action menu when clicking outside
   useEffect(() => {
     if (!openActionMenu) return;
@@ -787,7 +773,7 @@ export default function SanXuatPage() {
   const tongSP  = losCat.reduce((s, l) => s + (l.soSanPham ?? 0), 0);
   const tongNhan = losCat.reduce((s, l) => s + (l.hangThucTe ?? 0), 0);
   const tongThieu = losCat.reduce((s, l) => s + Math.max(0, l.soLuongThieu ?? 0), 0);
-  const daNhapCount = losCat.filter(isLoDaNhap).length;
+  const daNhapCount = losCat.filter(l => l.trangThai === "da_nhap").length;
 
   const thangOptions = useMemo(() => {
     const opts = []; const now = new Date();
@@ -1102,7 +1088,7 @@ export default function SanXuatPage() {
 
       {/* Main tabs: Lô Cắt | Xuất Hóa Đơn */}
       {(() => {
-        const hoaDonCount = allLoCat.filter(isLoDaNhap).length;
+        const hoaDonCount = allLoCat.filter(l => l.trangThai === "da_nhap").length;
         return (
           <div className="flex gap-2 mb-4">
             <button
@@ -1547,7 +1533,7 @@ export default function SanXuatPage() {
 
       {/* ═══ TAB: XUẤT HÓA ĐƠN ═══ */}
       {activeMainTab === "hoa-don" && (() => {
-        const hoaDonRows = allLoCat.filter(isLoDaNhap).sort((a, b) => {
+        const hoaDonRows = allLoCat.filter(l => l.trangThai === "da_nhap").sort((a, b) => {
           const da = a.ngay ? new Date(a.ngay).getTime() : 0;
           const db = b.ngay ? new Date(b.ngay).getTime() : 0;
           return db - da;
