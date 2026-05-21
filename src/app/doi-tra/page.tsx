@@ -594,6 +594,7 @@ export default function DoiTraPage() {
         <table className="w-full text-sm whitespace-nowrap">
           <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             <tr>
+              <th className="px-3 py-3 text-left">Nguồn</th>
               <th className="px-3 py-3 text-left">SĐT Khách</th>
               <th className="px-3 py-3 text-left">Tên KH</th>
               <th className="px-3 py-3 text-left">Địa chỉ</th>
@@ -603,7 +604,6 @@ export default function DoiTraPage() {
               <th className="px-3 py-3 text-right">Thu KH</th>
               <th className="px-3 py-3 text-center">Chiều</th>
               <th className="px-3 py-3 text-left">Mã vận đơn</th>
-              <th className="px-3 py-3 text-left">Nguồn</th>
               <th className="px-3 py-3 text-left">Ngày tạo</th>
               <th className="px-3 py-3"></th>
             </tr>
@@ -627,6 +627,20 @@ export default function DoiTraPage() {
                   !daGui ? "bg-amber-50 hover:bg-amber-100" :
                   "hover:bg-slate-50"
                 }`}>
+                  {/* Nguồn */}
+                  <td className="px-3 py-2.5">
+                    {r.nguon ? (
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        r.nguon === "shopee" ? "bg-orange-100 text-orange-700" :
+                        r.nguon === "tiktok" ? "bg-pink-100 text-pink-700" :
+                        r.nguon === "don_ngoai" ? "bg-blue-100 text-blue-700" :
+                        "bg-slate-100 text-slate-600"
+                      }`}>
+                        {r.nguon === "shopee" ? "Shopee" : r.nguon === "tiktok" ? "Tiktok" : r.nguon === "don_ngoai" ? "Đơn ngoài" : "Khác"}
+                      </span>
+                    ) : <span className="text-slate-300 text-xs">—</span>}
+                  </td>
+
                   {/* SĐT */}
                   <td className="px-3 py-2.5 font-mono font-medium">
                     <div className="flex items-center gap-1.5">
@@ -683,20 +697,6 @@ export default function DoiTraPage() {
                       </span>
                     )}
                     {daGui && <p className="text-xs text-green-600 mt-0.5">✓ Đã gửi</p>}
-                  </td>
-
-                  {/* Nguồn */}
-                  <td className="px-3 py-2.5">
-                    {r.nguon ? (
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        r.nguon === "shopee" ? "bg-orange-100 text-orange-700" :
-                        r.nguon === "tiktok" ? "bg-pink-100 text-pink-700" :
-                        r.nguon === "don_ngoai" ? "bg-blue-100 text-blue-700" :
-                        "bg-slate-100 text-slate-600"
-                      }`}>
-                        {r.nguon === "shopee" ? "Shopee" : r.nguon === "tiktok" ? "Tiktok" : r.nguon === "don_ngoai" ? "Đơn ngoài" : "Khác"}
-                      </span>
-                    ) : <span className="text-slate-300 text-xs">—</span>}
                   </td>
 
                   {/* Ngày */}
