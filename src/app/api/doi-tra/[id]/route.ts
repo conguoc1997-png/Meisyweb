@@ -24,6 +24,7 @@ export async function PATCH(
         ...(body.soChieuShip !== undefined && { soChieuShip: Number(body.soChieuShip) }),
         ...(body.maVanDon    !== undefined && { maVanDon: body.maVanDon || null }),
         ...(body.nguoiXuLy   !== undefined && { nguoiXuLy: body.nguoiXuLy }),
+        ...(body.nguon       !== undefined && { nguon: body.nguon || null }),
       },
     });
     return NextResponse.json(record);

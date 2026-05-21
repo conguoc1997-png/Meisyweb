@@ -85,6 +85,7 @@ model DoiTra {
   // cho_xu_ly | dang_xu_ly | da_gui | hoan_thanh
 
   nguoiXuLy String?
+  nguon     String?  // shopee | tiktok | don_ngoai | khac
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
