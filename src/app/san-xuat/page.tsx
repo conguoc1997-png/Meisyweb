@@ -1961,23 +1961,25 @@ export default function SanXuatPage() {
                       <input value={form.maVai}
                         onChange={e => {
                           const val = e.target.value;
-                          // Tìm vải khớp theo label "maVai — mauSac" hoặc maVai
-                          const found = vaiTons.find(v => `${v.maVai}${v.mauSac ? ` — ${v.mauSac}` : ""}` === val)
-                            || vaiTons.find(v => v.maVai === val);
+                          // Chỉ tìm trong vải của xưởng đang chọn
+                          const vaiXuong = vaiTons.filter(v => !v.xuong || v.xuong === form.xuong);
+                          const found = vaiXuong.find(v => `${v.maVai}${v.mauSac ? ` — ${v.mauSac}` : ""}` === val)
+                            || vaiXuong.find(v => v.maVai === val);
                           setForm(f => ({ ...f, maVai: found?.maVai ?? val }));
                           setSelectedVaiId(found?.id ?? "");
                           setSelectedVaiCayIdxs([]);
                         }}
                         className={inp} list="lo-cat-mavai-list" placeholder="Nhập hoặc chọn từ kho..." />
                       <datalist id="lo-cat-mavai-list">
-                        {vaiTons.map(v => {
+                        {vaiTons.filter(v => !v.xuong || v.xuong === form.xuong).map(v => {
                           const label = `${v.maVai}${v.mauSac ? ` — ${v.mauSac}` : ""}`;
                           return <option key={v.id} value={label}>{label} ({v.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} {v.donVi})</option>;
                         })}
                       </datalist>
                       {/* Chọn cây từ kho khi mã vải khớp */}
                       {(() => {
-                        const matched = vaiTons.find(v => v.id === selectedVaiId) || vaiTons.find(v => v.maVai === form.maVai);
+                        const vaiXuong = vaiTons.filter(v => !v.xuong || v.xuong === form.xuong);
+                        const matched = vaiXuong.find(v => v.id === selectedVaiId) || vaiXuong.find(v => v.maVai === form.maVai);
                         if (!matched) return null;
                         let cays: { soMet: number; soMetUsed?: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
                         if (matched.cayData) { try { cays = JSON.parse(matched.cayData); } catch {} }
