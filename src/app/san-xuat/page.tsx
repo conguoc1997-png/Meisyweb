@@ -49,6 +49,16 @@ const emptyForm = {
 const inp = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200";
 const inpRo = "w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-500 select-none";
 
+// Trả về true nếu lô đã nhập: trangThai = "da_nhap" HOẶC tất cả cây đã đánh dấu "da_nhap"
+const isLoDaNhap = (l: LoCat): boolean => {
+  if (l.trangThai === "da_nhap") return true;
+  if (!l.cayData) return false;
+  try {
+    const parsed: { trangThai?: string }[] = JSON.parse(l.cayData);
+    return parsed.length > 0 && parsed.every(c => c.trangThai === "da_nhap");
+  } catch { return false; }
+};
+
 export default function SanXuatPage() {
   // ── Xưởng list (localStorage) ──
   const [xuongList, setXuongListRaw] = useState<{ key: string; label: string }[]>(() => {
@@ -305,6 +315,28 @@ export default function SanXuatPage() {
 
   useEffect(() => { fetchData(); fetchHoaDonTon(); fetchAllForBalance(); }, [filterThang, filterXuong, filterTrangThai]);
   useEffect(() => { fetchVaiTon(); }, []);
+
+  // Auto-sync: nếu tất cả cây đã nhập nhưng parent trangThai vẫn là chua_nhap → patch DB
+  useEffect(() => {
+    if (losCat.length === 0) return;
+    losCat.forEach(lo => {
+      if (lo.trangThai !== "da_nhap" && lo.cayData) {
+        try {
+          const parsed: { trangThai?: string }[] = JSON.parse(lo.cayData);
+          if (parsed.length > 0 && parsed.every(c => c.trangThai === "da_nhap")) {
+            // Optimistic update
+            setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: "da_nhap" } : l));
+            setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: "da_nhap" } : l));
+            // Patch DB
+            fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ trangThai: "da_nhap" }),
+            }).catch(() => {});
+          }
+        } catch { /* ignore */ }
+      }
+    });
+  }, [losCat.length]);
   // Close action menu when clicking outside
   useEffect(() => {
     if (!openActionMenu) return;
@@ -755,7 +787,7 @@ export default function SanXuatPage() {
   const tongSP  = losCat.reduce((s, l) => s + (l.soSanPham ?? 0), 0);
   const tongNhan = losCat.reduce((s, l) => s + (l.hangThucTe ?? 0), 0);
   const tongThieu = losCat.reduce((s, l) => s + Math.max(0, l.soLuongThieu ?? 0), 0);
-  const daNhapCount = losCat.filter(l => l.trangThai === "da_nhap").length;
+  const daNhapCount = losCat.filter(isLoDaNhap).length;
 
   const thangOptions = useMemo(() => {
     const opts = []; const now = new Date();
@@ -1070,7 +1102,7 @@ export default function SanXuatPage() {
 
       {/* Main tabs: Lô Cắt | Xuất Hóa Đơn */}
       {(() => {
-        const hoaDonCount = allLoCat.filter(l => l.trangThai === "da_nhap").length;
+        const hoaDonCount = allLoCat.filter(isLoDaNhap).length;
         return (
           <div className="flex gap-2 mb-4">
             <button
@@ -1515,7 +1547,7 @@ export default function SanXuatPage() {
 
       {/* ═══ TAB: XUẤT HÓA ĐƠN ═══ */}
       {activeMainTab === "hoa-don" && (() => {
-        const hoaDonRows = allLoCat.filter(l => l.trangThai === "da_nhap").sort((a, b) => {
+        const hoaDonRows = allLoCat.filter(isLoDaNhap).sort((a, b) => {
           const da = a.ngay ? new Date(a.ngay).getTime() : 0;
           const db = b.ngay ? new Date(b.ngay).getTime() : 0;
           return db - da;
