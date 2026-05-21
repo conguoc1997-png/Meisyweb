@@ -930,7 +930,8 @@ export default function SanXuatPage() {
                         </td>
                         <td className="px-3 py-2 text-center">
                           {(() => {
-                            const totalCay = v.soCay ?? 0;
+                            // Dùng cayDataParsed.length nếu có, tránh lệch với v.soCay
+                            const totalCay = cayDataParsed.length > 0 ? cayDataParsed.length : (v.soCay ?? 0);
                             const cutCount = cayDataParsed.filter((c: { cut?: boolean }) => c.cut).length;
                             const remainingCay = totalCay - cutCount;
                             const hasAnyCut = cutCount > 0;
