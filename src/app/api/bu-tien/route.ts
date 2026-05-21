@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
         trangThai: body.trangThai || "cho_bu",
         ghiChu:    body.ghiChu    || null,
         nguoiXuLy: body.nguoiXuLy || null,
+        nguon:     body.nguon     || null,
       },
     });
     return NextResponse.json(record, { status: 201 });

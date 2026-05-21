@@ -19,6 +19,7 @@ export async function PATCH(
         ...(body.trangThai !== undefined && { trangThai: body.trangThai }),
         ...(body.ghiChu    !== undefined && { ghiChu:    body.ghiChu    || null }),
         ...(body.nguoiXuLy !== undefined && { nguoiXuLy: body.nguoiXuLy || null }),
+        ...(body.nguon     !== undefined && { nguon:     body.nguon     || null }),
       },
     });
     return NextResponse.json(record);

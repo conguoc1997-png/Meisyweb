@@ -116,6 +116,7 @@ model BuTien {
   trangThai    String   @default("cho_bu") // cho_bu | da_bu
   ghiChu       String?
   nguoiXuLy    String?
+  nguon        String?  // shopee | tiktok | khac
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

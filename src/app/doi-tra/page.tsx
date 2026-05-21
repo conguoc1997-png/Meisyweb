@@ -50,11 +50,18 @@ type BuTien = {
   trangThai: string;
   ghiChu: string | null;
   nguoiXuLy: string | null;
+  nguon: string | null;
   createdAt: string;
 };
 
+const NGUON_BU_OPTIONS = [
+  { value: "shopee",  label: "Shopee",  cls: "bg-orange-100 text-orange-700" },
+  { value: "tiktok",  label: "Tiktok",  cls: "bg-pink-100 text-pink-700" },
+  { value: "khac",    label: "Khác",    cls: "bg-slate-100 text-slate-600" },
+];
+
 const emptyBuTienForm = {
-  tenKhach: "", sdtKhach: "", loiBu: "hang_loi", soTien: "", ghiChu: "",
+  tenKhach: "", sdtKhach: "", nguon: "shopee", loiBu: "hang_loi", soTien: "", ghiChu: "",
 };
 
 const emptyFeedbackForm = {
@@ -263,7 +270,7 @@ export default function DoiTraPage() {
 
   const openBtEdit = (r: BuTien) => {
     setBtForm({
-      tenKhach: r.tenKhach, sdtKhach: r.sdtKhach || "", loiBu: r.loiBu,
+      tenKhach: r.tenKhach, sdtKhach: r.sdtKhach || "", nguon: r.nguon || "shopee", loiBu: r.loiBu,
       soTien: String(r.soTien), ghiChu: r.ghiChu || "",
     });
     setBtEditRecord(r);
@@ -1139,6 +1146,7 @@ export default function DoiTraPage() {
                 <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
                   <tr>
                     <th className="px-3 py-3 text-left">Thời gian</th>
+                    <th className="px-3 py-3 text-left">Nguồn</th>
                     <th className="px-3 py-3 text-left">Tên KH</th>
                     <th className="px-3 py-3 text-left">SĐT</th>
                     <th className="px-3 py-3 text-left">Lỗi bù</th>
@@ -1151,6 +1159,14 @@ export default function DoiTraPage() {
                   {buTiens.map((r) => (
                     <tr key={r.id} className="transition-colors hover:bg-slate-50">
                       <td className="px-3 py-2.5 text-xs text-slate-400">{formatDateTime(r.createdAt)}</td>
+                      <td className="px-3 py-2.5">
+                        {(() => {
+                          const opt = NGUON_BU_OPTIONS.find(o => o.value === r.nguon);
+                          return opt
+                            ? <span className={`px-2 py-0.5 rounded text-xs font-medium ${opt.cls}`}>{opt.label}</span>
+                            : <span className="text-slate-300 text-xs">—</span>;
+                        })()}
+                      </td>
                       <td className="px-3 py-2.5 font-medium text-slate-800">{r.tenKhach}</td>
                       <td className="px-3 py-2.5 font-mono text-sm text-slate-600">{r.sdtKhach || <span className="text-slate-300">—</span>}</td>
                       <td className="px-3 py-2.5">
@@ -1257,6 +1273,15 @@ export default function DoiTraPage() {
                 className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <form onSubmit={handleBtSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Nguồn *</label>
+                <select value={btForm.nguon} onChange={(e) => setBtForm({ ...btForm, nguon: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                  <option value="shopee">🛒 Shopee</option>
+                  <option value="tiktok">🎵 Tiktok</option>
+                  <option value="khac">🔖 Khác</option>
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Tên khách hàng *</label>
