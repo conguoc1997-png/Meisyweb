@@ -463,17 +463,30 @@ export default function SanXuatPage() {
           }
 
           // Đánh dấu cây mới được chọn
+          const isYardVai = matchedVai.donVi === "yard";
           if (selectedVaiCayIdxs.length > 0 && savedId) {
-            const isYardVai = matchedVai.donVi === "yard";
+            // Có chọn cây cụ thể → trừ từng cây
             vCays = vCays.map((c, i) => {
               const selIdx = selectedVaiCayIdxs.indexOf(i);
               if (selIdx === -1) return c;
-              // Nếu vải tính theo yard → trừ bằng soY; ngược lại dùng soM
               const amountUsed = isYardVai
                 ? (numCay === 1 ? (Number(form.soY) || 0) : (Number(cayRows[selIdx]?.soY) || 0))
                 : (numCay === 1 ? (Number(form.soM) || 0) : (Number(cayRows[selIdx]?.soM) || 0));
               return { ...c, soMet: Math.max(0, c.soMet - amountUsed), soMetUsed: amountUsed, cut: true, lotId: savedId, lotCayIdx: selIdx };
             });
+          } else if (!modalEdit && savedId) {
+            // Không chọn cây → fallback: trừ thẳng vào soMet tổng của cây đầu tiên chưa cắt
+            const amountUsed = isYardVai
+              ? (Number(form.soY) || 0)
+              : (soMTotal || Number(form.soM) || 0);
+            if (amountUsed > 0) {
+              let deducted = false;
+              vCays = vCays.map(c => {
+                if (deducted || c.cut) return c;
+                deducted = true;
+                return { ...c, soMet: Math.max(0, c.soMet - amountUsed), soMetUsed: amountUsed, cut: true, lotId: savedId, lotCayIdx: 0 };
+              });
+            }
           }
 
           // Kiểm tra tất cả cây đã cắt chưa
