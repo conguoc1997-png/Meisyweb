@@ -498,9 +498,31 @@ export default function SanXuatPage() {
 
   const toggleCayTrangThai = (lo: LoCat, ci: number) => {
     try {
-      const parsed = JSON.parse(lo.cayData!);
+      const parsed: { trangThai?: string }[] = JSON.parse(lo.cayData!);
       const cur = parsed[ci]?.trangThai ?? "chua_nhap";
-      saveCayField(lo, ci, "trangThai", cur === "da_nhap" ? "chua_nhap" : "da_nhap");
+      const nextCay = cur === "da_nhap" ? "chua_nhap" : "da_nhap";
+
+      // Cập nhật per-cây
+      parsed[ci] = { ...parsed[ci], trangThai: nextCay };
+      const newCayData = JSON.stringify(parsed);
+
+      // Kiểm tra tất cả cây đã nhập chưa
+      const allDaNhap = parsed.every(c => c.trangThai === "da_nhap");
+      const newLoTrangThai = allDaNhap ? "da_nhap" : "chua_nhap";
+
+      // Optimistic update
+      setLosCat(prev => prev.map(l =>
+        l.id === lo.id ? { ...l, cayData: newCayData, trangThai: newLoTrangThai } : l
+      ));
+
+      // Nếu tất cả cây đã nhập → chuyển sang tab hóa đơn
+      if (allDaNhap) setActiveMainTab("hoa-don");
+
+      // Lưu cayData + trangThai lô cùng lúc
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newCayData, trangThai: newLoTrangThai }),
+      }).catch(() => fetchData());
     } catch { /* ignore */ }
   };
 
