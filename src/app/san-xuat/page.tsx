@@ -458,10 +458,17 @@ export default function SanXuatPage() {
             });
           }
 
-          await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cayData: vCays }),
-          });
+          // Kiểm tra tất cả cây đã cắt chưa
+          const allCut = vCays.every((c: { cut?: boolean }) => c.cut);
+          if (allCut) {
+            // Xoá hẳn record nếu không còn cây nào chưa cắt
+            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, { method: "DELETE" });
+          } else {
+            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ cayData: vCays }),
+            });
+          }
           fetchVaiTon();
         }
       }
@@ -1729,17 +1736,14 @@ export default function SanXuatPage() {
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <button
                   onClick={async () => {
-                    if (!confirm("Đặt kho vải này về 0? (soMet=0, soCay=0)")) return;
+                    if (!confirm("Xoá hẳn mã vải này khỏi tồn kho?")) return;
                     const target = modalVai as VaiTon;
-                    await fetch(`/api/san-xuat/vai-ton/${target.id}`, {
-                      method: "PATCH", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ soMet: 0, soCay: 0, cayData: null }),
-                    });
+                    await fetch(`/api/san-xuat/vai-ton/${target.id}`, { method: "DELETE" });
                     setModalVai(null);
                     fetchVaiTon();
                   }}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">
-                  🗑 Đặt về 0 (reset kho)
+                  🗑 Xoá mã vải này khỏi tồn kho
                 </button>
               </div>
             )}
