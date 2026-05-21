@@ -785,7 +785,8 @@ export default function SanXuatPage() {
   // Stats
   const tongSP  = losCat.reduce((s, l) => s + (l.soSanPham ?? 0), 0);
   const tongNhan = losCat.reduce((s, l) => s + (l.hangThucTe ?? 0), 0);
-  const tongThieu = losCat.reduce((s, l) => s + Math.max(0, l.soLuongThieu ?? 0), 0);
+  // Chỉ tính thiếu khi đã có giá trị "Nhận về" (hangThucTe != null)
+  const tongThieu = losCat.reduce((s, l) => s + (l.hangThucTe != null ? Math.max(0, l.soLuongThieu ?? 0) : 0), 0);
   const daNhapCount = losCat.filter(l => l.trangThai === "da_nhap").length;
 
   const thangOptions = useMemo(() => {
