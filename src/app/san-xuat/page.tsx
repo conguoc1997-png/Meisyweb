@@ -620,8 +620,8 @@ export default function SanXuatPage() {
       }
       const newCays = cays.map((c, i) => {
         if (i !== cayIdx) return c;
-        const { cut: _cut, lotId: _lotId, lotCayIdx: _lotCayIdx, ...rest } = c;
-        void _cut; void _lotId; void _lotCayIdx;
+        const { cut: _cut, lotId: _lotId, lotCayIdx: _lotCayIdx, soMetUsed: _soMetUsed, ...rest } = c;
+        void _cut; void _lotId; void _lotCayIdx; void _soMetUsed;
         return { ...rest, soMet: c.soMet + originalSoM };
       });
       setVaiTons(prev => prev.map(v => v.id === vai.id ? { ...v, cayData: JSON.stringify(newCays) } : v));
