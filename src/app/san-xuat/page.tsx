@@ -798,8 +798,11 @@ export default function SanXuatPage() {
     if (filterThang) {
       const [y, m] = filterThang.split("-").map(Number);
       rows = rows.filter(l => {
-        if (!l.ngayNhanHang) return false;
-        const d = new Date(l.ngayNhanHang);
+        if (l.hangThucTe == null) return false; // chưa điền nhận về → bỏ qua
+        // Ưu tiên ngayNhanHang; nếu chưa có (dữ liệu cũ) fallback sang ngay cắt
+        const dateStr = l.ngayNhanHang ?? l.ngay;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
         return d.getFullYear() === y && d.getMonth() + 1 === m;
       });
     }
