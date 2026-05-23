@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2 } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -54,6 +54,10 @@ export default function KocPage() {
 
   const [formKOC, setFormKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
   const [formEditKOC, setFormEditKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
+  const [linkInput, setLinkInput] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkEditInput, setLinkEditInput] = useState("");
+  const [linkEditLoading, setLinkEditLoading] = useState(false);
   const [formBooking, setFormBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
@@ -101,6 +105,39 @@ export default function KocPage() {
       return b.roi - a.roi;
     });
   }, [kocs, bookings]);
+
+  const fetchProfileFromLink = async (url: string, mode: "add" | "edit") => {
+    if (!url.trim()) return;
+    mode === "add" ? setLinkLoading(true) : setLinkEditLoading(true);
+    try {
+      const res = await fetch("/api/koc/fetch-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (mode === "add") {
+        setFormKOC(prev => ({
+          ...prev,
+          ten: data.ten || prev.ten,
+          platform: data.platform || prev.platform,
+          linkProfile: data.linkProfile || prev.linkProfile,
+        }));
+      } else {
+        setFormEditKOC(prev => ({
+          ...prev,
+          ten: data.ten || prev.ten,
+          platform: data.platform || prev.platform,
+          linkProfile: data.linkProfile || prev.linkProfile,
+        }));
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Không lấy được thông tin từ link này");
+    } finally {
+      mode === "add" ? setLinkLoading(false) : setLinkEditLoading(false);
+    }
+  };
 
   const handleAddKOC = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
@@ -152,6 +189,7 @@ export default function KocPage() {
 
   const openEditKOC = (k: KOC) => {
     setFormEditKOC({ ten: k.ten, platform: k.platform, follower: String(k.follower), giaCast: String(k.giaCast), linkProfile: k.linkProfile || "", sdt: k.sdt || "", ghiChu: k.ghiChu || "" });
+    setLinkEditInput(k.linkProfile || "");
     setModalEditKOC(k);
   };
 
@@ -1023,6 +1061,41 @@ export default function KocPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-slate-200"><h2 className="font-bold text-slate-800">Thêm KOC mới</h2></div>
             <form onSubmit={handleAddKOC} className="p-5 space-y-3">
+
+              {/* Dán link tự động lấy thông tin */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                  <Link2 size={13} /> Dán link profile để tự lấy thông tin
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={linkInput}
+                    onChange={e => setLinkInput(e.target.value)}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData("text");
+                      if (pasted.includes("tiktok.com") || pasted.includes("shopee.vn") || pasted.includes("instagram.com") || pasted.includes("facebook.com")) {
+                        e.preventDefault();
+                        setLinkInput(pasted.trim());
+                        setTimeout(() => fetchProfileFromLink(pasted.trim(), "add"), 100);
+                      }
+                    }}
+                    placeholder="https://www.tiktok.com/@username"
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-300 bg-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={linkLoading || !linkInput.trim()}
+                    onClick={() => fetchProfileFromLink(linkInput, "add")}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 transition whitespace-nowrap"
+                  >
+                    {linkLoading ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                    {linkLoading ? "Đang lấy..." : "Lấy info"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">Hỗ trợ: TikTok, Shopee, Instagram, Facebook — dán link tự nhận diện</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Tên KOC *</label>
@@ -1059,7 +1132,7 @@ export default function KocPage() {
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setModalKOC(false)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="button" onClick={() => { setModalKOC(false); setLinkInput(""); }} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">{loading ? "Đang lưu..." : "Thêm KOC"}</button>
               </div>
             </form>
@@ -1152,6 +1225,40 @@ export default function KocPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-slate-200"><h2 className="font-bold text-slate-800">Sửa thông tin KOC</h2></div>
             <form onSubmit={handleEditKOC} className="p-5 space-y-3">
+
+              {/* Dán link để refresh thông tin */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                  <Link2 size={13} /> Cập nhật qua link profile
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={linkEditInput}
+                    onChange={e => setLinkEditInput(e.target.value)}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData("text");
+                      if (pasted.includes("tiktok.com") || pasted.includes("shopee.vn") || pasted.includes("instagram.com") || pasted.includes("facebook.com")) {
+                        e.preventDefault();
+                        setLinkEditInput(pasted.trim());
+                        setTimeout(() => fetchProfileFromLink(pasted.trim(), "edit"), 100);
+                      }
+                    }}
+                    placeholder="https://www.tiktok.com/@username"
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-300 bg-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={linkEditLoading || !linkEditInput.trim()}
+                    onClick={() => fetchProfileFromLink(linkEditInput, "edit")}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 transition whitespace-nowrap"
+                  >
+                    {linkEditLoading ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                    {linkEditLoading ? "Đang lấy..." : "Lấy info"}
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Tên KOC *</label>
