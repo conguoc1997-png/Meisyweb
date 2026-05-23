@@ -807,6 +807,7 @@ export default function KocPage() {
                               <th className="text-left px-5 py-2.5 text-slate-500 font-medium text-xs">KOC</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Thời gian</th>
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Số lượng gửi</th>
+                              <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá cast</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Trạng thái</th>
                               <th className="px-4 py-2.5"></th>
                             </tr>
@@ -824,6 +825,9 @@ export default function KocPage() {
                                   {formatDate(b.ngayBat)}{b.ngayKet ? ` → ${formatDate(b.ngayKet)}` : " → ..."}
                                 </td>
                                 <td className="px-4 py-3 text-right text-xs text-slate-600">{b.soLuongGui} cái</td>
+                                <td className="px-4 py-3 text-right text-xs font-medium text-rose-600">
+                                  {b.chiPhiCast > 0 ? formatCurrency(b.chiPhiCast) : <span className="text-slate-400">—</span>}
+                                </td>
                                 <td className="px-4 py-3">
                                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${TT_COLOR[b.trangThai]}`}>
                                     {TRANG_THAI_BOOKING[b.trangThai]}
