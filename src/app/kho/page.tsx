@@ -55,6 +55,7 @@ export default function KhoPage() {
   };
   const [modalSheet, setModalSheet] = useState(false);
   const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetIncludePrice, setSheetIncludePrice] = useState(false);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [sheetError, setSheetError] = useState("");
   const [sheetPreview, setSheetPreview] = useState<SheetRow[]>([]);
@@ -90,7 +91,7 @@ export default function KhoPage() {
     try {
       const rows = sheetPreview.map(r => ({
         ten: r.ten,
-        giaBan: r.giaBan,
+        giaBan: sheetIncludePrice ? r.giaBan : null, // bỏ giá nếu không chọn
         existingId: r.existingId ?? null,
       }));
       const res = await fetch("/api/kho/update-sheet", {
@@ -253,7 +254,7 @@ export default function KhoPage() {
             {importLoading ? "Đang đọc..." : "Import Excel"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} />
           </label>
-          <button onClick={() => { setModalSheet(true); setSheetUrl(""); setSheetPreview([]); setSheetError(""); setSheetDone(false); }}
+          <button onClick={() => { setModalSheet(true); setSheetUrl(""); setSheetPreview([]); setSheetError(""); setSheetDone(null); setSheetIncludePrice(false); }}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
             <FileSpreadsheet size={16} /> Cập nhật từ Sheet
           </button>
@@ -612,7 +613,14 @@ export default function KhoPage() {
               {sheetError && (
                 <p className="mt-2 text-xs text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {sheetError}</p>
               )}
-              <p className="mt-1.5 text-xs text-slate-400">Share sheet quyền <strong>"Anyone with the link"</strong> trước khi dán link.</p>
+              <div className="mt-2.5 flex items-center justify-between">
+                <p className="text-xs text-slate-400">Share sheet quyền <strong>"Anyone with the link"</strong> trước khi dán link.</p>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={sheetIncludePrice} onChange={e => setSheetIncludePrice(e.target.checked)}
+                    className="w-4 h-4 rounded accent-emerald-600 cursor-pointer" />
+                  <span className="text-sm text-slate-700 font-medium">Bao gồm giá bán</span>
+                </label>
+              </div>
             </div>
 
             {/* Preview table */}
@@ -636,8 +644,10 @@ export default function KhoPage() {
                       <tr>
                         <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Tên (cột B)</th>
                         <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">SP khớp (SKU)</th>
-                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá bán cũ</th>
-                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá bán mới (cột I)</th>
+                        {sheetIncludePrice && <>
+                          <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá bán cũ</th>
+                          <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá bán mới (cột I)</th>
+                        </>}
                         <th className="text-center px-4 py-2.5 text-slate-500 font-medium text-xs w-24">Hành động</th>
                       </tr>
                     </thead>
@@ -650,13 +660,15 @@ export default function KhoPage() {
                               ? <span className="text-green-600 italic">Sản phẩm mới</span>
                               : <span className="font-mono text-slate-600">{row.existingSku}</span>}
                           </td>
-                          <td className="px-4 py-2 text-right text-xs text-slate-400">
-                            {!row.isNew && row.oldGiaBan != null && row.oldGiaBan > 0
-                              ? row.oldGiaBan.toLocaleString("vi-VN") + " ₫" : "—"}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm font-semibold text-emerald-700">
-                            {row.giaBan != null ? row.giaBan.toLocaleString("vi-VN") + " ₫" : "—"}
-                          </td>
+                          {sheetIncludePrice && <>
+                            <td className="px-4 py-2 text-right text-xs text-slate-400">
+                              {!row.isNew && row.oldGiaBan != null && row.oldGiaBan > 0
+                                ? row.oldGiaBan.toLocaleString("vi-VN") + " ₫" : "—"}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm font-semibold text-emerald-700">
+                              {row.giaBan != null ? row.giaBan.toLocaleString("vi-VN") + " ₫" : "—"}
+                            </td>
+                          </>}
                           <td className="px-4 py-2 text-center">
                             {row.isNew
                               ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Thêm mới</span>
