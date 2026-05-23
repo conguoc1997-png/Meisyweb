@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet } from "lucide-react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -35,6 +35,10 @@ export default function KocPage() {
   const [modalBooking, setModalBooking] = useState(false);
   const [modalUpdate, setModalUpdate] = useState<Booking | null>(null);
   const [modalEditKOC, setModalEditKOC] = useState<KOC | null>(null);
+  const [modalEditBooking, setModalEditBooking] = useState<Booking | null>(null);
+  const [modalEditChiPhi, setModalEditChiPhi] = useState<Booking | null>(null);
+  const [formEditBooking, setFormEditBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
+  const [formEditChiPhi, setFormEditChiPhi] = useState({ chiPhiCast: "", chiPhiSP: "" });
   const [modalLaunch, setModalLaunch] = useState<SanPham | null>(null);
   const [launchKOCs, setLaunchKOCs] = useState<Record<string, { checked: boolean; soLuong: string }>>({});
   const [launchNgayBat, setLaunchNgayBat] = useState("");
@@ -242,6 +246,61 @@ export default function KocPage() {
     setLaunchNgayBat(new Date().toISOString().slice(0, 10));
     setLaunchSearch("");
     setModalLaunch(sp);
+  };
+
+  const openEditBooking = (b: Booking) => {
+    setFormEditBooking({
+      kocId: b.kocId, sanPhamId: b.sanPhamId ?? "",
+      soLuongGui: String(b.soLuongGui),
+      ngayBat: b.ngayBat.slice(0, 10),
+      ngayKet: b.ngayKet ? b.ngayKet.slice(0, 10) : "",
+      ghiChu: b.ghiChu ?? "",
+    });
+    setModalEditBooking(b);
+  };
+
+  const handleSaveEditBooking = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true);
+    try {
+      const res = await fetch(`/api/koc/booking/${modalEditBooking!.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formEditBooking),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setModalEditBooking(null); fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setLoading(false); }
+  };
+
+  const openEditChiPhi = (b: Booking) => {
+    setFormEditChiPhi({ chiPhiCast: String(b.chiPhiCast), chiPhiSP: String(b.chiPhiSP) });
+    setModalEditChiPhi(b);
+  };
+
+  const handleSaveChiPhi = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true);
+    try {
+      const chiPhiCast = Number(formEditChiPhi.chiPhiCast) || 0;
+      const chiPhiSP   = Number(formEditChiPhi.chiPhiSP)   || 0;
+      const res = await fetch(`/api/koc/booking/${modalEditChiPhi!.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chiPhiCast, chiPhiSP }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setModalEditChiPhi(null); fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setLoading(false); }
+  };
+
+  const handleDeleteBooking = async (b: Booking) => {
+    if (!confirm(`Xoá booking của ${b.koc.ten}?`)) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/koc/booking/${b.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setLoading(false); }
   };
 
   const handleLaunchSubmit = async (e: React.FormEvent) => {
@@ -751,7 +810,15 @@ export default function KocPage() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  <button onClick={() => openUpdate(b)} className="text-xs text-rose-500 hover:underline">Cập nhật</button>
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <button onClick={() => openUpdate(b)} className="text-xs text-rose-500 hover:underline px-2 py-1">Kết quả</button>
+                                    <button onClick={() => openEditBooking(b)} className="p-1.5 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition" title="Sửa booking">
+                                      <Pencil size={13} />
+                                    </button>
+                                    <button onClick={() => handleDeleteBooking(b)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition" title="Xoá">
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -787,16 +854,22 @@ export default function KocPage() {
                                 <th className="text-right px-3 py-2 text-slate-500">Số lượng</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Chi phí SP</th>
                                 <th className="text-right px-3 py-2 text-slate-500 font-semibold">Tổng</th>
+                                <th className="px-3 py-2 w-8"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {group.items.map(b => (
-                                <tr key={b.id}>
+                                <tr key={b.id} className="hover:bg-slate-50">
                                   <td className="px-3 py-2 font-medium text-slate-700">{b.koc.ten}</td>
                                   <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(b.chiPhiCast)}</td>
                                   <td className="px-3 py-2 text-right text-slate-600">{b.soLuongGui} cái</td>
                                   <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(b.chiPhiSP)}</td>
                                   <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(b.chiPhi)}</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <button onClick={() => openEditChiPhi(b)} className="p-1 rounded hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition" title="Sửa chi phí">
+                                      <Pencil size={12} />
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1753,6 +1826,106 @@ export default function KocPage() {
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setModalEditKOC(null)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">{loading ? "Đang lưu..." : "Lưu"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sửa thông tin Booking */}
+      {modalEditBooking && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-slate-200">
+              <h2 className="font-bold text-slate-800">Sửa booking</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{modalEditBooking.koc.ten}{modalEditBooking.sanPham ? ` · ${modalEditBooking.sanPham.sku}` : ""}</p>
+            </div>
+            <form onSubmit={handleSaveEditBooking} className="p-5 space-y-3">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">KOC *</label>
+                <select required value={formEditBooking.kocId} onChange={e => setFormEditBooking({...formEditBooking, kocId: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200">
+                  {kocs.map(k => <option key={k.id} value={k.id}>{k.ten}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Sản phẩm</label>
+                  <select value={formEditBooking.sanPhamId} onChange={e => setFormEditBooking({...formEditBooking, sanPhamId: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200">
+                    <option value="">-- Không --</option>
+                    {sanPhams.map(s => <option key={s.id} value={s.id}>{s.sku}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Số lượng gửi</label>
+                  <input type="number" min="0" value={formEditBooking.soLuongGui}
+                    onChange={e => setFormEditBooking({...formEditBooking, soLuongGui: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Ngày bắt đầu *</label>
+                  <input required type="date" value={formEditBooking.ngayBat}
+                    onChange={e => setFormEditBooking({...formEditBooking, ngayBat: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Ngày kết thúc</label>
+                  <input type="date" value={formEditBooking.ngayKet}
+                    onChange={e => setFormEditBooking({...formEditBooking, ngayKet: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
+                <input value={formEditBooking.ghiChu} onChange={e => setFormEditBooking({...formEditBooking, ghiChu: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setModalEditBooking(null)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">
+                  {loading ? "Đang lưu..." : "Lưu"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sửa Chi phí */}
+      {modalEditChiPhi && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div className="p-5 border-b border-slate-200">
+              <h2 className="font-bold text-slate-800">Cập nhật chi phí</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{modalEditChiPhi.koc.ten}{modalEditChiPhi.sanPham ? ` · ${modalEditChiPhi.sanPham.sku}` : ""}</p>
+            </div>
+            <form onSubmit={handleSaveChiPhi} className="p-5 space-y-3">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Chi phí Cast (VNĐ)</label>
+                <input type="number" min="0" value={formEditChiPhi.chiPhiCast}
+                  onChange={e => setFormEditChiPhi({...formEditChiPhi, chiPhiCast: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Chi phí Sản phẩm (VNĐ)</label>
+                <input type="number" min="0" value={formEditChiPhi.chiPhiSP}
+                  onChange={e => setFormEditChiPhi({...formEditChiPhi, chiPhiSP: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 text-xs flex justify-between">
+                <span className="text-slate-500">Tổng chi phí</span>
+                <span className="font-bold text-rose-600">
+                  {((Number(formEditChiPhi.chiPhiCast)||0) + (Number(formEditChiPhi.chiPhiSP)||0)).toLocaleString("vi-VN")}đ
+                </span>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setModalEditChiPhi(null)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">
+                  {loading ? "Đang lưu..." : "Lưu chi phí"}
+                </button>
               </div>
             </form>
           </div>
