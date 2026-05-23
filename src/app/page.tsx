@@ -11,6 +11,7 @@ import {
   MessageCircle, HeadphonesIcon, Heart,
   Megaphone, Zap, Target,
   Shield, Key, Lock,
+  DollarSign, Tags, BadgePercent,
 } from "lucide-react";
 import { useUser } from "@/lib/user-context";
 
@@ -94,19 +95,24 @@ const MODULES: Module[] = [
     ],
   },
   {
+    key: "gia-ban",
+    label: "Giá bán SP",
+    desc: "Tính giá & lợi nhuận Shopee",
+    icon: Calculator,
+    gradient: "from-emerald-500 to-emerald-700",
+    decoIcons: [DollarSign, Tags, BadgePercent],
+    roles: ["admin", "gia-ban"],
+    href: "/gia-ban",
+  },
+  {
     key: "quantri",
     label: "Quản trị",
-    desc: "User, giá bán, cài đặt",
+    desc: "User & phân quyền",
     icon: Settings,
     gradient: "from-slate-500 to-slate-700",
     decoIcons: [Shield, Key, Lock],
     roles: ["admin"],
     children: [
-      {
-        href: "/gia-ban", label: "Giá bán SP", desc: "Bảng giá sản phẩm",
-        icon: Calculator, color: "bg-slate-100", textColor: "text-slate-600",
-        decoIcons: [BarChart3, TrendingUp, PieChart],
-      },
       {
         href: "/admin/users", label: "Quản lý User", desc: "Tài khoản & phân quyền",
         icon: Users, color: "bg-indigo-100", textColor: "text-indigo-600",

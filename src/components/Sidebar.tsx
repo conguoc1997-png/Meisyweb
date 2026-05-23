@@ -71,12 +71,17 @@ const MODULES: NavModule[] = [
     ],
   },
   {
-    key: "quantri", moduleKey: "gia-ban",
+    key: "gia-ban", moduleKey: "gia-ban",
+    label: "Giá bán SP", icon: Calculator,
+    bg: "bg-gradient-to-br from-emerald-500 to-emerald-700", text: "text-white",
+    href: "/gia-ban",
+  },
+  {
+    key: "quantri", moduleKey: "users",
     label: "Quản trị", icon: Settings,
     bg: "bg-gradient-to-br from-slate-500 to-slate-700", text: "text-white",
     children: [
-      { href: "/gia-ban",     label: "Giá bán SP",   icon: Calculator, moduleKey: "gia-ban" },
-      { href: "/admin/users", label: "Quản lý User", icon: Users,      moduleKey: "users"   },
+      { href: "/admin/users", label: "Quản lý User", icon: Users, moduleKey: "users" },
     ],
   },
 ];
