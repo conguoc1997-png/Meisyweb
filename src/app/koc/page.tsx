@@ -59,6 +59,21 @@ export default function KocPage() {
   const [addNewSelected, setAddNewSelected] = useState<Set<number>>(new Set());
   const [addingNew, setAddingNew] = useState(false);
 
+  // Update contacts từ Sheet
+  type ContactRow = {
+    rowIndex: number; kocName: string; kocId: string | null; kocTen: string | null;
+    oldSdt: string | null; oldDiaChi: string | null;
+    newSdt: string | null; newDiaChi: string | null;
+    matched: boolean;
+  };
+  const [modalContacts, setModalContacts] = useState(false);
+  const [contactSheetUrl, setContactSheetUrl] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [contactPreview, setContactPreview] = useState<ContactRow[]>([]);
+  const [contactConfirming, setContactConfirming] = useState(false);
+  const [contactDone, setContactDone] = useState(false);
+
   // Google Sheet import
   const [modalSheet, setModalSheet] = useState(false);
   const [sheetUrl, setSheetUrl] = useState("");
@@ -330,6 +345,39 @@ export default function KocPage() {
     } finally {
       setAddingNew(false);
     }
+  };
+
+  const handleContactPreview = async () => {
+    if (!contactSheetUrl.trim()) return;
+    setContactLoading(true); setContactError(""); setContactPreview([]);
+    try {
+      const res = await fetch("/api/koc/update-contacts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: contactSheetUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setContactPreview(data.preview);
+      setContactDone(false);
+    } catch (e: unknown) { setContactError(e instanceof Error ? e.message : "Lỗi"); }
+    finally { setContactLoading(false); }
+  };
+
+  const handleContactConfirm = async () => {
+    const toUpdate = contactPreview.filter(r => r.matched && r.kocId);
+    if (!toUpdate.length) return;
+    setContactConfirming(true);
+    try {
+      const res = await fetch("/api/koc/update-contacts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: toUpdate.map(r => ({ kocId: r.kocId, sdt: r.newSdt, diaChi: r.newDiaChi })) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setContactDone(true);
+      fetchData();
+    } catch (e: unknown) { alert(e instanceof Error ? e.message : "Lỗi"); }
+    finally { setContactConfirming(false); }
   };
 
   const handleSheetImport = async () => {
@@ -822,9 +870,9 @@ export default function KocPage() {
       {/* KOC Table */}
       {tab === "kocs" && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {/* Search bar */}
-          <div className="px-4 py-3 border-b border-slate-100">
-            <div className="relative max-w-sm">
+          {/* Search bar + action */}
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div className="relative max-w-sm flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={searchKOC}
@@ -836,6 +884,12 @@ export default function KocPage() {
                 <button onClick={() => setSearchKOC("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
               )}
             </div>
+            <button
+              onClick={() => { setContactSheetUrl(""); setContactError(""); setContactPreview([]); setContactDone(false); setModalContacts(true); }}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition whitespace-nowrap"
+            >
+              <FileSpreadsheet size={15} /> Cập nhật SĐT/ĐCHI từ Sheet
+            </button>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -1310,6 +1364,138 @@ export default function KocPage() {
                   {importLoading
                     ? "Đang cập nhật..."
                     : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).filter(k => manualMatches[+k]?.bookingId).length} booking</>}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cập nhật SĐT/ĐCHI từ Sheet */}
+      {modalContacts && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
+                  <FileSpreadsheet size={18} className="text-green-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-800">Cập nhật SĐT & Địa chỉ KOC từ Google Sheets</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Cột I = SĐT · Cột J = Địa chỉ · Tên kênh tự ghép với KOC trong hệ thống</p>
+                </div>
+              </div>
+              <button onClick={() => setModalContacts(false)} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+            </div>
+
+            {/* URL input */}
+            <div className="p-5 border-b border-slate-100">
+              <div className="flex gap-2">
+                <input
+                  autoFocus
+                  type="url"
+                  value={contactSheetUrl}
+                  onChange={e => { setContactSheetUrl(e.target.value); setContactError(""); }}
+                  onPaste={e => {
+                    const p = e.clipboardData.getData("text");
+                    if (p.includes("docs.google.com/spreadsheets")) {
+                      e.preventDefault(); setContactSheetUrl(p.trim()); setContactError("");
+                      setTimeout(handleContactPreview, 100);
+                    }
+                  }}
+                  onKeyDown={e => e.key === "Enter" && handleContactPreview()}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                />
+                <button
+                  onClick={handleContactPreview}
+                  disabled={contactLoading || !contactSheetUrl.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition whitespace-nowrap"
+                >
+                  {contactLoading ? <><Loader2 size={14} className="animate-spin" /> Đang tải...</> : "Xem trước"}
+                </button>
+              </div>
+              {contactError && <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{contactError}</p>}
+            </div>
+
+            {/* Preview table */}
+            {contactPreview.length > 0 && (
+              <>
+                <div className="px-5 py-2 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    <span className="font-semibold text-green-600">{contactPreview.filter(r => r.matched).length}</span> / {contactPreview.length} KOC khớp
+                    {contactPreview.filter(r => !r.matched).length > 0 && (
+                      <span className="ml-2 text-amber-600">{contactPreview.filter(r => !r.matched).length} không tìm thấy (sẽ bỏ qua)</span>
+                    )}
+                  </span>
+                  {contactDone && <span className="text-green-600 font-semibold flex items-center gap-1"><CheckCircle size={13} /> Đã cập nhật!</span>}
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">Tên kênh (sheet)</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">KOC trong hệ thống</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">SĐT hiện tại</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-green-600 font-semibold">SĐT mới (cột I)</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">ĐCHI hiện tại</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-green-600 font-semibold">ĐCHI mới (cột J)</th>
+                        <th className="px-4 py-2.5 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {contactPreview.map(row => (
+                        <tr key={row.rowIndex} className={row.matched ? "bg-white hover:bg-slate-50" : "bg-amber-50"}>
+                          <td className="px-4 py-2.5 text-xs font-medium text-slate-700">{row.kocName}</td>
+                          <td className="px-4 py-2.5 text-xs">
+                            {row.matched
+                              ? <span className="text-green-700 font-medium flex items-center gap-1"><CheckCircle size={11} className="text-green-500" />{row.kocTen}</span>
+                              : <span className="text-amber-600 flex items-center gap-1"><XCircle size={11} />Không tìm thấy</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400 font-mono">{row.oldSdt || "—"}</td>
+                          <td className="px-4 py-2.5 text-xs">
+                            {row.newSdt
+                              ? <span className={`font-mono font-semibold ${row.matched ? "text-green-700" : "text-slate-400"}`}>{row.newSdt}</span>
+                              : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400 max-w-[150px]"><span className="truncate block">{row.oldDiaChi || "—"}</span></td>
+                          <td className="px-4 py-2.5 text-xs max-w-[180px]">
+                            {row.newDiaChi
+                              ? <span className={`truncate block ${row.matched ? "text-green-700 font-medium" : "text-slate-400"}`} title={row.newDiaChi}>{row.newDiaChi}</span>
+                              : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {row.matched ? <CheckCircle size={13} className="text-green-500 mx-auto" /> : <XCircle size={13} className="text-amber-400 mx-auto" />}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {contactPreview.length === 0 && !contactLoading && contactSheetUrl && !contactError && (
+              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                Không có dữ liệu SĐT/ĐCHI trong sheet
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex gap-2 p-5 border-t border-slate-100">
+              <button onClick={() => setModalContacts(false)} className="px-4 py-2 text-sm border border-slate-200 rounded-xl hover:bg-slate-50">
+                {contactDone ? "Đóng" : "Huỷ"}
+              </button>
+              {!contactDone && contactPreview.some(r => r.matched) && (
+                <button
+                  onClick={handleContactConfirm}
+                  disabled={contactConfirming}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition font-semibold"
+                >
+                  {contactConfirming
+                    ? <><Loader2 size={14} className="animate-spin" />Đang cập nhật...</>
+                    : <><CheckCircle size={14} />Cập nhật {contactPreview.filter(r => r.matched).length} KOC</>}
                 </button>
               )}
             </div>
