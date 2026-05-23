@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Package, RefreshCcw, Star, AlertTriangle,
   TrendingUp, ShoppingBag, Clock, Scissors,
-  BarChart3, PieChart, CalendarDays,
+  BarChart3, PieChart, CalendarDays, ChevronDown,
 } from "lucide-react";
 import { formatCurrency, formatDateTime, LOAI_VAN_DE, TRANG_THAI_DOI_TRA } from "@/lib/utils";
 
@@ -37,12 +37,63 @@ const StatCard = ({ title, value, sub, color }: { title: string; value: string |
   </div>
 );
 
+type FilterKey = "tat_ca" | "hom_nay" | "7_ngay" | "thang_nay" | "thang_truoc" | "tuy_chinh";
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: "tat_ca",      label: "Tất cả" },
+  { key: "hom_nay",     label: "Hôm nay" },
+  { key: "7_ngay",      label: "7 ngày qua" },
+  { key: "thang_nay",   label: "Tháng này" },
+  { key: "thang_truoc", label: "Tháng trước" },
+  { key: "tuy_chinh",   label: "Tùy chỉnh" },
+];
+
+function getDateRange(key: FilterKey, customFrom?: string, customTo?: string): { from?: string; to?: string } {
+  const now = new Date();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  if (key === "hom_nay") {
+    const s = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const e = new Date(s); e.setDate(e.getDate() + 1);
+    return { from: fmt(s), to: fmt(e) };
+  }
+  if (key === "7_ngay") {
+    const s = new Date(now); s.setDate(s.getDate() - 6);
+    return { from: fmt(new Date(s.getFullYear(), s.getMonth(), s.getDate())), to: fmt(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)) };
+  }
+  if (key === "thang_nay") {
+    const s = new Date(now.getFullYear(), now.getMonth(), 1);
+    const e = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return { from: fmt(s), to: fmt(e) };
+  }
+  if (key === "thang_truoc") {
+    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const e = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from: fmt(s), to: fmt(e) };
+  }
+  if (key === "tuy_chinh") {
+    return { from: customFrom, to: customTo ? fmt(new Date(new Date(customTo).getTime() + 86400000)) : undefined };
+  }
+  return {};
+}
+
 export default function TongQuanPage() {
   const [data, setData]       = useState<DashboardData | null>(null);
   const [sanXuat, setSanXuat] = useState<SanXuatStats | null>(null);
+  const [filter, setFilter]   = useState<FilterKey>("tat_ca");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo]     = useState("");
+
+  const fetchDashboard = (f: FilterKey, cf?: string, ct?: string) => {
+    const range = getDateRange(f, cf, ct);
+    const params = new URLSearchParams();
+    if (range.from) params.set("from", range.from);
+    if (range.to)   params.set("to",   range.to);
+    const url = "/api/dashboard" + (params.toString() ? "?" + params.toString() : "");
+    fetch(url).then(r => r.json()).then(setData);
+  };
 
   useEffect(() => {
-    fetch("/api/dashboard").then(r => r.json()).then(setData);
+    fetchDashboard("tat_ca");
     Promise.all([
       fetch("/api/san-xuat/lo-cat").then(r => r.json()),
       fetch("/api/san-xuat/hoa-don-ton").then(r => r.json()),
@@ -75,11 +126,58 @@ export default function TongQuanPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-          <BarChart3 size={22} className="text-blue-500" /> Tổng quan
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">Báo cáo hoạt động kinh doanh</p>
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
+            <BarChart3 size={22} className="text-blue-500" /> Tổng quan
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">Báo cáo hoạt động kinh doanh</p>
+        </div>
+
+        {/* ── Bộ lọc thời gian ── */}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-0.5 shadow-sm">
+            {FILTER_OPTIONS.filter(o => o.key !== "tuy_chinh").map(o => (
+              <button
+                key={o.key}
+                onClick={() => { setFilter(o.key); fetchDashboard(o.key); }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                  filter === o.key
+                    ? "bg-blue-500 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                }`}>
+                {o.label}
+              </button>
+            ))}
+            {/* Tùy chỉnh */}
+            <button
+              onClick={() => setFilter("tuy_chinh")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1 ${
+                filter === "tuy_chinh"
+                  ? "bg-blue-500 text-white shadow-sm"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              }`}>
+              <CalendarDays size={12} /> Tùy chỉnh
+            </button>
+          </div>
+
+          {/* Date picker khi chọn Tùy chỉnh */}
+          {filter === "tuy_chinh" && (
+            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                className="text-xs text-slate-600 border-0 outline-none bg-transparent" />
+              <span className="text-slate-300 text-xs">→</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                className="text-xs text-slate-600 border-0 outline-none bg-transparent" />
+              <button
+                onClick={() => fetchDashboard("tuy_chinh", customFrom, customTo)}
+                disabled={!customFrom && !customTo}
+                className="ml-1 px-2.5 py-1 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40 transition">
+                Lọc
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Alerts */}
