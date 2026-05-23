@@ -18,74 +18,65 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
+import { parseModules } from "@/lib/auth";
 
 type NavChild = {
   href: string;
   label: string;
   icon: React.ElementType;
-  roles: string[];
+  moduleKey: string; // module permission key
 };
 
 type NavModule = {
   key: string;
   label: string;
   icon: React.ElementType;
-  bg: string;       // icon badge gradient bg
-  text: string;     // icon color (always white for gradient)
+  bg: string;
+  text: string;
   href?: string;
-  roles: string[];
+  moduleKey: string; // module permission key
   children?: NavChild[];
 };
 
 const MODULES: NavModule[] = [
   {
-    key: "dashboard",
-    label: "Tổng quan",
-    icon: LayoutDashboard,
+    key: "dashboard", moduleKey: "tong-quan",
+    label: "Tổng quan", icon: LayoutDashboard,
     bg: "bg-gradient-to-br from-blue-500 to-blue-700", text: "text-white",
     href: "/tong-quan",
-    roles: ["admin", "kho", "san_xuat"],
   },
   {
-    key: "kho-sx",
-    label: "Kho & Sản xuất",
-    icon: Package,
+    key: "kho-sx", moduleKey: "kho",
+    label: "Kho & Sản xuất", icon: Package,
     bg: "bg-gradient-to-br from-orange-400 to-orange-600", text: "text-white",
-    roles: ["admin", "kho", "san_xuat"],
     children: [
-      { href: "/kho",      label: "Quản lý Kho", icon: Package,  roles: ["admin", "kho"] },
-      { href: "/san-xuat", label: "Sản xuất",     icon: Scissors, roles: ["admin", "san_xuat"] },
+      { href: "/kho",      label: "Quản lý Kho", icon: Package,  moduleKey: "kho" },
+      { href: "/san-xuat", label: "Sản xuất",     icon: Scissors, moduleKey: "san-xuat" },
     ],
   },
   {
-    key: "cham-soc",
-    label: "Chăm sóc KH",
-    icon: RefreshCcw,
+    key: "cham-soc", moduleKey: "doi-tra",
+    label: "Chăm sóc KH", icon: RefreshCcw,
     bg: "bg-gradient-to-br from-rose-400 to-rose-600", text: "text-white",
-    roles: ["admin", "kho"],
     children: [
-      { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw, roles: ["admin", "kho"] },
+      { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw, moduleKey: "doi-tra" },
     ],
   },
   {
-    key: "marketing",
-    label: "Marketing",
-    icon: Star,
+    key: "marketing", moduleKey: "koc",
+    label: "Marketing", icon: Star,
     bg: "bg-gradient-to-br from-yellow-400 to-amber-500", text: "text-white",
-    roles: ["admin"],
     children: [
-      { href: "/koc", label: "KOC Booking", icon: Star, roles: ["admin"] },
+      { href: "/koc", label: "KOC Booking", icon: Star, moduleKey: "koc" },
     ],
   },
   {
-    key: "quantri",
-    label: "Quản trị",
-    icon: Settings,
+    key: "quantri", moduleKey: "gia-ban",
+    label: "Quản trị", icon: Settings,
     bg: "bg-gradient-to-br from-slate-500 to-slate-700", text: "text-white",
-    roles: ["admin"],
     children: [
-      { href: "/gia-ban",      label: "Giá bán SP",    icon: Calculator, roles: ["admin"] },
-      { href: "/admin/users",  label: "Quản lý User",  icon: Users,      roles: ["admin"] },
+      { href: "/gia-ban",     label: "Giá bán SP",   icon: Calculator, moduleKey: "gia-ban" },
+      { href: "/admin/users", label: "Quản lý User", icon: Users,      moduleKey: "users"   },
     ],
   },
 ];
@@ -123,7 +114,9 @@ export default function Sidebar() {
     router.refresh();
   }
 
-  const visible = (roles: string[]) => !user || roles.includes(user.role);
+  const userModules = user ? parseModules(user.role) : [];
+  const visible = (moduleKey: string) =>
+    !user || user.role === "admin" || userModules.includes(moduleKey);
 
   return (
     <aside className="min-h-screen w-56 bg-white border-r border-slate-200 flex flex-col shadow-sm flex-shrink-0">
@@ -143,7 +136,7 @@ export default function Sidebar() {
 
       {/* ── Nav ── */}
       <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
-        {MODULES.filter(m => visible(m.roles)).map(mod => {
+        {MODULES.filter(m => visible(m.moduleKey)).map(mod => {
           const Icon    = mod.icon;
           const isOpen  = openKeys.has(mod.key);
           const hasKids = !!mod.children?.length;
@@ -198,7 +191,7 @@ export default function Sidebar() {
               {/* Sub-items */}
               {isOpen && (
                 <div className="ml-3 mt-0.5 pl-4 border-l-2 border-slate-100 space-y-0.5">
-                  {mod.children!.filter(c => visible(c.roles)).map(child => {
+                  {mod.children!.filter(c => visible(c.moduleKey)).map(child => {
                     const CIcon    = child.icon;
                     const isActive = pathname === child.href || pathname.startsWith(child.href + "/");
                     return (

@@ -1,13 +1,31 @@
 import { SignJWT, jwtVerify } from "jose";
 
-export type UserRole = "admin" | "kho" | "san_xuat";
-
 export type SessionUser = {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  role: string; // "admin" | comma-separated module keys e.g. "kho,san-xuat,doi-tra"
 };
+
+// Tất cả module keys có thể phân quyền
+export const ALL_MODULES = [
+  { key: "tong-quan", label: "Tổng quan",       routes: ["/tong-quan", "/api/dashboard"] },
+  { key: "kho",       label: "Quản lý Kho",      routes: ["/kho", "/api/kho"] },
+  { key: "san-xuat",  label: "Sản xuất",          routes: ["/san-xuat", "/api/san-xuat"] },
+  { key: "doi-tra",   label: "Đổi trả / Sự cố",  routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
+  { key: "koc",       label: "KOC Booking",       routes: ["/koc", "/api/koc"] },
+  { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban"] },
+  { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
+] as const;
+
+// Chuyển đổi role cũ sang module keys mới (backward compat)
+export function parseModules(role: string): string[] {
+  if (role === "admin") return ALL_MODULES.map(m => m.key);
+  if (role === "kho")      return ["tong-quan", "kho", "doi-tra"];
+  if (role === "san_xuat") return ["tong-quan", "san-xuat"];
+  // Định dạng mới: "kho,san-xuat,doi-tra"
+  return role.split(",").map(s => s.trim()).filter(Boolean);
+}
 
 const getSecret = () => {
   const s = process.env.SESSION_SECRET || "meisy-inhouse-2026";
@@ -30,17 +48,14 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
   }
 }
 
-// Which pages each role can access (prefix match)
-export const ROLE_PAGES: Record<UserRole, string[]> = {
-  admin: ["/"],
-  kho: ["/", "/kho", "/doi-tra", "/api/kho", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/dashboard"],
-  san_xuat: ["/", "/san-xuat", "/api/san-xuat", "/api/dashboard"],
-};
-
-export function canAccess(role: UserRole, pathname: string): boolean {
+export function canAccess(role: string, pathname: string): boolean {
   if (role === "admin") return true;
-  const allowed = ROLE_PAGES[role] ?? [];
-  return allowed.some((prefix) =>
-    prefix === "/" ? pathname === "/" : pathname.startsWith(prefix)
-  );
+  // Launcher + login luôn mở
+  if (pathname === "/" || pathname === "/login") return true;
+
+  const modules = parseModules(role);
+  return modules.some(mk => {
+    const mod = ALL_MODULES.find(m => m.key === mk);
+    return mod?.routes.some(prefix => pathname.startsWith(prefix)) ?? false;
+  });
 }
