@@ -45,23 +45,23 @@ function slugSKU(ten: string): string {
 
 // ── Cột cố định ──
 const COL_TEN    = 1; // cột B
-const COL_GIABAN = 8; // cột I
+const COL_GIANHAP = 8; // cột I = giá nhập
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type SheetPreviewRow = {
   rowIndex: number;
   ten: string;
-  giaBan: number | null;
+  giaNhap: number | null;
   existingId:  string | null;
   existingSku: string | null;
-  oldGiaBan:   number | null;
+  oldGiaNhap:  number | null;
   isNew: boolean;   // true = chưa có trong DB → sẽ tạo mới
 };
 
 type ConfirmRow = {
   ten: string;
-  giaBan: number | null;
+  giaNhap: number | null;
   existingId: string | null; // null = tạo mới
 };
 
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
           data: toInsert.map(r => ({
             ten:     r.ten,
             sku:     slugSKU(r.ten),
-            giaBan:  r.giaBan ?? 0,
-            giaNhap: 0,
+            giaNhap: r.giaNhap ?? 0,
+            giaBan:  0,
             tonKho:  0,
             nguon:   "shopee",
           })),
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
               where: { id: r.existingId! },
               data: {
                 ten: r.ten,
-                ...(r.giaBan !== null ? { giaBan: r.giaBan } : {}),
+                ...(r.giaNhap !== null ? { giaNhap: r.giaNhap } : {}),
               },
             })
           )
@@ -143,8 +143,8 @@ export async function POST(req: NextRequest) {
     const allSP = await prisma.sanPham.findMany();
 
     const preview: SheetPreviewRow[] = rows.slice(startIdx).map((r, idx) => {
-      const ten    = r[COL_TEN]?.trim()    ?? "";
-      const giaBan = parsePrice(r[COL_GIABAN]?.trim() ?? "");
+      const ten     = r[COL_TEN]?.trim()     ?? "";
+      const giaNhap = parsePrice(r[COL_GIANHAP]?.trim() ?? "");
 
       if (!ten) return null; // bỏ dòng trống
 
@@ -157,10 +157,10 @@ export async function POST(req: NextRequest) {
       return {
         rowIndex: startIdx + idx,
         ten,
-        giaBan,
-        existingId:  matched?.id    ?? null,
-        existingSku: matched?.sku   ?? null,
-        oldGiaBan:   matched?.giaBan ?? null,
+        giaNhap,
+        existingId:  matched?.id      ?? null,
+        existingSku: matched?.sku     ?? null,
+        oldGiaNhap:  matched?.giaNhap ?? null,
         isNew: !matched,
       };
     }).filter((r): r is SheetPreviewRow => r !== null);
