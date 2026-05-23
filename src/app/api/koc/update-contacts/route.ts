@@ -43,16 +43,19 @@ export async function POST(req: NextRequest) {
     // ── CHẾ ĐỘ XÁC NHẬN (confirm) ──
     if (body.rows) {
       const toUpdate = body.rows.filter(r => r.kocId);
-      await Promise.all(toUpdate.map(r =>
-        prisma.kOC.update({
-          where: { id: r.kocId },
+      let updated = 0;
+      // Chạy tuần tự để tránh pool timeout (Supabase connection_limit=1)
+      for (const r of toUpdate) {
+        await prisma.kOC.update({
+          where: { id: r.kocId! },
           data: {
             ...(r.sdt    !== undefined ? { sdt:    r.sdt    || null } : {}),
             ...(r.diaChi !== undefined ? { diaChi: r.diaChi || null } : {}),
           },
-        })
-      ));
-      return NextResponse.json({ updated: toUpdate.length });
+        });
+        updated++;
+      }
+      return NextResponse.json({ updated });
     }
 
     // ── CHẾ ĐỘ PREVIEW ──

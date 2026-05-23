@@ -17,36 +17,33 @@ export async function POST(req: NextRequest) {
     const { rows }: { rows: ImportRow[] } = await req.json();
     if (!rows?.length) return NextResponse.json({ error: "Không có dữ liệu" }, { status: 400 });
 
-    const results = await Promise.all(
-      rows.map(async r => {
-        // Cập nhật booking
-        const booking = await prisma.kOCBooking.update({
-          where: { id: r.bookingId },
+    // Chạy tuần tự tránh pool timeout (Supabase connection_limit=1)
+    let updated = 0;
+    for (const r of rows) {
+      const booking = await prisma.kOCBooking.update({
+        where: { id: r.bookingId },
+        data: {
+          luotXem:   r.luotXem,
+          donHang:   r.donHang,
+          doanhThu:  r.doanhThu,
+          trangThai: "ket_thuc",
+        },
+      });
+
+      const kocId = r.kocId ?? booking.kocId;
+      if (kocId && (r.sdt || r.diaChi)) {
+        await prisma.kOC.update({
+          where: { id: kocId },
           data: {
-            luotXem:   r.luotXem,
-            donHang:   r.donHang,
-            doanhThu:  r.doanhThu,
-            trangThai: "ket_thuc",
+            ...(r.sdt    ? { sdt:    r.sdt    } : {}),
+            ...(r.diaChi ? { diaChi: r.diaChi } : {}),
           },
         });
+      }
+      updated++;
+    }
 
-        // Cập nhật SĐT / ĐCHI cho KOC nếu có dữ liệu
-        const kocId = r.kocId ?? booking.kocId;
-        if (kocId && (r.sdt || r.diaChi)) {
-          await prisma.kOC.update({
-            where: { id: kocId },
-            data: {
-              ...(r.sdt    ? { sdt:    r.sdt    } : {}),
-              ...(r.diaChi ? { diaChi: r.diaChi } : {}),
-            },
-          });
-        }
-
-        return booking;
-      })
-    );
-
-    return NextResponse.json({ updated: results.length });
+    return NextResponse.json({ updated });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }
