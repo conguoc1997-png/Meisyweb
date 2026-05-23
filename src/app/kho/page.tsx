@@ -282,7 +282,6 @@ export default function KhoPage() {
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Size / Màu</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Nguồn</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá nhập</th>
-                <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá bán</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Tồn kho</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -290,7 +289,7 @@ export default function KhoPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredSP.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">
+                  <td colSpan={6} className="text-center py-12 text-slate-400">
                     <Package size={32} className="mx-auto mb-2 opacity-40" />
                     Chưa có sản phẩm nào
                   </td>
@@ -313,7 +312,6 @@ export default function KhoPage() {
                         ? <span className="text-amber-500 text-xs font-medium">Chưa có giá</span>
                         : <span className="text-slate-600">{formatCurrency(sp.giaNhap)}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-600">{sp.giaBan > 0 ? formatCurrency(sp.giaBan) : "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <span className={`font-bold ${sp.tonKho <= 5 ? "text-red-600" : sp.tonKho <= 20 ? "text-amber-600" : "text-green-600"}`}>
                         {sp.tonKho}
