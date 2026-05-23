@@ -1,276 +1,196 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Package, RefreshCcw, Star, AlertTriangle, TrendingUp, ShoppingBag, Clock, Scissors } from "lucide-react";
-import { formatCurrency, formatDateTime, LOAI_VAN_DE, TRANG_THAI_DOI_TRA } from "@/lib/utils";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  LayoutDashboard, Package, RefreshCcw, Star,
+  Scissors, Calculator, Users, Settings,
+  ChevronLeft, ArrowRight,
+} from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
-type DashboardData = {
-  kho: { tongSanPham: number; tongTonKho: number; spSapHet: number };
-  doiTra: { total: number; choXuLy: number; dangXuLy: number };
-  koc: { tongChiPhiKOC: number; tongDoanhThuKOC: number; bookingDangChay: number; tongBooking: number };
-  recentDoiTra: Array<{ id: string; maDoiTra: string; tenKhach: string; loaiVanDe: string; trangThai: string; createdAt: string }>;
+type Child = { href: string; label: string; desc: string; icon: React.ElementType; color: string };
+type Module = {
+  key: string;
+  label: string;
+  desc: string;
+  icon: React.ElementType;
+  gradient: string;       // Tailwind gradient
+  iconBg: string;         // icon circle bg
+  roles: string[];
+  href?: string;          // nếu không có children
+  children?: Child[];
 };
 
-type LoCat = {
-  trangThai: string;
-  soLuongThieu: number | null;
-  hdMayDa: number | null;
-  hdGiatViSinhDa: number | null;
-  hdGiatMauDa: number | null;
-};
+const MODULES: Module[] = [
+  {
+    key: "dashboard",
+    label: "Tổng quan",
+    desc: "Dashboard & báo cáo",
+    icon: LayoutDashboard,
+    gradient: "from-blue-500 to-blue-600",
+    iconBg: "bg-blue-400/30",
+    roles: ["admin", "kho", "san_xuat"],
+    href: "/",          // dùng page này làm launcher → hiện sub mocked
+  },
+  {
+    key: "kho-sx",
+    label: "Kho & Sản xuất",
+    desc: "Quản lý tồn kho và lô cắt",
+    icon: Package,
+    gradient: "from-orange-400 to-orange-500",
+    iconBg: "bg-orange-300/30",
+    roles: ["admin", "kho", "san_xuat"],
+    children: [
+      { href: "/kho",      label: "Quản lý Kho",  desc: "Tồn kho, nhập xuất",  icon: Package,  color: "bg-orange-100 text-orange-600" },
+      { href: "/san-xuat", label: "Sản xuất",      desc: "Lô cắt, vải tồn",    icon: Scissors, color: "bg-amber-100 text-amber-600"  },
+    ],
+  },
+  {
+    key: "cham-soc",
+    label: "Chăm sóc KH",
+    desc: "Đổi trả, bù tiền, feedback",
+    icon: RefreshCcw,
+    gradient: "from-rose-400 to-rose-600",
+    iconBg: "bg-rose-300/30",
+    roles: ["admin", "kho"],
+    children: [
+      { href: "/doi-tra", label: "Đổi trả / Sự cố", desc: "Xử lý case đổi trả", icon: RefreshCcw, color: "bg-rose-100 text-rose-600" },
+    ],
+  },
+  {
+    key: "marketing",
+    label: "Marketing",
+    desc: "KOC, booking, hiệu quả",
+    icon: Star,
+    gradient: "from-yellow-400 to-amber-500",
+    iconBg: "bg-yellow-300/30",
+    roles: ["admin"],
+    children: [
+      { href: "/koc", label: "KOC Booking", desc: "Quản lý KOC & chi phí", icon: Star, color: "bg-yellow-100 text-yellow-600" },
+    ],
+  },
+  {
+    key: "quantri",
+    label: "Quản trị",
+    desc: "Cài đặt, user, giá bán",
+    icon: Settings,
+    gradient: "from-slate-500 to-slate-600",
+    iconBg: "bg-slate-400/30",
+    roles: ["admin"],
+    children: [
+      { href: "/gia-ban",     label: "Giá bán SP",   desc: "Bảng giá sản phẩm", icon: Calculator, color: "bg-slate-100 text-slate-600" },
+      { href: "/admin/users", label: "Quản lý User", desc: "Tài khoản & phân quyền", icon: Users, color: "bg-indigo-100 text-indigo-600" },
+    ],
+  },
+];
 
-type SanXuatStats = {
-  tongLo: number;
-  dangSanXuat: number;
-  daNhanVe: number;
-  tongThieu: number;
-  hoaDonMay: number;
-  hoaDonViSinh: number;
-  hoaDonMau: number;
-};
+export default function LauncherPage() {
+  const router = useRouter();
+  const { user } = useUser();
+  const [active, setActive] = useState<Module | null>(null);
 
-export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [sanXuat, setSanXuat] = useState<SanXuatStats | null>(null);
+  const visible = (roles: string[]) => !user || roles.includes(user.role);
+  const mods = MODULES.filter(m => visible(m.roles));
 
-  useEffect(() => {
-    fetch("/api/dashboard").then((r) => r.json()).then(setData);
-    Promise.all([
-      fetch("/api/san-xuat/lo-cat").then((r) => r.json()),
-      fetch("/api/san-xuat/hoa-don-ton").then((r) => r.json()),
-    ]).then(([loList, hoaDon]: [LoCat[], { may: number; giat_vi_sinh: number; giat_mau: number }]) => {
-      const mayDa = loList.reduce((s: number, l: LoCat) => s + (l.hdMayDa ?? 0), 0);
-      const vsinhDa = loList.reduce((s: number, l: LoCat) => s + (l.hdGiatViSinhDa ?? 0), 0);
-      const mauDa = loList.reduce((s: number, l: LoCat) => s + (l.hdGiatMauDa ?? 0), 0);
-      setSanXuat({
-        tongLo: loList.length,
-        dangSanXuat: loList.filter((l: LoCat) => l.trangThai !== "da_nhan").length,
-        daNhanVe: loList.filter((l: LoCat) => l.trangThai === "da_nhan").length,
-        tongThieu: loList.reduce((s: number, l: LoCat) => s + (l.soLuongThieu ?? 0), 0),
-        hoaDonMay: hoaDon.may - mayDa,
-        hoaDonViSinh: hoaDon.giat_vi_sinh - vsinhDa,
-        hoaDonMau: hoaDon.giat_mau - mauDa,
-      });
-    });
-  }, []);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
 
-  if (!data) {
+  // ── Sub-module view ──
+  if (active) {
+    const children = active.children?.filter(c => visible(["admin", "kho", "san_xuat"])) ?? [];
     return (
-      <div className="p-6 flex items-center justify-center h-full">
-        <div className="text-slate-400 text-sm">Đang tải...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
+        {/* Back */}
+        <button
+          onClick={() => setActive(null)}
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-8 transition"
+        >
+          <ChevronLeft size={16} />
+          Quay lại
+        </button>
+
+        {/* Module header */}
+        <div className={`inline-flex items-center gap-4 mb-8 px-5 py-3 rounded-2xl bg-gradient-to-r ${active.gradient} text-white shadow-lg`}>
+          <active.icon size={24} />
+          <div>
+            <p className="font-bold text-lg leading-tight">{active.label}</p>
+            <p className="text-white/70 text-sm">{active.desc}</p>
+          </div>
+        </div>
+
+        {/* Sub-module grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+          {children.map(child => (
+            <button
+              key={child.href}
+              onClick={() => router.push(child.href)}
+              className="group bg-white rounded-2xl p-6 border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all text-left flex flex-col gap-4"
+            >
+              <span className={`w-12 h-12 rounded-xl flex items-center justify-center ${child.color}`}>
+                <child.icon size={22} />
+              </span>
+              <div className="flex-1">
+                <p className="font-bold text-slate-800 text-base leading-tight">{child.label}</p>
+                <p className="text-slate-400 text-sm mt-1">{child.desc}</p>
+              </div>
+              <span className="flex items-center gap-1 text-xs text-slate-400 group-hover:text-slate-600 transition">
+                Mở <ArrowRight size={12} />
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
 
-  const roiKOC = data.koc.tongChiPhiKOC > 0
-    ? ((data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC) / data.koc.tongChiPhiKOC * 100).toFixed(1)
-    : "0";
-
+  // ── Main launcher grid ──
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-        <p className="text-slate-500 text-sm mt-1">Tổng quan hoạt động kinh doanh</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-800">Meisy Inhouse</h1>
+        <p className="text-slate-400 text-sm mt-1 capitalize">{dateStr}</p>
       </div>
 
-      {/* Alert: SP sắp hết */}
-      {data.kho.spSapHet > 0 && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle size={18} className="text-red-500 shrink-0" />
-          <p className="text-sm text-red-700">
-            <span className="font-bold">{data.kho.spSapHet} sản phẩm</span> sắp hết hàng (tồn kho ≤ 5).{" "}
-            <Link href="/kho" className="underline">Kiểm tra kho →</Link>
-          </p>
-        </div>
-      )}
+      {/* Module grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+        {mods.map(mod => {
+          const hasChildren = !!mod.children?.length;
+          return (
+            <button
+              key={mod.key}
+              onClick={() => {
+                if (hasChildren) setActive(mod);
+                else if (mod.href && mod.href !== "/") router.push(mod.href);
+              }}
+              className={`group relative bg-gradient-to-br ${mod.gradient} rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all text-left flex flex-col gap-5 overflow-hidden`}
+            >
+              {/* Background decoration */}
+              <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-white/10" />
+              <div className="absolute -right-2 -bottom-6 w-16 h-16 rounded-full bg-white/10" />
 
-      {data.doiTra.choXuLy > 0 && (
-        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center gap-3">
-          <Clock size={18} className="text-yellow-500 shrink-0" />
-          <p className="text-sm text-yellow-700">
-            <span className="font-bold">{data.doiTra.choXuLy} case đổi trả</span> đang chờ xử lý.{" "}
-            <Link href="/doi-tra" className="underline">Xử lý ngay →</Link>
-          </p>
-        </div>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        {/* Kho */}
-        <Link href="/kho" className="bg-white rounded-xl p-5 border border-slate-200 hover:border-rose-200 hover:shadow-sm transition group">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-slate-600">Quản lý Kho</p>
-            <Package size={20} className="text-rose-400 group-hover:text-rose-500 transition" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Tổng sản phẩm</span>
-              <span className="font-bold text-slate-800">{data.kho.tongSanPham}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Tổng tồn kho</span>
-              <span className="font-bold text-slate-800">{data.kho.tongTonKho.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Sắp hết hàng</span>
-              <span className={`font-bold ${data.kho.spSapHet > 0 ? "text-red-600" : "text-green-600"}`}>{data.kho.spSapHet}</span>
-            </div>
-          </div>
-        </Link>
-
-        {/* Đổi trả */}
-        <Link href="/doi-tra" className="bg-white rounded-xl p-5 border border-slate-200 hover:border-rose-200 hover:shadow-sm transition group">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-slate-600">Đổi trả / Sự cố</p>
-            <RefreshCcw size={20} className="text-blue-400 group-hover:text-blue-500 transition" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Tổng case</span>
-              <span className="font-bold text-slate-800">{data.doiTra.total}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Chờ xử lý</span>
-              <span className={`font-bold ${data.doiTra.choXuLy > 0 ? "text-yellow-600" : "text-slate-800"}`}>{data.doiTra.choXuLy}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Đang xử lý</span>
-              <span className="font-bold text-blue-600">{data.doiTra.dangXuLy}</span>
-            </div>
-          </div>
-        </Link>
-
-        {/* KOC */}
-        <Link href="/koc" className="bg-white rounded-xl p-5 border border-slate-200 hover:border-rose-200 hover:shadow-sm transition group">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-slate-600">KOC Booking</p>
-            <Star size={20} className="text-amber-400 group-hover:text-amber-500 transition" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Tổng booking</span>
-              <span className="font-bold text-slate-800">{data.koc.tongBooking}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Đang chạy</span>
-              <span className="font-bold text-green-600">{data.koc.bookingDangChay}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">ROI tổng</span>
-              <span className={`font-bold ${Number(roiKOC) >= 0 ? "text-green-600" : "text-red-600"}`}>{roiKOC}%</span>
-            </div>
-          </div>
-        </Link>
-
-        {/* Sản xuất */}
-        <Link href="/san-xuat" className="bg-white rounded-xl p-5 border border-slate-200 hover:border-rose-200 hover:shadow-sm transition group">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-slate-600">Sản xuất</p>
-            <Scissors size={20} className="text-purple-400 group-hover:text-purple-500 transition" />
-          </div>
-          {sanXuat ? (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Tổng lô cắt</span>
-                <span className="font-bold text-slate-800">{sanXuat.tongLo}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Đang sản xuất</span>
-                <span className="font-bold text-blue-600">{sanXuat.dangSanXuat}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Tổng thiếu</span>
-                <span className={`font-bold ${sanXuat.tongThieu > 0 ? "text-red-600" : "text-green-600"}`}>{sanXuat.tongThieu}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400">Đang tải...</p>
-          )}
-        </Link>
-      </div>
-
-      {/* Sản xuất - HĐ còn */}
-      {sanXuat && (
-        <div className="bg-white rounded-xl p-5 border border-slate-200 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Scissors size={18} className="text-purple-500" />
-            <h3 className="font-semibold text-slate-700">Hóa đơn sản xuất còn lại</h3>
-            <Link href="/san-xuat" className="ml-auto text-xs text-rose-500 hover:underline">Xem chi tiết</Link>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-3 bg-purple-50 rounded-lg">
-              <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
-              <p className={`text-2xl font-bold ${sanXuat.hoaDonMay < 0 ? "text-red-600" : "text-purple-700"}`}>{sanXuat.hoaDonMay.toLocaleString()}</p>
-            </div>
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
-              <p className={`text-2xl font-bold ${sanXuat.hoaDonViSinh < 0 ? "text-red-600" : "text-blue-700"}`}>{sanXuat.hoaDonViSinh.toLocaleString()}</p>
-            </div>
-            <div className="text-center p-3 bg-amber-50 rounded-lg">
-              <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
-              <p className={`text-2xl font-bold ${sanXuat.hoaDonMau < 0 ? "text-red-600" : "text-amber-700"}`}>{sanXuat.hoaDonMau.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* KOC Summary */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={18} className="text-green-500" />
-            <h3 className="font-semibold text-slate-700">Hiệu quả KOC</h3>
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-500">Tổng chi phí booking</span>
-              <span className="font-bold text-slate-700">{formatCurrency(data.koc.tongChiPhiKOC)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-500">Tổng doanh thu từ KOC</span>
-              <span className="font-bold text-green-600">{formatCurrency(data.koc.tongDoanhThuKOC)}</span>
-            </div>
-            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-              <span className="text-sm text-slate-500">Lợi nhuận ước tính</span>
-              <span className={`font-bold ${data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC)}
+              {/* Icon */}
+              <span className={`relative w-12 h-12 rounded-xl flex items-center justify-center ${mod.iconBg}`}>
+                <mod.icon size={22} className="text-white" />
               </span>
-            </div>
-          </div>
-        </div>
 
-        {/* Recent đổi trả */}
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <ShoppingBag size={18} className="text-rose-400" />
-              <h3 className="font-semibold text-slate-700">Đổi trả gần đây</h3>
-            </div>
-            <Link href="/doi-tra" className="text-xs text-rose-500 hover:underline">Xem tất cả</Link>
-          </div>
-          {data.recentDoiTra.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-4">Chưa có case nào</p>
-          ) : (
-            <div className="space-y-2">
-              {data.recentDoiTra.map((dt) => (
-                <div key={dt.id} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
-                  <div>
-                    <p className="text-xs font-mono text-rose-500">{dt.maDoiTra}</p>
-                    <p className="text-sm text-slate-700">{dt.tenKhach} · <span className="text-xs text-slate-400">{LOAI_VAN_DE[dt.loaiVanDe]?.label}</span></p>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${TRANG_THAI_DOI_TRA[dt.trangThai]?.color ?? "bg-slate-100 text-slate-600"}`}>
-                      {TRANG_THAI_DOI_TRA[dt.trangThai]?.label ?? dt.trangThai}
-                    </span>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dt.createdAt)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+              {/* Label */}
+              <div className="relative">
+                <p className="font-bold text-white text-lg leading-tight">{mod.label}</p>
+                <p className="text-white/60 text-sm mt-1">{mod.desc}</p>
+              </div>
+
+              {/* Arrow */}
+              {hasChildren && (
+                <ArrowRight
+                  size={18}
+                  className="relative text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all mt-auto self-end"
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
