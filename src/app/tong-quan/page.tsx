@@ -13,7 +13,7 @@ type ThangRow = { label: string; soBooking: number; chiPhi: number; doanhThu: nu
 
 type DashboardData = {
   kho: { tongSanPham: number; tongTonKho: number; spSapHet: number };
-  doiTra: { total: number; choXuLy: number; dangXuLy: number };
+  doiTra: { total: number; choXuLy: number; dangXuLy: number; chuaXuLy: number };
   koc: { tongChiPhiKOC: number; tongDoanhThuKOC: number; bookingDangChay: number; tongBooking: number };
   recentDoiTra: Array<{ id: string; maDoiTra: string; tenKhach: string; loaiVanDe: string; trangThai: string; createdAt: string }>;
   thangData: ThangRow[];
@@ -190,11 +190,11 @@ export default function TongQuanPage() {
           </p>
         </div>
       )}
-      {data.doiTra.choXuLy > 0 && (
+      {data.doiTra.chuaXuLy > 0 && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center gap-3">
           <Clock size={18} className="text-yellow-500 shrink-0" />
           <p className="text-sm text-yellow-700">
-            <span className="font-bold">{data.doiTra.choXuLy} case đổi trả</span> đang chờ xử lý.{" "}
+            <span className="font-bold">{data.doiTra.chuaXuLy} case đổi trả</span> chưa có mã vận đơn.{" "}
             <Link href="/doi-tra" className="underline">Xử lý ngay →</Link>
           </p>
         </div>
@@ -247,14 +247,17 @@ export default function TongQuanPage() {
           <Link href="/koc" className="ml-auto text-xs text-rose-500 hover:underline">Chi tiết →</Link>
         </div>
       </div>
-      {/* Stat cards — 6 thẻ trong 1 grid duy nhất, đảm bảo thẳng hàng */}
-      <div className="grid grid-cols-6 gap-3 mb-6">
-        <StatCard title="Tổng case"      value={data.doiTra.total}    />
-        <StatCard title="Chờ xử lý"     value={data.doiTra.choXuLy}  color={data.doiTra.choXuLy  > 0 ? "text-yellow-600" : "text-slate-800"} />
-        <StatCard title="Đang xử lý"    value={data.doiTra.dangXuLy} color="text-blue-600" />
-        <StatCard title="Tổng booking"  value={data.koc.tongBooking}  />
-        <StatCard title="Đang chạy"     value={data.koc.bookingDangChay} color="text-green-600" />
-        <StatCard title="ROI tổng"      value={`${roiKOC}%`}         color={Number(roiKOC) >= 0 ? "text-green-600" : "text-red-600"} />
+      {/* Stat cards — 2 cột độc lập khớp với header */}
+      <div className="grid grid-cols-2 gap-5 mb-6">
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard title="Tổng case"  value={data.doiTra.total} />
+          <StatCard title="Chưa xử lý" value={data.doiTra.chuaXuLy} color={data.doiTra.chuaXuLy > 0 ? "text-yellow-600" : "text-slate-800"} />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard title="Tổng booking" value={data.koc.tongBooking} />
+          <StatCard title="Đang chạy"    value={data.koc.bookingDangChay} color="text-green-600" />
+          <StatCard title="ROI tổng"     value={`${roiKOC}%`} color={Number(roiKOC) >= 0 ? "text-green-600" : "text-red-600"} />
+        </div>
       </div>
 
       {/* ── Đổi trả gần đây (trái) + Hiệu quả KOC (phải) ── */}
@@ -271,21 +274,29 @@ export default function TongQuanPage() {
           {data.recentDoiTra.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-4">Chưa có case nào</p>
           ) : (
-            <div className="space-y-2">
-              {data.recentDoiTra.map(dt => (
-                <div key={dt.id} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
-                  <div>
-                    <p className="text-xs font-mono text-rose-500">{dt.maDoiTra}</p>
-                    <p className="text-sm text-slate-700">{dt.tenKhach} · <span className="text-xs text-slate-400">{LOAI_VAN_DE[dt.loaiVanDe]?.label}</span></p>
+            <div className="space-y-1.5">
+              {data.recentDoiTra.map(dt => {
+                const rowColor: Record<string, string> = {
+                  doi_size:     "border-l-4 border-l-blue-300 bg-blue-50/60",
+                  gui_nham:     "border-l-4 border-l-purple-300 bg-purple-50/60",
+                  hang_loi:     "border-l-4 border-l-red-300 bg-red-50/60",
+                  don_hang_loi: "border-l-4 border-l-orange-300 bg-orange-50/60",
+                };
+                return (
+                  <div key={dt.id} className={`flex items-center justify-between px-3 py-2 rounded-lg ${rowColor[dt.loaiVanDe] ?? "bg-slate-50/60"}`}>
+                    <div>
+                      <p className="text-xs font-mono text-rose-500">{dt.maDoiTra}</p>
+                      <p className="text-sm text-slate-700">{dt.tenKhach} · <span className="text-xs text-slate-400">{LOAI_VAN_DE[dt.loaiVanDe]?.label}</span></p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${TRANG_THAI_DOI_TRA[dt.trangThai]?.color ?? "bg-slate-100 text-slate-600"}`}>
+                        {TRANG_THAI_DOI_TRA[dt.trangThai]?.label ?? dt.trangThai}
+                      </span>
+                      <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dt.createdAt)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${TRANG_THAI_DOI_TRA[dt.trangThai]?.color ?? "bg-slate-100 text-slate-600"}`}>
-                      {TRANG_THAI_DOI_TRA[dt.trangThai]?.label ?? dt.trangThai}
-                    </span>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dt.createdAt)}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

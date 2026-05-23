@@ -699,12 +699,17 @@ export default function SanXuatPage() {
     } catch { /* ignore */ }
   };
 
-  const deleteLoCat = (lo: LoCat) => {
+  const deleteLoCat = async (lo: LoCat) => {
     setOpenActionMenu(null);
-    if (!confirm(`Xoá lô cắt "${lo.hangCat}" ngày ${formatDate(lo.ngay)}?`)) return;
+    if (!confirm(`Xoá lô cắt "${lo.hangCat}" ngày ${formatDate(lo.ngay)}?\nCác cây vải liên quan sẽ được hoàn tác về kho.`)) return;
     // Optimistic remove
     setLosCat(prev => prev.filter(l => l.id !== lo.id));
-    fetch(`/api/san-xuat/lo-cat/${lo.id}`, { method: "DELETE" }).catch(() => fetchData());
+    try {
+      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, { method: "DELETE" });
+      fetchVaiTon(); // refresh kho vải sau khi hoàn tác
+    } catch {
+      fetchData();
+    }
   };
 
   const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {

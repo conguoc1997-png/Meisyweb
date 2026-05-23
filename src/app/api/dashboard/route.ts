@@ -24,8 +24,9 @@ export async function GET(req: NextRequest) {
     const tongTonKho = sanPhams.reduce((s: number, sp: typeof sanPhams[0]) => s + sp.tonKho, 0);
     const spSapHet = sanPhams.filter((sp: typeof sanPhams[0]) => sp.tonKho <= 5).length;
 
-    const choXuLy = doiTras.filter((d: typeof doiTras[0]) => d.trangThai === "cho_xu_ly").length;
+    const choXuLy  = doiTras.filter((d: typeof doiTras[0]) => d.trangThai === "cho_xu_ly").length;
     const dangXuLy = doiTras.filter((d: typeof doiTras[0]) => d.trangThai === "dang_xu_ly").length;
+    const chuaXuLy = doiTras.filter((d: typeof doiTras[0]) => !d.maVanDon).length;
 
     const tongChiPhiKOC = bookings.reduce((s: number, b: typeof bookings[0]) => s + b.chiPhi, 0);
     const tongDoanhThuKOC = bookings.reduce((s: number, b: typeof bookings[0]) => s + b.doanhThu, 0);
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       kho: { tongSanPham, tongTonKho, spSapHet },
-      doiTra: { total: doiTras.length, choXuLy, dangXuLy },
+      doiTra: { total: doiTras.length, choXuLy, dangXuLy, chuaXuLy },
       koc: { tongChiPhiKOC, tongDoanhThuKOC, bookingDangChay, tongBooking: bookings.length },
       recentDoiTra,
       thangData,

@@ -56,6 +56,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+
+    // Hoàn tác cây vải về kho VaiTon trước khi xoá lô
+    const vaiTons = await prisma.vaiTon.findMany();
+    for (const vai of vaiTons) {
+      if (!vai.cayData) continue;
+      let cays: { soMet: number; soMetUsed?: number; cut?: boolean; lotId?: string; lotCayIdx?: number }[] = [];
+      try { cays = JSON.parse(vai.cayData); } catch { continue; }
+
+      const hasLinked = cays.some(c => c.lotId === id);
+      if (!hasLinked) continue;
+
+      // Khôi phục soMet cho cây liên quan đến lô này
+      const restored = cays.map(c => {
+        if (c.lotId !== id) return c;
+        const { cut: _c, lotId: _l, lotCayIdx: _lci, soMetUsed, ...rest } = c;
+        void _c; void _l; void _lci;
+        return { ...rest, soMet: c.soMet + (soMetUsed ?? 0) };
+      });
+
+      const allUncut = restored.every(c => !(c as { cut?: boolean }).cut);
+      const newSoMet = restored.reduce((s, c) => s + (c.soMet ?? 0), 0);
+
+      if (allUncut && newSoMet <= 0) {
+        // Không còn vải → xoá record vải
+        await prisma.vaiTon.delete({ where: { id: vai.id } });
+      } else {
+        await prisma.vaiTon.update({
+          where: { id: vai.id },
+          data: { cayData: JSON.stringify(restored), soMet: newSoMet, soCay: restored.length },
+        });
+      }
+    }
+
     await prisma.loCat.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
