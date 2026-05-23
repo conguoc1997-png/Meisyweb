@@ -30,9 +30,9 @@ type NavModule = {
   key: string;
   label: string;
   icon: React.ElementType;
-  bg: string;       // icon badge bg
-  text: string;     // icon badge text color
-  href?: string;    // nếu không có children → link trực tiếp
+  bg: string;       // icon badge gradient bg
+  text: string;     // icon color (always white for gradient)
+  href?: string;
   roles: string[];
   children?: NavChild[];
 };
@@ -42,7 +42,7 @@ const MODULES: NavModule[] = [
     key: "dashboard",
     label: "Tổng quan",
     icon: LayoutDashboard,
-    bg: "bg-blue-100", text: "text-blue-600",
+    bg: "bg-gradient-to-br from-blue-500 to-blue-700", text: "text-white",
     href: "/tong-quan",
     roles: ["admin", "kho", "san_xuat"],
   },
@@ -50,7 +50,7 @@ const MODULES: NavModule[] = [
     key: "kho-sx",
     label: "Kho & Sản xuất",
     icon: Package,
-    bg: "bg-orange-100", text: "text-orange-600",
+    bg: "bg-gradient-to-br from-orange-400 to-orange-600", text: "text-white",
     roles: ["admin", "kho", "san_xuat"],
     children: [
       { href: "/kho",      label: "Quản lý Kho", icon: Package,  roles: ["admin", "kho"] },
@@ -61,7 +61,7 @@ const MODULES: NavModule[] = [
     key: "cham-soc",
     label: "Chăm sóc KH",
     icon: RefreshCcw,
-    bg: "bg-rose-100", text: "text-rose-600",
+    bg: "bg-gradient-to-br from-rose-400 to-rose-600", text: "text-white",
     roles: ["admin", "kho"],
     children: [
       { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw, roles: ["admin", "kho"] },
@@ -71,7 +71,7 @@ const MODULES: NavModule[] = [
     key: "marketing",
     label: "Marketing",
     icon: Star,
-    bg: "bg-yellow-100", text: "text-yellow-600",
+    bg: "bg-gradient-to-br from-yellow-400 to-amber-500", text: "text-white",
     roles: ["admin"],
     children: [
       { href: "/koc", label: "KOC Booking", icon: Star, roles: ["admin"] },
@@ -81,7 +81,7 @@ const MODULES: NavModule[] = [
     key: "quantri",
     label: "Quản trị",
     icon: Settings,
-    bg: "bg-slate-100", text: "text-slate-600",
+    bg: "bg-gradient-to-br from-slate-500 to-slate-700", text: "text-white",
     roles: ["admin"],
     children: [
       { href: "/gia-ban",      label: "Giá bán SP",    icon: Calculator, roles: ["admin"] },
@@ -161,8 +161,8 @@ export default function Sidebar() {
                     : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${mod.bg}`}>
-                  <Icon size={14} className={mod.text} />
+                <span className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${mod.bg}`}>
+                  <Icon size={16} className={mod.text} />
                 </span>
                 <span>{mod.label}</span>
               </Link>
@@ -185,8 +185,8 @@ export default function Sidebar() {
                     : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${mod.bg}`}>
-                  <Icon size={14} className={mod.text} />
+                <span className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${mod.bg}`}>
+                  <Icon size={16} className={mod.text} />
                 </span>
                 <span className="flex-1 text-left">{mod.label}</span>
                 {isOpen
