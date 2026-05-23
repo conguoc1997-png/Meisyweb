@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2 } from "lucide-react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -51,6 +51,12 @@ export default function KocPage() {
   const [importPreview, setImportPreview] = useState<PreviewRow[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importDone, setImportDone] = useState(false);
+
+  // Google Sheet import
+  const [modalSheet, setModalSheet] = useState(false);
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const [sheetError, setSheetError] = useState("");
 
   const [formKOC, setFormKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
   const [formEditKOC, setFormEditKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
@@ -280,6 +286,29 @@ export default function KocPage() {
     finally { setImportLoading(false); }
   };
 
+  const handleSheetImport = async () => {
+    if (!sheetUrl.trim()) return;
+    setSheetLoading(true);
+    setSheetError("");
+    try {
+      const res = await fetch("/api/koc/import-sheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: sheetUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setImportPreview(data.preview);
+      setImportDone(false);
+      setModalSheet(false);
+      setModalImport(true);
+    } catch (err: unknown) {
+      setSheetError(err instanceof Error ? err.message : "Lỗi không xác định");
+    } finally {
+      setSheetLoading(false);
+    }
+  };
+
   // Stats
   const tongChiPhi  = bookings.reduce((s, b) => s + b.chiPhi, 0);
   const tongDoanhThu = bookings.reduce((s, b) => s + b.doanhThu, 0);
@@ -422,6 +451,12 @@ export default function KocPage() {
             {importLoading ? "Đang đọc..." : "Import Excel"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
           </label>
+          <button
+            onClick={() => { setSheetUrl(""); setSheetError(""); setModalSheet(true); }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition"
+          >
+            <FileSpreadsheet size={16} /> Google Sheet
+          </button>
           <button onClick={() => setModalKOC(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 transition">
             <Plus size={16} /> Thêm KOC
           </button>
@@ -967,6 +1002,86 @@ export default function KocPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Google Sheet */}
+      {modalSheet && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
+                  <FileSpreadsheet size={18} className="text-green-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-800">Import từ Google Sheets</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Dán link sheet chứa kết quả KOC</p>
+                </div>
+              </div>
+              <button onClick={() => setModalSheet(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Hướng dẫn */}
+              <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-1.5">
+                <p className="font-semibold text-slate-600">Cấu trúc sheet cần có các cột:</p>
+                <div className="grid grid-cols-2 gap-1">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span> Tên kênh / KOC</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block"></span> Lượt xem</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block"></span> Đơn hàng</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block"></span> Doanh thu</span>
+                </div>
+                <p className="text-slate-400 pt-1">Sheet phải được chia sẻ: <b className="text-slate-600">Anyone with the link → Viewer</b></p>
+              </div>
+
+              {/* URL Input */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Link Google Sheets</label>
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    type="url"
+                    value={sheetUrl}
+                    onChange={e => { setSheetUrl(e.target.value); setSheetError(""); }}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData("text");
+                      if (pasted.includes("docs.google.com/spreadsheets")) {
+                        e.preventDefault();
+                        setSheetUrl(pasted.trim());
+                        setSheetError("");
+                      }
+                    }}
+                    onKeyDown={e => e.key === "Enter" && handleSheetImport()}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                  />
+                </div>
+                {sheetError && (
+                  <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{sheetError}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 p-5 pt-0">
+              <button
+                onClick={() => setModalSheet(false)}
+                className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={handleSheetImport}
+                disabled={sheetLoading || !sheetUrl.trim()}
+                className="flex-1 px-4 py-2.5 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition flex items-center justify-center gap-2 font-semibold"
+              >
+                {sheetLoading
+                  ? <><Loader2 size={15} className="animate-spin" /> Đang tải...</>
+                  : <><FileSpreadsheet size={15} /> Tải & xem trước</>}
+              </button>
+            </div>
           </div>
         </div>
       )}
