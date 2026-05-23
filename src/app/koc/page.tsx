@@ -28,6 +28,7 @@ export default function KocPage() {
   const [expandedSP, setExpandedSP] = useState<string | null>(null);
   const [spSubTab, setSpSubTab] = useState<Record<string, "chiphi" | "koc" | "hieugua">>({});
   const [modalPickSP, setModalPickSP] = useState(false);
+  const [pickSPSearch, setPickSPSearch] = useState("");
   const [searchKOC, setSearchKOC] = useState("");
   const [filterThang, setFilterThang] = useState("");
   const [filterSP, setFilterSP] = useState("");
@@ -1037,12 +1038,32 @@ export default function KocPage() {
                 <h2 className="font-bold text-slate-800">Chọn sản phẩm để Booking</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Chọn sản phẩm → tích KOC → tạo booking</p>
               </div>
-              <button onClick={() => setModalPickSP(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+              <button onClick={() => { setModalPickSP(false); setPickSPSearch(""); }} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+            </div>
+            {/* Search */}
+            <div className="px-4 py-3 border-b border-slate-100">
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Tìm theo tên hoặc SKU..."
+                  value={pickSPSearch}
+                  onChange={e => setPickSPSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200"
+                />
+              </div>
             </div>
             <div className="overflow-y-auto flex-1 p-3 space-y-2">
-              {sanPhams.length === 0 ? (
-                <p className="text-center text-slate-400 py-8">Chưa có sản phẩm trong kho</p>
-              ) : sanPhams.map(sp => {
+              {(() => {
+                const filtered = sanPhams.filter(sp =>
+                  sp.ten.toLowerCase().includes(pickSPSearch.toLowerCase()) ||
+                  sp.sku.toLowerCase().includes(pickSPSearch.toLowerCase())
+                );
+                if (filtered.length === 0) return (
+                  <p className="text-center text-slate-400 py-8">Không tìm thấy sản phẩm</p>
+                );
+                return filtered.map(sp => {
                 const soBooking = bookings.filter(b => b.sanPhamId === sp.id).length;
                 return (
                   <button
@@ -1071,7 +1092,8 @@ export default function KocPage() {
                     <span className="text-rose-400 text-sm flex-shrink-0">→</span>
                   </button>
                 );
-              })}
+              });
+              })()}
             </div>
           </div>
         </div>
