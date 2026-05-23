@@ -142,6 +142,7 @@ model KOC {
   linkProfile String?
   sdt         String?
   email       String?
+  diaChi      String?
   ghiChu      String?
   createdAt   DateTime @default(now())
 

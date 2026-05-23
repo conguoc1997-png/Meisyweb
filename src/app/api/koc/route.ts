@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
         linkProfile: body.linkProfile || null,
         sdt: body.sdt || null,
         email: body.email || null,
+        diaChi: body.diaChi || null,
         ghiChu: body.ghiChu || null,
       },
     });

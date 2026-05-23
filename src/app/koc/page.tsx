@@ -5,7 +5,7 @@ import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, U
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
-type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; ghiChu: string | null };
+type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
@@ -54,6 +54,8 @@ export default function KocPage() {
   const [manualMatches, setManualMatches] = useState<Record<number, {
     kocId: string; kocTen: string; bookingId: string; bookingSP: string | null;
   }>>({});
+  const [addNewSelected, setAddNewSelected] = useState<Set<number>>(new Set());
+  const [addingNew, setAddingNew] = useState(false);
 
   // Google Sheet import
   const [modalSheet, setModalSheet] = useState(false);
@@ -61,8 +63,8 @@ export default function KocPage() {
   const [sheetLoading, setSheetLoading] = useState(false);
   const [sheetError, setSheetError] = useState("");
 
-  const [formKOC, setFormKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
-  const [formEditKOC, setFormEditKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
+  const [formKOC, setFormKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
+  const [formEditKOC, setFormEditKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
   const [linkInput, setLinkInput] = useState("");
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkEditInput, setLinkEditInput] = useState("");
@@ -154,7 +156,7 @@ export default function KocPage() {
       const res = await fetch("/api/koc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formKOC) });
       if (!res.ok) throw new Error((await res.json()).error);
       setModalKOC(false);
-      setFormKOC({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
+      setFormKOC({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
       fetchData();
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
     finally { setLoading(false); }
@@ -197,7 +199,7 @@ export default function KocPage() {
   };
 
   const openEditKOC = (k: KOC) => {
-    setFormEditKOC({ ten: k.ten, platform: k.platform, follower: String(k.follower), giaCast: String(k.giaCast), linkProfile: k.linkProfile || "", sdt: k.sdt || "", ghiChu: k.ghiChu || "" });
+    setFormEditKOC({ ten: k.ten, platform: k.platform, follower: String(k.follower), giaCast: String(k.giaCast), linkProfile: k.linkProfile || "", sdt: k.sdt || "", email: k.email || "", diaChi: k.diaChi || "", ghiChu: k.ghiChu || "" });
     setLinkEditInput(k.linkProfile || "");
     setModalEditKOC(k);
   };
@@ -268,6 +270,7 @@ export default function KocPage() {
       if (!res.ok) throw new Error(data.error);
       setImportPreview(data.preview);
       setManualMatches({});
+      setAddNewSelected(new Set());
       setModalImport(true);
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi đọc file"); }
     finally { setImportLoading(false); e.target.value = ""; }
@@ -297,6 +300,36 @@ export default function KocPage() {
     finally { setImportLoading(false); }
   };
 
+  const handleAddNewKOCs = async () => {
+    const toAdd = importPreview.filter(r => addNewSelected.has(r.rowIndex) && !r.matched && !manualMatches[r.rowIndex]);
+    if (!toAdd.length) return;
+    setAddingNew(true);
+    try {
+      const added = await Promise.all(toAdd.map(r =>
+        fetch("/api/koc", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: r.kocName, platform: "tiktok", follower: 0, giaCast: 0 }),
+        }).then(res => res.json())
+      ));
+      // Auto-match những dòng vừa thêm vào manualMatches
+      const newMatches: typeof manualMatches = { ...manualMatches };
+      toAdd.forEach((r, i) => {
+        const newKoc = added[i];
+        if (newKoc?.id) {
+          newMatches[r.rowIndex] = { kocId: newKoc.id, kocTen: newKoc.ten, bookingId: "", bookingSP: null };
+        }
+      });
+      setManualMatches(newMatches);
+      setAddNewSelected(new Set());
+      await fetchData(); // refresh kocs list
+      alert(`Đã thêm ${toAdd.length} KOC mới vào hệ thống!`);
+    } catch {
+      alert("Có lỗi khi thêm KOC");
+    } finally {
+      setAddingNew(false);
+    }
+  };
+
   const handleSheetImport = async () => {
     if (!sheetUrl.trim()) return;
     setSheetLoading(true);
@@ -312,6 +345,7 @@ export default function KocPage() {
       setImportPreview(data.preview);
       setImportDone(false);
       setManualMatches({});
+      setAddNewSelected(new Set());
       setModalSheet(false);
       setModalImport(true);
     } catch (err: unknown) {
@@ -806,8 +840,9 @@ export default function KocPage() {
               <tr>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Tên KOC</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá cast</th>
-                <th className="text-right px-4 py-3 text-slate-600 font-medium">Số booking</th>
+                <th className="text-right px-4 py-3 text-slate-600 font-medium">Booking</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">SĐT</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-medium">Địa chỉ</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Link</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -827,7 +862,10 @@ export default function KocPage() {
                     <td className="px-4 py-3 font-medium text-slate-800">{k.ten}</td>
                     <td className="px-4 py-3 text-right text-slate-700">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
                     <td className="px-4 py-3 text-right font-medium text-rose-600">{kocBookings.length}</td>
-                    <td className="px-4 py-3 text-slate-500">{k.sdt || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-sm">{k.sdt || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-sm max-w-[180px]">
+                      <span className="truncate block" title={k.diaChi || ""}>{k.diaChi || "—"}</span>
+                    </td>
                     <td className="px-4 py-3">
                       {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs truncate block max-w-32">Xem profile</a> : "—"}
                     </td>
@@ -1123,6 +1161,17 @@ export default function KocPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                   <tr>
+                    <th className="px-3 py-2.5 w-8">
+                      <input type="checkbox"
+                        checked={importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).length > 0 &&
+                          importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).every(r => addNewSelected.has(r.rowIndex))}
+                        onChange={e => {
+                          const unmatched = importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).map(r => r.rowIndex);
+                          setAddNewSelected(e.target.checked ? new Set(unmatched) : new Set());
+                        }}
+                        className="rounded" title="Chọn tất cả chưa khớp"
+                      />
+                    </th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">Tên kênh (file)</th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">KOC trong hệ thống</th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">Sản phẩm</th>
@@ -1134,8 +1183,23 @@ export default function KocPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {importPreview.map((row) => (
-                    <tr key={row.rowIndex} className={row.matched ? "bg-white" : manualMatches[row.rowIndex] ? "bg-blue-50" : "bg-amber-50"}>
-                      <td className="px-4 py-2.5 text-slate-700 text-xs">{row.kocName}</td>
+                    <tr key={row.rowIndex} className={row.matched ? "bg-white" : manualMatches[row.rowIndex] ? "bg-blue-50" : addNewSelected.has(row.rowIndex) ? "bg-emerald-50" : "bg-amber-50"}>
+                      <td className="px-3 py-2.5 text-center">
+                        {!row.matched && !manualMatches[row.rowIndex] ? (
+                          <input type="checkbox"
+                            checked={addNewSelected.has(row.rowIndex)}
+                            onChange={e => {
+                              setAddNewSelected(prev => {
+                                const n = new Set(prev);
+                                e.target.checked ? n.add(row.rowIndex) : n.delete(row.rowIndex);
+                                return n;
+                              });
+                            }}
+                            className="rounded"
+                          />
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-700 text-xs font-medium">{row.kocName}</td>
                       <td className="px-4 py-2.5 text-xs">
                         {row.matched ? (
                           <span className="text-green-700 font-medium flex items-center gap-1">
@@ -1206,11 +1270,23 @@ export default function KocPage() {
               </div>
             )}
 
-            <div className="flex gap-2 p-5 border-t border-slate-200">
-              <button onClick={() => { setModalImport(false); setImportPreview([]); setImportDone(false); }}
-                className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
+            <div className="flex gap-2 p-5 border-t border-slate-200 flex-wrap">
+              <button onClick={() => { setModalImport(false); setImportPreview([]); setImportDone(false); setAddNewSelected(new Set()); }}
+                className="px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
                 {importDone ? "Đóng" : "Huỷ"}
               </button>
+              {/* Nút thêm mới KOC từ danh sách đã chọn */}
+              {!importDone && addNewSelected.size > 0 && (
+                <button
+                  onClick={handleAddNewKOCs}
+                  disabled={addingNew}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {addingNew
+                    ? <><Loader2 size={14} className="animate-spin" /> Đang thêm...</>
+                    : <><Plus size={14} /> Thêm {addNewSelected.size} KOC mới</>}
+                </button>
+              )}
               {!importDone && (
                 <button
                   onClick={handleImportConfirm}
@@ -1219,7 +1295,7 @@ export default function KocPage() {
                 >
                   {importLoading
                     ? "Đang cập nhật..."
-                    : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).length} booking</>}
+                    : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).filter(k => manualMatches[+k]?.bookingId).length} booking</>}
                 </button>
               )}
             </div>
@@ -1292,11 +1368,15 @@ export default function KocPage() {
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">SĐT</label>
-                  <input value={formKOC.sdt} onChange={(e) => setFormKOC({ ...formKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  <input value={formKOC.sdt} onChange={(e) => setFormKOC({ ...formKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="0901..." />
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Link profile</label>
                   <input value={formKOC.linkProfile} onChange={(e) => setFormKOC({ ...formKOC, linkProfile: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1 block">Địa chỉ (ĐCHI)</label>
+                  <input value={formKOC.diaChi} onChange={(e) => setFormKOC({ ...formKOC, diaChi: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành..." />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
@@ -1455,11 +1535,15 @@ export default function KocPage() {
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">SĐT</label>
-                  <input value={formEditKOC.sdt} onChange={(e) => setFormEditKOC({ ...formEditKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  <input value={formEditKOC.sdt} onChange={(e) => setFormEditKOC({ ...formEditKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="0901..." />
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Link profile</label>
                   <input value={formEditKOC.linkProfile} onChange={(e) => setFormEditKOC({ ...formEditKOC, linkProfile: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1 block">Địa chỉ (ĐCHI)</label>
+                  <input value={formEditKOC.diaChi} onChange={(e) => setFormEditKOC({ ...formEditKOC, diaChi: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành..." />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
