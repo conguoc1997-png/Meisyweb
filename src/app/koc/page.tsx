@@ -249,10 +249,12 @@ export default function KocPage() {
   };
 
   const openEditBooking = (b: Booking) => {
+    // Ưu tiên giá cast của booking; nếu chưa có (= 0) thì lấy từ hồ sơ KOC
+    const defaultCast = b.chiPhiCast > 0 ? b.chiPhiCast : b.koc.giaCast;
     setFormEditBooking({
       kocId: b.kocId, sanPhamId: b.sanPhamId ?? "",
       soLuongGui: String(b.soLuongGui),
-      chiPhiCast: String(b.chiPhiCast),
+      chiPhiCast: String(defaultCast),
       ngayBat: b.ngayBat.slice(0, 10),
       ngayKet: b.ngayKet ? b.ngayKet.slice(0, 10) : "",
       ghiChu: b.ghiChu ?? "",
@@ -269,6 +271,14 @@ export default function KocPage() {
         body: JSON.stringify({ ...formEditBooking, chiPhiSP }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
+      // Cập nhật giaCast trong hồ sơ KOC theo giá mới nhất
+      const newCast = Number(formEditBooking.chiPhiCast) || 0;
+      if (newCast > 0) {
+        await fetch(`/api/koc/${modalEditBooking!.kocId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ giaCast: newCast }),
+        });
+      }
       setModalEditBooking(null); fetchData();
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
     finally { setLoading(false); }
@@ -289,6 +299,13 @@ export default function KocPage() {
         body: JSON.stringify({ chiPhiCast, chiPhiSP }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
+      // Cập nhật giaCast trong hồ sơ KOC theo giá mới nhất
+      if (chiPhiCast > 0) {
+        await fetch(`/api/koc/${modalEditChiPhi!.kocId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ giaCast: chiPhiCast }),
+        });
+      }
       setModalEditChiPhi(null); fetchData();
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
     finally { setLoading(false); }
