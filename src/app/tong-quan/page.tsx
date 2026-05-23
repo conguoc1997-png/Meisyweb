@@ -5,15 +5,18 @@ import Link from "next/link";
 import {
   Package, RefreshCcw, Star, AlertTriangle,
   TrendingUp, ShoppingBag, Clock, Scissors,
-  BarChart3, PieChart,
+  BarChart3, PieChart, CalendarDays,
 } from "lucide-react";
 import { formatCurrency, formatDateTime, LOAI_VAN_DE, TRANG_THAI_DOI_TRA } from "@/lib/utils";
+
+type ThangRow = { label: string; soBooking: number; chiPhi: number; doanhThu: number; loiNhuan: number; soDoiTra: number };
 
 type DashboardData = {
   kho: { tongSanPham: number; tongTonKho: number; spSapHet: number };
   doiTra: { total: number; choXuLy: number; dangXuLy: number };
   koc: { tongChiPhiKOC: number; tongDoanhThuKOC: number; bookingDangChay: number; tongBooking: number };
   recentDoiTra: Array<{ id: string; maDoiTra: string; tenKhach: string; loaiVanDe: string; trangThai: string; createdAt: string }>;
+  thangData: ThangRow[];
 };
 
 type LoCatRaw = {
@@ -212,9 +215,62 @@ export default function TongQuanPage() {
         </div>
       </div>
 
-      {/* PieChart placeholder */}
-      <div className="mt-4 flex justify-center">
-        <PieChart size={14} className="text-slate-200" />
+      {/* ── Tổng kết theo tháng ── */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <CalendarDays size={16} className="text-indigo-500" />
+          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">Tổng kết theo tháng</h2>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-5 py-3 text-slate-500 font-medium text-xs">Tháng</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Booking KOC</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Chi phí KOC</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Doanh thu KOC</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Lợi nhuận KOC</th>
+                <th className="text-right px-4 py-3 text-slate-500 font-medium text-xs">Đổi trả</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.thangData.map((t, i) => {
+                const isCurrentMonth = i === data.thangData.length - 1;
+                return (
+                  <tr key={t.label} className={isCurrentMonth ? "bg-indigo-50/60" : "hover:bg-slate-50"}>
+                    <td className="px-5 py-3 font-semibold text-slate-700">
+                      {t.label}
+                      {isCurrentMonth && <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">Hiện tại</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-600">
+                      {t.soBooking > 0 ? <span className="font-medium">{t.soBooking}</span> : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-600">
+                      {t.chiPhi > 0 ? formatCurrency(t.chiPhi) : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {t.doanhThu > 0
+                        ? <span className="text-green-600 font-medium">{formatCurrency(t.doanhThu)}</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {t.chiPhi > 0 || t.doanhThu > 0
+                        ? <span className={`font-semibold ${t.loiNhuan >= 0 ? "text-green-600" : "text-red-500"}`}>
+                            {t.loiNhuan >= 0 ? "+" : ""}{formatCurrency(t.loiNhuan)}
+                          </span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {t.soDoiTra > 0
+                        ? <span className="text-rose-500 font-medium">{t.soDoiTra}</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

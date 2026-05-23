@@ -27,11 +27,45 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    // ── Tổng kết theo tháng (6 tháng gần nhất) ──
+    const now = new Date();
+    const thangList = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      return { label: `T${d.getMonth() + 1}/${d.getFullYear()}`, year: d.getFullYear(), month: d.getMonth() + 1 };
+    });
+
+    const thangData = thangList.map(t => {
+      const start = new Date(t.year, t.month - 1, 1);
+      const end   = new Date(t.year, t.month, 1);
+
+      const mBookings = bookings.filter(b => {
+        const d = new Date(b.ngayBat);
+        return d >= start && d < end;
+      });
+      const mDoiTra = doiTras.filter(d => {
+        const cd = new Date(d.createdAt);
+        return cd >= start && cd < end;
+      });
+
+      const chiPhi   = mBookings.reduce((s, b) => s + b.chiPhi, 0);
+      const doanhThu = mBookings.reduce((s, b) => s + b.doanhThu, 0);
+
+      return {
+        label:     t.label,
+        soBooking: mBookings.length,
+        chiPhi,
+        doanhThu,
+        loiNhuan:  doanhThu - chiPhi,
+        soDoiTra:  mDoiTra.length,
+      };
+    });
+
     return NextResponse.json({
       kho: { tongSanPham, tongTonKho, spSapHet },
       doiTra: { total: doiTras.length, choXuLy, dangXuLy },
       koc: { tongChiPhiKOC, tongDoanhThuKOC, bookingDangChay, tongBooking: bookings.length },
       recentDoiTra,
+      thangData,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
