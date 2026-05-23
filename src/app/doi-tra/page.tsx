@@ -696,7 +696,7 @@ export default function DoiTraPage() {
               <th className="px-3 py-3 text-left">Nguồn</th>
               <th className="px-3 py-3 text-left">SĐT Khách</th>
               <th className="px-3 py-3 text-left">Tên KH</th>
-              <th className="px-3 py-3 text-left">Địa chỉ</th>
+              <th className="px-3 py-3 text-left min-w-[220px]">Địa chỉ</th>
               <th className="px-3 py-3 text-left">SKU đổi sang</th>
               <th className="px-3 py-3 text-left">Ghi chú</th>
               <th className="px-3 py-3 text-right">Giá trị</th>
@@ -754,7 +754,21 @@ export default function DoiTraPage() {
                   <td className="px-3 py-2.5 font-medium text-slate-800 max-w-[120px] truncate">{r.tenKhach}</td>
 
                   {/* Địa chỉ */}
-                  <td className="px-3 py-2.5 text-slate-500 max-w-[160px] truncate" title={r.diaChi || ""}>{r.diaChi || "—"}</td>
+                  <td className="px-3 py-2.5 min-w-[220px] max-w-[280px]">
+                    <div className="group flex items-center gap-1.5">
+                      <span className="text-slate-500 truncate" title={r.diaChi || ""}>{r.diaChi || "—"}</span>
+                      {r.diaChi && (
+                        <button
+                          onClick={() => navigator.clipboard.writeText(r.diaChi!)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-slate-400 hover:text-slate-700"
+                          title="Sao chép địa chỉ">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </td>
 
                   {/* SKU */}
                   <td className="px-3 py-2.5">
