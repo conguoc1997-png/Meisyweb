@@ -129,13 +129,15 @@ export default function Sidebar() {
     <aside className="min-h-screen w-56 bg-white border-r border-slate-200 flex flex-col shadow-sm flex-shrink-0">
 
       {/* ── Logo ── */}
-      <div className="px-4 py-4 border-b border-slate-100 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-rose-500 flex items-center justify-center flex-shrink-0">
-          <ShoppingBag size={16} className="text-white" />
-        </div>
-        <div>
-          <p className="font-bold text-slate-800 text-sm leading-tight">Meisy</p>
-          <p className="text-[11px] text-slate-400">Inhouse v1.0</p>
+      <div className="px-4 py-5 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center flex-shrink-0 shadow-md">
+            <ShoppingBag size={20} className="text-white" />
+          </div>
+          <div>
+            <p className="font-extrabold text-slate-800 text-lg leading-none tracking-tight">Meisy</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Inhouse v1.0</p>
+          </div>
         </div>
       </div>
 
