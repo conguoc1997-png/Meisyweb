@@ -37,7 +37,7 @@ export default function KocPage() {
   const [modalEditKOC, setModalEditKOC] = useState<KOC | null>(null);
   const [modalEditBooking, setModalEditBooking] = useState<Booking | null>(null);
   const [modalEditChiPhi, setModalEditChiPhi] = useState<Booking | null>(null);
-  const [formEditBooking, setFormEditBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
+  const [formEditBooking, setFormEditBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", chiPhiCast: "", ngayBat: "", ngayKet: "", ghiChu: "" });
   const [formEditChiPhi, setFormEditChiPhi] = useState({ chiPhiCast: "", chiPhiSP: "" });
   const [modalLaunch, setModalLaunch] = useState<SanPham | null>(null);
   const [launchKOCs, setLaunchKOCs] = useState<Record<string, { checked: boolean; soLuong: string }>>({});
@@ -252,6 +252,7 @@ export default function KocPage() {
     setFormEditBooking({
       kocId: b.kocId, sanPhamId: b.sanPhamId ?? "",
       soLuongGui: String(b.soLuongGui),
+      chiPhiCast: String(b.chiPhiCast),
       ngayBat: b.ngayBat.slice(0, 10),
       ngayKet: b.ngayKet ? b.ngayKet.slice(0, 10) : "",
       ghiChu: b.ghiChu ?? "",
@@ -262,9 +263,10 @@ export default function KocPage() {
   const handleSaveEditBooking = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
     try {
+      const chiPhiSP = modalEditBooking!.chiPhiSP; // giữ nguyên chi phí SP
       const res = await fetch(`/api/koc/booking/${modalEditBooking!.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formEditBooking),
+        body: JSON.stringify({ ...formEditBooking, chiPhiSP }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setModalEditBooking(null); fetchData();
@@ -1863,6 +1865,13 @@ export default function KocPage() {
                     onChange={e => setFormEditBooking({...formEditBooking, soLuongGui: e.target.value})}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Giá cast (VNĐ)</label>
+                <input type="number" min="0" value={formEditBooking.chiPhiCast}
+                  onChange={e => setFormEditBooking({...formEditBooking, chiPhiCast: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
+                  placeholder="0" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
