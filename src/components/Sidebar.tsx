@@ -43,7 +43,7 @@ const MODULES: NavModule[] = [
     label: "Tổng quan",
     icon: LayoutDashboard,
     bg: "bg-blue-100", text: "text-blue-600",
-    href: "/",
+    href: "/tong-quan",
     roles: ["admin", "kho", "san_xuat"],
   },
   {

@@ -38,6 +38,7 @@ const MODULES: Module[] = [
     gradient: "from-blue-500 to-blue-700",
     decoIcons: [BarChart3, TrendingUp, PieChart],
     roles: ["admin", "kho", "san_xuat"],
+    href: "/tong-quan",
   },
   {
     key: "kho-sx",
@@ -201,8 +202,8 @@ export default function LauncherPage() {
           return (
             <button
               key={mod.key}
-              onClick={() => { if (hasChildren) setActive(mod); }}
-              className={`group relative bg-gradient-to-br ${mod.gradient} rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col gap-5 overflow-hidden min-h-[160px] ${!hasChildren ? "cursor-default" : "cursor-pointer"}`}
+              onClick={() => { if (hasChildren) setActive(mod); else if (mod.href) router.push(mod.href); }}
+              className={`group relative bg-gradient-to-br ${mod.gradient} rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all text-left flex flex-col gap-5 overflow-hidden min-h-[160px] cursor-pointer`}
             >
               {/* Decoration circles */}
               <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
