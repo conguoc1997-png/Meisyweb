@@ -159,31 +159,9 @@ export default function TongQuanPage() {
         <StatCard title="ROI tổng"      value={`${roiKOC}%`}         color={Number(roiKOC) >= 0 ? "text-green-600" : "text-red-600"} />
       </div>
 
-      {/* ── KOC Chi phí + Recent ── */}
+      {/* ── Đổi trả gần đây (trái) + Hiệu quả KOC (phải) ── */}
       <div className="grid grid-cols-2 gap-5">
-        <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={16} className="text-green-500" />
-            <h3 className="font-semibold text-slate-700 text-sm">Hiệu quả KOC</h3>
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Chi phí booking</span>
-              <span className="font-bold text-slate-700">{formatCurrency(data.koc.tongChiPhiKOC)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Doanh thu KOC</span>
-              <span className="font-bold text-green-600">{formatCurrency(data.koc.tongDoanhThuKOC)}</span>
-            </div>
-            <div className="flex justify-between text-sm border-t border-slate-100 pt-3">
-              <span className="text-slate-500">Lợi nhuận ước tính</span>
-              <span className={`font-bold ${data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC)}
-              </span>
-            </div>
-          </div>
-        </div>
-
+        {/* TRÁI: Đổi trả — khớp với header "Đổi trả / Sự cố" bên trái */}
         <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -212,6 +190,30 @@ export default function TongQuanPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* PHẢI: Hiệu quả KOC — khớp với header "KOC" bên phải */}
+        <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp size={16} className="text-green-500" />
+            <h3 className="font-semibold text-slate-700 text-sm">Hiệu quả KOC</h3>
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Chi phí booking</span>
+              <span className="font-bold text-slate-700">{formatCurrency(data.koc.tongChiPhiKOC)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Doanh thu KOC</span>
+              <span className="font-bold text-green-600">{formatCurrency(data.koc.tongDoanhThuKOC)}</span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-slate-100 pt-3">
+              <span className="text-slate-500">Lợi nhuận ước tính</span>
+              <span className={`font-bold ${data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {formatCurrency(data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC)}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
