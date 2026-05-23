@@ -133,34 +133,27 @@ export default function TongQuanPage() {
       </div>
 
       {/* ── Section: Đổi trả + KOC ── */}
-      <div className="grid grid-cols-2 gap-5 mb-6">
-        {/* Đổi trả */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <RefreshCcw size={16} className="text-rose-500" />
-            <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">Đổi trả / Sự cố</h2>
-            <Link href="/doi-tra" className="ml-auto text-xs text-rose-500 hover:underline">Chi tiết →</Link>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard title="Tổng case"   value={data.doiTra.total}    />
-            <StatCard title="Chờ xử lý"  value={data.doiTra.choXuLy}  color={data.doiTra.choXuLy  > 0 ? "text-yellow-600" : "text-slate-800"} />
-            <StatCard title="Đang xử lý" value={data.doiTra.dangXuLy} color="text-blue-600" />
-          </div>
+      {/* Header row — cùng chiều cao, đường kẻ dọc giữa */}
+      <div className="grid grid-cols-2 gap-5 mb-3">
+        <div className="flex items-center gap-2">
+          <RefreshCcw size={16} className="text-rose-500" />
+          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">Đổi trả / Sự cố</h2>
+          <Link href="/doi-tra" className="ml-auto text-xs text-rose-500 hover:underline">Chi tiết →</Link>
         </div>
-
-        {/* KOC */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Star size={16} className="text-amber-500" />
-            <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">KOC</h2>
-            <Link href="/koc" className="ml-auto text-xs text-rose-500 hover:underline">Chi tiết →</Link>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard title="Tổng booking"  value={data.koc.tongBooking}       />
-            <StatCard title="Đang chạy"     value={data.koc.bookingDangChay}  color="text-green-600" />
-            <StatCard title="ROI tổng"      value={`${roiKOC}%`}              color={Number(roiKOC) >= 0 ? "text-green-600" : "text-red-600"} />
-          </div>
+        <div className="flex items-center gap-2">
+          <Star size={16} className="text-amber-500" />
+          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">KOC</h2>
+          <Link href="/koc" className="ml-auto text-xs text-rose-500 hover:underline">Chi tiết →</Link>
         </div>
+      </div>
+      {/* Stat cards — 6 thẻ trong 1 grid duy nhất, đảm bảo thẳng hàng */}
+      <div className="grid grid-cols-6 gap-3 mb-6">
+        <StatCard title="Tổng case"      value={data.doiTra.total}    />
+        <StatCard title="Chờ xử lý"     value={data.doiTra.choXuLy}  color={data.doiTra.choXuLy  > 0 ? "text-yellow-600" : "text-slate-800"} />
+        <StatCard title="Đang xử lý"    value={data.doiTra.dangXuLy} color="text-blue-600" />
+        <StatCard title="Tổng booking"  value={data.koc.tongBooking}  />
+        <StatCard title="Đang chạy"     value={data.koc.bookingDangChay} color="text-green-600" />
+        <StatCard title="ROI tổng"      value={`${roiKOC}%`}         color={Number(roiKOC) >= 0 ? "text-green-600" : "text-red-600"} />
       </div>
 
       {/* ── KOC Chi phí + Recent ── */}
