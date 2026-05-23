@@ -73,34 +73,43 @@ export async function POST(req: NextRequest) {
 
     // ── CONFIRM ──
     if (body.rows) {
-      let updated = 0, inserted = 0;
-      for (const r of body.rows) {
-        if (r.existingId) {
-          // Cập nhật giá bán + tên
-          await prisma.sanPham.update({
-            where: { id: r.existingId },
-            data: {
-              ten:    r.ten,
-              ...(r.giaBan !== null ? { giaBan: r.giaBan } : {}),
-            },
-          });
-          updated++;
-        } else {
-          // Tạo mới
-          const sku = slugSKU(r.ten);
-          await prisma.sanPham.create({
-            data: {
-              ten:    r.ten,
-              sku,
-              giaBan: r.giaBan ?? 0,
-              giaNhap: 0,
-              tonKho:  0,
-              nguon:   "shopee",
-            },
-          });
-          inserted++;
-        }
+      const toInsert = body.rows.filter(r => !r.existingId);
+      const toUpdate = body.rows.filter(r => !!r.existingId);
+
+      // Thêm mới: 1 query duy nhất
+      let inserted = 0;
+      if (toInsert.length > 0) {
+        const result = await prisma.sanPham.createMany({
+          data: toInsert.map(r => ({
+            ten:     r.ten,
+            sku:     slugSKU(r.ten),
+            giaBan:  r.giaBan ?? 0,
+            giaNhap: 0,
+            tonKho:  0,
+            nguon:   "shopee",
+          })),
+          skipDuplicates: true,
+        });
+        inserted = result.count;
       }
+
+      // Cập nhật: gom vào 1 transaction
+      let updated = 0;
+      if (toUpdate.length > 0) {
+        await prisma.$transaction(
+          toUpdate.map(r =>
+            prisma.sanPham.update({
+              where: { id: r.existingId! },
+              data: {
+                ten: r.ten,
+                ...(r.giaBan !== null ? { giaBan: r.giaBan } : {}),
+              },
+            })
+          )
+        );
+        updated = toUpdate.length;
+      }
+
       return NextResponse.json({ updated, inserted });
     }
 
