@@ -45,7 +45,9 @@ export default function KocPage() {
   type PreviewRow = {
     rowIndex: number; kocName: string; kocId: string | null; kocTen: string | null;
     bookingId: string | null; bookingSP: string | null;
-    luotXem: number; donHang: number; doanhThu: number; matched: boolean;
+    luotXem: number; donHang: number; doanhThu: number;
+    sdt: string | null; diaChi: string | null;
+    matched: boolean;
   };
   const [modalImport, setModalImport] = useState(false);
   const [importPreview, setImportPreview] = useState<PreviewRow[]>([]);
@@ -290,7 +292,7 @@ export default function KocPage() {
     try {
       const res = await fetch("/api/koc/import-confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: matched.map(r => ({ bookingId: r.bookingId, luotXem: r.luotXem, donHang: r.donHang, doanhThu: r.doanhThu })) }),
+        body: JSON.stringify({ rows: matched.map(r => ({ bookingId: r.bookingId, kocId: r.kocId, luotXem: r.luotXem, donHang: r.donHang, doanhThu: r.doanhThu, sdt: r.sdt, diaChi: r.diaChi })) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -1175,6 +1177,8 @@ export default function KocPage() {
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">Tên kênh (file)</th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">KOC trong hệ thống</th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">Sản phẩm</th>
+                    <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">SĐT (cột I)</th>
+                    <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">ĐCHI (cột J)</th>
                     <th className="text-right px-4 py-2.5 text-slate-600 font-medium text-xs">Lượt xem</th>
                     <th className="text-right px-4 py-2.5 text-slate-600 font-medium text-xs">Đơn hàng</th>
                     <th className="text-right px-4 py-2.5 text-slate-600 font-medium text-xs">Doanh thu</th>
@@ -1242,6 +1246,16 @@ export default function KocPage() {
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">
                         {row.matched ? (row.bookingSP ?? "—") : (manualMatches[row.rowIndex]?.bookingSP ?? "—")}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs">
+                        {row.sdt
+                          ? <span className="text-slate-700 font-mono">{row.sdt}</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs max-w-[160px]">
+                        {row.diaChi
+                          ? <span className="text-slate-600 truncate block" title={row.diaChi}>{row.diaChi}</span>
+                          : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs text-slate-700">{row.luotXem.toLocaleString()}</td>
                       <td className="px-4 py-2.5 text-right text-xs text-slate-700">{row.donHang.toLocaleString()}</td>
