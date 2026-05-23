@@ -45,7 +45,7 @@ export default function KocPage() {
   const [launchNgayBat, setLaunchNgayBat] = useState("");
   const [launchSearch, setLaunchSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showDeXuat, setShowDeXuat] = useState(true);
+  const [showDeXuat, setShowDeXuat] = useState(false);
 
   type PreviewRow = {
     rowIndex: number; kocName: string; kocId: string | null; kocTen: string | null;
