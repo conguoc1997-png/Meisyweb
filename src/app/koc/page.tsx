@@ -51,6 +51,9 @@ export default function KocPage() {
   const [importPreview, setImportPreview] = useState<PreviewRow[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importDone, setImportDone] = useState(false);
+  const [manualMatches, setManualMatches] = useState<Record<number, {
+    kocId: string; kocTen: string; bookingId: string; bookingSP: string | null;
+  }>>({});
 
   // Google Sheet import
   const [modalSheet, setModalSheet] = useState(false);
@@ -264,13 +267,21 @@ export default function KocPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setImportPreview(data.preview);
+      setManualMatches({});
       setModalImport(true);
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi đọc file"); }
     finally { setImportLoading(false); e.target.value = ""; }
   };
 
   const handleImportConfirm = async () => {
-    const matched = importPreview.filter(r => r.matched && r.bookingId);
+    // Gộp auto-matched + manual-matched
+    const allRows = importPreview.map(r => {
+      if (r.matched && r.bookingId) return r;
+      const m = manualMatches[r.rowIndex];
+      if (m?.bookingId) return { ...r, ...m, matched: true };
+      return r;
+    });
+    const matched = allRows.filter(r => r.matched && r.bookingId);
     if (!matched.length) return;
     setImportLoading(true);
     try {
@@ -300,6 +311,7 @@ export default function KocPage() {
       if (!res.ok) throw new Error(data.error);
       setImportPreview(data.preview);
       setImportDone(false);
+      setManualMatches({});
       setModalSheet(false);
       setModalImport(true);
     } catch (err: unknown) {
@@ -1094,7 +1106,10 @@ export default function KocPage() {
               <div>
                 <h2 className="font-bold text-slate-800">Preview kết quả Import</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {importPreview.filter(r => r.matched).length}/{importPreview.length} dòng khớp với KOC trong hệ thống
+                  {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).length}/{importPreview.length} dòng sẽ được cập nhật
+                  {Object.keys(manualMatches).length > 0 && (
+                    <span className="ml-1 text-blue-600 font-medium">({Object.keys(manualMatches).length} ghép thủ công)</span>
+                  )}
                 </p>
               </div>
               {importDone && (
@@ -1119,21 +1134,60 @@ export default function KocPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {importPreview.map((row) => (
-                    <tr key={row.rowIndex} className={row.matched ? "bg-white" : "bg-amber-50"}>
+                    <tr key={row.rowIndex} className={row.matched ? "bg-white" : manualMatches[row.rowIndex] ? "bg-blue-50" : "bg-amber-50"}>
                       <td className="px-4 py-2.5 text-slate-700 text-xs">{row.kocName}</td>
                       <td className="px-4 py-2.5 text-xs">
-                        {row.matched
-                          ? <span className="text-green-700 font-medium">{row.kocTen}</span>
-                          : <span className="text-amber-600 flex items-center gap-1"><XCircle size={12} /> Không tìm thấy</span>}
+                        {row.matched ? (
+                          <span className="text-green-700 font-medium flex items-center gap-1">
+                            <CheckCircle size={12} className="text-green-500" /> {row.kocTen}
+                          </span>
+                        ) : manualMatches[row.rowIndex] ? (
+                          <div className="flex items-center gap-1">
+                            <CheckCircle size={12} className="text-blue-500 flex-shrink-0" />
+                            <select
+                              value={manualMatches[row.rowIndex]?.kocId ?? ""}
+                              onChange={e => {
+                                const kocId = e.target.value;
+                                if (!kocId) { setManualMatches(prev => { const n = {...prev}; delete n[row.rowIndex]; return n; }); return; }
+                                const koc = kocs.find(k => k.id === kocId);
+                                const latestBooking = bookings.find(b => b.kocId === kocId);
+                                setManualMatches(prev => ({ ...prev, [row.rowIndex]: { kocId, kocTen: koc?.ten ?? "", bookingId: latestBooking?.id ?? "", bookingSP: latestBooking?.sanPham?.ten ?? null } }));
+                              }}
+                              className="text-xs border border-blue-200 rounded px-1 py-0.5 bg-blue-50 text-blue-700 focus:outline-none max-w-[130px]"
+                            >
+                              <option value="">-- Xoá --</option>
+                              {kocs.map(k => <option key={k.id} value={k.id}>{k.ten}</option>)}
+                            </select>
+                          </div>
+                        ) : (
+                          <select
+                            defaultValue=""
+                            onChange={e => {
+                              const kocId = e.target.value;
+                              if (!kocId) return;
+                              const koc = kocs.find(k => k.id === kocId);
+                              const latestBooking = bookings.find(b => b.kocId === kocId);
+                              setManualMatches(prev => ({ ...prev, [row.rowIndex]: { kocId, kocTen: koc?.ten ?? "", bookingId: latestBooking?.id ?? "", bookingSP: latestBooking?.sanPham?.ten ?? null } }));
+                            }}
+                            className="text-xs border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 focus:outline-none focus:border-rose-300 max-w-[150px] bg-amber-50"
+                          >
+                            <option value="">-- Chọn KOC --</option>
+                            {kocs.map(k => <option key={k.id} value={k.id}>{k.ten}</option>)}
+                          </select>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500">{row.bookingSP ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">
+                        {row.matched ? (row.bookingSP ?? "—") : (manualMatches[row.rowIndex]?.bookingSP ?? "—")}
+                      </td>
                       <td className="px-4 py-2.5 text-right text-xs text-slate-700">{row.luotXem.toLocaleString()}</td>
                       <td className="px-4 py-2.5 text-right text-xs text-slate-700">{row.donHang.toLocaleString()}</td>
                       <td className="px-4 py-2.5 text-right text-xs font-medium text-green-700">{formatCurrency(row.doanhThu)}</td>
                       <td className="px-4 py-2.5 text-center">
                         {row.matched
                           ? <CheckCircle size={14} className="text-green-500 mx-auto" />
-                          : <XCircle size={14} className="text-amber-400 mx-auto" />}
+                          : manualMatches[row.rowIndex]
+                            ? <CheckCircle size={14} className="text-blue-500 mx-auto" />
+                            : <XCircle size={14} className="text-amber-400 mx-auto" />}
                       </td>
                     </tr>
                   ))}
@@ -1144,8 +1198,11 @@ export default function KocPage() {
             {/* Không khớp warning */}
             {importPreview.some(r => !r.matched) && (
               <div className="px-5 py-2.5 bg-amber-50 border-t border-amber-100 text-xs text-amber-700">
-                ⚠️ {importPreview.filter(r => !r.matched).length} dòng không tìm thấy KOC tương ứng — sẽ bỏ qua khi import.
-                Kiểm tra tên kênh trong file có khớp với tên KOC trong hệ thống không.
+                ⚠️ {importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).length} dòng chưa khớp KOC
+                {Object.keys(manualMatches).length > 0 && (
+                  <span className="text-blue-600 ml-1 font-medium">· {Object.keys(manualMatches).length} đã ghép thủ công</span>
+                )}
+                <span className="text-slate-500 ml-1">— Chọn KOC từ dropdown để ghép thủ công.</span>
               </div>
             )}
 
@@ -1157,12 +1214,12 @@ export default function KocPage() {
               {!importDone && (
                 <button
                   onClick={handleImportConfirm}
-                  disabled={importLoading || !importPreview.some(r => r.matched)}
+                  disabled={importLoading || (!importPreview.some(r => r.matched) && Object.keys(manualMatches).length === 0)}
                   className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {importLoading
                     ? "Đang cập nhật..."
-                    : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length} booking</>}
+                    : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).length} booking</>}
                 </button>
               )}
             </div>
