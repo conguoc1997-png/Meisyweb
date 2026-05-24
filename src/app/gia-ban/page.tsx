@@ -70,6 +70,8 @@ export default function GiaBanPage() {
   const [showFees, setShowFees] = useState(false);
   const [fees, setFees] = useState<FeeItem[]>(() => makeFees(CATEGORIES[0].thuong));
 
+  const [markupPct, setMarkupPct] = useState("200");
+
   // Bảng giá kho
   const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
   const [loadingKho, setLoadingKho] = useState(false);
@@ -78,12 +80,14 @@ export default function GiaBanPage() {
   const fetchKho = useCallback(async () => {
     setLoadingKho(true);
     try {
-      const data: KhoProduct[] = await fetch("/api/kho/san-pham").then(r => r.json());
+      const res = await fetch("/api/kho/san-pham");
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
       setPriceRows(prev => {
         const map = Object.fromEntries(prev.map(r => [r.id, r]));
-        return data.map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSale: "", ngaySale: "", live: "" });
+        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSale: "", ngaySale: "", live: "" });
       });
-    } finally { setLoadingKho(false); }
+    } catch { /* ignore */ } finally { setLoadingKho(false); }
   }, []);
 
   useEffect(() => { fetchKho(); }, [fetchKho]);
@@ -139,7 +143,6 @@ export default function GiaBanPage() {
     setFees(makeFees(pct));
   }
 
-  const [markupPct, setMarkupPct] = useState("200");
   const suggestedPrice = useMemo(() => {
     const n = parseFloat(giaNhap) || 0;
     const m = parseFloat(markupPct) || 0;
