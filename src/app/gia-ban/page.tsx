@@ -479,9 +479,9 @@ export default function GiaBanPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">SKU</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
-                <th className="text-center px-3 py-2.5 text-xs font-medium text-orange-500">Flash Sale<div className="font-normal text-[10px] text-orange-300">% giảm · giá</div></th>
-                <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-500">Ngày Sale<div className="font-normal text-[10px] text-blue-300">% giảm · giá</div></th>
-                <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-500">Live<div className="font-normal text-[10px] text-purple-300">% giảm · giá</div></th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-orange-500">Flash Sale</th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-500">Ngày Sale</th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-500">Live</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -523,27 +523,42 @@ export default function GiaBanPage() {
                     </td>
                     {/* Flash Sale */}
                     <td className="px-2 py-2 text-center">
-                      <input type="number" placeholder="%" min={0} max={99}
-                        value={r.flashSalePct}
-                        onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
-                        className="w-14 text-center text-sm border border-orange-200 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 text-orange-600 font-bold placeholder:text-slate-300" />
-                      {flashPrice > 0 && <div className="text-xs font-semibold text-orange-500 mt-0.5">{fmtVnd(flashPrice)}đ</div>}
+                      <div className="flex items-center justify-center gap-0.5 mb-1">
+                        <input type="number" placeholder="%" min={0} max={99}
+                          value={r.flashSalePct}
+                          onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
+                          className="w-12 text-center text-xs border border-orange-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-300 text-orange-500 placeholder:text-slate-300 bg-orange-50" />
+                        <span className="text-[10px] text-slate-400">%</span>
+                      </div>
+                      <div className={`text-sm font-bold ${flashPrice > 0 ? "text-orange-500" : "text-slate-200"}`}>
+                        {flashPrice > 0 ? fmtVnd(flashPrice) + "đ" : "—"}
+                      </div>
                     </td>
                     {/* Ngày Sale */}
                     <td className="px-2 py-2 text-center">
-                      <input type="number" placeholder="%" min={0} max={99}
-                        value={r.ngaySalePct}
-                        onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
-                        className="w-14 text-center text-sm border border-blue-200 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200 text-blue-600 font-bold placeholder:text-slate-300" />
-                      {ngayPrice > 0 && <div className="text-xs font-semibold text-blue-500 mt-0.5">{fmtVnd(ngayPrice)}đ</div>}
+                      <div className="flex items-center justify-center gap-0.5 mb-1">
+                        <input type="number" placeholder="%" min={0} max={99}
+                          value={r.ngaySalePct}
+                          onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
+                          className="w-12 text-center text-xs border border-blue-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-300 text-blue-500 placeholder:text-slate-300 bg-blue-50" />
+                        <span className="text-[10px] text-slate-400">%</span>
+                      </div>
+                      <div className={`text-sm font-bold ${ngayPrice > 0 ? "text-blue-500" : "text-slate-200"}`}>
+                        {ngayPrice > 0 ? fmtVnd(ngayPrice) + "đ" : "—"}
+                      </div>
                     </td>
                     {/* Live */}
                     <td className="px-2 py-2 text-center">
-                      <input type="number" placeholder="%" min={0} max={99}
-                        value={r.livePct}
-                        onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
-                        className="w-14 text-center text-sm border border-purple-200 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-purple-200 text-purple-600 font-bold placeholder:text-slate-300" />
-                      {livePrice > 0 && <div className="text-xs font-semibold text-purple-500 mt-0.5">{fmtVnd(livePrice)}đ</div>}
+                      <div className="flex items-center justify-center gap-0.5 mb-1">
+                        <input type="number" placeholder="%" min={0} max={99}
+                          value={r.livePct}
+                          onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
+                          className="w-12 text-center text-xs border border-purple-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-purple-300 text-purple-500 placeholder:text-slate-300 bg-purple-50" />
+                        <span className="text-[10px] text-slate-400">%</span>
+                      </div>
+                      <div className={`text-sm font-bold ${livePrice > 0 ? "text-purple-500" : "text-slate-200"}`}>
+                        {livePrice > 0 ? fmtVnd(livePrice) + "đ" : "—"}
+                      </div>
                     </td>
                   </tr>
                 );
