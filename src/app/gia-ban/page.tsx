@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
   { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
@@ -135,6 +135,13 @@ export default function GiaBanPage() {
       [arr[idx], arr[next]] = [arr[next], arr[idx]];
       return arr;
     });
+  };
+
+  const sortByPrice = () => {
+    setPriceRows(prev => [
+      ...prev.filter(r => r.giaNhap > 0),
+      ...prev.filter(r => r.giaNhap <= 0),
+    ]);
   };
 
   const applyBulk = () => {
@@ -443,6 +450,11 @@ export default function GiaBanPage() {
               value={searchBang} onChange={e => setSearchBang(e.target.value)}
               className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:ring-2 focus:ring-rose-200"
             />
+            <button onClick={sortByPrice}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition font-medium">
+              <ArrowUpDown size={13} />
+              Giá đủ lên trước
+            </button>
             <button onClick={fetchKho} disabled={loadingKho}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50">
               <RefreshCw size={13} className={loadingKho ? "animate-spin" : ""} />
