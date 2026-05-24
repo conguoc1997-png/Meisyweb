@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2 } from "lucide-react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -78,6 +78,36 @@ export default function KocPage() {
   const [contactPreview, setContactPreview] = useState<ContactRow[]>([]);
   const [contactConfirming, setContactConfirming] = useState(false);
   const [contactDone, setContactDone] = useState(false);
+
+  // Tick duyệt booking
+  const [approvedBookings, setApprovedBookings] = useState<Set<string>>(new Set());
+  const toggleApprove = (id: string) => {
+    setApprovedBookings(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const exportApproved = () => {
+    const rows = bookings.filter(b => approvedBookings.has(b.id));
+    if (rows.length === 0) return;
+    const header = ["Tên KOC", "Platform", "SKU sản phẩm", "Tên sản phẩm", "Số lượng gửi", "SĐT", "Địa chỉ"];
+    const lines = rows.map(b => [
+      b.koc.ten,
+      b.koc.platform.toUpperCase(),
+      b.sanPham?.sku ?? "—",
+      b.sanPham?.ten ?? "—",
+      String(b.soLuongGui),
+      b.koc.sdt ?? "—",
+      b.koc.diaChi ?? "—",
+    ].map(v => `"${v.replace(/"/g, '""')}"`).join(","));
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `koc-duyet-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
 
   // Google Sheet import
   const [modalSheet, setModalSheet] = useState(false);
@@ -711,7 +741,15 @@ export default function KocPage() {
                   ✕ Xoá lọc
                 </button>
               )}
-              <span className="text-xs text-slate-400 ml-auto">{filteredBookings.length} booking</span>
+              <div className="ml-auto flex items-center gap-2">
+                {approvedBookings.size > 0 && (
+                  <button onClick={exportApproved}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition">
+                    <Download size={13} /> Xuất {approvedBookings.size} đã duyệt
+                  </button>
+                )}
+                <span className="text-xs text-slate-400">{filteredBookings.length} booking</span>
+              </div>
             </div>
 
             {grouped.length === 0 ? (
@@ -804,6 +842,9 @@ export default function KocPage() {
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50">
                             <tr>
+                              <th className="px-3 py-2.5 w-10 text-center">
+                                <span className="text-xs font-medium text-emerald-600">Duyệt</span>
+                              </th>
                               <th className="text-left px-5 py-2.5 text-slate-500 font-medium text-xs">KOC</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Thời gian</th>
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Số lượng gửi</th>
@@ -813,8 +854,16 @@ export default function KocPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {group.items.map(b => (
-                              <tr key={b.id} className="hover:bg-slate-50">
+                            {group.items.map(b => {
+                              const approved = approvedBookings.has(b.id);
+                              return (
+                              <tr key={b.id} className={`hover:bg-slate-50 transition-colors ${approved ? "bg-emerald-50/60" : ""}`}>
+                                <td className="px-3 py-3 text-center">
+                                  <button onClick={() => toggleApprove(b.id)}
+                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mx-auto transition-all ${approved ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300 hover:border-emerald-400 bg-white"}`}>
+                                    {approved && <CheckCircle size={14} />}
+                                  </button>
+                                </td>
                                 <td className="px-5 py-3">
                                   <p className="font-medium text-slate-800">{b.koc.ten}</p>
                                   <span className={`text-xs px-1.5 py-0.5 rounded ${b.koc.platform === "tiktok" ? "bg-pink-100 text-pink-700" : b.koc.platform === "shopee" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
@@ -845,7 +894,8 @@ export default function KocPage() {
                                   </div>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       )}
