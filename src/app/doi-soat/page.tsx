@@ -104,6 +104,36 @@ export default function DoiSoatPage() {
   const [formAdd, setFormAdd] = useState({ maDon: "", san: "shopee", tenSP: "", sku: "", soLuong: "1", lyDoHoan: "" });
   const [saving, setSaving] = useState(false);
 
+  // Chọn nhiều để bulk action
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const toggleSelect = (id: string) =>
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const toggleSelectAll = (ids: string[]) =>
+    setSelected(prev => ids.every(id => prev.has(id)) ? new Set() : new Set(ids));
+
+  const bulkDelete = async () => {
+    if (!confirm(`Xóa ${selected.size} đơn đã chọn?`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selected);
+    setDons(prev => prev.filter(d => !selected.has(d.id)));
+    setSelected(new Set());
+    await Promise.all(ids.map(id => fetch(`/api/doi-soat/${id}`, { method: "DELETE" })));
+    setBulkDeleting(false);
+  };
+
+  const bulkApprove = async () => {
+    const ids = Array.from(selected);
+    setDons(prev => prev.map(d => selected.has(d.id) ? { ...d, daDoiSoat: true, trangThai: "da_ve" } : d));
+    setSelected(new Set());
+    await Promise.all(ids.map(id => fetch(`/api/doi-soat/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daDoiSoat: true, trangThai: "da_ve" }),
+    })));
+  };
+
   // Inline edit ghiChu
   const [editingGCId, setEditingGCId] = useState<string | null>(null);
   const gcRef = useCallback((el: HTMLTextAreaElement | null) => { if (el) el.focus(); }, []);
@@ -337,12 +367,40 @@ export default function DoiSoatPage() {
         <span className="text-xs text-slate-400 ml-auto">{filtered.length} / {dons.length} đơn</span>
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+          <span className="text-sm font-semibold text-indigo-700">Đã chọn {selected.size} đơn</span>
+          <div className="flex items-center gap-2 ml-auto">
+            <button onClick={bulkApprove}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition">
+              <CheckCircle size={13} /> Đánh dấu đã về
+            </button>
+            <button onClick={bulkDelete} disabled={bulkDeleting}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition disabled:opacity-50">
+              <Trash2 size={13} /> {bulkDeleting ? "Đang xóa..." : "Xóa đã chọn"}
+            </button>
+            <button onClick={() => setSelected(new Set())}
+              className="text-xs px-2 py-1.5 text-indigo-500 hover:bg-indigo-100 rounded-lg transition">
+              Bỏ chọn
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                {/* Checkbox chọn tất cả */}
+                <th className="px-3 py-3 w-10 text-center">
+                  <input type="checkbox"
+                    checked={filtered.length > 0 && filtered.every(d => selected.has(d.id))}
+                    onChange={() => toggleSelectAll(filtered.map(d => d.id))}
+                    className="w-4 h-4 rounded accent-indigo-600 cursor-pointer" />
+                </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-indigo-600 w-16">Đã về</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">Mã đơn</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-500">Sàn</th>
@@ -357,13 +415,19 @@ export default function DoiSoatPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 && (
-                <tr><td colSpan={10} className="text-center py-12 text-slate-400">
+                <tr><td colSpan={11} className="text-center py-12 text-slate-400">
                   {loading ? "Đang tải..." : dons.length === 0 ? "Chưa có đơn hoàn trả nào. Import từ sàn để bắt đầu." : "Không tìm thấy đơn nào."}
                 </td></tr>
               )}
               {filtered.map(don => (
                 <tr key={don.id}
-                  className={`hover:bg-slate-50 transition-colors ${don.daDoiSoat ? "bg-green-50/40" : ""}`}>
+                  className={`hover:bg-slate-50 transition-colors ${selected.has(don.id) ? "bg-indigo-50/60" : don.daDoiSoat ? "bg-green-50/40" : ""}`}>
+                  {/* Checkbox chọn */}
+                  <td className="px-3 py-3 text-center">
+                    <input type="checkbox" checked={selected.has(don.id)}
+                      onChange={() => toggleSelect(don.id)}
+                      className="w-4 h-4 rounded accent-indigo-600 cursor-pointer" />
+                  </td>
                   {/* Tick đối soát */}
                   <td className="px-4 py-3 text-center">
                     <button onClick={() => toggleDoiSoat(don)}
