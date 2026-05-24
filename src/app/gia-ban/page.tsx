@@ -88,6 +88,13 @@ export default function GiaBanPage() {
 
   useEffect(() => { fetchKho(); }, [fetchKho]);
 
+  // Tự động cập nhật khi quay lại tab
+  useEffect(() => {
+    const onFocus = () => fetchKho();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchKho]);
+
   const calcShopeePrice = (giaNhap: number) => {
     const m = parseFloat(markupPct) || 0;
     if (giaNhap <= 0 || m <= 0) return 0;
