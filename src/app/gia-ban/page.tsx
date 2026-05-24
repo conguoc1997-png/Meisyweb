@@ -105,6 +105,17 @@ export default function GiaBanPage() {
     return Math.round(giaNhap * (m / 100));
   };
 
+  const calcLoiNhuan = (giaNhap: number) => {
+    const gB = calcShopeePrice(giaNhap);
+    if (gB <= 0) return null;
+    let tp = 0;
+    for (const f of fees) {
+      if (f.isFixed) { tp += f.amount; }
+      else { let v = (f.pct / 100) * gB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
+    }
+    return { loiNhuan: gB - giaNhap - tp, tongPhi: tp, gB };
+  };
+
   const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSale" | "ngaySale" | "live">, val: string) => {
     setPriceRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
   };
@@ -416,6 +427,7 @@ export default function GiaBanPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">SKU</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500">Giá nhập</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-orange-500">Giá Flash Sale</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-blue-500">Giá ngày Sale</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-purple-500">Giá Live</th>
@@ -439,6 +451,21 @@ export default function GiaBanPage() {
                       <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
                         {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
                       </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {(() => {
+                        const calc = calcLoiNhuan(r.giaNhap);
+                        if (!calc) return <span className="text-slate-300">—</span>;
+                        const pct = ((calc.loiNhuan / calc.gB) * 100).toFixed(1);
+                        return (
+                          <div>
+                            <span className={`font-bold text-sm ${calc.loiNhuan >= 0 ? "text-green-600" : "text-red-500"}`}>
+                              {fmtVnd(calc.loiNhuan)}đ
+                            </span>
+                            <div className={`text-xs ${calc.loiNhuan >= 0 ? "text-green-400" : "text-red-400"}`}>{pct}%</div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" placeholder="—"
