@@ -164,9 +164,12 @@ export default function GiaBanPage() {
   // Tính toán
   const gN = parseFloat(giaNhap) || 0;
   const gB = parseFloat(giaBan) || 0;
-  // Dùng giá bán nhập tay nếu có, fallback về giá đề xuất
-  const effectiveGB = gB > 0 ? gB : suggestedPrice;
+  const ratio = parseFloat(markupPct) || 0;
+  // Giá bán hiệu lực: nhập tay > đề xuất > dùng 100k làm tham chiếu %
+  const effectiveGB = gB > 0 ? gB : suggestedPrice > 0 ? suggestedPrice : (ratio > 0 && ratio < 100 ? Math.round(100000 / (ratio / 100)) : 0);
+  const isEstimate = gB === 0 && gN === 0; // đang dùng giá tham chiếu
   const ready = effectiveGB > 0;
+  const effectiveGN = gN > 0 ? gN : (ratio > 0 && ratio < 100 ? effectiveGB * (ratio / 100) : 0);
 
   const { tongPhi, pctPhi, loiNhuan, pctLN } = useMemo(() => {
     if (!ready) return { tongPhi: 0, pctPhi: 0, loiNhuan: 0, pctLN: 0 };
@@ -175,9 +178,9 @@ export default function GiaBanPage() {
       if (f.isFixed) { tp += f.amount; }
       else { let v = (f.pct / 100) * effectiveGB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
     }
-    const ln = effectiveGB - gN - tp;
+    const ln = effectiveGB - effectiveGN - tp;
     return { tongPhi: tp, pctPhi: (tp / effectiveGB) * 100, loiNhuan: ln, pctLN: (ln / effectiveGB) * 100 };
-  }, [fees, gN, effectiveGB, ready]);
+  }, [fees, effectiveGN, effectiveGB, ready]);
 
   // Import Google Sheets
   async function handleImport() {
@@ -279,9 +282,11 @@ export default function GiaBanPage() {
         </div>
 
         {/* Kết quả */}
-        <div className={`grid grid-cols-4 divide-x divide-slate-100 ${ready ? "" : "opacity-40"}`}>
+        <div className="grid grid-cols-4 divide-x divide-slate-100">
           <div className="px-5 py-3 text-center">
-            <div className="text-xs text-slate-500 mb-1">TỔNG PHÍ</div>
+            <div className="text-xs text-slate-500 mb-1 flex items-center justify-center gap-1">
+              TỔNG PHÍ {isEstimate && <span className="text-[10px] bg-amber-100 text-amber-600 px-1 rounded">~ước tính</span>}
+            </div>
             <div className="text-lg font-bold text-red-500">{ready ? fmtVnd(tongPhi) + "đ" : "—"}</div>
             <div className="text-xs text-slate-400">{ready ? pctPhi.toFixed(2) + "% giá bán" : ""}</div>
           </div>
