@@ -88,8 +88,8 @@ export default function KocPage() {
       return next;
     });
   };
-  const exportApproved = () => {
-    const rows = bookings.filter(b => approvedBookings.has(b.id));
+  const exportApproved = (groupItems: Booking[], spLabel: string) => {
+    const rows = groupItems.filter(b => approvedBookings.has(b.id));
     if (rows.length === 0) return;
     const header = ["Tên KOC", "Platform", "SKU sản phẩm", "Tên sản phẩm", "Số lượng gửi", "SĐT", "Địa chỉ"];
     const lines = rows.map(b => [
@@ -105,7 +105,8 @@ export default function KocPage() {
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
-    a.download = `koc-duyet-${new Date().toISOString().slice(0,10)}.csv`;
+    const safeName = spLabel.replace(/[^a-zA-Z0-9À-ɏḀ-ỿ]/g, "_").slice(0, 40);
+    a.download = `koc-${safeName}-${new Date().toISOString().slice(0,10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
@@ -741,15 +742,7 @@ export default function KocPage() {
                   ✕ Xoá lọc
                 </button>
               )}
-              <div className="ml-auto flex items-center gap-2">
-                {approvedBookings.size > 0 && (
-                  <button onClick={exportApproved}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition">
-                    <Download size={13} /> Xuất {approvedBookings.size} đã duyệt
-                  </button>
-                )}
-                <span className="text-xs text-slate-400">{filteredBookings.length} booking</span>
-              </div>
+              <span className="text-xs text-slate-400 ml-auto">{filteredBookings.length} booking</span>
             </div>
 
             {grouped.length === 0 ? (
@@ -772,6 +765,7 @@ export default function KocPage() {
               const isOpen     = expandedSP === group.key;
               const subTab     = spSubTab[group.key] ?? "koc";
 
+              const groupApprovedCount = group.items.filter(b => approvedBookings.has(b.id)).length;
               return (
                 <div key={group.key} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                   {/* Header card — click để mở/đóng */}
@@ -787,6 +781,15 @@ export default function KocPage() {
                         <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{group.items.length} KOC</span>
                       </div>
                     </div>
+                    {/* Xuất đã duyệt — chỉ hiện khi có tick */}
+                    {groupApprovedCount > 0 && (
+                      <button
+                        onClick={e => { e.stopPropagation(); exportApproved(group.items, group.label); }}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition flex-shrink-0"
+                      >
+                        <Download size={12} /> Xuất {groupApprovedCount} đã duyệt
+                      </button>
+                    )}
                     {/* Thêm KOC vào sản phẩm này */}
                     {group.spId && (() => {
                       const sp = sanPhams.find(s => s.id === group.spId);
