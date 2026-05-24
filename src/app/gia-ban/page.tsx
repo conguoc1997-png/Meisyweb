@@ -164,18 +164,20 @@ export default function GiaBanPage() {
   // Tính toán
   const gN = parseFloat(giaNhap) || 0;
   const gB = parseFloat(giaBan) || 0;
-  const ready = gB > 0;
+  // Dùng giá bán nhập tay nếu có, fallback về giá đề xuất
+  const effectiveGB = gB > 0 ? gB : suggestedPrice;
+  const ready = effectiveGB > 0;
 
   const { tongPhi, pctPhi, loiNhuan, pctLN } = useMemo(() => {
     if (!ready) return { tongPhi: 0, pctPhi: 0, loiNhuan: 0, pctLN: 0 };
     let tp = 0;
     for (const f of fees) {
       if (f.isFixed) { tp += f.amount; }
-      else { let v = (f.pct / 100) * gB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
+      else { let v = (f.pct / 100) * effectiveGB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
     }
-    const ln = gB - gN - tp;
-    return { tongPhi: tp, pctPhi: (tp / gB) * 100, loiNhuan: ln, pctLN: (ln / gB) * 100 };
-  }, [fees, gN, gB, ready]);
+    const ln = effectiveGB - gN - tp;
+    return { tongPhi: tp, pctPhi: (tp / effectiveGB) * 100, loiNhuan: ln, pctLN: (ln / effectiveGB) * 100 };
+  }, [fees, gN, effectiveGB, ready]);
 
   // Import Google Sheets
   async function handleImport() {
@@ -322,7 +324,7 @@ export default function GiaBanPage() {
             </div>
             <div className="grid grid-cols-2 gap-x-6">
               {fees.map(f => {
-                const amt = f.isFixed ? f.amount : (() => { let v = (f.pct / 100) * gB; return f.maxAmount > 0 ? Math.min(v, f.maxAmount) : v; })();
+                const amt = f.isFixed ? f.amount : (() => { let v = (f.pct / 100) * effectiveGB; return f.maxAmount > 0 ? Math.min(v, f.maxAmount) : v; })();
                 return (
                   <div key={f.key} className="grid grid-cols-[1fr_80px_40px_90px] items-center py-1 border-b border-slate-100 text-xs">
                     <span className={f.key === "co_dinh" || f.key === "quang_cao" ? "font-bold text-slate-700" : "text-slate-600"}>{f.label}</span>
