@@ -79,6 +79,33 @@ export default function KocPage() {
   const [contactConfirming, setContactConfirming] = useState(false);
   const [contactDone, setContactDone] = useState(false);
 
+  // Inline edit booking fields
+  const [editingSL, setEditingSL] = useState<{ id: string; val: string } | null>(null);
+  const [editingGC, setEditingGC] = useState<{ id: string; val: string } | null>(null);
+
+  const patchBooking = async (id: string, data: Record<string, unknown>) => {
+    const res = await fetch(`/api/koc/booking/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
+    }
+  };
+
+  const saveSoLuong = (b: Booking) => {
+    const val = parseInt(editingSL?.val ?? "") || b.soLuongGui;
+    setEditingSL(null);
+    if (val !== b.soLuongGui) patchBooking(b.id, { soLuongGui: val });
+  };
+
+  const saveGhiChu = (b: Booking) => {
+    const val = editingGC?.val ?? b.ghiChu ?? "";
+    setEditingGC(null);
+    if (val !== (b.ghiChu ?? "")) patchBooking(b.id, { ghiChu: val || null });
+  };
+
   // Tick duyệt booking
   const [approvedBookings, setApprovedBookings] = useState<Set<string>>(new Set());
   const toggleApprove = (id: string) => {
@@ -853,6 +880,7 @@ export default function KocPage() {
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Số lượng gửi</th>
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá cast</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Trạng thái</th>
+                              <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Ghi chú</th>
                               <th className="px-4 py-2.5"></th>
                             </tr>
                           </thead>
@@ -876,7 +904,26 @@ export default function KocPage() {
                                 <td className="px-4 py-3 text-xs text-slate-500">
                                   {formatDate(b.ngayBat)}{b.ngayKet ? ` → ${formatDate(b.ngayKet)}` : " → ..."}
                                 </td>
-                                <td className="px-4 py-3 text-right text-xs text-slate-600">{b.soLuongGui} cái</td>
+                                {/* Số lượng gửi — inline edit */}
+                                <td className="px-4 py-3 text-right">
+                                  {editingSL?.id === b.id ? (
+                                    <input
+                                      type="number" min={1} autoFocus
+                                      value={editingSL.val}
+                                      onChange={e => setEditingSL({ id: b.id, val: e.target.value })}
+                                      onBlur={() => saveSoLuong(b)}
+                                      onKeyDown={e => { if (e.key === "Enter") saveSoLuong(b); if (e.key === "Escape") setEditingSL(null); }}
+                                      className="w-16 text-right text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingSL({ id: b.id, val: String(b.soLuongGui) })}
+                                      className="text-xs text-slate-600 hover:text-blue-600 hover:underline cursor-pointer px-1"
+                                      title="Click để sửa">
+                                      {b.soLuongGui} cái
+                                    </button>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3 text-right text-xs font-medium text-rose-600">
                                   {b.chiPhiCast > 0 ? formatCurrency(b.chiPhiCast) : <span className="text-slate-400">—</span>}
                                 </td>
@@ -884,6 +931,29 @@ export default function KocPage() {
                                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${TT_COLOR[b.trangThai]}`}>
                                     {TRANG_THAI_BOOKING[b.trangThai]}
                                   </span>
+                                </td>
+                                {/* Ghi chú — inline edit */}
+                                <td className="px-4 py-3 max-w-[180px]">
+                                  {editingGC?.id === b.id ? (
+                                    <textarea
+                                      autoFocus rows={2}
+                                      value={editingGC.val}
+                                      onChange={e => setEditingGC({ id: b.id, val: e.target.value })}
+                                      onBlur={() => saveGhiChu(b)}
+                                      onKeyDown={e => { if (e.key === "Escape") setEditingGC(null); }}
+                                      className="w-full text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                                      placeholder="Nhập ghi chú..."
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingGC({ id: b.id, val: b.ghiChu ?? "" })}
+                                      className="text-xs text-left w-full hover:text-blue-600 cursor-pointer"
+                                      title="Click để sửa">
+                                      {b.ghiChu
+                                        ? <span className="text-slate-600 line-clamp-2">{b.ghiChu}</span>
+                                        : <span className="text-slate-300 italic">+ ghi chú</span>}
+                                    </button>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center gap-1 justify-end">
