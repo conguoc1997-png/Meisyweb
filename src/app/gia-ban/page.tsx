@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, Table2, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
   { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
@@ -389,7 +389,7 @@ export default function GiaBanPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Table2 size={18} className="text-rose-500 shrink-0" />
+            <List size={18} className="text-rose-500 shrink-0" />
             <h2 className="font-semibold text-slate-700">Bảng giá sản phẩm</h2>
             <span className="text-xs text-slate-400 ml-1">· Giá Shopee/TikTok tự tính theo công thức ×{markupPct}%</span>
           </div>
