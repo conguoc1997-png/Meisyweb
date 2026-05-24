@@ -15,6 +15,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -50,8 +51,9 @@ const MODULES: NavModule[] = [
     label: "Kho & Sản xuất", icon: Package,
     bg: "bg-gradient-to-br from-orange-400 to-orange-600", text: "text-white",
     children: [
-      { href: "/kho",      label: "Quản lý Kho", icon: Package,  moduleKey: "kho" },
-      { href: "/san-xuat", label: "Sản xuất",     icon: Scissors, moduleKey: "san-xuat" },
+      { href: "/kho",       label: "Quản lý Kho",          icon: Package,       moduleKey: "kho" },
+      { href: "/san-xuat",  label: "Sản xuất",             icon: Scissors,      moduleKey: "san-xuat" },
+      { href: "/doi-soat",  label: "Đối soát hoàn trả",    icon: ClipboardList, moduleKey: "kho" },
     ],
   },
   {
