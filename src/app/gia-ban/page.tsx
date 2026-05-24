@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, Table2, RefreshCw } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
   { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
@@ -57,6 +57,8 @@ function makeFees(coDinhPct: number): FeeItem[] {
 }
 
 type Product = { sku: string; giaNhap: number; giaThanh: number };
+type KhoProduct = { id: string; ten: string; sku: string; giaNhap: number };
+type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSale: string; ngaySale: string; live: string };
 
 function fmtVnd(n: number) { return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }); }
 
@@ -67,6 +69,41 @@ export default function GiaBanPage() {
   const [giaBan, setGiaBan] = useState("");
   const [showFees, setShowFees] = useState(false);
   const [fees, setFees] = useState<FeeItem[]>(() => makeFees(CATEGORIES[0].thuong));
+
+  // Bảng giá kho
+  const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
+  const [loadingKho, setLoadingKho] = useState(false);
+  const [searchBang, setSearchBang] = useState("");
+
+  const fetchKho = useCallback(async () => {
+    setLoadingKho(true);
+    try {
+      const data: KhoProduct[] = await fetch("/api/kho/san-pham").then(r => r.json());
+      setPriceRows(prev => {
+        const map = Object.fromEntries(prev.map(r => [r.id, r]));
+        return data.map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSale: "", ngaySale: "", live: "" });
+      });
+    } finally { setLoadingKho(false); }
+  }, []);
+
+  useEffect(() => { fetchKho(); }, [fetchKho]);
+
+  const calcShopeePrice = (giaNhap: number) => {
+    const m = parseFloat(markupPct) || 0;
+    if (giaNhap <= 0 || m <= 0) return 0;
+    return Math.round(giaNhap * (m / 100));
+  };
+
+  const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSale" | "ngaySale" | "live">, val: string) => {
+    setPriceRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+  };
+
+  const filteredRows = useMemo(() =>
+    priceRows.filter(r =>
+      !searchBang ||
+      r.ten.toLowerCase().includes(searchBang.toLowerCase()) ||
+      r.sku.toLowerCase().includes(searchBang.toLowerCase())
+    ), [priceRows, searchBang]);
 
   // Google Sheets
   const [sheetUrl, setSheetUrl] = useState("");
@@ -335,6 +372,93 @@ export default function GiaBanPage() {
 
         {products.length === 0 && !sheetError && (
           <p className="text-xs text-slate-400">Dán link Google Sheets rồi nhấn "Tải dữ liệu" để lấy danh sách sản phẩm.</p>
+        )}
+      </div>
+
+      {/* ── BẢNG GIÁ SẢN PHẨM ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Table2 size={18} className="text-rose-500 shrink-0" />
+            <h2 className="font-semibold text-slate-700">Bảng giá sản phẩm</h2>
+            <span className="text-xs text-slate-400 ml-1">· Giá Shopee/TikTok tự tính theo công thức ×{markupPct}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text" placeholder="Tìm tên / SKU..."
+              value={searchBang} onChange={e => setSearchBang(e.target.value)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:ring-2 focus:ring-rose-200"
+            />
+            <button onClick={fetchKho} disabled={loadingKho}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50">
+              <RefreshCw size={13} className={loadingKho ? "animate-spin" : ""} />
+              Làm mới
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 w-8">#</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Tên sản phẩm</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">SKU</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500">Giá nhập</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-orange-500">Giá Flash Sale</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-blue-500">Giá ngày Sale</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-purple-500">Giá Live</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredRows.length === 0 && (
+                <tr><td colSpan={8} className="text-center py-8 text-slate-400 text-sm">
+                  {loadingKho ? "Đang tải..." : "Không có sản phẩm"}
+                </td></tr>
+              )}
+              {filteredRows.map((r, i) => {
+                const shopee = calcShopeePrice(r.giaNhap);
+                return (
+                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-2.5 text-xs text-slate-400">{i + 1}</td>
+                    <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[200px] truncate" title={r.ten}>{r.ten}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{r.sku}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600 text-xs">{fmtVnd(r.giaNhap)}đ</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                        {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input type="number" placeholder="—"
+                        value={r.flashSale}
+                        onChange={e => updatePriceRow(r.id, "flashSale", e.target.value)}
+                        className="w-28 text-right text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200 text-orange-600 font-medium placeholder:text-slate-300" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input type="number" placeholder="—"
+                        value={r.ngaySale}
+                        onChange={e => updatePriceRow(r.id, "ngaySale", e.target.value)}
+                        className="w-28 text-right text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200 text-blue-600 font-medium placeholder:text-slate-300" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input type="number" placeholder="—"
+                        value={r.live}
+                        onChange={e => updatePriceRow(r.id, "live", e.target.value)}
+                        className="w-28 text-right text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-200 text-purple-600 font-medium placeholder:text-slate-300" />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredRows.length > 0 && (
+          <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
+            {filteredRows.length} sản phẩm · Giá Shopee/TikTok = Giá nhập × {markupPct}% · Giá Flash Sale / Ngày sale / Live nhập tay
+          </div>
         )}
       </div>
     </div>
