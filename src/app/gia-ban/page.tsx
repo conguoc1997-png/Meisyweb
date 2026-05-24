@@ -58,7 +58,7 @@ function makeFees(coDinhPct: number): FeeItem[] {
 
 type Product = { sku: string; giaNhap: number; giaThanh: number };
 type KhoProduct = { id: string; ten: string; sku: string; giaNhap: number };
-type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSale: string; ngaySale: string; live: string };
+type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSalePct: string; ngaySalePct: string; livePct: string };
 
 function fmtVnd(n: number) { return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }); }
 
@@ -85,7 +85,7 @@ export default function GiaBanPage() {
       if (!Array.isArray(data)) return;
       setPriceRows(prev => {
         const map = Object.fromEntries(prev.map(r => [r.id, r]));
-        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSale: "", ngaySale: "", live: "" });
+        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSalePct: "", ngaySalePct: "", livePct: "" });
       });
     } catch { /* ignore */ } finally { setLoadingKho(false); }
   }, []);
@@ -116,7 +116,7 @@ export default function GiaBanPage() {
     return { loiNhuan: gB - giaNhap - tp, tongPhi: tp, gB };
   };
 
-  const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSale" | "ngaySale" | "live">, val: string) => {
+  const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSalePct" | "ngaySalePct" | "livePct">, val: string) => {
     setPriceRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
   };
 
@@ -431,13 +431,13 @@ export default function GiaBanPage() {
               <tr>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 w-8">#</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Tên sản phẩm</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">SKU</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500">Giá nhập</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">SKU</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-orange-500">Giá Flash Sale</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-blue-500">Giá ngày Sale</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-purple-500">Giá Live</th>
+                <th className="text-center px-4 py-2.5 text-xs font-medium text-orange-500">Flash Sale<div className="font-normal text-slate-400 text-[10px]">% giảm · giá</div></th>
+                <th className="text-center px-4 py-2.5 text-xs font-medium text-blue-500">Ngày Sale<div className="font-normal text-slate-400 text-[10px]">% giảm · giá</div></th>
+                <th className="text-center px-4 py-2.5 text-xs font-medium text-purple-500">Live<div className="font-normal text-slate-400 text-[10px]">% giảm · giá</div></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -451,9 +451,9 @@ export default function GiaBanPage() {
                 return (
                   <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-2.5 text-xs text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[200px] truncate" title={r.ten}>{r.ten}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{r.sku}</td>
+                    <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[180px] truncate" title={r.ten}>{r.ten}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600 text-xs">{fmtVnd(r.giaNhap)}đ</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-400">{r.sku}</td>
                     <td className="px-4 py-2.5 text-right">
                       <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
                         {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
@@ -474,24 +474,28 @@ export default function GiaBanPage() {
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-2">
-                      <input type="number" placeholder="—"
-                        value={r.flashSale}
-                        onChange={e => updatePriceRow(r.id, "flashSale", e.target.value)}
-                        className="w-28 text-right text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200 text-orange-600 font-medium placeholder:text-slate-300" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input type="number" placeholder="—"
-                        value={r.ngaySale}
-                        onChange={e => updatePriceRow(r.id, "ngaySale", e.target.value)}
-                        className="w-28 text-right text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200 text-blue-600 font-medium placeholder:text-slate-300" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input type="number" placeholder="—"
-                        value={r.live}
-                        onChange={e => updatePriceRow(r.id, "live", e.target.value)}
-                        className="w-28 text-right text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-200 text-purple-600 font-medium placeholder:text-slate-300" />
-                    </td>
+                    {([
+                      { field: "flashSalePct" as const, ring: "focus:ring-orange-200", color: "text-orange-600", bg: "text-orange-500" },
+                      { field: "ngaySalePct"  as const, ring: "focus:ring-blue-200",   color: "text-blue-600",   bg: "text-blue-500"   },
+                      { field: "livePct"      as const, ring: "focus:ring-purple-200", color: "text-purple-600", bg: "text-purple-500"  },
+                    ]).map(({ field, ring, color, bg }) => {
+                      const pct = parseFloat(r[field]) || 0;
+                      const discounted = shopee > 0 && pct > 0 ? Math.round(shopee * (1 - pct / 100)) : 0;
+                      return (
+                        <td key={field} className="px-2 py-2 text-center">
+                          <div className="flex items-center gap-1 justify-center">
+                            <input type="number" placeholder="%" min={0} max={99}
+                              value={r[field]}
+                              onChange={e => updatePriceRow(r.id, field, e.target.value)}
+                              className={`w-14 text-center text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-2 ${ring} ${color} font-medium placeholder:text-slate-300`} />
+                            <span className="text-slate-300 text-xs">%</span>
+                          </div>
+                          {discounted > 0 && (
+                            <div className={`text-xs font-semibold mt-0.5 ${bg}`}>{fmtVnd(discounted)}đ</div>
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}
