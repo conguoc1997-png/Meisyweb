@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
   { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
@@ -123,6 +123,18 @@ export default function GiaBanPage() {
 
   const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSalePct" | "ngaySalePct" | "livePct">, val: string) => {
     setPriceRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+  };
+
+  const moveRow = (id: string, dir: -1 | 1) => {
+    setPriceRows(prev => {
+      const idx = prev.findIndex(r => r.id === id);
+      if (idx < 0) return prev;
+      const next = idx + dir;
+      if (next < 0 || next >= prev.length) return prev;
+      const arr = [...prev];
+      [arr[idx], arr[next]] = [arr[next], arr[idx]];
+      return arr;
+    });
   };
 
   const applyBulk = () => {
@@ -476,7 +488,9 @@ export default function GiaBanPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 w-8">#</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Tên sản phẩm</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500">Giá nhập</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">SKU</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">
+                  <div className="flex items-center gap-1">SKU <span className="text-[10px] font-normal text-slate-300">↕ thứ tự</span></div>
+                </th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
                 <th className="text-center px-3 py-2.5 text-xs font-medium text-orange-500">Flash Sale</th>
@@ -491,6 +505,7 @@ export default function GiaBanPage() {
                 </td></tr>
               )}
               {filteredRows.map((r, i) => {
+                const realIdx = priceRows.findIndex(x => x.id === r.id);
                 const shopee = calcShopeePrice(r.giaNhap);
                 const flashPrice = shopee > 0 && parseFloat(r.flashSalePct) > 0 ? Math.round(shopee * (1 - parseFloat(r.flashSalePct) / 100)) : 0;
                 const ngayPrice  = shopee > 0 && parseFloat(r.ngaySalePct)  > 0 ? Math.round(shopee * (1 - parseFloat(r.ngaySalePct)  / 100)) : 0;
@@ -500,7 +515,21 @@ export default function GiaBanPage() {
                     <td className="px-4 py-2.5 text-xs text-slate-400">{i + 1}</td>
                     <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[180px] truncate" title={r.ten}>{r.ten}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600 text-xs">{fmtVnd(r.giaNhap)}đ</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-400">{r.sku}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex flex-col gap-0.5">
+                          <button onClick={() => moveRow(r.id, -1)} disabled={realIdx === 0}
+                            className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-slate-600 transition">
+                            <ArrowUp size={11} />
+                          </button>
+                          <button onClick={() => moveRow(r.id, 1)} disabled={realIdx === priceRows.length - 1}
+                            className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-slate-600 transition">
+                            <ArrowDown size={11} />
+                          </button>
+                        </div>
+                        <span className="font-mono text-xs text-slate-400">{r.sku}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
                         {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
