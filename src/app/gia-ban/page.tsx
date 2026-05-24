@@ -70,7 +70,7 @@ export default function GiaBanPage() {
   const [showFees, setShowFees] = useState(false);
   const [fees, setFees] = useState<FeeItem[]>(() => makeFees(CATEGORIES[0].thuong));
 
-  const [markupPct, setMarkupPct] = useState("200");
+  const [markupPct, setMarkupPct] = useState("40");
 
   // Bảng giá kho
   const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
@@ -101,8 +101,8 @@ export default function GiaBanPage() {
 
   const calcShopeePrice = (giaNhap: number) => {
     const m = parseFloat(markupPct) || 0;
-    if (giaNhap <= 0 || m <= 0) return 0;
-    return Math.round(giaNhap * (m / 100));
+    if (giaNhap <= 0 || m <= 0 || m >= 100) return 0;
+    return Math.round(giaNhap / (m / 100));
   };
 
   const calcLoiNhuan = (giaNhap: number) => {
@@ -157,8 +157,8 @@ export default function GiaBanPage() {
   const suggestedPrice = useMemo(() => {
     const n = parseFloat(giaNhap) || 0;
     const m = parseFloat(markupPct) || 0;
-    if (n <= 0 || m <= 0) return 0;
-    return Math.round(n * (m / 100));
+    if (n <= 0 || m <= 0 || m >= 100) return 0;
+    return Math.round(n / (m / 100));
   }, [giaNhap, markupPct]);
 
   // Tính toán
@@ -258,7 +258,7 @@ export default function GiaBanPage() {
 
             {/* Giá bán đề xuất */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Đề xuất (Giá nhập ×)</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Tỉ lệ cost (Giá nhập / Giá bán)</label>
               <div className="flex items-center gap-1.5">
                 <input type="number" step="10" value={markupPct}
                   onChange={e => setMarkupPct(e.target.value)}
@@ -402,7 +402,7 @@ export default function GiaBanPage() {
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <List size={18} className="text-rose-500 shrink-0" />
             <h2 className="font-semibold text-slate-700">Bảng giá sản phẩm</h2>
-            <span className="text-xs text-slate-400 ml-1">· Giá Shopee/TikTok tự tính theo công thức ×{markupPct}%</span>
+            <span className="text-xs text-slate-400 ml-1">· Giá Shopee/TikTok = Giá nhập ÷ {markupPct}%</span>
           </div>
           <div className="flex items-center gap-2">
             <input
