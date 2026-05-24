@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { CheckCircle, Circle, Trash2, RefreshCw, Upload, Plus, Search, Filter, ClipboardList, AlertTriangle, PackageCheck, PackageX, X } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { CheckCircle, Circle, Trash2, RefreshCw, Upload, Plus, Search, Filter, ClipboardList, AlertTriangle, PackageCheck, PackageX, X, FileSpreadsheet } from "lucide-react";
 
 type DonHoanTra = {
   id: string; maDon: string; san: string; tenSP: string; sku: string;
@@ -31,48 +31,53 @@ function fmtDate(s: string | null) {
   return new Date(s).toLocaleDateString("vi-VN");
 }
 
+// ── Parse rows (dùng chung cho paste và Excel) ──
+function parseRows(headers: string[], dataRows: string[][], san: string): Partial<DonHoanTra>[] {
+  const norm = headers.map(h => h.trim().toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/mã đơn hàng|mã đơn|order id|orderid|mã đh|order no|order_id|orderno/gi, "ma_don")
+    .replace(/tên sp|tên sản phẩm|product name|sản phẩm|product/gi, "ten_sp")
+    .replace(/^sku$|mã sku|product sku|product_sku/gi, "sku")
+    .replace(/số lượng|qty|quantity|sl|amount/gi, "so_luong")
+    .replace(/ngày|date|thời gian|create|created/gi, "ngay")
+    .replace(/lý do|reason|ghi chú|note|remark/gi, "ly_do")
+  );
+
+  const get = (row: string[], key: string) => {
+    const idx = norm.findIndex(h => h.includes(key));
+    return idx >= 0 ? (row[idx] ?? "").trim() : "";
+  };
+
+  const rows: Partial<DonHoanTra>[] = [];
+  for (const cols of dataRows) {
+    if (cols.every(c => !c?.trim())) continue;
+    const maDon = get(cols, "ma_don") || cols[0]?.trim() || "";
+    if (!maDon) continue;
+    rows.push({
+      maDon,
+      san,
+      tenSP:    get(cols, "ten_sp") || cols[1]?.trim() || "",
+      sku:      get(cols, "sku")    || cols[2]?.trim() || "",
+      soLuong:  parseInt(get(cols, "so_luong") || cols[3]) || 1,
+      lyDoHoan: get(cols, "ly_do") || null,
+    });
+  }
+  return rows;
+}
+
 // ── Parse paste từ Shopee/TikTok ──
 function parsePaste(text: string, san: string): Partial<DonHoanTra>[] {
   const lines = text.trim().split("\n").filter(l => l.trim());
   if (lines.length === 0) return [];
-  const rows: Partial<DonHoanTra>[] = [];
-
-  // Tự detect separator: tab hoặc dấu phẩy
   const sep = lines[0].includes("\t") ? "\t" : ",";
-  const headers = lines[0].split(sep).map(h => h.trim().toLowerCase()
-    .replace(/['"]/g, "")
-    .replace(/mã đơn|order id|orderid|mã đh|order no/gi, "ma_don")
-    .replace(/tên sp|tên sản phẩm|product name|sản phẩm/gi, "ten_sp")
-    .replace(/sku|mã sku|product sku/gi, "sku")
-    .replace(/số lượng|qty|quantity|sl/gi, "so_luong")
-    .replace(/ngày|date|thời gian/gi, "ngay")
-    .replace(/lý do|reason|ghi chú|note/gi, "ly_do")
+  const rawHeaders = lines[0].split(sep).map(c => c.trim().replace(/^["']|["']$/g, ""));
+  const hasHeader = rawHeaders.some(h =>
+    /mã|order|sku|tên|product|qty|quantity|lý do|reason/i.test(h)
   );
-
-  const startRow = headers.some(h => h.includes("ma_don") || h.includes("sku")) ? 1 : 0;
-
-  for (let i = startRow; i < lines.length; i++) {
-    const cols = lines[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g, ""));
-    if (cols.every(c => !c)) continue;
-
-    const get = (key: string) => {
-      const idx = headers.findIndex(h => h.includes(key));
-      return idx >= 0 ? cols[idx] ?? "" : "";
-    };
-
-    const maDon = get("ma_don") || cols[0] || "";
-    if (!maDon) continue;
-
-    rows.push({
-      maDon,
-      san,
-      tenSP:   get("ten_sp") || cols[1] || "",
-      sku:     get("sku")    || cols[2] || "",
-      soLuong: parseInt(get("so_luong") || cols[3]) || 1,
-      lyDoHoan: get("ly_do") || null,
-    });
-  }
-  return rows;
+  const headers   = hasHeader ? rawHeaders : rawHeaders.map((_, i) => String(i));
+  const startRow  = hasHeader ? 1 : 0;
+  const dataRows  = lines.slice(startRow).map(l => l.split(sep).map(c => c.trim().replace(/^["']|["']$/g, "")));
+  return parseRows(headers, dataRows, san);
 }
 
 export default function DoiSoatPage() {
@@ -91,6 +96,8 @@ export default function DoiSoatPage() {
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState<Partial<DonHoanTra>[]>([]);
   const [importing, setImporting] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Add single modal
   const [showAdd, setShowAdd] = useState(false);
@@ -149,7 +156,41 @@ export default function DoiSoatPage() {
     await fetch(`/api/doi-soat/${id}`, { method: "DELETE" });
   };
 
-  // Preview import
+  // Đọc file Excel
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileLoading(true);
+    setPreview([]);
+    setPasteText("");
+    try {
+      const XLSX = await import("xlsx");
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf, { type: "array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const raw: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      if (raw.length < 1) return;
+      // Tìm hàng header thực sự (bỏ qua các dòng trắng đầu)
+      let headerIdx = 0;
+      for (let i = 0; i < Math.min(raw.length, 5); i++) {
+        if (raw[i].some(c => /mã|order|sku|tên|product|qty|lý do|reason/i.test(String(c)))) {
+          headerIdx = i; break;
+        }
+      }
+      const headers  = raw[headerIdx].map(c => String(c));
+      const dataRows = raw.slice(headerIdx + 1).map(r => r.map(c => String(c ?? "")));
+      const rows = parseRows(headers, dataRows, importSan);
+      setPreview(rows);
+    } catch (err) {
+      alert("Không đọc được file Excel. Vui lòng thử lại hoặc dùng Copy-Paste.");
+      console.error(err);
+    } finally {
+      setFileLoading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  // Preview import (paste)
   const handleParse = () => {
     const rows = parsePaste(pasteText, importSan);
     setPreview(rows);
@@ -431,14 +472,37 @@ export default function DoiSoatPage() {
                 ))}
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1.5">
-                  Dán dữ liệu từ sàn vào đây (Excel copy, CSV, TSV...)
+              {/* Upload file Excel */}
+              <div className="border-2 border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/40 text-center">
+                <FileSpreadsheet size={28} className="mx-auto mb-2 text-indigo-400" />
+                <p className="text-sm font-medium text-slate-700 mb-1">Upload file Excel từ sàn</p>
+                <p className="text-xs text-slate-400 mb-3">Hỗ trợ .xlsx, .xls, .csv — hệ thống tự nhận cột</p>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden" id="file-excel-input" />
+                <label htmlFor="file-excel-input"
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition ${
+                    fileLoading
+                      ? "bg-slate-200 text-slate-400 cursor-wait"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}>
+                  {fileLoading ? <><RefreshCw size={14} className="animate-spin" /> Đang đọc file...</> : <><Upload size={14} /> Chọn file Excel</>}
                 </label>
+              </div>
+
+              {/* Hoặc paste text */}
+              <div className="relative">
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center">
+                  <div className="flex-1 border-t border-slate-200" />
+                  <span className="mx-3 text-xs text-slate-400 bg-white px-1">hoặc Copy-Paste từ bảng</span>
+                  <div className="flex-1 border-t border-slate-200" />
+                </div>
+              </div>
+              <div>
                 <p className="text-xs text-slate-400 mb-2">
-                  Hệ thống tự nhận diện cột. Cột bắt buộc: <strong>Mã đơn</strong>. Tuỳ chọn: SKU, Tên SP, Số lượng, Lý do, Ngày.
+                  Cột bắt buộc: <strong>Mã đơn</strong>. Tuỳ chọn: SKU, Tên SP, Số lượng, Lý do.
                 </p>
-                <textarea rows={8} value={pasteText}
+                <textarea rows={6} value={pasteText}
                   onChange={e => { setPasteText(e.target.value); setPreview([]); }}
                   placeholder={"Mã đơn\tSKU\tTên SP\tSố lượng\tLý do\n2412345678\tCVN01TT\tÁo croptop\t1\tKhách đổi ý"}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
