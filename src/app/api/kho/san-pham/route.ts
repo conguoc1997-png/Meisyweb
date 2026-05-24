@@ -5,8 +5,17 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const sanPhams = await prisma.sanPham.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
     });
+
+    // Sắp xếp: có giá nhập > lên trước, cùng nhóm thì mới nhất trước
+    sanPhams.sort((a, b) => {
+      const aHas = a.giaNhap > 0 ? 1 : 0;
+      const bHas = b.giaNhap > 0 ? 1 : 0;
+      if (bHas !== aHas) return bHas - aHas;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+
     return NextResponse.json(sanPhams);
   } catch {
     return NextResponse.json({ error: "Lỗi server" }, { status: 500 });
