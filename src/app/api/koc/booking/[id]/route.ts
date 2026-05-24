@@ -9,6 +9,22 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await req.json();
+
+    // Khi cập nhật soLuongGui → tự tính lại chiPhiSP và chiPhi
+    let extraSoLuong: Record<string, number> = {};
+    if (body.soLuongGui !== undefined) {
+      const current = await prisma.kOCBooking.findUnique({
+        where: { id },
+        include: { sanPham: true },
+      });
+      if (current) {
+        const newSL = Number(body.soLuongGui);
+        const giaNhap = current.sanPham?.giaNhap ?? 0;
+        const newChiPhiSP = giaNhap * newSL;
+        extraSoLuong = { soLuongGui: newSL, chiPhiSP: newChiPhiSP, chiPhi: current.chiPhiCast + newChiPhiSP };
+      }
+    }
+
     const booking = await prisma.kOCBooking.update({
       where: { id },
       data: {
@@ -21,15 +37,16 @@ export async function PATCH(
         // Sửa thông tin booking
         ...(body.kocId      !== undefined && { kocId:      body.kocId      }),
         ...(body.sanPhamId  !== undefined && { sanPhamId:  body.sanPhamId  || null }),
-        ...(body.soLuongGui !== undefined && { soLuongGui: Number(body.soLuongGui) }),
         ...(body.ngayBat    !== undefined && { ngayBat:    new Date(body.ngayBat) }),
         ...(body.ngayKet    !== undefined && { ngayKet:    body.ngayKet ? new Date(body.ngayKet) : null }),
-        // Sửa chi phí
+        // soLuongGui + chi phí tính lại tự động
+        ...extraSoLuong,
+        // Sửa chi phí thủ công (từ modal chi phí)
         ...(body.chiPhiCast !== undefined && {
           chiPhiCast: Number(body.chiPhiCast),
           chiPhi: Number(body.chiPhiCast) + Number(body.chiPhiSP ?? 0),
         }),
-        ...(body.chiPhiSP   !== undefined && {
+        ...(body.chiPhiSP !== undefined && body.soLuongGui === undefined && {
           chiPhiSP: Number(body.chiPhiSP),
           chiPhi: Number(body.chiPhiCast ?? 0) + Number(body.chiPhiSP),
         }),

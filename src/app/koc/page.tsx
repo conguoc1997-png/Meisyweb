@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
@@ -79,9 +79,11 @@ export default function KocPage() {
   const [contactConfirming, setContactConfirming] = useState(false);
   const [contactDone, setContactDone] = useState(false);
 
-  // Inline edit booking fields
-  const [editingSL, setEditingSL] = useState<{ id: string; val: string } | null>(null);
-  const [editingGC, setEditingGC] = useState<{ id: string; val: string } | null>(null);
+  // Inline edit booking fields — dùng ref để tránh re-render mỗi keystroke
+  const [editingSLId, setEditingSLId] = useState<string | null>(null);
+  const [editingGCId, setEditingGCId] = useState<string | null>(null);
+  const slRef = useRef<HTMLInputElement>(null);
+  const gcRef = useRef<HTMLTextAreaElement>(null);
 
   const patchBooking = async (id: string, data: Record<string, unknown>) => {
     const res = await fetch(`/api/koc/booking/${id}`, {
@@ -95,14 +97,14 @@ export default function KocPage() {
   };
 
   const saveSoLuong = (b: Booking) => {
-    const val = parseInt(editingSL?.val ?? "") || b.soLuongGui;
-    setEditingSL(null);
+    const val = parseInt(slRef.current?.value ?? "") || b.soLuongGui;
+    setEditingSLId(null);
     if (val !== b.soLuongGui) patchBooking(b.id, { soLuongGui: val });
   };
 
   const saveGhiChu = (b: Booking) => {
-    const val = editingGC?.val ?? b.ghiChu ?? "";
-    setEditingGC(null);
+    const val = gcRef.current?.value ?? b.ghiChu ?? "";
+    setEditingGCId(null);
     if (val !== (b.ghiChu ?? "")) patchBooking(b.id, { ghiChu: val || null });
   };
 
@@ -904,20 +906,20 @@ export default function KocPage() {
                                 <td className="px-4 py-3 text-xs text-slate-500">
                                   {formatDate(b.ngayBat)}{b.ngayKet ? ` → ${formatDate(b.ngayKet)}` : " → ..."}
                                 </td>
-                                {/* Số lượng gửi — inline edit */}
+                                {/* Số lượng gửi — inline edit (uncontrolled, nhanh) */}
                                 <td className="px-4 py-3 text-right">
-                                  {editingSL?.id === b.id ? (
+                                  {editingSLId === b.id ? (
                                     <input
                                       type="number" min={1} autoFocus
-                                      value={editingSL.val}
-                                      onChange={e => setEditingSL({ id: b.id, val: e.target.value })}
+                                      ref={slRef}
+                                      defaultValue={b.soLuongGui}
                                       onBlur={() => saveSoLuong(b)}
-                                      onKeyDown={e => { if (e.key === "Enter") saveSoLuong(b); if (e.key === "Escape") setEditingSL(null); }}
+                                      onKeyDown={e => { if (e.key === "Enter") saveSoLuong(b); if (e.key === "Escape") setEditingSLId(null); }}
                                       className="w-16 text-right text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                     />
                                   ) : (
                                     <button
-                                      onClick={() => setEditingSL({ id: b.id, val: String(b.soLuongGui) })}
+                                      onClick={() => setEditingSLId(b.id)}
                                       className="text-xs text-slate-600 hover:text-blue-600 hover:underline cursor-pointer px-1"
                                       title="Click để sửa">
                                       {b.soLuongGui} cái
@@ -932,21 +934,21 @@ export default function KocPage() {
                                     {TRANG_THAI_BOOKING[b.trangThai]}
                                   </span>
                                 </td>
-                                {/* Ghi chú — inline edit */}
+                                {/* Ghi chú — inline edit (uncontrolled) */}
                                 <td className="px-4 py-3 max-w-[180px]">
-                                  {editingGC?.id === b.id ? (
+                                  {editingGCId === b.id ? (
                                     <textarea
                                       autoFocus rows={2}
-                                      value={editingGC.val}
-                                      onChange={e => setEditingGC({ id: b.id, val: e.target.value })}
+                                      ref={gcRef}
+                                      defaultValue={b.ghiChu ?? ""}
                                       onBlur={() => saveGhiChu(b)}
-                                      onKeyDown={e => { if (e.key === "Escape") setEditingGC(null); }}
+                                      onKeyDown={e => { if (e.key === "Escape") setEditingGCId(null); }}
                                       className="w-full text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
                                       placeholder="Nhập ghi chú..."
                                     />
                                   ) : (
                                     <button
-                                      onClick={() => setEditingGC({ id: b.id, val: b.ghiChu ?? "" })}
+                                      onClick={() => setEditingGCId(b.id)}
                                       className="text-xs text-left w-full hover:text-blue-600 cursor-pointer"
                                       title="Click để sửa">
                                       {b.ghiChu
