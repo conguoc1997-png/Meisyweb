@@ -58,7 +58,7 @@ function makeFees(coDinhPct: number): FeeItem[] {
 
 type Product = { sku: string; giaNhap: number; giaThanh: number };
 type KhoProduct = { id: string; ten: string; sku: string; giaNhap: number };
-type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; salePct: string };
+type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSalePct: string; ngaySalePct: string; livePct: string };
 
 function fmtVnd(n: number) { return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }); }
 
@@ -85,7 +85,7 @@ export default function GiaBanPage() {
       if (!Array.isArray(data)) return;
       setPriceRows(prev => {
         const map = Object.fromEntries(prev.map(r => [r.id, r]));
-        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, salePct: "" });
+        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSalePct: "", ngaySalePct: "", livePct: "" });
       });
     } catch { /* ignore */ } finally { setLoadingKho(false); }
   }, []);
@@ -116,8 +116,22 @@ export default function GiaBanPage() {
     return { loiNhuan: gB - giaNhap - tp, tongPhi: tp, gB };
   };
 
-  const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "salePct">, val: string) => {
+  // Bulk global % inputs
+  const [bulkFlash, setBulkFlash] = useState("");
+  const [bulkNgay, setBulkNgay] = useState("");
+  const [bulkLive, setBulkLive] = useState("");
+
+  const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSalePct" | "ngaySalePct" | "livePct">, val: string) => {
     setPriceRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+  };
+
+  const applyBulk = () => {
+    setPriceRows(prev => prev.map(r => ({
+      ...r,
+      ...(bulkFlash !== "" ? { flashSalePct: bulkFlash } : {}),
+      ...(bulkNgay  !== "" ? { ngaySalePct:  bulkNgay  } : {}),
+      ...(bulkLive  !== "" ? { livePct:       bulkLive  } : {}),
+    })));
   };
 
   const filteredRows = useMemo(() =>
@@ -425,6 +439,36 @@ export default function GiaBanPage() {
           </div>
         </div>
 
+        {/* ── BULK ROW ── */}
+        <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-semibold text-amber-700 shrink-0">Áp dụng cho tất cả SKU:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-orange-500 font-medium w-20">Flash Sale</span>
+            <input type="number" placeholder="%" min={0} max={99} value={bulkFlash}
+              onChange={e => setBulkFlash(e.target.value)}
+              className="w-16 text-center text-sm border border-orange-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-300 text-orange-600 font-bold placeholder:text-slate-300 bg-white" />
+            <span className="text-xs text-slate-400">%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-blue-500 font-medium w-20">Ngày Sale</span>
+            <input type="number" placeholder="%" min={0} max={99} value={bulkNgay}
+              onChange={e => setBulkNgay(e.target.value)}
+              className="w-16 text-center text-sm border border-blue-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 text-blue-600 font-bold placeholder:text-slate-300 bg-white" />
+            <span className="text-xs text-slate-400">%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-purple-500 font-medium w-14">Live</span>
+            <input type="number" placeholder="%" min={0} max={99} value={bulkLive}
+              onChange={e => setBulkLive(e.target.value)}
+              className="w-16 text-center text-sm border border-purple-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-300 text-purple-600 font-bold placeholder:text-slate-300 bg-white" />
+            <span className="text-xs text-slate-400">%</span>
+          </div>
+          <button onClick={applyBulk}
+            className="text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-semibold transition">
+            Cập nhật tất cả
+          </button>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -435,17 +479,22 @@ export default function GiaBanPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">SKU</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
-                <th className="text-center px-4 py-2.5 text-xs font-medium text-orange-500">% Giảm Sale<div className="font-normal text-slate-400 text-[10px]">Flash · Ngày Sale · Live</div></th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-orange-500">Flash Sale<div className="font-normal text-[10px] text-orange-300">% giảm · giá</div></th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-500">Ngày Sale<div className="font-normal text-[10px] text-blue-300">% giảm · giá</div></th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-500">Live<div className="font-normal text-[10px] text-purple-300">% giảm · giá</div></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredRows.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-8 text-slate-400 text-sm">
+                <tr><td colSpan={9} className="text-center py-8 text-slate-400 text-sm">
                   {loadingKho ? "Đang tải..." : "Không có sản phẩm"}
                 </td></tr>
               )}
               {filteredRows.map((r, i) => {
                 const shopee = calcShopeePrice(r.giaNhap);
+                const flashPrice = shopee > 0 && parseFloat(r.flashSalePct) > 0 ? Math.round(shopee * (1 - parseFloat(r.flashSalePct) / 100)) : 0;
+                const ngayPrice  = shopee > 0 && parseFloat(r.ngaySalePct)  > 0 ? Math.round(shopee * (1 - parseFloat(r.ngaySalePct)  / 100)) : 0;
+                const livePrice  = shopee > 0 && parseFloat(r.livePct)      > 0 ? Math.round(shopee * (1 - parseFloat(r.livePct)      / 100)) : 0;
                 return (
                   <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-2.5 text-xs text-slate-400">{i + 1}</td>
@@ -472,21 +521,29 @@ export default function GiaBanPage() {
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-center">
-                      <div className="flex items-center gap-1 justify-center">
-                        <input type="number" placeholder="%" min={0} max={99}
-                          value={r.salePct}
-                          onChange={e => updatePriceRow(r.id, "salePct", e.target.value)}
-                          className="w-16 text-center text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-200 text-orange-600 font-bold placeholder:text-slate-300" />
-                        <span className="text-slate-400 text-xs">%</span>
-                      </div>
-                      {(() => {
-                        const pct = parseFloat(r.salePct) || 0;
-                        const salePrice = shopee > 0 && pct > 0 ? Math.round(shopee * (1 - pct / 100)) : 0;
-                        return salePrice > 0 ? (
-                          <div className="text-xs font-semibold text-orange-500 mt-1">{fmtVnd(salePrice)}đ</div>
-                        ) : null;
-                      })()}
+                    {/* Flash Sale */}
+                    <td className="px-2 py-2 text-center">
+                      <input type="number" placeholder="%" min={0} max={99}
+                        value={r.flashSalePct}
+                        onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
+                        className="w-14 text-center text-sm border border-orange-200 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-orange-200 text-orange-600 font-bold placeholder:text-slate-300" />
+                      {flashPrice > 0 && <div className="text-xs font-semibold text-orange-500 mt-0.5">{fmtVnd(flashPrice)}đ</div>}
+                    </td>
+                    {/* Ngày Sale */}
+                    <td className="px-2 py-2 text-center">
+                      <input type="number" placeholder="%" min={0} max={99}
+                        value={r.ngaySalePct}
+                        onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
+                        className="w-14 text-center text-sm border border-blue-200 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200 text-blue-600 font-bold placeholder:text-slate-300" />
+                      {ngayPrice > 0 && <div className="text-xs font-semibold text-blue-500 mt-0.5">{fmtVnd(ngayPrice)}đ</div>}
+                    </td>
+                    {/* Live */}
+                    <td className="px-2 py-2 text-center">
+                      <input type="number" placeholder="%" min={0} max={99}
+                        value={r.livePct}
+                        onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
+                        className="w-14 text-center text-sm border border-purple-200 rounded-lg px-1 py-1 focus:outline-none focus:ring-2 focus:ring-purple-200 text-purple-600 font-bold placeholder:text-slate-300" />
+                      {livePrice > 0 && <div className="text-xs font-semibold text-purple-500 mt-0.5">{fmtVnd(livePrice)}đ</div>}
                     </td>
                   </tr>
                 );
@@ -497,7 +554,7 @@ export default function GiaBanPage() {
 
         {filteredRows.length > 0 && (
           <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
-            {filteredRows.length} sản phẩm · Giá Shopee/TikTok = Giá nhập × {markupPct}% · Giá Flash Sale / Ngày sale / Live nhập tay
+            {filteredRows.length} sản phẩm · Giá Shopee/TikTok = Giá nhập ÷ {markupPct}% · Flash Sale / Ngày Sale / Live = % giảm so với giá Shopee
           </div>
         )}
       </div>
