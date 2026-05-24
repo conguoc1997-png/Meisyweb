@@ -85,27 +85,40 @@ export default function KocPage() {
   const slRef = useRef<HTMLInputElement>(null);
   const gcRef = useRef<HTMLTextAreaElement>(null);
 
-  const patchBooking = async (id: string, data: Record<string, unknown>) => {
-    const res = await fetch(`/api/koc/booking/${id}`, {
+  const patchBookingBackground = (id: string, data: Record<string, unknown>) => {
+    // Fire-and-forget — không chờ response, UI đã cập nhật optimistic rồi
+    fetch(`/api/koc/booking/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
-    }
+    }).then(res => {
+      if (res.ok) res.json().then(updated => {
+        // Sync lại từ server (chiPhiSP, chiPhi đã tính lại)
+        setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
+      });
+    }).catch(() => {/* ignore */});
   };
 
   const saveSoLuong = (b: Booking) => {
     const val = parseInt(slRef.current?.value ?? "") || b.soLuongGui;
     setEditingSLId(null);
-    if (val !== b.soLuongGui) patchBooking(b.id, { soLuongGui: val });
+    if (val === b.soLuongGui) return;
+    // Optimistic: cập nhật UI ngay, tính tạm chiPhiSP
+    const newChiPhiSP = (b.sanPham?.giaNhap ?? 0) * val;
+    const newChiPhi = b.chiPhiCast + newChiPhiSP;
+    setBookings(prev => prev.map(x => x.id === b.id
+      ? { ...x, soLuongGui: val, chiPhiSP: newChiPhiSP, chiPhi: newChiPhi }
+      : x
+    ));
+    patchBookingBackground(b.id, { soLuongGui: val });
   };
 
   const saveGhiChu = (b: Booking) => {
     const val = gcRef.current?.value ?? b.ghiChu ?? "";
     setEditingGCId(null);
-    if (val !== (b.ghiChu ?? "")) patchBooking(b.id, { ghiChu: val || null });
+    if (val === (b.ghiChu ?? "")) return;
+    // Optimistic
+    setBookings(prev => prev.map(x => x.id === b.id ? { ...x, ghiChu: val || null } : x));
+    patchBookingBackground(b.id, { ghiChu: val || null });
   };
 
   // Tick duyệt booking
