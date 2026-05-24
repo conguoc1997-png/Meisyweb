@@ -47,14 +47,19 @@ const MODULES: NavModule[] = [
     href: "/tong-quan",
   },
   {
-    key: "kho-sx", moduleKey: "kho",
-    label: "Kho & Sản xuất", icon: Package,
+    key: "kho", moduleKey: "kho",
+    label: "Quản lý Kho", icon: Package,
     bg: "bg-gradient-to-br from-orange-400 to-orange-600", text: "text-white",
     children: [
-      { href: "/kho",       label: "Quản lý Kho",          icon: Package,       moduleKey: "kho" },
-      { href: "/san-xuat",  label: "Sản xuất",             icon: Scissors,      moduleKey: "san-xuat" },
-      { href: "/doi-soat",  label: "Đối soát hoàn trả",    icon: ClipboardList, moduleKey: "kho" },
+      { href: "/kho",      label: "Kho hàng",           icon: Package,       moduleKey: "kho" },
+      { href: "/doi-soat", label: "Đối soát hoàn trả",  icon: ClipboardList, moduleKey: "kho" },
     ],
+  },
+  {
+    key: "san-xuat", moduleKey: "san-xuat",
+    label: "Sản xuất", icon: Scissors,
+    bg: "bg-gradient-to-br from-teal-500 to-teal-700", text: "text-white",
+    href: "/san-xuat",
   },
   {
     key: "cham-soc", moduleKey: "doi-tra",
