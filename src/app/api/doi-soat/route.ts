@@ -59,12 +59,23 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { batchId } = await req.json();
-    if (batchId) {
-      await prisma.donHoanTra.deleteMany({ where: { batchId } });
+    const body = await req.json().catch(() => ({}));
+    // Xóa tất cả
+    if (body.deleteAll === true) {
+      await prisma.donHoanTra.deleteMany({});
       return NextResponse.json({ ok: true });
     }
-    return NextResponse.json({ error: "Thiếu batchId" }, { status: 400 });
+    // Xóa theo danh sách IDs
+    if (Array.isArray(body.ids) && body.ids.length > 0) {
+      await prisma.donHoanTra.deleteMany({ where: { id: { in: body.ids } } });
+      return NextResponse.json({ ok: true });
+    }
+    // Xóa theo batchId
+    if (body.batchId) {
+      await prisma.donHoanTra.deleteMany({ where: { batchId: body.batchId } });
+      return NextResponse.json({ ok: true });
+    }
+    return NextResponse.json({ error: "Thiếu tham số" }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Lỗi server" }, { status: 500 });
   }

@@ -120,7 +120,23 @@ export default function DoiSoatPage() {
     const ids = Array.from(selected);
     setDons(prev => prev.filter(d => !selected.has(d.id)));
     setSelected(new Set());
-    await Promise.all(ids.map(id => fetch(`/api/doi-soat/${id}`, { method: "DELETE" })));
+    // 1 request duy nhất thay vì N request
+    await fetch("/api/doi-soat", {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    setBulkDeleting(false);
+  };
+
+  const deleteAll = async () => {
+    if (!confirm(`Xóa TẤT CẢ ${dons.length} đơn? Không thể hoàn tác.`)) return;
+    setBulkDeleting(true);
+    setDons([]);
+    setSelected(new Set());
+    await fetch("/api/doi-soat", {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteAll: true }),
+    });
     setBulkDeleting(false);
   };
 
@@ -290,6 +306,12 @@ export default function DoiSoatPage() {
           <p className="text-slate-500 text-sm mt-1">Theo dõi và đối chiếu đơn hàng hoàn trả từ sàn</p>
         </div>
         <div className="flex items-center gap-2">
+          {dons.length > 0 && (
+            <button onClick={deleteAll} disabled={bulkDeleting}
+              className="flex items-center gap-1.5 text-sm px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50">
+              <Trash2 size={15} /> Xóa tất cả
+            </button>
+          )}
           <button onClick={() => setShowAdd(true)}
             className="flex items-center gap-1.5 text-sm px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition">
             <Plus size={15} /> Thêm thủ công
