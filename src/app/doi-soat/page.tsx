@@ -544,56 +544,67 @@ export default function DoiSoatPage() {
           </div>
         </div>
 
-        {/* Dropdown log */}
+        {/* Dropdown log — nhóm theo ngày */}
         {showScanLog && (
-          <div className="border-t border-indigo-100 bg-white max-h-64 overflow-y-auto">
+          <div className="border-t border-indigo-100 bg-white max-h-72 overflow-y-auto">
             {scanLog.length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-6">Chưa có lịch sử quét nào</p>
-            ) : (
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 sticky top-0">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-slate-400 font-medium w-6"></th>
-                    <th className="px-4 py-2 text-left text-slate-500 font-medium">Mã đơn</th>
-                    <th className="px-4 py-2 text-left text-slate-500 font-medium">Kết quả</th>
-                    <th className="px-4 py-2 text-right text-slate-400 font-medium">Thời gian</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {scanLog.map((l, i) => {
-                    const d = new Date(l.ts);
-                    const timeStr = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-                    const dateStr = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-                    return (
-                      <tr key={l.ts + i} className={`hover:bg-slate-50 transition-colors ${
-                        l.status === "ok"       ? "bg-green-50/30"
-                        : l.status === "already" ? "bg-blue-50/30"
-                        : "bg-red-50/30"
-                      }`}>
-                        <td className="px-4 py-2 text-center font-bold text-base leading-none">
-                          <span className={l.status === "ok" ? "text-green-500" : l.status === "already" ? "text-blue-400" : "text-red-400"}>
-                            {l.status === "ok" ? "✓" : l.status === "already" ? "↩" : "✗"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 font-mono font-semibold text-slate-700">{l.maDon}</td>
-                        <td className="px-4 py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                            l.status === "ok"       ? "bg-green-100 text-green-700"
-                            : l.status === "already" ? "bg-blue-100 text-blue-600"
-                            : "bg-red-100 text-red-600"
-                          }`}>
-                            {l.status === "ok" ? "Đã đối soát" : l.status === "already" ? "Đã soát trước đó" : "Không tìm thấy"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-right text-slate-400 whitespace-nowrap">
-                          {timeStr} <span className="text-slate-300">·</span> {dateStr}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+            ) : (() => {
+              // Nhóm theo ngày (key = "dd/mm/yyyy")
+              const groups: { dateKey: string; dateLabel: string; items: typeof scanLog }[] = [];
+              for (const l of scanLog) {
+                const d = new Date(l.ts);
+                const key = d.toLocaleDateString("vi-VN");
+                const today = new Date().toLocaleDateString("vi-VN");
+                const yesterday = new Date(Date.now() - 86400000).toLocaleDateString("vi-VN");
+                const label = key === today ? "Hôm nay" : key === yesterday ? "Hôm qua" : key;
+                const g = groups.find(x => x.dateKey === key);
+                if (g) g.items.push(l);
+                else groups.push({ dateKey: key, dateLabel: label, items: [l] });
+              }
+              return groups.map(g => (
+                <div key={g.dateKey}>
+                  {/* Tiêu đề ngày */}
+                  <div className="sticky top-0 z-10 bg-slate-50 border-y border-slate-100 px-4 py-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">{g.dateLabel}</span>
+                    <span className="text-[11px] text-slate-400">
+                      <span className="text-green-600 font-semibold">{g.items.filter(l => l.status === "ok").length} soát</span>
+                      {g.items.some(l => l.status === "not_found") && (
+                        <> · <span className="text-red-500 font-semibold">{g.items.filter(l => l.status === "not_found").length} không thấy</span></>
+                      )}
+                    </span>
+                  </div>
+                  {/* Bảng các lần quét trong ngày */}
+                  <table className="w-full text-xs">
+                    <tbody className="divide-y divide-slate-50">
+                      {g.items.map((l, i) => {
+                        const timeStr = new Date(l.ts).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                        return (
+                          <tr key={l.ts + i} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="pl-4 pr-2 py-2 w-6 text-center font-bold text-sm leading-none">
+                              <span className={l.status === "ok" ? "text-green-500" : l.status === "already" ? "text-blue-400" : "text-red-400"}>
+                                {l.status === "ok" ? "✓" : l.status === "already" ? "↩" : "✗"}
+                              </span>
+                            </td>
+                            <td className="px-2 py-2 font-mono font-semibold text-slate-700">{l.maDon}</td>
+                            <td className="px-2 py-2">
+                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                l.status === "ok"       ? "bg-green-100 text-green-700"
+                                : l.status === "already" ? "bg-blue-100 text-blue-600"
+                                : "bg-red-100 text-red-600"
+                              }`}>
+                                {l.status === "ok" ? "Đã đối soát" : l.status === "already" ? "Đã soát trước đó" : "Không tìm thấy"}
+                              </span>
+                            </td>
+                            <td className="pl-2 pr-4 py-2 text-right text-slate-400 whitespace-nowrap tabular-nums">{timeStr}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ));
+            })()}
           </div>
         )}
       </div>
