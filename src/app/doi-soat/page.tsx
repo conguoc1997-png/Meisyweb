@@ -10,11 +10,12 @@ type DonHoanTra = {
   batchId: string | null; createdAt: string;
 };
 
-const SAN_LABEL: Record<string, string> = { shopee: "Shopee", tiktok: "TikTok", lazada: "Lazada" };
+const SAN_LABEL: Record<string, string> = { shopee: "Shopee", tiktok: "TikTok", lazada: "Lazada", viettel: "Viettel Post" };
 const SAN_COLOR: Record<string, string> = {
-  shopee: "bg-orange-100 text-orange-700",
-  tiktok: "bg-pink-100 text-pink-700",
-  lazada: "bg-blue-100 text-blue-700",
+  shopee:  "bg-orange-100 text-orange-700",
+  tiktok:  "bg-pink-100 text-pink-700",
+  lazada:  "bg-blue-100 text-blue-700",
+  viettel: "bg-red-100 text-red-700",
 };
 const TT_COLOR: Record<string, string> = {
   cho_ve:  "bg-yellow-100 text-yellow-700",
@@ -431,6 +432,7 @@ export default function DoiSoatPage() {
             <option value="shopee">Shopee</option>
             <option value="tiktok">TikTok</option>
             <option value="lazada">Lazada</option>
+            <option value="viettel">Viettel Post</option>
           </select>
         </div>
         <select value={filterTT} onChange={e => setFilterTT(e.target.value)}
@@ -663,7 +665,7 @@ export default function DoiSoatPage() {
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
               <div className="flex items-center gap-3">
                 <label className="text-sm font-medium text-slate-600 whitespace-nowrap">Sàn:</label>
-                {["shopee", "tiktok", "lazada"].map(s => (
+                {["shopee", "tiktok", "lazada", "viettel"].map(s => (
                   <button key={s} onClick={() => setImportSan(s)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition border ${importSan === s ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
                     {SAN_LABEL[s]}
@@ -799,7 +801,7 @@ export default function DoiSoatPage() {
                 {/* Chọn sàn */}
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Sàn:</span>
-                  {["shopee", "tiktok", "lazada"].map(s => (
+                  {["shopee", "tiktok", "lazada", "viettel"].map(s => (
                     <button key={s} onClick={() => setAddScanSan(s)}
                       className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${
                         addScanSan === s ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-200 text-slate-500 hover:bg-slate-50"
@@ -884,6 +886,7 @@ export default function DoiSoatPage() {
                         <option value="shopee">Shopee</option>
                         <option value="tiktok">TikTok</option>
                         <option value="lazada">Lazada</option>
+                        <option value="viettel">Viettel Post</option>
                       </select>
                     </div>
                   </div>
