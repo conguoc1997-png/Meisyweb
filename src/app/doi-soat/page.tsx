@@ -150,6 +150,38 @@ export default function DoiSoatPage() {
     })));
   };
 
+  // ── Quét mã vạch ──
+  type ScanLog = { maDon: string; status: "ok" | "not_found" | "already"; ts: number };
+  const [scanInput, setScanInput] = useState("");
+  const [scanLog, setScanLog]     = useState<ScanLog[]>([]);
+  const [scanActive, setScanActive] = useState(true);
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  const handleScan = useCallback(async (raw: string) => {
+    const maDon = raw.trim();
+    if (!maDon) return;
+    setScanInput("");
+
+    // Tìm đơn trong danh sách (không phân biệt hoa thường)
+    const don = dons.find(d => d.maDon.toLowerCase() === maDon.toLowerCase());
+
+    if (!don) {
+      setScanLog(prev => [{ maDon, status: "not_found", ts: Date.now() }, ...prev].slice(0, 30));
+      return;
+    }
+    if (don.daDoiSoat) {
+      setScanLog(prev => [{ maDon, status: "already", ts: Date.now() }, ...prev].slice(0, 30));
+      return;
+    }
+    // Optimistic update
+    setDons(prev => prev.map(d => d.id === don.id ? { ...d, daDoiSoat: true, trangThai: "da_ve" } : d));
+    setScanLog(prev => [{ maDon, status: "ok", ts: Date.now() }, ...prev].slice(0, 30));
+    await fetch(`/api/doi-soat/${don.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daDoiSoat: true, trangThai: "da_ve" }),
+    });
+  }, [dons]);
+
   // Inline edit ghiChu
   const [editingGCId, setEditingGCId] = useState<string | null>(null);
   const gcRef = useCallback((el: HTMLTextAreaElement | null) => { if (el) el.focus(); }, []);
@@ -409,6 +441,55 @@ export default function DoiSoatPage() {
           </div>
         </div>
       )}
+
+      {/* ── Thanh quét mã vạch ── */}
+      <div className={`rounded-xl border-2 shadow-sm overflow-hidden transition-colors ${scanActive ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 bg-white"}`}>
+        <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
+          {/* Toggle on/off */}
+          <button onClick={() => { setScanActive(v => !v); if (!scanActive) setTimeout(() => scanRef.current?.focus(), 50); }}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition border ${scanActive ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+            {scanActive ? "Đang quét" : "Quét mã vạch"}
+          </button>
+
+          {/* Input nhận scan */}
+          <input ref={scanRef} type="text" value={scanInput}
+            onChange={e => setScanInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { handleScan(scanInput); } }}
+            placeholder={scanActive ? "Đưa mã vạch vào đây — quét hoặc nhập tay rồi Enter..." : "Bấm 'Quét mã vạch' để bắt đầu"}
+            disabled={!scanActive}
+            autoFocus={scanActive}
+            className={`flex-1 min-w-[260px] text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono transition ${
+              scanActive ? "border-indigo-300 bg-white" : "border-slate-200 bg-slate-50 text-slate-400"
+            }`}
+          />
+
+          {/* Log scan gần nhất */}
+          {scanLog.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap max-w-[500px]">
+              {scanLog.slice(0, 6).map((l, i) => (
+                <span key={l.ts + i} className={`text-xs px-2 py-0.5 rounded-full font-mono font-medium ${
+                  l.status === "ok"        ? "bg-green-100 text-green-700" :
+                  l.status === "already"   ? "bg-blue-100 text-blue-600"  :
+                                             "bg-red-100 text-red-600"
+                }`}>
+                  {l.status === "ok" ? "✓" : l.status === "already" ? "↩" : "✗"} {l.maDon.slice(-8)}
+                </span>
+              ))}
+              {scanLog.length > 6 && <span className="text-xs text-slate-400">+{scanLog.length - 6}</span>}
+              <button onClick={() => setScanLog([])} className="text-xs text-slate-300 hover:text-slate-500 ml-1">xóa log</button>
+            </div>
+          )}
+
+          {/* Stats quét */}
+          {scanLog.length > 0 && (
+            <span className="text-xs text-slate-500 ml-auto whitespace-nowrap">
+              ✓ {scanLog.filter(l => l.status === "ok").length} &nbsp;
+              ✗ {scanLog.filter(l => l.status === "not_found").length} không tìm thấy
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
