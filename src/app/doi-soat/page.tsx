@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { CheckCircle, Circle, Trash2, RefreshCw, Upload, Plus, Search, Filter, ClipboardList, AlertTriangle, PackageCheck, PackageX, X, FileSpreadsheet } from "lucide-react";
+import { CheckCircle, Circle, Trash2, RefreshCw, Upload, Plus, Search, Filter, ClipboardList, AlertTriangle, PackageCheck, PackageX, X, FileSpreadsheet, ScanLine, PenLine } from "lucide-react";
 
 type DonHoanTra = {
   id: string; maDon: string; san: string; tenSP: string; sku: string;
@@ -101,8 +101,40 @@ export default function DoiSoatPage() {
 
   // Add single modal
   const [showAdd, setShowAdd] = useState(false);
+  const [addTab, setAddTab] = useState<"scan" | "manual">("scan");
   const [formAdd, setFormAdd] = useState({ maDon: "", san: "shopee", tenSP: "", sku: "", soLuong: "1", lyDoHoan: "" });
   const [saving, setSaving] = useState(false);
+
+  // Scan-in-modal state
+  type AddScanLog = { maDon: string; status: "added" | "dup" | "err"; ts: number };
+  const [addScanInput, setAddScanInput] = useState("");
+  const [addScanSan, setAddScanSan] = useState("shopee");
+  const [addScanLog, setAddScanLog] = useState<AddScanLog[]>([]);
+  const addScanRef = useRef<HTMLInputElement>(null);
+
+  const handleAddScan = useCallback(async (raw: string) => {
+    const maDon = raw.trim();
+    if (!maDon) return;
+    setAddScanInput("");
+    // Kiểm tra trùng trong dons hiện tại
+    const exists = dons.some(d => d.maDon.toLowerCase() === maDon.toLowerCase());
+    if (exists) {
+      setAddScanLog(prev => [{ maDon, status: "dup", ts: Date.now() }, ...prev].slice(0, 50));
+      return;
+    }
+    try {
+      const res = await fetch("/api/doi-soat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maDon, san: addScanSan }),
+      });
+      if (!res.ok) throw new Error();
+      const newDon: DonHoanTra = await res.json();
+      setDons(prev => [newDon, ...prev]);
+      setAddScanLog(prev => [{ maDon, status: "added", ts: Date.now() }, ...prev].slice(0, 50));
+    } catch {
+      setAddScanLog(prev => [{ maDon, status: "err", ts: Date.now() }, ...prev].slice(0, 50));
+    }
+  }, [dons, addScanSan]);
 
   // Chọn nhiều để bulk action
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -726,70 +758,185 @@ export default function DoiSoatPage() {
         </div>
       )}
 
-      {/* ── Modal Thêm 1 đơn ── */}
+      {/* ── Modal Thêm đơn (2 tab) ── */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+            {/* Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <Plus size={18} className="text-indigo-500" /> Thêm đơn hoàn trả
               </h2>
-              <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-slate-100 transition">
+              <button onClick={() => { setShowAdd(false); setAddScanLog([]); setAddScanInput(""); }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 transition">
                 <X size={18} className="text-slate-400" />
               </button>
             </div>
-            <div className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Mã đơn *</label>
-                  <input type="text" value={formAdd.maDon} onChange={e => setFormAdd({...formAdd, maDon: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    placeholder="2412345678" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Sàn</label>
-                  <select value={formAdd.san} onChange={e => setFormAdd({...formAdd, san: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    <option value="shopee">Shopee</option>
-                    <option value="tiktok">TikTok</option>
-                    <option value="lazada">Lazada</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">SKU</label>
-                  <input type="text" value={formAdd.sku} onChange={e => setFormAdd({...formAdd, sku: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    placeholder="CVN01TT" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Số lượng</label>
-                  <input type="number" min={1} value={formAdd.soLuong} onChange={e => setFormAdd({...formAdd, soLuong: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Tên sản phẩm</label>
-                <input type="text" value={formAdd.tenSP} onChange={e => setFormAdd({...formAdd, tenSP: e.target.value})}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  placeholder="Tên sản phẩm..." />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 block mb-1">Lý do hoàn trả</label>
-                <input type="text" value={formAdd.lyDoHoan} onChange={e => setFormAdd({...formAdd, lyDoHoan: e.target.value})}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  placeholder="Khách đổi ý, hàng lỗi..." />
-              </div>
-            </div>
-            <div className="p-5 border-t border-slate-100 flex gap-3 justify-end">
-              <button onClick={() => setShowAdd(false)}
-                className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Huỷ</button>
-              <button onClick={handleAddOne} disabled={!formAdd.maDon.trim() || saving}
-                className="px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
-                {saving ? "Đang lưu..." : "Thêm đơn"}
+
+            {/* Tabs */}
+            <div className="flex border-b border-slate-100">
+              <button onClick={() => { setAddTab("scan"); setTimeout(() => addScanRef.current?.focus(), 50); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition border-b-2 ${
+                  addTab === "scan"
+                    ? "border-indigo-500 text-indigo-600 bg-indigo-50/60"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}>
+                <ScanLine size={15} /> Quét mã
+              </button>
+              <button onClick={() => setAddTab("manual")}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition border-b-2 ${
+                  addTab === "manual"
+                    ? "border-indigo-500 text-indigo-600 bg-indigo-50/60"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}>
+                <PenLine size={15} /> Nhập thủ công
               </button>
             </div>
+
+            {/* Tab: Quét mã */}
+            {addTab === "scan" && (
+              <div className="p-5 flex-1 overflow-y-auto space-y-4">
+                {/* Chọn sàn */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Sàn:</span>
+                  {["shopee", "tiktok", "lazada"].map(s => (
+                    <button key={s} onClick={() => setAddScanSan(s)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${
+                        addScanSan === s ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                      }`}>
+                      {SAN_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Input quét */}
+                <div className={`rounded-xl border-2 p-3 transition-colors border-indigo-400 bg-indigo-50/50`}>
+                  <p className="text-xs text-indigo-600 font-medium mb-2">Quét mã vạch đơn hàng — Enter để thêm</p>
+                  <input
+                    ref={addScanRef}
+                    autoFocus
+                    type="text"
+                    value={addScanInput}
+                    onChange={e => setAddScanInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleAddScan(addScanInput); }}
+                    placeholder="Đưa mã vạch vào đây hoặc nhập tay rồi Enter..."
+                    className="w-full text-sm font-mono px-3 py-2 rounded-lg border border-indigo-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+
+                {/* Log thêm đơn */}
+                {addScanLog.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-xs font-medium text-slate-600">
+                        Kết quả — ✓ {addScanLog.filter(l => l.status === "added").length} đã thêm
+                        {addScanLog.some(l => l.status === "dup") && ` · ↩ ${addScanLog.filter(l => l.status === "dup").length} trùng`}
+                        {addScanLog.some(l => l.status === "err") && ` · ✗ ${addScanLog.filter(l => l.status === "err").length} lỗi`}
+                      </p>
+                      <button onClick={() => setAddScanLog([])}
+                        className="text-xs text-slate-300 hover:text-slate-500 transition">xóa log</button>
+                    </div>
+                    <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                      {addScanLog.map((l, i) => (
+                        <div key={l.ts + i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono ${
+                          l.status === "added" ? "bg-green-50 text-green-700"
+                          : l.status === "dup" ? "bg-blue-50 text-blue-600"
+                          : "bg-red-50 text-red-600"
+                        }`}>
+                          <span className="font-bold text-base leading-none">
+                            {l.status === "added" ? "✓" : l.status === "dup" ? "↩" : "✗"}
+                          </span>
+                          <span className="flex-1">{l.maDon}</span>
+                          <span className="text-[10px] opacity-60">
+                            {l.status === "added" ? "Đã thêm" : l.status === "dup" ? "Đã tồn tại" : "Lỗi"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {addScanLog.length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-4">
+                    Quét hoặc nhập mã đơn rồi nhấn <kbd className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-mono">Enter</kbd>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Nhập thủ công */}
+            {addTab === "manual" && (
+              <>
+                <div className="p-5 space-y-3 flex-1 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Mã đơn *</label>
+                      <input type="text" value={formAdd.maDon}
+                        onChange={e => setFormAdd({...formAdd, maDon: e.target.value})}
+                        autoFocus
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        placeholder="2412345678" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Sàn</label>
+                      <select value={formAdd.san} onChange={e => setFormAdd({...formAdd, san: e.target.value})}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="shopee">Shopee</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="lazada">Lazada</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">SKU</label>
+                      <input type="text" value={formAdd.sku}
+                        onChange={e => setFormAdd({...formAdd, sku: e.target.value})}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        placeholder="CVN01TT" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Số lượng</label>
+                      <input type="number" min={1} value={formAdd.soLuong}
+                        onChange={e => setFormAdd({...formAdd, soLuong: e.target.value})}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Tên sản phẩm</label>
+                    <input type="text" value={formAdd.tenSP}
+                      onChange={e => setFormAdd({...formAdd, tenSP: e.target.value})}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      placeholder="Tên sản phẩm..." />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Lý do hoàn trả</label>
+                    <input type="text" value={formAdd.lyDoHoan}
+                      onChange={e => setFormAdd({...formAdd, lyDoHoan: e.target.value})}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      placeholder="Khách đổi ý, hàng lỗi..." />
+                  </div>
+                </div>
+                <div className="p-5 border-t border-slate-100 flex gap-3 justify-end">
+                  <button onClick={() => { setShowAdd(false); setAddScanLog([]); setAddScanInput(""); }}
+                    className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Huỷ</button>
+                  <button onClick={handleAddOne} disabled={!formAdd.maDon.trim() || saving}
+                    className="px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
+                    {saving ? "Đang lưu..." : "Thêm đơn"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Footer cho tab quét mã */}
+            {addTab === "scan" && (
+              <div className="p-4 border-t border-slate-100 flex justify-end">
+                <button onClick={() => { setShowAdd(false); setAddScanLog([]); setAddScanInput(""); }}
+                  className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+                  Đóng
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
