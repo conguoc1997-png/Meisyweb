@@ -185,30 +185,38 @@ export default function DoiSoatPage() {
 
   // ── Quét mã vạch ──
   type ScanLog = { maDon: string; status: "ok" | "not_found" | "already"; ts: number };
+  const SCAN_LOG_KEY = "doi-soat-scan-log";
   const [scanInput, setScanInput] = useState("");
-  const [scanLog, setScanLog]     = useState<ScanLog[]>([]);
-  const [scanActive, setScanActive] = useState(true);
+  const [scanLog, setScanLog]     = useState<ScanLog[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem(SCAN_LOG_KEY) ?? "[]"); } catch { return []; }
+  });
+  const [scanActive, setScanActive] = useState(false);
+  const [showScanLog, setShowScanLog] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
+
+  // Lưu log vào localStorage mỗi khi thay đổi
+  useEffect(() => {
+    try { localStorage.setItem(SCAN_LOG_KEY, JSON.stringify(scanLog)); } catch {}
+  }, [scanLog]);
 
   const handleScan = useCallback(async (raw: string) => {
     const maDon = raw.trim();
     if (!maDon) return;
     setScanInput("");
 
-    // Tìm đơn trong danh sách (không phân biệt hoa thường)
     const don = dons.find(d => d.maDon.toLowerCase() === maDon.toLowerCase());
 
     if (!don) {
-      setScanLog(prev => [{ maDon, status: "not_found", ts: Date.now() }, ...prev].slice(0, 30));
+      setScanLog(prev => [{ maDon, status: "not_found", ts: Date.now() }, ...prev].slice(0, 200));
       return;
     }
     if (don.daDoiSoat) {
-      setScanLog(prev => [{ maDon, status: "already", ts: Date.now() }, ...prev].slice(0, 30));
+      setScanLog(prev => [{ maDon, status: "already", ts: Date.now() }, ...prev].slice(0, 200));
       return;
     }
-    // Optimistic update
     setDons(prev => prev.map(d => d.id === don.id ? { ...d, daDoiSoat: true, trangThai: "da_ve" } : d));
-    setScanLog(prev => [{ maDon, status: "ok", ts: Date.now() }, ...prev].slice(0, 30));
+    setScanLog(prev => [{ maDon, status: "ok", ts: Date.now() }, ...prev].slice(0, 200));
     await fetch(`/api/doi-soat/${don.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ daDoiSoat: true, trangThai: "da_ve" }),
@@ -478,51 +486,116 @@ export default function DoiSoatPage() {
 
       {/* ── Thanh quét mã vạch ── */}
       <div className={`rounded-xl border-2 shadow-sm overflow-hidden transition-colors ${scanActive ? "border-indigo-400 bg-indigo-50/60" : "border-slate-200 bg-white"}`}>
+        {/* Row chính */}
         <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
           {/* Toggle on/off */}
-          <button onClick={() => { setScanActive(v => !v); if (!scanActive) setTimeout(() => scanRef.current?.focus(), 50); }}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition border ${scanActive ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+          <button
+            onClick={() => {
+              const next = !scanActive;
+              setScanActive(next);
+              if (next) setTimeout(() => scanRef.current?.focus(), 50);
+            }}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition border ${
+              scanActive ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+            }`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+              <line x1="7" y1="12" x2="17" y2="12"/>
+            </svg>
             {scanActive ? "Đang quét" : "Quét mã vạch"}
           </button>
 
           {/* Input nhận scan */}
           <input ref={scanRef} type="text" value={scanInput}
             onChange={e => setScanInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") { handleScan(scanInput); } }}
+            onKeyDown={e => { if (e.key === "Enter") handleScan(scanInput); }}
             placeholder={scanActive ? "Đưa mã vạch vào đây — quét hoặc nhập tay rồi Enter..." : "Bấm 'Quét mã vạch' để bắt đầu"}
             disabled={!scanActive}
-            autoFocus={scanActive}
             className={`flex-1 min-w-[260px] text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono transition ${
               scanActive ? "border-indigo-300 bg-white" : "border-slate-200 bg-slate-50 text-slate-400"
             }`}
           />
 
-          {/* Log scan gần nhất */}
-          {scanLog.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap max-w-[500px]">
-              {scanLog.slice(0, 6).map((l, i) => (
-                <span key={l.ts + i} className={`text-xs px-2 py-0.5 rounded-full font-mono font-medium ${
-                  l.status === "ok"        ? "bg-green-100 text-green-700" :
-                  l.status === "already"   ? "bg-blue-100 text-blue-600"  :
-                                             "bg-red-100 text-red-600"
-                }`}>
-                  {l.status === "ok" ? "✓" : l.status === "already" ? "↩" : "✗"} {l.maDon.slice(-8)}
-                </span>
-              ))}
-              {scanLog.length > 6 && <span className="text-xs text-slate-400">+{scanLog.length - 6}</span>}
-              <button onClick={() => setScanLog([])} className="text-xs text-slate-300 hover:text-slate-500 ml-1">xóa log</button>
-            </div>
-          )}
-
-          {/* Stats quét */}
-          {scanLog.length > 0 && (
-            <span className="text-xs text-slate-500 ml-auto whitespace-nowrap">
-              ✓ {scanLog.filter(l => l.status === "ok").length} &nbsp;
-              ✗ {scanLog.filter(l => l.status === "not_found").length} không tìm thấy
-            </span>
-          )}
+          {/* Stats + nút xem log */}
+          <div className="flex items-center gap-2 ml-auto">
+            {scanLog.length > 0 && (
+              <span className="text-xs text-slate-500 whitespace-nowrap">
+                <span className="text-green-600 font-semibold">✓ {scanLog.filter(l => l.status === "ok").length}</span>
+                {" · "}
+                <span className="text-red-500 font-semibold">✗ {scanLog.filter(l => l.status === "not_found").length}</span>
+                {" không tìm thấy"}
+              </span>
+            )}
+            <button
+              onClick={() => setShowScanLog(v => !v)}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition ${
+                showScanLog ? "bg-indigo-100 text-indigo-700 border-indigo-200" : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+              }`}>
+              Lịch sử {scanLog.length > 0 && <span className="bg-indigo-500 text-white rounded-full text-[10px] px-1.5 py-px ml-0.5">{scanLog.length}</span>}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={`ml-0.5 transition-transform ${showScanLog ? "rotate-180" : ""}`}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {scanLog.length > 0 && (
+              <button onClick={() => { if (confirm("Xóa toàn bộ lịch sử quét?")) setScanLog([]); }}
+                className="text-xs text-slate-300 hover:text-red-400 transition px-1">
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Dropdown log */}
+        {showScanLog && (
+          <div className="border-t border-indigo-100 bg-white max-h-64 overflow-y-auto">
+            {scanLog.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-6">Chưa có lịch sử quét nào</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-slate-400 font-medium w-6"></th>
+                    <th className="px-4 py-2 text-left text-slate-500 font-medium">Mã đơn</th>
+                    <th className="px-4 py-2 text-left text-slate-500 font-medium">Kết quả</th>
+                    <th className="px-4 py-2 text-right text-slate-400 font-medium">Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {scanLog.map((l, i) => {
+                    const d = new Date(l.ts);
+                    const timeStr = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                    const dateStr = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                    return (
+                      <tr key={l.ts + i} className={`hover:bg-slate-50 transition-colors ${
+                        l.status === "ok"       ? "bg-green-50/30"
+                        : l.status === "already" ? "bg-blue-50/30"
+                        : "bg-red-50/30"
+                      }`}>
+                        <td className="px-4 py-2 text-center font-bold text-base leading-none">
+                          <span className={l.status === "ok" ? "text-green-500" : l.status === "already" ? "text-blue-400" : "text-red-400"}>
+                            {l.status === "ok" ? "✓" : l.status === "already" ? "↩" : "✗"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 font-mono font-semibold text-slate-700">{l.maDon}</td>
+                        <td className="px-4 py-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                            l.status === "ok"       ? "bg-green-100 text-green-700"
+                            : l.status === "already" ? "bg-blue-100 text-blue-600"
+                            : "bg-red-100 text-red-600"
+                          }`}>
+                            {l.status === "ok" ? "Đã đối soát" : l.status === "already" ? "Đã soát trước đó" : "Không tìm thấy"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-right text-slate-400 whitespace-nowrap">
+                          {timeStr} <span className="text-slate-300">·</span> {dateStr}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
