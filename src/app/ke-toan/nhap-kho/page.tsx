@@ -31,9 +31,15 @@ const NHA_CC = [
 ];
 
 const DON_VI_MUA = [
-  { value: "m",   label: "Mét (m)",   showQuyDoi: false, placeholder: "" },
-  { value: "cay", label: "Cây",        showQuyDoi: true,  placeholder: "m/cây" },
-  { value: "kg",  label: "KG",         showQuyDoi: true,  placeholder: "m/kg" },
+  { value: "m",     label: "Mét (m)",    showQuyDoi: false, placeholder: "" },
+  { value: "cay",   label: "Cây",         showQuyDoi: true,  placeholder: "m/cây" },
+  { value: "kg",    label: "KG",          showQuyDoi: true,  placeholder: "m/kg" },
+  { value: "chiec", label: "Chiếc",       showQuyDoi: false, placeholder: "" },
+  { value: "goi",   label: "Gói",         showQuyDoi: false, placeholder: "" },
+  { value: "cuon",  label: "Cuộn",        showQuyDoi: false, placeholder: "" },
+  { value: "hop",   label: "Hộp",         showQuyDoi: false, placeholder: "" },
+  { value: "bo",    label: "Bộ",          showQuyDoi: false, placeholder: "" },
+  { value: "cai",   label: "Cái",         showQuyDoi: false, placeholder: "" },
 ];
 
 const DEFAULT_QUY_DOI: Record<string, number> = { m: 1, cay: 50, kg: 1.5 };
@@ -341,7 +347,7 @@ export default function NhapKhoPage() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">ĐV mua</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-20">Số lượng</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">Quy đổi</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-20 text-teal-600">≈ Tổng m</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-20">≈ Tổng m</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-28">Đơn giá</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-28">Thành tiền</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ghi chú</th>
@@ -424,11 +430,15 @@ export default function NhapKhoPage() {
                               )}
                             </td>
 
-                            {/* Tổng mét */}
+                            {/* Tổng mét — chỉ hiện khi đơn vị có quy đổi */}
                             <td className="px-3 py-1.5 align-top">
-                              <span className={`text-xs font-semibold ${row.soLuong > 0 ? "text-teal-600" : "text-slate-300"}`}>
-                                {row.soLuong > 0 ? `${fmt(row.soLuong)} m` : "—"}
-                              </span>
+                              {showQD ? (
+                                <span className={`text-xs font-semibold ${row.soLuong > 0 ? "text-teal-600" : "text-slate-300"}`}>
+                                  {row.soLuong > 0 ? `${fmt(row.soLuong)} m` : "—"}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-300">—</span>
+                              )}
                             </td>
 
                             {/* Đơn giá */}
