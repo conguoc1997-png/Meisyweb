@@ -576,12 +576,21 @@ export default function DoiSoatPage() {
                   </div>
                   {/* Bảng các lần quét trong ngày */}
                   <table className="w-full text-xs">
+                    <thead className="bg-white border-b border-slate-100">
+                      <tr>
+                        <th className="pl-4 pr-2 py-1.5 text-center text-slate-400 font-medium w-8">Tick</th>
+                        <th className="px-2 py-1.5 text-left text-slate-400 font-medium">Mã đơn</th>
+                        <th className="px-2 py-1.5 text-left text-slate-400 font-medium">Kết quả</th>
+                        <th className="px-2 py-1.5 text-right text-slate-400 font-medium">Giờ</th>
+                        <th className="pl-2 pr-4 py-1.5 w-24"></th>
+                      </tr>
+                    </thead>
                     <tbody className="divide-y divide-slate-50">
                       {g.items.map((l, i) => {
                         const timeStr = new Date(l.ts).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
                         return (
-                          <tr key={l.ts + i} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="pl-4 pr-2 py-2 w-6 text-center font-bold text-sm leading-none">
+                          <tr key={l.ts + i} className="hover:bg-slate-50/80 transition-colors group">
+                            <td className="pl-4 pr-2 py-2 text-center font-bold text-sm leading-none">
                               <span className={l.status === "ok" ? "text-green-500" : l.status === "already" ? "text-blue-400" : "text-red-400"}>
                                 {l.status === "ok" ? "✓" : l.status === "already" ? "↩" : "✗"}
                               </span>
@@ -596,7 +605,16 @@ export default function DoiSoatPage() {
                                 {l.status === "ok" ? "Đã đối soát" : l.status === "already" ? "Đã soát trước đó" : "Không tìm thấy"}
                               </span>
                             </td>
-                            <td className="pl-2 pr-4 py-2 text-right text-slate-400 whitespace-nowrap tabular-nums">{timeStr}</td>
+                            <td className="px-2 py-2 text-right text-slate-400 whitespace-nowrap tabular-nums">{timeStr}</td>
+                            <td className="pl-2 pr-4 py-2 text-right">
+                              {l.status !== "ok" && (
+                                <button
+                                  onClick={() => handleScan(l.maDon)}
+                                  className="opacity-0 group-hover:opacity-100 text-[11px] px-2 py-0.5 rounded border border-indigo-200 text-indigo-500 hover:bg-indigo-50 transition whitespace-nowrap">
+                                  Đối soát lại
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
