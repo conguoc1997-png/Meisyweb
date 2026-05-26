@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  BookOpen,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -82,6 +83,14 @@ const MODULES: NavModule[] = [
     label: "Giá bán SP", icon: Calculator,
     bg: "bg-gradient-to-br from-emerald-500 to-emerald-700", text: "text-white",
     href: "/gia-ban",
+  },
+  {
+    key: "ke-toan", moduleKey: "ke-toan",
+    label: "Kế toán", icon: BookOpen,
+    bg: "bg-gradient-to-br from-indigo-500 to-indigo-700", text: "text-white",
+    children: [
+      { href: "/ke-toan/cong-no", label: "Công nợ", icon: BookOpen, moduleKey: "ke-toan" },
+    ],
   },
   {
     key: "quantri", moduleKey: "users",

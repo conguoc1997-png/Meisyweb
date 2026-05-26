@@ -244,6 +244,22 @@ model HoaDonTon {
   updatedAt DateTime @updatedAt
 }
 
+// ===================== MODULE KẾ TOÁN =====================
+
+model CongNo {
+  id         String   @id @default(cuid())
+  nhaCC      String   // "hac_long" | "an_huy" | "viet_hoa"
+  ngay       DateTime
+  soChungTu  String?  // Số hoá đơn / chứng từ
+  dienGiai   String   // Diễn giải giao dịch
+  loai       String   // "mua_hang" | "tra_tien" | "dieu_chinh_no" | "dieu_chinh_co"
+  soTien     Float    @default(0)
+  ghiChu     String?
+  nguoiTao   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 // ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================
 
 model DonHoanTra {

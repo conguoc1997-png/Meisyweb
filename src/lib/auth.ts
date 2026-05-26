@@ -15,6 +15,7 @@ export const ALL_MODULES = [
   { key: "doi-tra",   label: "Đổi trả / Sự cố",  routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
   { key: "koc",       label: "KOC Booking",       routes: ["/koc", "/api/koc"] },
   { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban"] },
+  { key: "ke-toan",   label: "Kế toán",            routes: ["/ke-toan", "/api/ke-toan"] },
   { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
 ] as const;
 
