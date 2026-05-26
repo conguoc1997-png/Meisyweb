@@ -246,6 +246,67 @@ model HoaDonTon {
 
 // ===================== MODULE KẾ TOÁN =====================
 
+// Danh mục nguyên phụ liệu
+model VatTu {
+  id        String   @id @default(cuid())
+  ma        String   @unique
+  ten       String
+  loai      String   // "vai" | "phu_lieu"
+  nhom      String?  // chi | cuc | khoa_keo | mex | nhan | dong_goi | vai_cotton | vai_thun | khac
+  donVi     String   @default("m") // m | kg | cai | cuon | thuong | bo | met
+  ghiChu    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tonKho    TonKhoVatTu?
+  chiTiet   ChiTietNhapKho[]
+}
+
+// Tồn kho nguyên phụ liệu (1 dòng / vật tư)
+model TonKhoVatTu {
+  id             String   @id @default(cuid())
+  vatTuId        String   @unique
+  soLuong        Float    @default(0)
+  giaTrungBinh   Float    @default(0) // giá vốn bình quân gia quyền
+  giaTriTon      Float    @default(0) // = soLuong × giaTrungBinh
+  updatedAt      DateTime @updatedAt
+
+  vatTu VatTu @relation(fields: [vatTuId], references: [id])
+}
+
+// Phiếu nhập kho
+model PhieuNhapKho {
+  id          String    @id @default(cuid())
+  soPhieu     String    @unique
+  ngay        DateTime
+  nhaCC       String    // "hac_long" | "an_huy" | "viet_hoa" | custom
+  tenNhaCC    String?
+  soHoaDon    String?
+  ngayHoaDon  DateTime?
+  tongTien    Float     @default(0)
+  trangThai   String    @default("chua_thanh_toan") // chua_thanh_toan | da_thanh_toan | thanh_toan_1_phan
+  ghiChu      String?
+  nguoiTao    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chiTiet ChiTietNhapKho[]
+}
+
+// Chi tiết phiếu nhập (từng dòng vật tư)
+model ChiTietNhapKho {
+  id         String  @id @default(cuid())
+  phieuId    String
+  vatTuId    String
+  soLuong    Float
+  donGia     Float
+  thanhTien  Float
+  ghiChu     String?
+
+  phieu PhieuNhapKho @relation(fields: [phieuId], references: [id], onDelete: Cascade)
+  vatTu VatTu        @relation(fields: [vatTuId], references: [id])
+}
+
 model CongNo {
   id         String   @id @default(cuid())
   nhaCC      String   // "hac_long" | "an_huy" | "viet_hoa"
