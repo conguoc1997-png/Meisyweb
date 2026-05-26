@@ -2,6 +2,15 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RowInput = {
+  vatTuId: string;
+  soLuongMua: number; // số lượng theo đơn vị mua (cây, kg, m)
+  donViMua: string;   // "m" | "cay" | "kg"
+  quyDoi: number;     // hệ số: tổng m = soLuongMua × quyDoi
+  donGia: number;     // giá / donViMua
+  ghiChu?: string;
+};
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const nhaCC = searchParams.get("nhaCC");
@@ -20,9 +29,7 @@ export async function GET(req: NextRequest) {
         }
       } : {}),
     },
-    include: {
-      chiTiet: { include: { vatTu: true } },
-    },
+    include: { chiTiet: { include: { vatTu: true } } },
     orderBy: { ngay: "desc" },
   });
   return NextResponse.json(phieus);
@@ -31,13 +38,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    // body: { soPhieu, ngay, nhaCC, tenNhaCC?, soHoaDon?, ngayHoaDon?, ghiChu?, nguoiTao?, chiTiet: [{vatTuId, soLuong, donGia, ghiChu?}] }
+    const rows: RowInput[] = body.chiTiet;
 
-    const tongTien = (body.chiTiet as { soLuong: number; donGia: number }[])
-      .reduce((s, r) => s + r.soLuong * r.donGia, 0);
+    // Tổng tiền = sum(soLuongMua × donGia)
+    const tongTien = rows.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
 
     const phieu = await prisma.$transaction(async (tx) => {
-      // 1. Tạo phiếu nhập
+      // 1. Tạo phiếu nhập + chi tiết
       const p = await tx.phieuNhapKho.create({
         data: {
           soPhieu: body.soPhieu,
@@ -51,11 +58,14 @@ export async function POST(req: NextRequest) {
           ghiChu: body.ghiChu || null,
           nguoiTao: body.nguoiTao || null,
           chiTiet: {
-            create: (body.chiTiet as { vatTuId: string; soLuong: number; donGia: number; ghiChu?: string }[]).map(r => ({
+            create: rows.map(r => ({
               vatTuId: r.vatTuId,
-              soLuong: r.soLuong,
+              soLuongMua: r.soLuongMua,
+              donViMua: r.donViMua || "m",
+              quyDoi: r.quyDoi || 1,
+              soLuong: r.soLuongMua * (r.quyDoi || 1), // tổng mét
               donGia: r.donGia,
-              thanhTien: r.soLuong * r.donGia,
+              thanhTien: r.soLuongMua * r.donGia,
               ghiChu: r.ghiChu || null,
             })),
           },
@@ -63,35 +73,36 @@ export async function POST(req: NextRequest) {
         include: { chiTiet: { include: { vatTu: true } } },
       });
 
-      // 2. Cập nhật tồn kho (bình quân gia quyền)
-      for (const row of body.chiTiet as { vatTuId: string; soLuong: number; donGia: number }[]) {
-        const existing = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
+      // 2. Cập nhật tồn kho bình quân gia quyền
+      for (const r of rows) {
+        const soLuong = r.soLuongMua * (r.quyDoi || 1); // tổng đơn vị cơ bản (m)
+        const thanhTien = r.soLuongMua * r.donGia;
+        // giá/đơn vị cơ bản
+        const giaCoBan = soLuong > 0 ? thanhTien / soLuong : r.donGia;
+
+        const existing = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: r.vatTuId } });
         if (existing) {
-          const newSoLuong = existing.soLuong + row.soLuong;
+          const newSoLuong = existing.soLuong + soLuong;
           const newGiaTB = newSoLuong > 0
-            ? (existing.soLuong * existing.giaTrungBinh + row.soLuong * row.donGia) / newSoLuong
-            : row.donGia;
+            ? (existing.giaTriTon + thanhTien) / newSoLuong
+            : giaCoBan;
           await tx.tonKhoVatTu.update({
-            where: { vatTuId: row.vatTuId },
-            data: {
-              soLuong: newSoLuong,
-              giaTrungBinh: newGiaTB,
-              giaTriTon: newSoLuong * newGiaTB,
-            },
+            where: { vatTuId: r.vatTuId },
+            data: { soLuong: newSoLuong, giaTrungBinh: newGiaTB, giaTriTon: newSoLuong * newGiaTB },
           });
         } else {
           await tx.tonKhoVatTu.create({
             data: {
-              vatTuId: row.vatTuId,
-              soLuong: row.soLuong,
-              giaTrungBinh: row.donGia,
-              giaTriTon: row.soLuong * row.donGia,
+              vatTuId: r.vatTuId,
+              soLuong,
+              giaTrungBinh: giaCoBan,
+              giaTriTon: thanhTien,
             },
           });
         }
       }
 
-      // 3. Tạo bút toán công nợ
+      // 3. Bút toán công nợ
       await tx.congNo.create({
         data: {
           nhaCC: body.nhaCC,

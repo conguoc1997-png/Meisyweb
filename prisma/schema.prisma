@@ -295,13 +295,16 @@ model PhieuNhapKho {
 
 // Chi tiết phiếu nhập (từng dòng vật tư)
 model ChiTietNhapKho {
-  id         String  @id @default(cuid())
-  phieuId    String
-  vatTuId    String
-  soLuong    Float
-  donGia     Float
-  thanhTien  Float
-  ghiChu     String?
+  id          String  @id @default(cuid())
+  phieuId     String
+  vatTuId     String
+  soLuongMua  Float   @default(0) // số lượng theo đơn vị mua (cây, kg, m...)
+  donViMua    String  @default("m") // đơn vị mua: m | cay | kg
+  quyDoi      Float   @default(1)   // hệ số: soLuong = soLuongMua × quyDoi
+  soLuong     Float   // tổng theo đơn vị tồn kho (m)
+  donGia      Float   // giá / donViMua
+  thanhTien   Float
+  ghiChu      String?
 
   phieu PhieuNhapKho @relation(fields: [phieuId], references: [id], onDelete: Cascade)
   vatTu VatTu        @relation(fields: [vatTuId], references: [id])
