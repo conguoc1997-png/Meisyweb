@@ -546,8 +546,6 @@ export default function SanXuatPage() {
         l.id === lo.id ? { ...l, cayData: newCayData, trangThai: newLoTrangThai } : l
       ));
 
-      // Nếu tất cả cây đã nhập → chuyển sang tab hóa đơn
-      if (allDaNhap) setActiveMainTab("hoa-don");
 
       // Lưu cayData + trangThai lô cùng lúc
       fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
@@ -724,7 +722,6 @@ export default function SanXuatPage() {
   const handleQuickStatus = (lo: LoCat) => {
     const next = lo.trangThai === "da_nhap" ? "chua_nhap" : "da_nhap";
     setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: next } : l));
-    if (next === "da_nhap") setActiveMainTab("hoa-don");
     fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trangThai: next }),
@@ -1118,12 +1115,14 @@ export default function SanXuatPage() {
             <option key={x} value={x}>{XUONG_LABEL[x] ?? x}</option>
           ))}
         </select>
-        <select value={filterTrangThai} onChange={e => setFilterTrangThai(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
-          <option value="">Tất cả trạng thái</option>
-          <option value="da_nhap">Đã nhập</option>
-          <option value="chua_nhap">Chưa nhập</option>
-        </select>
+        <div className="flex gap-1">
+          {([["", "Tất cả"], ["chua_nhap", "⏳ Chưa nhập"], ["da_nhap", "✓ Đã nhập"]] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterTrangThai(val)}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium ${filterTrangThai === val ? (val === "chua_nhap" ? "bg-amber-500 text-white border-amber-500" : val === "da_nhap" ? "bg-green-600 text-white border-green-600" : "bg-slate-700 text-white border-slate-700") : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
         {(filterThang || filterXuong || filterTrangThai) && (
           <button onClick={() => { setFilterThang(""); setFilterXuong(""); setFilterTrangThai(""); }}
             className="text-xs text-slate-400 hover:text-slate-600 px-2 py-2 rounded-lg hover:bg-slate-100">✕ Xoá lọc</button>
