@@ -17,6 +17,7 @@ type DoiTra = {
   ghiChu: string | null;
   phiShip: number;
   soChieuShip: number;
+  nguon: string | null;
   maVanDon: string | null;
   nguoiXuLy: string | null;
   createdAt: string;
@@ -66,7 +67,7 @@ const emptyForm = {
   skuHienTai: "", skuDoiSang: "", giaTriHang: "",
   loaiVanDe: "doi_size", ghiChu: "",
   phiShip: "30000", phiShipThuCong: false,
-  soChieuShip: "2", maVanDon: "", nguoiXuLy: "",
+  soChieuShip: "2", nguon: "shopee", maVanDon: "", nguoiXuLy: "",
 };
 
 const THANG_LABEL = ["", "T1","T2","T3","T4","T5","T6","T7","T8","T9","T10","T11","T12"];
@@ -196,6 +197,7 @@ export default function DoiTraPage() {
           ghiChu: form.ghiChu,
           phiShip: Number(form.phiShip),
           soChieuShip: Number(form.soChieuShip),
+          nguon: form.nguon,
           maVanDon: form.maVanDon,
           nguoiXuLy: form.nguoiXuLy,
         }),
@@ -308,6 +310,7 @@ export default function DoiTraPage() {
       phiShip: String(r.phiShip),
       phiShipThuCong: false,
       soChieuShip: String(r.soChieuShip),
+      nguon: r.nguon || "shopee",
       maVanDon: r.maVanDon || "",
       nguoiXuLy: r.nguoiXuLy || "",
     });
@@ -591,6 +594,7 @@ export default function DoiTraPage() {
         <table className="w-full text-sm whitespace-nowrap">
           <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             <tr>
+              <th className="px-3 py-3 text-left">Nguồn</th>
               <th className="px-3 py-3 text-left">SĐT Khách</th>
               <th className="px-3 py-3 text-left">Tên KH</th>
               <th className="px-3 py-3 text-left">Địa chỉ</th>
@@ -623,6 +627,13 @@ export default function DoiTraPage() {
                   !daGui ? "bg-amber-50 hover:bg-amber-100" :
                   "hover:bg-slate-50"
                 }`}>
+                  {/* Nguồn */}
+                  <td className="px-3 py-2.5">
+                    {r.nguon === "shopee" && <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-600">Shopee</span>}
+                    {r.nguon === "tiktok" && <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-600">TikTok</span>}
+                    {(!r.nguon || r.nguon === "khac") && <span className="text-xs text-slate-400">—</span>}
+                  </td>
+
                   {/* SĐT */}
                   <td className="px-3 py-2.5 font-mono font-medium">
                     <div className="flex items-center gap-1.5">
@@ -991,6 +1002,19 @@ export default function DoiTraPage() {
               {/* Vận chuyển */}
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Phân loại & Vận chuyển</p>
+                {/* Nguồn */}
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Nguồn kênh bán</label>
+                  <div className="flex gap-2">
+                    {[{ val: "shopee", label: "Shopee", cls: "bg-orange-100 text-orange-600 border-orange-200" }, { val: "tiktok", label: "TikTok", cls: "bg-pink-100 text-pink-600 border-pink-200" }, { val: "khac", label: "Khác", cls: "bg-slate-100 text-slate-600 border-slate-200" }].map(opt => (
+                      <button key={opt.val} type="button" onClick={() => setForm({ ...form, nguon: opt.val })}
+                        className={`flex-1 py-1.5 text-sm rounded-lg border font-semibold transition ${form.nguon === opt.val ? opt.cls : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-slate-600 mb-1 block">Loại vấn đề *</label>

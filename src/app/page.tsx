@@ -121,10 +121,10 @@ export default function DashboardPage() {
         </Link>
 
         {/* Đổi trả */}
-        <Link href="/doi-tra" className="bg-white rounded-xl p-5 border border-slate-200 hover:border-rose-200 hover:shadow-sm transition group">
+        <Link href="/doi-tra" className="bg-blue-50 rounded-xl p-5 border border-blue-100 hover:border-blue-300 hover:shadow-sm transition group">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-slate-600">Đổi trả / Sự cố</p>
-            <RefreshCcw size={20} className="text-blue-400 group-hover:text-blue-500 transition" />
+            <p className="text-sm font-medium text-blue-700">Đổi trả / Sự cố</p>
+            <RefreshCcw size={20} className="text-blue-400 group-hover:text-blue-600 transition" />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -242,29 +242,29 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent đổi trả */}
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
+        <div className="bg-blue-50 rounded-xl p-5 border border-blue-100">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <ShoppingBag size={18} className="text-rose-400" />
-              <h3 className="font-semibold text-slate-700">Đổi trả gần đây</h3>
+              <ShoppingBag size={18} className="text-blue-400" />
+              <h3 className="font-semibold text-blue-700">Đổi trả gần đây</h3>
             </div>
-            <Link href="/doi-tra" className="text-xs text-rose-500 hover:underline">Xem tất cả</Link>
+            <Link href="/doi-tra" className="text-xs text-blue-500 hover:underline">Xem tất cả</Link>
           </div>
           {data.recentDoiTra.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-4">Chưa có case nào</p>
+            <p className="text-sm text-blue-300 text-center py-4">Chưa có case nào</p>
           ) : (
             <div className="space-y-2">
               {data.recentDoiTra.map((dt) => (
-                <div key={dt.id} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+                <div key={dt.id} className="flex items-center justify-between py-1.5 border-b border-blue-100 last:border-0">
                   <div>
-                    <p className="text-xs font-mono text-rose-500">{dt.maDoiTra}</p>
-                    <p className="text-sm text-slate-700">{dt.tenKhach} · <span className="text-xs text-slate-400">{LOAI_VAN_DE[dt.loaiVanDe]?.label}</span></p>
+                    <p className="text-xs font-mono text-blue-500">{dt.maDoiTra}</p>
+                    <p className="text-sm text-blue-800">{dt.tenKhach} · <span className="text-xs text-blue-400">{LOAI_VAN_DE[dt.loaiVanDe]?.label}</span></p>
                   </div>
                   <div className="text-right">
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${TRANG_THAI_DOI_TRA[dt.trangThai]?.color ?? "bg-slate-100 text-slate-600"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${TRANG_THAI_DOI_TRA[dt.trangThai]?.color ?? "bg-blue-100 text-blue-600"}`}>
                       {TRANG_THAI_DOI_TRA[dt.trangThai]?.label ?? dt.trangThai}
                     </span>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatDateTime(dt.createdAt)}</p>
+                    <p className="text-xs text-blue-300 mt-0.5">{formatDateTime(dt.createdAt)}</p>
                   </div>
                 </div>
               ))}

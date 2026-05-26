@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -140,6 +140,17 @@ export default function SanXuatPage() {
   const [filterTrangThai, setFilterTrangThai] = useState("");
   const [modalAdd, setModalAdd] = useState(false);
   const [modalEdit, setModalEdit] = useState<LoCat | null>(null);
+  const [activeTab, setActiveTab] = useState<"lo_cat" | "hoa_don">("lo_cat");
+  const [scrollToHD, setScrollToHD] = useState(false);
+  const hdSectionRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollToHD && hdSectionRef.current) {
+      setTimeout(() => {
+        hdSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setScrollToHD(false);
+      }, 150);
+    }
+  }, [scrollToHD, modalEdit]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [hoaDonTon, setHoaDonTon] = useState({ may: 0, giat_vi_sinh: 0, giat_mau: 0 });
@@ -657,6 +668,11 @@ export default function SanXuatPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trangThai: next }),
     }).catch(() => fetchData());
+    // Khi đánh dấu "Đã nhập", mở form edit và scroll đến mục HĐ
+    if (next === "da_nhap") {
+      openEdit(lo);
+      setScrollToHD(true);
+    }
   };
 
   // Toggle "Đã cắt" cho lô 1 cây — xoá cây tương ứng khỏi tồn kho vải
@@ -744,6 +760,20 @@ export default function SanXuatPage() {
         </h1>
         <p className="text-slate-500 text-sm mt-1">Quản lý lô cắt và theo dõi tiến độ sản xuất</p>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-5 border-b border-slate-200">
+        <button onClick={() => setActiveTab("lo_cat")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition -mb-px ${activeTab === "lo_cat" ? "border-rose-500 text-rose-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          Lô cắt
+        </button>
+        <button onClick={() => setActiveTab("hoa_don")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition -mb-px ${activeTab === "hoa_don" ? "border-rose-500 text-rose-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          Hoá đơn
+        </button>
+      </div>
+
+      {activeTab === "lo_cat" && <>
 
       {/* Stats xưởng filter */}
       <div className="flex items-center gap-2 mb-3">
@@ -1066,9 +1096,6 @@ export default function SanXuatPage() {
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50 hidden">Số SP</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Nhận về</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Trạng thái</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">HĐ May</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Vi sinh</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Xưởng</th>
                 <th className="px-3 py-2.5"></th>
               </tr>
@@ -1266,39 +1293,6 @@ export default function SanXuatPage() {
                         </button>
                       )}
                     </td>
-                    {/* HĐ May checkbox */}
-                    <td className="px-3 py-2.5 text-center">
-                      {hasCay ? (
-                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdMayDa).length}/{cayParsed.length}</span>
-                      ) : (
-                        <button onClick={() => handleToggleHD(lo, "hdMayDa")}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdMayDa ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 hover:border-purple-400"}`}>
-                          {lo.hdMayDa && <CheckCircle size={12} />}
-                        </button>
-                      )}
-                    </td>
-                    {/* Vi sinh checkbox */}
-                    <td className="px-3 py-2.5 text-center">
-                      {hasCay ? (
-                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdGiatViSinhDa).length}/{cayParsed.length}</span>
-                      ) : (
-                        <button onClick={() => handleToggleHD(lo, "hdGiatViSinhDa")}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdGiatViSinhDa ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 hover:border-teal-400"}`}>
-                          {lo.hdGiatViSinhDa && <CheckCircle size={12} />}
-                        </button>
-                      )}
-                    </td>
-                    {/* Màu checkbox */}
-                    <td className="px-3 py-2.5 text-center">
-                      {hasCay ? (
-                        <span className="text-[13px] text-slate-400">{cayParsed.filter(c => c.hdGiatMauDa).length}/{cayParsed.length}</span>
-                      ) : (
-                        <button onClick={() => handleToggleHD(lo, "hdGiatMauDa")}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${lo.hdGiatMauDa ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300 hover:border-blue-400"}`}>
-                          {lo.hdGiatMauDa && <CheckCircle size={12} />}
-                        </button>
-                      )}
-                    </td>
                     <td className="px-3 py-2.5">
                       <span className={`px-1.5 py-0.5 rounded text-xs ${lo.xuong === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>
                         {XUONG_LABEL[lo.xuong] ?? lo.xuong}
@@ -1465,28 +1459,7 @@ export default function SanXuatPage() {
                             {cay.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
                           </button>
                         </td>
-                        {/* col 15: HĐ May per-cây */}
-                        <td className="px-3 py-1.5 text-center">
-                          <button onClick={() => toggleCayHD(lo, ci, "hdMayDa")}
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.hdMayDa ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 hover:border-purple-400"}`}>
-                            {cay.hdMayDa && <CheckCircle size={10} />}
-                          </button>
-                        </td>
-                        {/* col 16: Vi sinh per-cây */}
-                        <td className="px-3 py-1.5 text-center">
-                          <button onClick={() => toggleCayHD(lo, ci, "hdGiatViSinhDa")}
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.hdGiatViSinhDa ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 hover:border-teal-400"}`}>
-                            {cay.hdGiatViSinhDa && <CheckCircle size={10} />}
-                          </button>
-                        </td>
-                        {/* col 17: Màu per-cây */}
-                        <td className="px-3 py-1.5 text-center">
-                          <button onClick={() => toggleCayHD(lo, ci, "hdGiatMauDa")}
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition mx-auto ${cay.hdGiatMauDa ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300 hover:border-blue-400"}`}>
-                            {cay.hdGiatMauDa && <CheckCircle size={10} />}
-                          </button>
-                        </td>
-                        {/* cols 18-19 */}
+                        {/* cols filler */}
                         <td colSpan={2}></td>
                       </tr>
                     );
@@ -1509,6 +1482,94 @@ export default function SanXuatPage() {
           </table>
         </div>
       </div>
+
+      </> /* end tab lo_cat */}
+
+      {/* ═══ TAB HOÁ ĐƠN ═══ */}
+      {activeTab === "hoa_don" && (
+        <div>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className={`rounded-xl p-4 border ${mayDuTong < 0 ? "bg-red-50 border-red-200" : "bg-purple-50 border-purple-200"}`}>
+              <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
+              <p className={`text-2xl font-bold ${mayDuTong < 0 ? "text-red-600" : "text-purple-700"}`}>{mayDuTong.toLocaleString()}</p>
+              <p className="text-[13px] text-slate-400 mt-0.5">Tổng HĐ: {hoaDonTon.may.toLocaleString()}</p>
+            </div>
+            <div className={`rounded-xl p-4 border ${viSinhDuTong < 0 ? "bg-red-50 border-red-200" : "bg-teal-50 border-teal-200"}`}>
+              <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
+              <p className={`text-2xl font-bold ${viSinhDuTong < 0 ? "text-red-600" : "text-teal-700"}`}>{viSinhDuTong.toLocaleString()}</p>
+              <p className="text-[13px] text-slate-400 mt-0.5">Tổng HĐ: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
+            </div>
+            <div className={`rounded-xl p-4 border ${mauDuTong < 0 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
+              <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
+              <p className={`text-2xl font-bold ${mauDuTong < 0 ? "text-red-600" : "text-blue-700"}`}>{mauDuTong.toLocaleString()}</p>
+              <p className="text-[13px] text-slate-400 mt-0.5">Tổng HĐ: {hoaDonTon.giat_mau.toLocaleString()}</p>
+            </div>
+          </div>
+
+          {/* Bảng HĐ */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5 text-left">Ngày</th>
+                    <th className="px-3 py-2.5 text-left">Hàng cắt</th>
+                    <th className="px-3 py-2.5 text-left">Cây</th>
+                    <th className="px-3 py-2.5 text-right">Nhận về</th>
+                    <th className="px-3 py-2.5 text-center">Trạng thái</th>
+                    <th className="px-3 py-2.5 text-center">HĐ May</th>
+                    <th className="px-3 py-2.5 text-center">Vi sinh</th>
+                    <th className="px-3 py-2.5 text-center">Màu</th>
+                    <th className="px-3 py-2.5 text-left">Xưởng</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {allLoCat.map(lo => {
+                    const hasCay = lo.soCay > 1 && lo.cayData;
+                    type CayHD = { hangThucTe?: number; hdMayDa?: boolean; hdGiatViSinhDa?: boolean; hdGiatMauDa?: boolean; trangThai?: string };
+                    const cayList: CayHD[] = hasCay ? (() => { try { return JSON.parse(lo.cayData!); } catch { return []; } })() : [{ hangThucTe: lo.hangThucTe ?? undefined, hdMayDa: lo.hdMayDa, hdGiatViSinhDa: lo.hdGiatViSinhDa, hdGiatMauDa: lo.hdGiatMauDa, trangThai: lo.trangThai }];
+                    return cayList.map((cay, ci) => (
+                      <tr key={`${lo.id}-${ci}`} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 text-slate-500">{ci === 0 ? formatDate(lo.ngay) : ""}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-800">{ci === 0 ? lo.hangCat : ""}</td>
+                        <td className="px-3 py-2 text-slate-400 text-xs">{hasCay ? `Cây #${ci + 1}` : "—"}</td>
+                        <td className="px-3 py-2 text-right font-medium text-slate-700">{cay.hangThucTe ?? <span className="text-slate-300">—</span>}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cay.trangThai === "da_nhap" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
+                            {cay.trangThai === "da_nhap" ? "Đã nhập" : "Chưa nhập"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => hasCay ? toggleCayHD(lo, ci, "hdMayDa") : handleToggleHD(lo, "hdMayDa")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${(hasCay ? cay.hdMayDa : lo.hdMayDa) ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 hover:border-purple-400"}`}>
+                            {(hasCay ? cay.hdMayDa : lo.hdMayDa) && <CheckCircle size={12} />}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => hasCay ? toggleCayHD(lo, ci, "hdGiatViSinhDa") : handleToggleHD(lo, "hdGiatViSinhDa")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${(hasCay ? cay.hdGiatViSinhDa : lo.hdGiatViSinhDa) ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 hover:border-teal-400"}`}>
+                            {(hasCay ? cay.hdGiatViSinhDa : lo.hdGiatViSinhDa) && <CheckCircle size={12} />}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => hasCay ? toggleCayHD(lo, ci, "hdGiatMauDa") : handleToggleHD(lo, "hdGiatMauDa")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition mx-auto ${(hasCay ? cay.hdGiatMauDa : lo.hdGiatMauDa) ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300 hover:border-blue-400"}`}>
+                            {(hasCay ? cay.hdGiatMauDa : lo.hdGiatMauDa) && <CheckCircle size={12} />}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2">
+                          {ci === 0 && <span className={`text-xs px-1.5 py-0.5 rounded ${lo.xuong === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>{XUONG_LABEL[lo.xuong] ?? lo.xuong}</span>}
+                        </td>
+                      </tr>
+                    ));
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ MODAL Vải tồn ═══ */}
       {modalVai && (
@@ -2237,12 +2298,10 @@ export default function SanXuatPage() {
                   </div>
                 </div>
 
-                {/* ── HOÁ ĐƠN — chỉ hiện khi "Đã nhập" ── */}
-                {form.trangThai === "da_nhap" && (
-                  <div>
+                {/* ── HOÁ ĐƠN ── */}
+                <div ref={hdSectionRef}>
                     <p className="text-xs font-bold text-rose-500 uppercase tracking-wide mb-3 pb-1 border-b border-slate-100">
                       Hoá đơn
-                      <span className="ml-2 text-[13px] font-normal text-slate-400 normal-case">Hiển thị vì trạng thái: Đã nhập</span>
                     </p>
                     <div className="space-y-4">
 
@@ -2336,7 +2395,6 @@ export default function SanXuatPage() {
                       )}
                     </div>
                   </div>
-                )}
 
                 {/* Ghi chú */}
                 <div>

@@ -33,8 +33,8 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
 // Which pages each role can access (prefix match)
 export const ROLE_PAGES: Record<UserRole, string[]> = {
   admin: ["/"],
-  kho: ["/", "/kho", "/doi-tra", "/api/kho", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/dashboard"],
-  san_xuat: ["/", "/san-xuat", "/api/san-xuat", "/api/dashboard"],
+  kho: ["/", "/tong-quan", "/kho", "/doi-tra", "/api/kho", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/dashboard"],
+  san_xuat: ["/", "/tong-quan", "/san-xuat", "/api/san-xuat", "/api/dashboard"],
 };
 
 export function canAccess(role: UserRole, pathname: string): boolean {

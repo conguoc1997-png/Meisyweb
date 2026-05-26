@@ -77,6 +77,9 @@ model DoiTra {
   phiShip     Float  @default(0)   // 30000 nếu đổi size, 0 nếu lỗi shop
   soChieuShip Int    @default(2)   // 1 hoặc 2 chiều
 
+  // Nguồn kênh bán
+  nguon     String? // shopee | tiktok | khac
+
   // Vận đơn
   maVanDon  String? // Mã vận đơn để theo dõi
 
