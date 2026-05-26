@@ -21,6 +21,7 @@ type LoCat = {
   hdGiatViSinh: number | null; tonTruocGiatViSinh: number | null; hdGiatViSinhDa: boolean;
   hdGiatMau: number | null; tonTruocGiatMau: number | null; hdGiatMauDa: boolean;
   ghiChuMay: string | null; mauGiat: string | null;
+  xuatHoaDonDa: boolean;
   ghiChu: string | null;
 };
 
@@ -710,13 +711,46 @@ export default function SanXuatPage() {
     }
   };
 
-  const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
+  const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa" | "xuatHoaDonDa") => {
     const newVal = !lo[field];
-    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, [field]: newVal } : l));
+    const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, [field]: newVal } : l);
+    setLosCat(update); setAllLoCat(update);
     fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: newVal }),
     }).catch(() => fetchData());
+  };
+
+  // Dùng cho tab Xuất HĐ: tick lô multi-cây sẽ toggle toàn bộ cây cùng lúc
+  const handleHDTabToggle = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa" | "xuatHoaDonDa") => {
+    if (field === "xuatHoaDonDa" || lo.soCay <= 1 || !lo.cayData) {
+      handleToggleHD(lo, field);
+      return;
+    }
+    try {
+      const parsed: Record<string, unknown>[] = JSON.parse(lo.cayData);
+      const allChecked = parsed.every(c => c[field]);
+      const newCayData = JSON.stringify(parsed.map(c => ({ ...c, [field]: !allChecked })));
+      const newLoVal = !allChecked;
+      const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, [field]: newLoVal } : l);
+      setLosCat(update); setAllLoCat(update);
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newCayData, [field]: newLoVal }),
+      }).catch(() => fetchData());
+    } catch { handleToggleHD(lo, field); }
+  };
+
+  // Trạng thái hiển thị checkbox cho multi-cây trong tab HĐ
+  const getCayHDState = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
+    if (lo.soCay <= 1 || !lo.cayData) return lo[field] ? "all" : "none";
+    try {
+      const parsed: Record<string, unknown>[] = JSON.parse(lo.cayData);
+      const checked = parsed.filter(c => c[field]).length;
+      if (checked === 0) return "none";
+      if (checked === parsed.length) return "all";
+      return "partial";
+    } catch { return "none"; }
   };
 
   const handleQuickStatus = (lo: LoCat) => {
@@ -1597,18 +1631,35 @@ export default function SanXuatPage() {
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Size</th>
                       <th className="text-right px-4 py-2.5 text-slate-500 font-medium">Số lượng</th>
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Xưởng</th>
+                      <th className="text-center px-3 py-2.5 text-purple-500 font-medium text-xs">HĐ May</th>
+                      <th className="text-center px-3 py-2.5 text-teal-500 font-medium text-xs">HĐ Vi sinh</th>
+                      <th className="text-center px-3 py-2.5 text-blue-500 font-medium text-xs">HĐ Màu</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">ĐX HĐ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {hoaDonRows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-16 text-slate-400">
+                        <td colSpan={9} className="text-center py-16 text-slate-400">
                           <p className="text-2xl mb-2">📄</p>
                           <p>Chưa có lô nào được đánh dấu "Đã nhận"</p>
                         </td>
                       </tr>
                     ) : hoaDonRows.map(lo => {
                       const soLuong = lo.hangThucTe ?? lo.soSanPham ?? 0;
+                      const mayState    = getCayHDState(lo, "hdMayDa");
+                      const viSinhState = getCayHDState(lo, "hdGiatViSinhDa");
+                      const mauState    = getCayHDState(lo, "hdGiatMauDa");
+                      const mkCb = (state: string, color: string, onClick: () => void) => (
+                        <button onClick={onClick}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition mx-auto ${
+                            state === "all"     ? `${color} border-transparent` :
+                            state === "partial" ? "bg-white border-amber-400" : "bg-white border-slate-300 hover:border-slate-400"
+                          }`}>
+                          {state === "all"     && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          {state === "partial" && <div className="w-2.5 h-0.5 bg-amber-400 rounded" />}
+                        </button>
+                      );
                       return (
                         <tr key={lo.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 text-slate-600">
@@ -1620,6 +1671,15 @@ export default function SanXuatPage() {
                             {soLuong > 0 ? soLuong.toLocaleString() : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-4 py-3 text-slate-600">{lo.xuong ? (XUONG_LABEL[lo.xuong] ?? lo.xuong) : "—"}</td>
+                          <td className="px-3 py-3">{mkCb(mayState,    "bg-purple-500", () => handleHDTabToggle(lo, "hdMayDa"))}</td>
+                          <td className="px-3 py-3">{mkCb(viSinhState, "bg-teal-500",   () => handleHDTabToggle(lo, "hdGiatViSinhDa"))}</td>
+                          <td className="px-3 py-3">{mkCb(mauState,    "bg-blue-500",   () => handleHDTabToggle(lo, "hdGiatMauDa"))}</td>
+                          <td className="px-3 py-3">
+                            <button onClick={() => handleHDTabToggle(lo, "xuatHoaDonDa")}
+                              className={`w-6 h-6 rounded border-2 flex items-center justify-center transition mx-auto ${lo.xuatHoaDonDa ? "bg-slate-600 border-transparent" : "bg-white border-slate-300 hover:border-slate-400"}`}>
+                              {lo.xuatHoaDonDa && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1631,7 +1691,7 @@ export default function SanXuatPage() {
                         <td className="px-4 py-2.5 text-right text-emerald-700">
                           {hoaDonRows.reduce((s, l) => s + (l.hangThucTe ?? l.soSanPham ?? 0), 0).toLocaleString()}
                         </td>
-                        <td></td>
+                        <td colSpan={5}></td>
                       </tr>
                     </tfoot>
                   )}
