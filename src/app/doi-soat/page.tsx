@@ -120,7 +120,7 @@ export default function DoiSoatPage() {
     // Kiểm tra trùng trong dons hiện tại
     const exists = dons.some(d => d.maDon.toLowerCase() === maDon.toLowerCase());
     if (exists) {
-      setAddScanLog(prev => [{ maDon, status: "dup", ts: Date.now() }, ...prev].slice(0, 50));
+      setAddScanLog(prev => [{ maDon, status: "dup" as const, ts: Date.now() }, ...prev].slice(0, 50));
       return;
     }
     try {
@@ -131,9 +131,9 @@ export default function DoiSoatPage() {
       if (!res.ok) throw new Error();
       const newDon: DonHoanTra = await res.json();
       setDons(prev => [newDon, ...prev]);
-      setAddScanLog(prev => [{ maDon, status: "added", ts: Date.now() }, ...prev].slice(0, 50));
+      setAddScanLog(prev => [{ maDon, status: "added" as const, ts: Date.now() }, ...prev].slice(0, 50));
     } catch {
-      setAddScanLog(prev => [{ maDon, status: "err", ts: Date.now() }, ...prev].slice(0, 50));
+      setAddScanLog(prev => [{ maDon, status: "err" as const, ts: Date.now() }, ...prev].slice(0, 50));
     }
   }, [dons, addScanSan]);
 
@@ -208,15 +208,15 @@ export default function DoiSoatPage() {
     const don = dons.find(d => d.maDon.toLowerCase() === maDon.toLowerCase());
 
     if (!don) {
-      setScanLog(prev => [{ maDon, status: "not_found", ts: Date.now() }, ...prev].slice(0, 200));
+      setScanLog(prev => [{ maDon, status: "not_found" as const, ts: Date.now() }, ...prev].slice(0, 200));
       return;
     }
     if (don.daDoiSoat) {
-      setScanLog(prev => [{ maDon, status: "already", ts: Date.now() }, ...prev].slice(0, 200));
+      setScanLog(prev => [{ maDon, status: "already" as const, ts: Date.now() }, ...prev].slice(0, 200));
       return;
     }
     setDons(prev => prev.map(d => d.id === don.id ? { ...d, daDoiSoat: true, trangThai: "da_ve" } : d));
-    setScanLog(prev => [{ maDon, status: "ok", ts: Date.now() }, ...prev].slice(0, 200));
+    setScanLog(prev => [{ maDon, status: "ok" as const, ts: Date.now() }, ...prev].slice(0, 200));
     await fetch(`/api/doi-soat/${don.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ daDoiSoat: true, trangThai: "da_ve" }),

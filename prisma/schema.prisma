@@ -78,7 +78,7 @@ model DoiTra {
   soChieuShip Int    @default(2)   // 1 hoặc 2 chiều
 
   // Nguồn kênh bán
-  nguon     String? // shopee | tiktok | khac
+  nguon     String? // shopee | tiktok | don_ngoai | khac
 
   // Vận đơn
   maVanDon  String? // Mã vận đơn để theo dõi
@@ -88,7 +88,6 @@ model DoiTra {
   // cho_xu_ly | dang_xu_ly | da_gui | hoan_thanh
 
   nguoiXuLy String?
-  nguon     String?  // shopee | tiktok | don_ngoai | khac
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
