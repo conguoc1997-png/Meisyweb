@@ -132,6 +132,7 @@ export default function Sidebar() {
     !user || user.role === "admin" || userModules.includes(moduleKey);
 
   return (
+    <>
     <aside
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
@@ -239,23 +240,23 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* ── Footer ── */}
-      <div className={`py-3 border-t border-slate-100 space-y-1 ${expanded ? "px-2" : "px-2"}`}>
-        {expanded && user && (
-          <div className="px-3 py-2 rounded-xl bg-slate-50 mb-1">
-            <p className="text-[12px] font-semibold text-slate-700 truncate">{user.name}</p>
-            <p className="text-[11px] text-slate-400 capitalize">{user.role === "admin" ? "Admin" : "User"}</p>
-          </div>
-        )}
-        <button
-          onClick={handleLogout}
-          title={!expanded ? "Đăng xuất" : undefined}
-          className={`w-full flex items-center gap-2.5 px-1.5 py-2 rounded-xl text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all ${expanded ? "" : "justify-center"}`}
-        >
-          <LogOut size={18} />
-          {expanded && <span className="whitespace-nowrap">Đăng xuất</span>}
-        </button>
-      </div>
+      {/* ── Footer (user info khi mở rộng) ── */}
+      {expanded && user && (
+        <div className="px-4 py-3 border-t border-slate-100">
+          <p className="text-[12px] font-semibold text-slate-700 truncate">{user.name}</p>
+          <p className="text-[11px] text-slate-400 capitalize">{user.role === "admin" ? "Admin" : "User"}</p>
+        </div>
+      )}
     </aside>
+
+    {/* ── Nút đăng xuất cố định góc dưới trái ── */}
+    <button
+      onClick={handleLogout}
+      className="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-md text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+    >
+      <LogOut size={16} />
+      <span>Đăng xuất</span>
+    </button>
+    </>
   );
 }
