@@ -6,6 +6,14 @@ const globalForPrisma = globalThis as unknown as {
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient();
+  new PrismaClient({
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
+    log: [],
+  });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Giữ singleton cho cả production (tránh tạo nhiều pool kết nối)
+globalForPrisma.prisma = prisma;

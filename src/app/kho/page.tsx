@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, ArrowDownCircle, ArrowUpCircle, Search, Package, Upload, CheckCircle, XCircle } from "lucide-react";
+import { Plus, ArrowDownCircle, ArrowUpCircle, Search, Package, Upload, CheckCircle, XCircle, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 type SanPham = {
@@ -47,6 +47,20 @@ export default function KhoPage() {
   const [importDone, setImportDone] = useState<{ inserted: number; updated: number } | null>(null);
   const [showImport, setShowImport] = useState(false);
 
+  // ── Sheet update states ───────────────────────────────────────────────────
+  type SheetRow = {
+    rowIndex: number; ten: string; giaNhap: number | null;
+    existingId: string | null; existingSku: string | null;
+    oldGiaNhap: number | null; isNew: boolean;
+  };
+  const [modalSheet, setModalSheet] = useState(false);
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const [sheetError, setSheetError] = useState("");
+  const [sheetPreview, setSheetPreview] = useState<SheetRow[]>([]);
+  const [sheetConfirming, setSheetConfirming] = useState(false);
+  const [sheetDone, setSheetDone] = useState<{ updated: number; inserted: number } | null>(null);
+
   const fetchData = async () => {
     const [sp, nx] = await Promise.all([
       fetch("/api/kho/san-pham").then((r) => r.json()),
@@ -54,6 +68,41 @@ export default function KhoPage() {
     ]);
     setSanPhams(sp);
     setLichSu(nx);
+  };
+
+  const handleSheetPreview = async () => {
+    if (!sheetUrl.trim()) return;
+    setSheetLoading(true); setSheetError(""); setSheetPreview([]); setSheetDone(null);
+    try {
+      const res = await fetch("/api/kho/update-sheet", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: sheetUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSheetPreview(data.preview);
+    } catch (err: unknown) { setSheetError(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setSheetLoading(false); }
+  };
+
+  const handleSheetConfirm = async () => {
+    setSheetConfirming(true);
+    try {
+      const rows = sheetPreview.map(r => ({
+        ten: r.ten,
+        giaNhap: r.giaNhap,
+        existingId: r.existingId ?? null,
+      }));
+      const res = await fetch("/api/kho/update-sheet", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSheetDone({ updated: data.updated, inserted: data.inserted });
+      fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setSheetConfirming(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -204,6 +253,10 @@ export default function KhoPage() {
             {importLoading ? "Đang đọc..." : "Import Excel"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} />
           </label>
+          <button onClick={() => { setModalSheet(true); setSheetUrl(""); setSheetPreview([]); setSheetError(""); setSheetDone(null); }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+            <FileSpreadsheet size={16} /> Cập nhật từ Sheet
+          </button>
           <button onClick={() => setModal("them-sp")} className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition">
             <Plus size={16} /> Thêm SP
           </button>
@@ -229,7 +282,6 @@ export default function KhoPage() {
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Size / Màu</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Nguồn</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá nhập</th>
-                <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá bán</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Tồn kho</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -237,7 +289,7 @@ export default function KhoPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredSP.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">
+                  <td colSpan={6} className="text-center py-12 text-slate-400">
                     <Package size={32} className="mx-auto mb-2 opacity-40" />
                     Chưa có sản phẩm nào
                   </td>
@@ -260,7 +312,6 @@ export default function KhoPage() {
                         ? <span className="text-amber-500 text-xs font-medium">Chưa có giá</span>
                         : <span className="text-slate-600">{formatCurrency(sp.giaNhap)}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-600">{sp.giaBan > 0 ? formatCurrency(sp.giaBan) : "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <span className={`font-bold ${sp.tonKho <= 5 ? "text-red-600" : sp.tonKho <= 20 ? "text-amber-600" : "text-green-600"}`}>
                         {sp.tonKho}
@@ -524,6 +575,113 @@ export default function KhoPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Cập nhật từ Sheet ───────────────────────────────────────── */}
+      {modalSheet && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                  <FileSpreadsheet size={18} className="text-emerald-600" /> Thêm / Cập nhật sản phẩm từ Google Sheet
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">Cột B = Tên sản phẩm &nbsp;·&nbsp; Cột I = Giá nhập</p>
+              </div>
+              <button onClick={() => setModalSheet(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+            </div>
+
+            {/* URL input */}
+            <div className="p-5 border-b border-slate-100">
+              <div className="flex gap-2">
+                <input
+                  type="text" placeholder="https://docs.google.com/spreadsheets/d/..."
+                  value={sheetUrl} onChange={e => { setSheetUrl(e.target.value); setSheetError(""); setSheetPreview([]); setSheetDone(null); }}
+                  className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                />
+                <button onClick={handleSheetPreview} disabled={!sheetUrl.trim() || sheetLoading}
+                  className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap">
+                  {sheetLoading ? <><span className="animate-spin inline-block">⟳</span> Đang tải...</> : "Xem trước"}
+                </button>
+              </div>
+              {sheetError && (
+                <p className="mt-2 text-xs text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {sheetError}</p>
+              )}
+              <p className="mt-1.5 text-xs text-slate-400">Share sheet quyền <strong>"Anyone with the link"</strong> trước khi dán link.</p>
+            </div>
+
+            {/* Preview table */}
+            {sheetPreview.length > 0 && (
+              <>
+                <div className="px-5 py-2 border-b border-slate-100 flex items-center justify-between">
+                  <p className="text-xs text-slate-500">
+                    <span className="text-blue-600 font-semibold">{sheetPreview.filter(r => !r.isNew).length}</span> cập nhật &nbsp;·&nbsp;
+                    <span className="text-green-600 font-semibold">{sheetPreview.filter(r => r.isNew).length}</span> thêm mới
+                    &nbsp;·&nbsp; tổng {sheetPreview.length} dòng
+                  </p>
+                  {sheetDone && (
+                    <span className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium">
+                      <CheckCircle size={14} /> Cập nhật {sheetDone.updated} · Thêm mới {sheetDone.inserted}
+                    </span>
+                  )}
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-100 sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Tên (cột B)</th>
+                        <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">SP khớp (SKU)</th>
+                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá nhập cũ</th>
+                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá nhập mới (cột I)</th>
+                        <th className="text-center px-4 py-2.5 text-slate-500 font-medium text-xs w-24">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sheetPreview.map(row => (
+                        <tr key={row.rowIndex} className={row.isNew ? "bg-green-50 hover:bg-green-100/50" : "bg-white hover:bg-slate-50"}>
+                          <td className="px-4 py-2 text-sm font-medium text-slate-800">{row.ten}</td>
+                          <td className="px-4 py-2 text-xs text-slate-500">
+                            {row.isNew
+                              ? <span className="text-green-600 italic">Sản phẩm mới</span>
+                              : <span className="font-mono text-slate-600">{row.existingSku}</span>}
+                          </td>
+                          <td className="px-4 py-2 text-right text-xs text-slate-400">
+                            {!row.isNew && row.oldGiaNhap != null && row.oldGiaNhap > 0
+                              ? row.oldGiaNhap.toLocaleString("vi-VN") + " ₫" : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm font-semibold text-emerald-700">
+                            {row.giaNhap != null ? row.giaNhap.toLocaleString("vi-VN") + " ₫" : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            {row.isNew
+                              ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Thêm mới</span>
+                              : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Cập nhật</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex gap-2 p-5 border-t border-slate-200">
+                  <button onClick={() => setModalSheet(false)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
+                    {sheetDone ? "Đóng" : "Huỷ"}
+                  </button>
+                  {!sheetDone && (
+                    <button onClick={handleSheetConfirm}
+                      disabled={sheetConfirming || sheetPreview.length === 0}
+                      className="flex-1 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {sheetConfirming
+                        ? <><span className="animate-spin inline-block">⟳</span> Đang xử lý...</>
+                        : <><CheckCircle size={14} /> Xác nhận {sheetPreview.length} sản phẩm</>}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

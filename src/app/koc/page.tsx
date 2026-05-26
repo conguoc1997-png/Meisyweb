@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
-type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; ghiChu: string | null };
+type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
@@ -28,6 +28,7 @@ export default function KocPage() {
   const [expandedSP, setExpandedSP] = useState<string | null>(null);
   const [spSubTab, setSpSubTab] = useState<Record<string, "chiphi" | "koc" | "hieugua">>({});
   const [modalPickSP, setModalPickSP] = useState(false);
+  const [pickSPSearch, setPickSPSearch] = useState("");
   const [searchKOC, setSearchKOC] = useState("");
   const [filterThang, setFilterThang] = useState("");
   const [filterSP, setFilterSP] = useState("");
@@ -35,25 +36,134 @@ export default function KocPage() {
   const [modalBooking, setModalBooking] = useState(false);
   const [modalUpdate, setModalUpdate] = useState<Booking | null>(null);
   const [modalEditKOC, setModalEditKOC] = useState<KOC | null>(null);
+  const [modalEditBooking, setModalEditBooking] = useState<Booking | null>(null);
+  const [modalEditChiPhi, setModalEditChiPhi] = useState<Booking | null>(null);
+  const [formEditBooking, setFormEditBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", chiPhiCast: "", ngayBat: "", ngayKet: "", ghiChu: "" });
+  const [formEditChiPhi, setFormEditChiPhi] = useState({ chiPhiCast: "", chiPhiSP: "" });
   const [modalLaunch, setModalLaunch] = useState<SanPham | null>(null);
   const [launchKOCs, setLaunchKOCs] = useState<Record<string, { checked: boolean; soLuong: string }>>({});
   const [launchNgayBat, setLaunchNgayBat] = useState("");
   const [launchSearch, setLaunchSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showDeXuat, setShowDeXuat] = useState(true);
+  const [showDeXuat, setShowDeXuat] = useState(false);
 
   type PreviewRow = {
     rowIndex: number; kocName: string; kocId: string | null; kocTen: string | null;
     bookingId: string | null; bookingSP: string | null;
-    luotXem: number; donHang: number; doanhThu: number; matched: boolean;
+    luotXem: number; donHang: number; doanhThu: number;
+    sdt: string | null; diaChi: string | null;
+    matched: boolean;
   };
   const [modalImport, setModalImport] = useState(false);
   const [importPreview, setImportPreview] = useState<PreviewRow[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importDone, setImportDone] = useState(false);
+  const [manualMatches, setManualMatches] = useState<Record<number, {
+    kocId: string; kocTen: string; bookingId: string; bookingSP: string | null;
+  }>>({});
+  const [addNewSelected, setAddNewSelected] = useState<Set<number>>(new Set());
+  const [addingNew, setAddingNew] = useState(false);
 
-  const [formKOC, setFormKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
-  const [formEditKOC, setFormEditKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
+  // Update contacts từ Sheet
+  type ContactRow = {
+    rowIndex: number; kocName: string; kocId: string | null; kocTen: string | null;
+    oldSdt: string | null; oldDiaChi: string | null;
+    newSdt: string | null; newDiaChi: string | null;
+    matched: boolean;
+  };
+  const [modalContacts, setModalContacts] = useState(false);
+  const [contactSheetUrl, setContactSheetUrl] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [contactPreview, setContactPreview] = useState<ContactRow[]>([]);
+  const [contactConfirming, setContactConfirming] = useState(false);
+  const [contactDone, setContactDone] = useState(false);
+
+  // Inline edit booking fields — dùng ref để tránh re-render mỗi keystroke
+  const [editingSLId, setEditingSLId] = useState<string | null>(null);
+  const [editingGCId, setEditingGCId] = useState<string | null>(null);
+  const slRef = useRef<HTMLInputElement>(null);
+  const gcRef = useRef<HTMLTextAreaElement>(null);
+
+  const patchBookingBackground = (id: string, data: Record<string, unknown>) => {
+    // Fire-and-forget — không chờ response, UI đã cập nhật optimistic rồi
+    fetch(`/api/koc/booking/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(res => {
+      if (res.ok) res.json().then(updated => {
+        // Sync lại từ server (chiPhiSP, chiPhi đã tính lại)
+        setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
+      });
+    }).catch(() => {/* ignore */});
+  };
+
+  const saveSoLuong = (b: Booking) => {
+    const val = parseInt(slRef.current?.value ?? "") || b.soLuongGui;
+    setEditingSLId(null);
+    if (val === b.soLuongGui) return;
+    // Optimistic: cập nhật UI ngay, tính tạm chiPhiSP
+    const newChiPhiSP = (b.sanPham?.giaNhap ?? 0) * val;
+    const newChiPhi = b.chiPhiCast + newChiPhiSP;
+    setBookings(prev => prev.map(x => x.id === b.id
+      ? { ...x, soLuongGui: val, chiPhiSP: newChiPhiSP, chiPhi: newChiPhi }
+      : x
+    ));
+    patchBookingBackground(b.id, { soLuongGui: val });
+  };
+
+  const saveGhiChu = (b: Booking) => {
+    const val = gcRef.current?.value ?? b.ghiChu ?? "";
+    setEditingGCId(null);
+    if (val === (b.ghiChu ?? "")) return;
+    // Optimistic
+    setBookings(prev => prev.map(x => x.id === b.id ? { ...x, ghiChu: val || null } : x));
+    patchBookingBackground(b.id, { ghiChu: val || null });
+  };
+
+  // Tick duyệt booking
+  const [approvedBookings, setApprovedBookings] = useState<Set<string>>(new Set());
+  const toggleApprove = (id: string) => {
+    setApprovedBookings(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const exportApproved = (groupItems: Booking[], spLabel: string) => {
+    const rows = groupItems.filter(b => approvedBookings.has(b.id));
+    if (rows.length === 0) return;
+    const header = ["Tên KOC", "Platform", "SKU sản phẩm", "Tên sản phẩm", "Số lượng gửi", "SĐT", "Địa chỉ"];
+    const lines = rows.map(b => [
+      b.koc.ten,
+      b.koc.platform.toUpperCase(),
+      b.sanPham?.sku ?? "—",
+      b.sanPham?.ten ?? "—",
+      String(b.soLuongGui),
+      b.koc.sdt ?? "—",
+      b.koc.diaChi ?? "—",
+    ].map(v => `"${v.replace(/"/g, '""')}"`).join(","));
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    const safeName = spLabel.replace(/[^a-zA-Z0-9À-ɏḀ-ỿ]/g, "_").slice(0, 40);
+    a.download = `koc-${safeName}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // Google Sheet import
+  const [modalSheet, setModalSheet] = useState(false);
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [sheetLoading, setSheetLoading] = useState(false);
+  const [sheetError, setSheetError] = useState("");
+
+  const [formKOC, setFormKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
+  const [formEditKOC, setFormEditKOC] = useState({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
+  const [linkInput, setLinkInput] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkEditInput, setLinkEditInput] = useState("");
+  const [linkEditLoading, setLinkEditLoading] = useState(false);
   const [formBooking, setFormBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
@@ -102,13 +212,46 @@ export default function KocPage() {
     });
   }, [kocs, bookings]);
 
+  const fetchProfileFromLink = async (url: string, mode: "add" | "edit") => {
+    if (!url.trim()) return;
+    mode === "add" ? setLinkLoading(true) : setLinkEditLoading(true);
+    try {
+      const res = await fetch("/api/koc/fetch-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (mode === "add") {
+        setFormKOC(prev => ({
+          ...prev,
+          ten: data.ten || prev.ten,
+          platform: data.platform || prev.platform,
+          linkProfile: data.linkProfile || prev.linkProfile,
+        }));
+      } else {
+        setFormEditKOC(prev => ({
+          ...prev,
+          ten: data.ten || prev.ten,
+          platform: data.platform || prev.platform,
+          linkProfile: data.linkProfile || prev.linkProfile,
+        }));
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Không lấy được thông tin từ link này");
+    } finally {
+      mode === "add" ? setLinkLoading(false) : setLinkEditLoading(false);
+    }
+  };
+
   const handleAddKOC = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
     try {
       const res = await fetch("/api/koc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formKOC) });
       if (!res.ok) throw new Error((await res.json()).error);
       setModalKOC(false);
-      setFormKOC({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", ghiChu: "" });
+      setFormKOC({ ten: "", platform: "tiktok", follower: "", giaCast: "", linkProfile: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
       fetchData();
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
     finally { setLoading(false); }
@@ -151,7 +294,8 @@ export default function KocPage() {
   };
 
   const openEditKOC = (k: KOC) => {
-    setFormEditKOC({ ten: k.ten, platform: k.platform, follower: String(k.follower), giaCast: String(k.giaCast), linkProfile: k.linkProfile || "", sdt: k.sdt || "", ghiChu: k.ghiChu || "" });
+    setFormEditKOC({ ten: k.ten, platform: k.platform, follower: String(k.follower), giaCast: String(k.giaCast), linkProfile: k.linkProfile || "", sdt: k.sdt || "", email: k.email || "", diaChi: k.diaChi || "", ghiChu: k.ghiChu || "" });
+    setLinkEditInput(k.linkProfile || "");
     setModalEditKOC(k);
   };
 
@@ -176,6 +320,80 @@ export default function KocPage() {
     setLaunchNgayBat(new Date().toISOString().slice(0, 10));
     setLaunchSearch("");
     setModalLaunch(sp);
+  };
+
+  const openEditBooking = (b: Booking) => {
+    // Ưu tiên giá cast của booking; nếu chưa có (= 0) thì lấy từ hồ sơ KOC
+    const defaultCast = b.chiPhiCast > 0 ? b.chiPhiCast : b.koc.giaCast;
+    setFormEditBooking({
+      kocId: b.kocId, sanPhamId: b.sanPhamId ?? "",
+      soLuongGui: String(b.soLuongGui),
+      chiPhiCast: String(defaultCast),
+      ngayBat: b.ngayBat.slice(0, 10),
+      ngayKet: b.ngayKet ? b.ngayKet.slice(0, 10) : "",
+      ghiChu: b.ghiChu ?? "",
+    });
+    setModalEditBooking(b);
+  };
+
+  const handleSaveEditBooking = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true);
+    try {
+      const chiPhiSP = modalEditBooking!.chiPhiSP; // giữ nguyên chi phí SP
+      const res = await fetch(`/api/koc/booking/${modalEditBooking!.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formEditBooking, chiPhiSP }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      // Cập nhật giaCast trong hồ sơ KOC theo giá mới nhất
+      const newCast = Number(formEditBooking.chiPhiCast) || 0;
+      if (newCast > 0) {
+        await fetch(`/api/koc/${modalEditBooking!.kocId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ giaCast: newCast }),
+        });
+      }
+      setModalEditBooking(null); fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setLoading(false); }
+  };
+
+  const openEditChiPhi = (b: Booking) => {
+    setFormEditChiPhi({ chiPhiCast: String(b.chiPhiCast), chiPhiSP: String(b.chiPhiSP) });
+    setModalEditChiPhi(b);
+  };
+
+  const handleSaveChiPhi = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true);
+    try {
+      const chiPhiCast = Number(formEditChiPhi.chiPhiCast) || 0;
+      const chiPhiSP   = Number(formEditChiPhi.chiPhiSP)   || 0;
+      const res = await fetch(`/api/koc/booking/${modalEditChiPhi!.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chiPhiCast, chiPhiSP }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      // Cập nhật giaCast trong hồ sơ KOC theo giá mới nhất
+      if (chiPhiCast > 0) {
+        await fetch(`/api/koc/${modalEditChiPhi!.kocId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ giaCast: chiPhiCast }),
+        });
+      }
+      setModalEditChiPhi(null); fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setLoading(false); }
+  };
+
+  const handleDeleteBooking = async (b: Booking) => {
+    if (!confirm(`Xoá booking của ${b.koc.ten}?`)) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/koc/booking/${b.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error);
+      fetchData();
+    } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setLoading(false); }
   };
 
   const handleLaunchSubmit = async (e: React.FormEvent) => {
@@ -220,19 +438,28 @@ export default function KocPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setImportPreview(data.preview);
+      setManualMatches({});
+      setAddNewSelected(new Set());
       setModalImport(true);
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi đọc file"); }
     finally { setImportLoading(false); e.target.value = ""; }
   };
 
   const handleImportConfirm = async () => {
-    const matched = importPreview.filter(r => r.matched && r.bookingId);
+    // Gộp auto-matched + manual-matched
+    const allRows = importPreview.map(r => {
+      if (r.matched && r.bookingId) return r;
+      const m = manualMatches[r.rowIndex];
+      if (m?.bookingId) return { ...r, ...m, matched: true };
+      return r;
+    });
+    const matched = allRows.filter(r => r.matched && r.bookingId);
     if (!matched.length) return;
     setImportLoading(true);
     try {
       const res = await fetch("/api/koc/import-confirm", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: matched.map(r => ({ bookingId: r.bookingId, luotXem: r.luotXem, donHang: r.donHang, doanhThu: r.doanhThu })) }),
+        body: JSON.stringify({ rows: matched.map(r => ({ bookingId: r.bookingId, kocId: r.kocId, luotXem: r.luotXem, donHang: r.donHang, doanhThu: r.doanhThu, sdt: r.sdt, diaChi: r.diaChi })) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -240,6 +467,94 @@ export default function KocPage() {
       fetchData();
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi import"); }
     finally { setImportLoading(false); }
+  };
+
+  const handleAddNewKOCs = async () => {
+    const toAdd = importPreview.filter(r => addNewSelected.has(r.rowIndex) && !r.matched && !manualMatches[r.rowIndex]);
+    if (!toAdd.length) return;
+    setAddingNew(true);
+    try {
+      const added = await Promise.all(toAdd.map(r =>
+        fetch("/api/koc", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: r.kocName, platform: "tiktok", follower: 0, giaCast: 0 }),
+        }).then(res => res.json())
+      ));
+      // Auto-match những dòng vừa thêm vào manualMatches
+      const newMatches: typeof manualMatches = { ...manualMatches };
+      toAdd.forEach((r, i) => {
+        const newKoc = added[i];
+        if (newKoc?.id) {
+          newMatches[r.rowIndex] = { kocId: newKoc.id, kocTen: newKoc.ten, bookingId: "", bookingSP: null };
+        }
+      });
+      setManualMatches(newMatches);
+      setAddNewSelected(new Set());
+      await fetchData(); // refresh kocs list
+      alert(`Đã thêm ${toAdd.length} KOC mới vào hệ thống!`);
+    } catch {
+      alert("Có lỗi khi thêm KOC");
+    } finally {
+      setAddingNew(false);
+    }
+  };
+
+  const handleContactPreview = async () => {
+    if (!contactSheetUrl.trim()) return;
+    setContactLoading(true); setContactError(""); setContactPreview([]);
+    try {
+      const res = await fetch("/api/koc/update-contacts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: contactSheetUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setContactPreview(data.preview);
+      setContactDone(false);
+    } catch (e: unknown) { setContactError(e instanceof Error ? e.message : "Lỗi"); }
+    finally { setContactLoading(false); }
+  };
+
+  const handleContactConfirm = async () => {
+    const toUpdate = contactPreview.filter(r => r.matched && r.kocId);
+    if (!toUpdate.length) return;
+    setContactConfirming(true);
+    try {
+      const res = await fetch("/api/koc/update-contacts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: toUpdate.map(r => ({ kocId: r.kocId, sdt: r.newSdt, diaChi: r.newDiaChi })) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setContactDone(true);
+      fetchData();
+    } catch (e: unknown) { alert(e instanceof Error ? e.message : "Lỗi"); }
+    finally { setContactConfirming(false); }
+  };
+
+  const handleSheetImport = async () => {
+    if (!sheetUrl.trim()) return;
+    setSheetLoading(true);
+    setSheetError("");
+    try {
+      const res = await fetch("/api/koc/import-sheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: sheetUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setImportPreview(data.preview);
+      setImportDone(false);
+      setManualMatches({});
+      setAddNewSelected(new Set());
+      setModalSheet(false);
+      setModalImport(true);
+    } catch (err: unknown) {
+      setSheetError(err instanceof Error ? err.message : "Lỗi không xác định");
+    } finally {
+      setSheetLoading(false);
+    }
   };
 
   // Stats
@@ -384,6 +699,12 @@ export default function KocPage() {
             {importLoading ? "Đang đọc..." : "Import Excel"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
           </label>
+          <button
+            onClick={() => { setSheetUrl(""); setSheetError(""); setModalSheet(true); }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition"
+          >
+            <FileSpreadsheet size={16} /> Google Sheet
+          </button>
           <button onClick={() => setModalKOC(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 transition">
             <Plus size={16} /> Thêm KOC
           </button>
@@ -486,6 +807,7 @@ export default function KocPage() {
               const isOpen     = expandedSP === group.key;
               const subTab     = spSubTab[group.key] ?? "koc";
 
+              const groupApprovedCount = group.items.filter(b => approvedBookings.has(b.id)).length;
               return (
                 <div key={group.key} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                   {/* Header card — click để mở/đóng */}
@@ -501,6 +823,15 @@ export default function KocPage() {
                         <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{group.items.length} KOC</span>
                       </div>
                     </div>
+                    {/* Xuất đã duyệt — chỉ hiện khi có tick */}
+                    {groupApprovedCount > 0 && (
+                      <button
+                        onClick={e => { e.stopPropagation(); exportApproved(group.items, group.label); }}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition flex-shrink-0"
+                      >
+                        <Download size={12} /> Xuất {groupApprovedCount} đã duyệt
+                      </button>
+                    )}
                     {/* Thêm KOC vào sản phẩm này */}
                     {group.spId && (() => {
                       const sp = sanPhams.find(s => s.id === group.spId);
@@ -556,16 +887,29 @@ export default function KocPage() {
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50">
                             <tr>
+                              <th className="px-3 py-2.5 w-10 text-center">
+                                <span className="text-xs font-medium text-emerald-600">Duyệt</span>
+                              </th>
                               <th className="text-left px-5 py-2.5 text-slate-500 font-medium text-xs">KOC</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Thời gian</th>
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Số lượng gửi</th>
+                              <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá cast</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Trạng thái</th>
+                              <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Ghi chú</th>
                               <th className="px-4 py-2.5"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {group.items.map(b => (
-                              <tr key={b.id} className="hover:bg-slate-50">
+                            {group.items.map(b => {
+                              const approved = approvedBookings.has(b.id);
+                              return (
+                              <tr key={b.id} className={`hover:bg-slate-50 transition-colors ${approved ? "bg-emerald-50/60" : ""}`}>
+                                <td className="px-3 py-3 text-center">
+                                  <button onClick={() => toggleApprove(b.id)}
+                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mx-auto transition-all ${approved ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300 hover:border-emerald-400 bg-white"}`}>
+                                    {approved && <CheckCircle size={14} />}
+                                  </button>
+                                </td>
                                 <td className="px-5 py-3">
                                   <p className="font-medium text-slate-800">{b.koc.ten}</p>
                                   <span className={`text-xs px-1.5 py-0.5 rounded ${b.koc.platform === "tiktok" ? "bg-pink-100 text-pink-700" : b.koc.platform === "shopee" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
@@ -575,17 +919,71 @@ export default function KocPage() {
                                 <td className="px-4 py-3 text-xs text-slate-500">
                                   {formatDate(b.ngayBat)}{b.ngayKet ? ` → ${formatDate(b.ngayKet)}` : " → ..."}
                                 </td>
-                                <td className="px-4 py-3 text-right text-xs text-slate-600">{b.soLuongGui} cái</td>
+                                {/* Số lượng gửi — inline edit (uncontrolled, nhanh) */}
+                                <td className="px-4 py-3 text-right">
+                                  {editingSLId === b.id ? (
+                                    <input
+                                      type="number" min={1} autoFocus
+                                      ref={slRef}
+                                      defaultValue={b.soLuongGui}
+                                      onBlur={() => saveSoLuong(b)}
+                                      onKeyDown={e => { if (e.key === "Enter") saveSoLuong(b); if (e.key === "Escape") setEditingSLId(null); }}
+                                      className="w-16 text-right text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingSLId(b.id)}
+                                      className="text-xs text-slate-600 hover:text-blue-600 hover:underline cursor-pointer px-1"
+                                      title="Click để sửa">
+                                      {b.soLuongGui} cái
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-right text-xs font-medium text-rose-600">
+                                  {b.chiPhiCast > 0 ? formatCurrency(b.chiPhiCast) : <span className="text-slate-400">—</span>}
+                                </td>
                                 <td className="px-4 py-3">
                                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${TT_COLOR[b.trangThai]}`}>
                                     {TRANG_THAI_BOOKING[b.trangThai]}
                                   </span>
                                 </td>
+                                {/* Ghi chú — inline edit (uncontrolled) */}
+                                <td className="px-4 py-3 max-w-[180px]">
+                                  {editingGCId === b.id ? (
+                                    <textarea
+                                      autoFocus rows={2}
+                                      ref={gcRef}
+                                      defaultValue={b.ghiChu ?? ""}
+                                      onBlur={() => saveGhiChu(b)}
+                                      onKeyDown={e => { if (e.key === "Escape") setEditingGCId(null); }}
+                                      className="w-full text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                                      placeholder="Nhập ghi chú..."
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingGCId(b.id)}
+                                      className="text-xs text-left w-full hover:text-blue-600 cursor-pointer"
+                                      title="Click để sửa">
+                                      {b.ghiChu
+                                        ? <span className="text-slate-600 line-clamp-2">{b.ghiChu}</span>
+                                        : <span className="text-slate-300 italic">+ ghi chú</span>}
+                                    </button>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3 text-right">
-                                  <button onClick={() => openUpdate(b)} className="text-xs text-rose-500 hover:underline">Cập nhật</button>
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <button onClick={() => openUpdate(b)} className="text-xs text-rose-500 hover:underline px-2 py-1">Kết quả</button>
+                                    <button onClick={() => openEditBooking(b)} className="p-1.5 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition" title="Sửa booking">
+                                      <Pencil size={13} />
+                                    </button>
+                                    <button onClick={() => handleDeleteBooking(b)} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition" title="Xoá">
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       )}
@@ -618,16 +1016,22 @@ export default function KocPage() {
                                 <th className="text-right px-3 py-2 text-slate-500">Số lượng</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Chi phí SP</th>
                                 <th className="text-right px-3 py-2 text-slate-500 font-semibold">Tổng</th>
+                                <th className="px-3 py-2 w-8"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {group.items.map(b => (
-                                <tr key={b.id}>
+                                <tr key={b.id} className="hover:bg-slate-50">
                                   <td className="px-3 py-2 font-medium text-slate-700">{b.koc.ten}</td>
                                   <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(b.chiPhiCast)}</td>
                                   <td className="px-3 py-2 text-right text-slate-600">{b.soLuongGui} cái</td>
                                   <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(b.chiPhiSP)}</td>
                                   <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(b.chiPhi)}</td>
+                                  <td className="px-3 py-2 text-center">
+                                    <button onClick={() => openEditChiPhi(b)} className="p-1 rounded hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition" title="Sửa chi phí">
+                                      <Pencil size={12} />
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -701,9 +1105,9 @@ export default function KocPage() {
       {/* KOC Table */}
       {tab === "kocs" && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {/* Search bar */}
-          <div className="px-4 py-3 border-b border-slate-100">
-            <div className="relative max-w-sm">
+          {/* Search bar + action */}
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
+            <div className="relative max-w-sm flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={searchKOC}
@@ -715,14 +1119,21 @@ export default function KocPage() {
                 <button onClick={() => setSearchKOC("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
               )}
             </div>
+            <button
+              onClick={() => { setContactSheetUrl(""); setContactError(""); setContactPreview([]); setContactDone(false); setModalContacts(true); }}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition whitespace-nowrap"
+            >
+              <FileSpreadsheet size={15} /> Cập nhật SĐT/ĐCHI từ Sheet
+            </button>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Tên KOC</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá cast</th>
-                <th className="text-right px-4 py-3 text-slate-600 font-medium">Số booking</th>
+                <th className="text-right px-4 py-3 text-slate-600 font-medium">Booking</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">SĐT</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-medium">Địa chỉ</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Link</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -742,7 +1153,10 @@ export default function KocPage() {
                     <td className="px-4 py-3 font-medium text-slate-800">{k.ten}</td>
                     <td className="px-4 py-3 text-right text-slate-700">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
                     <td className="px-4 py-3 text-right font-medium text-rose-600">{kocBookings.length}</td>
-                    <td className="px-4 py-3 text-slate-500">{k.sdt || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-sm">{k.sdt || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-sm max-w-[180px]">
+                      <span className="truncate block" title={k.diaChi || ""}>{k.diaChi || "—"}</span>
+                    </td>
                     <td className="px-4 py-3">
                       {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs truncate block max-w-32">Xem profile</a> : "—"}
                     </td>
@@ -766,12 +1180,32 @@ export default function KocPage() {
                 <h2 className="font-bold text-slate-800">Chọn sản phẩm để Booking</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Chọn sản phẩm → tích KOC → tạo booking</p>
               </div>
-              <button onClick={() => setModalPickSP(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+              <button onClick={() => { setModalPickSP(false); setPickSPSearch(""); }} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+            </div>
+            {/* Search */}
+            <div className="px-4 py-3 border-b border-slate-100">
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Tìm theo tên hoặc SKU..."
+                  value={pickSPSearch}
+                  onChange={e => setPickSPSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200"
+                />
+              </div>
             </div>
             <div className="overflow-y-auto flex-1 p-3 space-y-2">
-              {sanPhams.length === 0 ? (
-                <p className="text-center text-slate-400 py-8">Chưa có sản phẩm trong kho</p>
-              ) : sanPhams.map(sp => {
+              {(() => {
+                const filtered = sanPhams.filter(sp =>
+                  sp.ten.toLowerCase().includes(pickSPSearch.toLowerCase()) ||
+                  sp.sku.toLowerCase().includes(pickSPSearch.toLowerCase())
+                );
+                if (filtered.length === 0) return (
+                  <p className="text-center text-slate-400 py-8">Không tìm thấy sản phẩm</p>
+                );
+                return filtered.map(sp => {
                 const soBooking = bookings.filter(b => b.sanPhamId === sp.id).length;
                 return (
                   <button
@@ -800,7 +1234,8 @@ export default function KocPage() {
                     <span className="text-rose-400 text-sm flex-shrink-0">→</span>
                   </button>
                 );
-              })}
+              });
+              })()}
             </div>
           </div>
         </div>
@@ -933,6 +1368,86 @@ export default function KocPage() {
         </div>
       )}
 
+      {/* Modal Google Sheet */}
+      {modalSheet && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
+                  <FileSpreadsheet size={18} className="text-green-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-800">Import từ Google Sheets</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Dán link sheet chứa kết quả KOC</p>
+                </div>
+              </div>
+              <button onClick={() => setModalSheet(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Hướng dẫn */}
+              <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-1.5">
+                <p className="font-semibold text-slate-600">Cấu trúc sheet cần có các cột:</p>
+                <div className="grid grid-cols-2 gap-1">
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span> Tên kênh / KOC</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400 inline-block"></span> Lượt xem</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block"></span> Đơn hàng</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block"></span> Doanh thu</span>
+                </div>
+                <p className="text-slate-400 pt-1">Sheet phải được chia sẻ: <b className="text-slate-600">Anyone with the link → Viewer</b></p>
+              </div>
+
+              {/* URL Input */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Link Google Sheets</label>
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    type="url"
+                    value={sheetUrl}
+                    onChange={e => { setSheetUrl(e.target.value); setSheetError(""); }}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData("text");
+                      if (pasted.includes("docs.google.com/spreadsheets")) {
+                        e.preventDefault();
+                        setSheetUrl(pasted.trim());
+                        setSheetError("");
+                      }
+                    }}
+                    onKeyDown={e => e.key === "Enter" && handleSheetImport()}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                  />
+                </div>
+                {sheetError && (
+                  <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{sheetError}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 p-5 pt-0">
+              <button
+                onClick={() => setModalSheet(false)}
+                className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={handleSheetImport}
+                disabled={sheetLoading || !sheetUrl.trim()}
+                className="flex-1 px-4 py-2.5 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition flex items-center justify-center gap-2 font-semibold"
+              >
+                {sheetLoading
+                  ? <><Loader2 size={15} className="animate-spin" /> Đang tải...</>
+                  : <><FileSpreadsheet size={15} /> Tải & xem trước</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Import Excel */}
       {modalImport && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -941,7 +1456,10 @@ export default function KocPage() {
               <div>
                 <h2 className="font-bold text-slate-800">Preview kết quả Import</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {importPreview.filter(r => r.matched).length}/{importPreview.length} dòng khớp với KOC trong hệ thống
+                  {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).length}/{importPreview.length} dòng sẽ được cập nhật
+                  {Object.keys(manualMatches).length > 0 && (
+                    <span className="ml-1 text-blue-600 font-medium">({Object.keys(manualMatches).length} ghép thủ công)</span>
+                  )}
                 </p>
               </div>
               {importDone && (
@@ -955,9 +1473,22 @@ export default function KocPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                   <tr>
+                    <th className="px-3 py-2.5 w-8">
+                      <input type="checkbox"
+                        checked={importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).length > 0 &&
+                          importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).every(r => addNewSelected.has(r.rowIndex))}
+                        onChange={e => {
+                          const unmatched = importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).map(r => r.rowIndex);
+                          setAddNewSelected(e.target.checked ? new Set(unmatched) : new Set());
+                        }}
+                        className="rounded" title="Chọn tất cả chưa khớp"
+                      />
+                    </th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">Tên kênh (file)</th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">KOC trong hệ thống</th>
                     <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">Sản phẩm</th>
+                    <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">SĐT (cột I)</th>
+                    <th className="text-left px-4 py-2.5 text-slate-600 font-medium text-xs">ĐCHI (cột J)</th>
                     <th className="text-right px-4 py-2.5 text-slate-600 font-medium text-xs">Lượt xem</th>
                     <th className="text-right px-4 py-2.5 text-slate-600 font-medium text-xs">Đơn hàng</th>
                     <th className="text-right px-4 py-2.5 text-slate-600 font-medium text-xs">Doanh thu</th>
@@ -966,21 +1497,85 @@ export default function KocPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {importPreview.map((row) => (
-                    <tr key={row.rowIndex} className={row.matched ? "bg-white" : "bg-amber-50"}>
-                      <td className="px-4 py-2.5 text-slate-700 text-xs">{row.kocName}</td>
-                      <td className="px-4 py-2.5 text-xs">
-                        {row.matched
-                          ? <span className="text-green-700 font-medium">{row.kocTen}</span>
-                          : <span className="text-amber-600 flex items-center gap-1"><XCircle size={12} /> Không tìm thấy</span>}
+                    <tr key={row.rowIndex} className={row.matched ? "bg-white" : manualMatches[row.rowIndex] ? "bg-blue-50" : addNewSelected.has(row.rowIndex) ? "bg-emerald-50" : "bg-amber-50"}>
+                      <td className="px-3 py-2.5 text-center">
+                        {!row.matched && !manualMatches[row.rowIndex] ? (
+                          <input type="checkbox"
+                            checked={addNewSelected.has(row.rowIndex)}
+                            onChange={e => {
+                              setAddNewSelected(prev => {
+                                const n = new Set(prev);
+                                e.target.checked ? n.add(row.rowIndex) : n.delete(row.rowIndex);
+                                return n;
+                              });
+                            }}
+                            className="rounded"
+                          />
+                        ) : null}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500">{row.bookingSP ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-slate-700 text-xs font-medium">{row.kocName}</td>
+                      <td className="px-4 py-2.5 text-xs">
+                        {row.matched ? (
+                          <span className="text-green-700 font-medium flex items-center gap-1">
+                            <CheckCircle size={12} className="text-green-500" /> {row.kocTen}
+                          </span>
+                        ) : manualMatches[row.rowIndex] ? (
+                          <div className="flex items-center gap-1">
+                            <CheckCircle size={12} className="text-blue-500 flex-shrink-0" />
+                            <select
+                              value={manualMatches[row.rowIndex]?.kocId ?? ""}
+                              onChange={e => {
+                                const kocId = e.target.value;
+                                if (!kocId) { setManualMatches(prev => { const n = {...prev}; delete n[row.rowIndex]; return n; }); return; }
+                                const koc = kocs.find(k => k.id === kocId);
+                                const latestBooking = bookings.find(b => b.kocId === kocId);
+                                setManualMatches(prev => ({ ...prev, [row.rowIndex]: { kocId, kocTen: koc?.ten ?? "", bookingId: latestBooking?.id ?? "", bookingSP: latestBooking?.sanPham?.ten ?? null } }));
+                              }}
+                              className="text-xs border border-blue-200 rounded px-1 py-0.5 bg-blue-50 text-blue-700 focus:outline-none max-w-[130px]"
+                            >
+                              <option value="">-- Xoá --</option>
+                              {kocs.map(k => <option key={k.id} value={k.id}>{k.ten}</option>)}
+                            </select>
+                          </div>
+                        ) : (
+                          <select
+                            defaultValue=""
+                            onChange={e => {
+                              const kocId = e.target.value;
+                              if (!kocId) return;
+                              const koc = kocs.find(k => k.id === kocId);
+                              const latestBooking = bookings.find(b => b.kocId === kocId);
+                              setManualMatches(prev => ({ ...prev, [row.rowIndex]: { kocId, kocTen: koc?.ten ?? "", bookingId: latestBooking?.id ?? "", bookingSP: latestBooking?.sanPham?.ten ?? null } }));
+                            }}
+                            className="text-xs border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 focus:outline-none focus:border-rose-300 max-w-[150px] bg-amber-50"
+                          >
+                            <option value="">-- Chọn KOC --</option>
+                            {kocs.map(k => <option key={k.id} value={k.id}>{k.ten}</option>)}
+                          </select>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">
+                        {row.matched ? (row.bookingSP ?? "—") : (manualMatches[row.rowIndex]?.bookingSP ?? "—")}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs">
+                        {row.sdt
+                          ? <span className="text-slate-700 font-mono">{row.sdt}</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs max-w-[160px]">
+                        {row.diaChi
+                          ? <span className="text-slate-600 truncate block" title={row.diaChi}>{row.diaChi}</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-4 py-2.5 text-right text-xs text-slate-700">{row.luotXem.toLocaleString()}</td>
                       <td className="px-4 py-2.5 text-right text-xs text-slate-700">{row.donHang.toLocaleString()}</td>
                       <td className="px-4 py-2.5 text-right text-xs font-medium text-green-700">{formatCurrency(row.doanhThu)}</td>
                       <td className="px-4 py-2.5 text-center">
                         {row.matched
                           ? <CheckCircle size={14} className="text-green-500 mx-auto" />
-                          : <XCircle size={14} className="text-amber-400 mx-auto" />}
+                          : manualMatches[row.rowIndex]
+                            ? <CheckCircle size={14} className="text-blue-500 mx-auto" />
+                            : <XCircle size={14} className="text-amber-400 mx-auto" />}
                       </td>
                     </tr>
                   ))}
@@ -991,25 +1586,172 @@ export default function KocPage() {
             {/* Không khớp warning */}
             {importPreview.some(r => !r.matched) && (
               <div className="px-5 py-2.5 bg-amber-50 border-t border-amber-100 text-xs text-amber-700">
-                ⚠️ {importPreview.filter(r => !r.matched).length} dòng không tìm thấy KOC tương ứng — sẽ bỏ qua khi import.
-                Kiểm tra tên kênh trong file có khớp với tên KOC trong hệ thống không.
+                ⚠️ {importPreview.filter(r => !r.matched && !manualMatches[r.rowIndex]).length} dòng chưa khớp KOC
+                {Object.keys(manualMatches).length > 0 && (
+                  <span className="text-blue-600 ml-1 font-medium">· {Object.keys(manualMatches).length} đã ghép thủ công</span>
+                )}
+                <span className="text-slate-500 ml-1">— Chọn KOC từ dropdown để ghép thủ công.</span>
               </div>
             )}
 
-            <div className="flex gap-2 p-5 border-t border-slate-200">
-              <button onClick={() => { setModalImport(false); setImportPreview([]); setImportDone(false); }}
-                className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
+            <div className="flex gap-2 p-5 border-t border-slate-200 flex-wrap">
+              <button onClick={() => { setModalImport(false); setImportPreview([]); setImportDone(false); setAddNewSelected(new Set()); }}
+                className="px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
                 {importDone ? "Đóng" : "Huỷ"}
               </button>
+              {/* Nút thêm mới KOC từ danh sách đã chọn */}
+              {!importDone && addNewSelected.size > 0 && (
+                <button
+                  onClick={handleAddNewKOCs}
+                  disabled={addingNew}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {addingNew
+                    ? <><Loader2 size={14} className="animate-spin" /> Đang thêm...</>
+                    : <><Plus size={14} /> Thêm {addNewSelected.size} KOC mới</>}
+                </button>
+              )}
               {!importDone && (
                 <button
                   onClick={handleImportConfirm}
-                  disabled={importLoading || !importPreview.some(r => r.matched)}
+                  disabled={importLoading || (!importPreview.some(r => r.matched) && Object.keys(manualMatches).length === 0)}
                   className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {importLoading
                     ? "Đang cập nhật..."
-                    : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length} booking</>}
+                    : <><Upload size={14} /> Cập nhật {importPreview.filter(r => r.matched).length + Object.keys(manualMatches).filter(k => manualMatches[+k]?.bookingId).length} booking</>}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cập nhật SĐT/ĐCHI từ Sheet */}
+      {modalContacts && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
+                  <FileSpreadsheet size={18} className="text-green-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-800">Cập nhật SĐT & Địa chỉ KOC từ Google Sheets</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Cột I = SĐT · Cột J = Địa chỉ · Tên kênh tự ghép với KOC trong hệ thống</p>
+                </div>
+              </div>
+              <button onClick={() => setModalContacts(false)} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+            </div>
+
+            {/* URL input */}
+            <div className="p-5 border-b border-slate-100">
+              <div className="flex gap-2">
+                <input
+                  autoFocus
+                  type="url"
+                  value={contactSheetUrl}
+                  onChange={e => { setContactSheetUrl(e.target.value); setContactError(""); }}
+                  onPaste={e => {
+                    const p = e.clipboardData.getData("text");
+                    if (p.includes("docs.google.com/spreadsheets")) {
+                      e.preventDefault(); setContactSheetUrl(p.trim()); setContactError("");
+                      setTimeout(handleContactPreview, 100);
+                    }
+                  }}
+                  onKeyDown={e => e.key === "Enter" && handleContactPreview()}
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                />
+                <button
+                  onClick={handleContactPreview}
+                  disabled={contactLoading || !contactSheetUrl.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition whitespace-nowrap"
+                >
+                  {contactLoading ? <><Loader2 size={14} className="animate-spin" /> Đang tải...</> : "Xem trước"}
+                </button>
+              </div>
+              {contactError && <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{contactError}</p>}
+            </div>
+
+            {/* Preview table */}
+            {contactPreview.length > 0 && (
+              <>
+                <div className="px-5 py-2 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    <span className="font-semibold text-green-600">{contactPreview.filter(r => r.matched).length}</span> / {contactPreview.length} KOC khớp
+                    {contactPreview.filter(r => !r.matched).length > 0 && (
+                      <span className="ml-2 text-amber-600">{contactPreview.filter(r => !r.matched).length} không tìm thấy (sẽ bỏ qua)</span>
+                    )}
+                  </span>
+                  {contactDone && <span className="text-green-600 font-semibold flex items-center gap-1"><CheckCircle size={13} /> Đã cập nhật!</span>}
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">Tên kênh (sheet)</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">KOC trong hệ thống</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">SĐT hiện tại</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-green-600 font-semibold">SĐT mới (cột I)</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-slate-500 font-medium">ĐCHI hiện tại</th>
+                        <th className="text-left px-4 py-2.5 text-xs text-green-600 font-semibold">ĐCHI mới (cột J)</th>
+                        <th className="px-4 py-2.5 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {contactPreview.map(row => (
+                        <tr key={row.rowIndex} className={row.matched ? "bg-white hover:bg-slate-50" : "bg-amber-50"}>
+                          <td className="px-4 py-2.5 text-xs font-medium text-slate-700">{row.kocName}</td>
+                          <td className="px-4 py-2.5 text-xs">
+                            {row.matched
+                              ? <span className="text-green-700 font-medium flex items-center gap-1"><CheckCircle size={11} className="text-green-500" />{row.kocTen}</span>
+                              : <span className="text-amber-600 flex items-center gap-1"><XCircle size={11} />Không tìm thấy</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400 font-mono">{row.oldSdt || "—"}</td>
+                          <td className="px-4 py-2.5 text-xs">
+                            {row.newSdt
+                              ? <span className={`font-mono font-semibold ${row.matched ? "text-green-700" : "text-slate-400"}`}>{row.newSdt}</span>
+                              : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400 max-w-[150px]"><span className="truncate block">{row.oldDiaChi || "—"}</span></td>
+                          <td className="px-4 py-2.5 text-xs max-w-[180px]">
+                            {row.newDiaChi
+                              ? <span className={`truncate block ${row.matched ? "text-green-700 font-medium" : "text-slate-400"}`} title={row.newDiaChi}>{row.newDiaChi}</span>
+                              : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {row.matched ? <CheckCircle size={13} className="text-green-500 mx-auto" /> : <XCircle size={13} className="text-amber-400 mx-auto" />}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {contactPreview.length === 0 && !contactLoading && contactSheetUrl && !contactError && (
+              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                Không có dữ liệu SĐT/ĐCHI trong sheet
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex gap-2 p-5 border-t border-slate-100">
+              <button onClick={() => setModalContacts(false)} className="px-4 py-2 text-sm border border-slate-200 rounded-xl hover:bg-slate-50">
+                {contactDone ? "Đóng" : "Huỷ"}
+              </button>
+              {!contactDone && contactPreview.some(r => r.matched) && (
+                <button
+                  onClick={handleContactConfirm}
+                  disabled={contactConfirming}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 transition font-semibold"
+                >
+                  {contactConfirming
+                    ? <><Loader2 size={14} className="animate-spin" />Đang cập nhật...</>
+                    : <><CheckCircle size={14} />Cập nhật {contactPreview.filter(r => r.matched).length} KOC</>}
                 </button>
               )}
             </div>
@@ -1023,6 +1765,41 @@ export default function KocPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-slate-200"><h2 className="font-bold text-slate-800">Thêm KOC mới</h2></div>
             <form onSubmit={handleAddKOC} className="p-5 space-y-3">
+
+              {/* Dán link tự động lấy thông tin */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                  <Link2 size={13} /> Dán link profile để tự lấy thông tin
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={linkInput}
+                    onChange={e => setLinkInput(e.target.value)}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData("text");
+                      if (pasted.includes("tiktok.com") || pasted.includes("shopee.vn") || pasted.includes("instagram.com") || pasted.includes("facebook.com")) {
+                        e.preventDefault();
+                        setLinkInput(pasted.trim());
+                        setTimeout(() => fetchProfileFromLink(pasted.trim(), "add"), 100);
+                      }
+                    }}
+                    placeholder="https://www.tiktok.com/@username"
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-300 bg-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={linkLoading || !linkInput.trim()}
+                    onClick={() => fetchProfileFromLink(linkInput, "add")}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 transition whitespace-nowrap"
+                  >
+                    {linkLoading ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                    {linkLoading ? "Đang lấy..." : "Lấy info"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">Hỗ trợ: TikTok, Shopee, Instagram, Facebook — dán link tự nhận diện</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Tên KOC *</label>
@@ -1047,11 +1824,15 @@ export default function KocPage() {
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">SĐT</label>
-                  <input value={formKOC.sdt} onChange={(e) => setFormKOC({ ...formKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  <input value={formKOC.sdt} onChange={(e) => setFormKOC({ ...formKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="0901..." />
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Link profile</label>
                   <input value={formKOC.linkProfile} onChange={(e) => setFormKOC({ ...formKOC, linkProfile: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1 block">Địa chỉ (ĐCHI)</label>
+                  <input value={formKOC.diaChi} onChange={(e) => setFormKOC({ ...formKOC, diaChi: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành..." />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
@@ -1059,7 +1840,7 @@ export default function KocPage() {
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setModalKOC(false)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="button" onClick={() => { setModalKOC(false); setLinkInput(""); }} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">{loading ? "Đang lưu..." : "Thêm KOC"}</button>
               </div>
             </form>
@@ -1152,6 +1933,40 @@ export default function KocPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-5 border-b border-slate-200"><h2 className="font-bold text-slate-800">Sửa thông tin KOC</h2></div>
             <form onSubmit={handleEditKOC} className="p-5 space-y-3">
+
+              {/* Dán link để refresh thông tin */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                  <Link2 size={13} /> Cập nhật qua link profile
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={linkEditInput}
+                    onChange={e => setLinkEditInput(e.target.value)}
+                    onPaste={e => {
+                      const pasted = e.clipboardData.getData("text");
+                      if (pasted.includes("tiktok.com") || pasted.includes("shopee.vn") || pasted.includes("instagram.com") || pasted.includes("facebook.com")) {
+                        e.preventDefault();
+                        setLinkEditInput(pasted.trim());
+                        setTimeout(() => fetchProfileFromLink(pasted.trim(), "edit"), 100);
+                      }
+                    }}
+                    placeholder="https://www.tiktok.com/@username"
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-300 bg-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={linkEditLoading || !linkEditInput.trim()}
+                    onClick={() => fetchProfileFromLink(linkEditInput, "edit")}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 transition whitespace-nowrap"
+                  >
+                    {linkEditLoading ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                    {linkEditLoading ? "Đang lấy..." : "Lấy info"}
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Tên KOC *</label>
@@ -1176,11 +1991,15 @@ export default function KocPage() {
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">SĐT</label>
-                  <input value={formEditKOC.sdt} onChange={(e) => setFormEditKOC({ ...formEditKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  <input value={formEditKOC.sdt} onChange={(e) => setFormEditKOC({ ...formEditKOC, sdt: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="0901..." />
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Link profile</label>
                   <input value={formEditKOC.linkProfile} onChange={(e) => setFormEditKOC({ ...formEditKOC, linkProfile: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1 block">Địa chỉ (ĐCHI)</label>
+                  <input value={formEditKOC.diaChi} onChange={(e) => setFormEditKOC({ ...formEditKOC, diaChi: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành..." />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
@@ -1190,6 +2009,113 @@ export default function KocPage() {
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setModalEditKOC(null)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">{loading ? "Đang lưu..." : "Lưu"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sửa thông tin Booking */}
+      {modalEditBooking && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b border-slate-200">
+              <h2 className="font-bold text-slate-800">Sửa booking</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{modalEditBooking.koc.ten}{modalEditBooking.sanPham ? ` · ${modalEditBooking.sanPham.sku}` : ""}</p>
+            </div>
+            <form onSubmit={handleSaveEditBooking} className="p-5 space-y-3">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">KOC *</label>
+                <select required value={formEditBooking.kocId} onChange={e => setFormEditBooking({...formEditBooking, kocId: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200">
+                  {kocs.map(k => <option key={k.id} value={k.id}>{k.ten}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Sản phẩm</label>
+                  <select value={formEditBooking.sanPhamId} onChange={e => setFormEditBooking({...formEditBooking, sanPhamId: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200">
+                    <option value="">-- Không --</option>
+                    {sanPhams.map(s => <option key={s.id} value={s.id}>{s.sku}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Số lượng gửi</label>
+                  <input type="number" min="0" value={formEditBooking.soLuongGui}
+                    onChange={e => setFormEditBooking({...formEditBooking, soLuongGui: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Giá cast (VNĐ)</label>
+                <input type="number" min="0" value={formEditBooking.chiPhiCast}
+                  onChange={e => setFormEditBooking({...formEditBooking, chiPhiCast: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
+                  placeholder="0" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Ngày bắt đầu *</label>
+                  <input required type="date" value={formEditBooking.ngayBat}
+                    onChange={e => setFormEditBooking({...formEditBooking, ngayBat: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Ngày kết thúc</label>
+                  <input type="date" value={formEditBooking.ngayKet}
+                    onChange={e => setFormEditBooking({...formEditBooking, ngayKet: e.target.value})}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
+                <input value={formEditBooking.ghiChu} onChange={e => setFormEditBooking({...formEditBooking, ghiChu: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setModalEditBooking(null)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">
+                  {loading ? "Đang lưu..." : "Lưu"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sửa Chi phí */}
+      {modalEditChiPhi && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div className="p-5 border-b border-slate-200">
+              <h2 className="font-bold text-slate-800">Cập nhật chi phí</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{modalEditChiPhi.koc.ten}{modalEditChiPhi.sanPham ? ` · ${modalEditChiPhi.sanPham.sku}` : ""}</p>
+            </div>
+            <form onSubmit={handleSaveChiPhi} className="p-5 space-y-3">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Chi phí Cast (VNĐ)</label>
+                <input type="number" min="0" value={formEditChiPhi.chiPhiCast}
+                  onChange={e => setFormEditChiPhi({...formEditChiPhi, chiPhiCast: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Chi phí Sản phẩm (VNĐ)</label>
+                <input type="number" min="0" value={formEditChiPhi.chiPhiSP}
+                  onChange={e => setFormEditChiPhi({...formEditChiPhi, chiPhiSP: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 text-xs flex justify-between">
+                <span className="text-slate-500">Tổng chi phí</span>
+                <span className="font-bold text-rose-600">
+                  {((Number(formEditChiPhi.chiPhiCast)||0) + (Number(formEditChiPhi.chiPhiSP)||0)).toLocaleString("vi-VN")}đ
+                </span>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setModalEditChiPhi(null)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">
+                  {loading ? "Đang lưu..." : "Lưu chi phí"}
+                </button>
               </div>
             </form>
           </div>

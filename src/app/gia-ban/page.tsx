@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
   { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
@@ -57,6 +57,8 @@ function makeFees(coDinhPct: number): FeeItem[] {
 }
 
 type Product = { sku: string; giaNhap: number; giaThanh: number };
+type KhoProduct = { id: string; ten: string; sku: string; giaNhap: number };
+type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSalePct: string; ngaySalePct: string; livePct: string };
 
 function fmtVnd(n: number) { return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }); }
 
@@ -67,6 +69,96 @@ export default function GiaBanPage() {
   const [giaBan, setGiaBan] = useState("");
   const [showFees, setShowFees] = useState(false);
   const [fees, setFees] = useState<FeeItem[]>(() => makeFees(CATEGORIES[0].thuong));
+
+  const [markupPct, setMarkupPct] = useState("40");
+
+  // Bảng giá kho
+  const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
+  const [loadingKho, setLoadingKho] = useState(false);
+  const [searchBang, setSearchBang] = useState("");
+
+  const fetchKho = useCallback(async () => {
+    setLoadingKho(true);
+    try {
+      const res = await fetch("/api/kho/san-pham");
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+      setPriceRows(prev => {
+        const map = Object.fromEntries(prev.map(r => [r.id, r]));
+        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSalePct: "", ngaySalePct: "", livePct: "" });
+      });
+    } catch { /* ignore */ } finally { setLoadingKho(false); }
+  }, []);
+
+  useEffect(() => { fetchKho(); }, [fetchKho]);
+
+  // Tự động cập nhật khi quay lại tab
+  useEffect(() => {
+    const onFocus = () => fetchKho();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchKho]);
+
+  const calcShopeePrice = (giaNhap: number) => {
+    const m = parseFloat(markupPct) || 0;
+    if (giaNhap <= 0 || m <= 0 || m >= 100) return 0;
+    return Math.round(giaNhap / (m / 100));
+  };
+
+  const calcLoiNhuan = (giaNhap: number) => {
+    const gB = calcShopeePrice(giaNhap);
+    if (gB <= 0) return null;
+    let tp = 0;
+    for (const f of fees) {
+      if (f.isFixed) { tp += f.amount; }
+      else { let v = (f.pct / 100) * gB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
+    }
+    return { loiNhuan: gB - giaNhap - tp, tongPhi: tp, gB };
+  };
+
+  // Bulk global % inputs
+  const [bulkFlash, setBulkFlash] = useState("");
+  const [bulkNgay, setBulkNgay] = useState("");
+  const [bulkLive, setBulkLive] = useState("");
+
+  const updatePriceRow = (id: string, field: keyof Pick<PriceRow, "flashSalePct" | "ngaySalePct" | "livePct">, val: string) => {
+    setPriceRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+  };
+
+  const moveRow = (id: string, dir: -1 | 1) => {
+    setPriceRows(prev => {
+      const idx = prev.findIndex(r => r.id === id);
+      if (idx < 0) return prev;
+      const next = idx + dir;
+      if (next < 0 || next >= prev.length) return prev;
+      const arr = [...prev];
+      [arr[idx], arr[next]] = [arr[next], arr[idx]];
+      return arr;
+    });
+  };
+
+  const sortByPrice = () => {
+    setPriceRows(prev => [
+      ...prev.filter(r => r.giaNhap > 0),
+      ...prev.filter(r => r.giaNhap <= 0),
+    ]);
+  };
+
+  const applyBulk = () => {
+    setPriceRows(prev => prev.map(r => ({
+      ...r,
+      ...(bulkFlash !== "" ? { flashSalePct: bulkFlash } : {}),
+      ...(bulkNgay  !== "" ? { ngaySalePct:  bulkNgay  } : {}),
+      ...(bulkLive  !== "" ? { livePct:       bulkLive  } : {}),
+    })));
+  };
+
+  const filteredRows = useMemo(() =>
+    priceRows.filter(r =>
+      !searchBang ||
+      r.ten.toLowerCase().includes(searchBang.toLowerCase()) ||
+      r.sku.toLowerCase().includes(searchBang.toLowerCase())
+    ), [priceRows, searchBang]);
 
   // Google Sheets
   const [sheetUrl, setSheetUrl] = useState("");
@@ -95,29 +187,33 @@ export default function GiaBanPage() {
     setFees(makeFees(pct));
   }
 
-  const [markupPct, setMarkupPct] = useState("200");
   const suggestedPrice = useMemo(() => {
     const n = parseFloat(giaNhap) || 0;
     const m = parseFloat(markupPct) || 0;
-    if (n <= 0 || m <= 0) return 0;
-    return Math.round(n * (m / 100));
+    if (n <= 0 || m <= 0 || m >= 100) return 0;
+    return Math.round(n / (m / 100));
   }, [giaNhap, markupPct]);
 
   // Tính toán
   const gN = parseFloat(giaNhap) || 0;
   const gB = parseFloat(giaBan) || 0;
-  const ready = gB > 0;
+  const ratio = parseFloat(markupPct) || 0;
+  // Giá bán hiệu lực: nhập tay > đề xuất > dùng 100k làm tham chiếu %
+  const effectiveGB = gB > 0 ? gB : suggestedPrice > 0 ? suggestedPrice : (ratio > 0 && ratio < 100 ? Math.round(100000 / (ratio / 100)) : 0);
+  const isEstimate = gB === 0 && gN === 0; // đang dùng giá tham chiếu
+  const ready = effectiveGB > 0;
+  const effectiveGN = gN > 0 ? gN : (ratio > 0 && ratio < 100 ? effectiveGB * (ratio / 100) : 0);
 
   const { tongPhi, pctPhi, loiNhuan, pctLN } = useMemo(() => {
     if (!ready) return { tongPhi: 0, pctPhi: 0, loiNhuan: 0, pctLN: 0 };
     let tp = 0;
     for (const f of fees) {
       if (f.isFixed) { tp += f.amount; }
-      else { let v = (f.pct / 100) * gB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
+      else { let v = (f.pct / 100) * effectiveGB; if (f.maxAmount > 0) v = Math.min(v, f.maxAmount); tp += v; }
     }
-    const ln = gB - gN - tp;
-    return { tongPhi: tp, pctPhi: (tp / gB) * 100, loiNhuan: ln, pctLN: (ln / gB) * 100 };
-  }, [fees, gN, gB, ready]);
+    const ln = effectiveGB - effectiveGN - tp;
+    return { tongPhi: tp, pctPhi: (tp / effectiveGB) * 100, loiNhuan: ln, pctLN: (ln / effectiveGB) * 100 };
+  }, [fees, effectiveGN, effectiveGB, ready]);
 
   // Import Google Sheets
   async function handleImport() {
@@ -143,7 +239,7 @@ export default function GiaBanPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-5" style={{ fontSize: "120%" }}>
+    <div className="p-6 max-w-6xl mx-auto space-y-5" style={{ fontSize: "120%" }}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -200,7 +296,7 @@ export default function GiaBanPage() {
 
             {/* Giá bán đề xuất */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Đề xuất (Giá nhập ×)</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Tỉ lệ cost (Giá nhập / Giá bán)</label>
               <div className="flex items-center gap-1.5">
                 <input type="number" step="10" value={markupPct}
                   onChange={e => setMarkupPct(e.target.value)}
@@ -219,9 +315,11 @@ export default function GiaBanPage() {
         </div>
 
         {/* Kết quả */}
-        <div className={`grid grid-cols-4 divide-x divide-slate-100 ${ready ? "" : "opacity-40"}`}>
+        <div className="grid grid-cols-4 divide-x divide-slate-100">
           <div className="px-5 py-3 text-center">
-            <div className="text-xs text-slate-500 mb-1">TỔNG PHÍ</div>
+            <div className="text-xs text-slate-500 mb-1 flex items-center justify-center gap-1">
+              TỔNG PHÍ {isEstimate && <span className="text-[10px] bg-amber-100 text-amber-600 px-1 rounded">~ước tính</span>}
+            </div>
             <div className="text-lg font-bold text-red-500">{ready ? fmtVnd(tongPhi) + "đ" : "—"}</div>
             <div className="text-xs text-slate-400">{ready ? pctPhi.toFixed(2) + "% giá bán" : ""}</div>
           </div>
@@ -264,7 +362,7 @@ export default function GiaBanPage() {
             </div>
             <div className="grid grid-cols-2 gap-x-6">
               {fees.map(f => {
-                const amt = f.isFixed ? f.amount : (() => { let v = (f.pct / 100) * gB; return f.maxAmount > 0 ? Math.min(v, f.maxAmount) : v; })();
+                const amt = f.isFixed ? f.amount : (() => { let v = (f.pct / 100) * effectiveGB; return f.maxAmount > 0 ? Math.min(v, f.maxAmount) : v; })();
                 return (
                   <div key={f.key} className="grid grid-cols-[1fr_80px_40px_90px] items-center py-1 border-b border-slate-100 text-xs">
                     <span className={f.key === "co_dinh" || f.key === "quang_cao" ? "font-bold text-slate-700" : "text-slate-600"}>{f.label}</span>
@@ -335,6 +433,185 @@ export default function GiaBanPage() {
 
         {products.length === 0 && !sheetError && (
           <p className="text-xs text-slate-400">Dán link Google Sheets rồi nhấn "Tải dữ liệu" để lấy danh sách sản phẩm.</p>
+        )}
+      </div>
+
+      {/* ── BẢNG GIÁ SẢN PHẨM ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <List size={18} className="text-rose-500 shrink-0" />
+            <h2 className="font-semibold text-slate-700">Bảng giá sản phẩm</h2>
+            <span className="text-xs text-slate-400 ml-1">· Giá Shopee/TikTok = Giá nhập ÷ {markupPct}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text" placeholder="Tìm tên / SKU..."
+              value={searchBang} onChange={e => setSearchBang(e.target.value)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:ring-2 focus:ring-rose-200"
+            />
+            <button onClick={sortByPrice}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition font-medium">
+              <ArrowUpDown size={13} />
+              Giá đủ lên trước
+            </button>
+            <button onClick={fetchKho} disabled={loadingKho}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50">
+              <RefreshCw size={13} className={loadingKho ? "animate-spin" : ""} />
+              Làm mới
+            </button>
+          </div>
+        </div>
+
+        {/* ── BULK ROW ── */}
+        <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-semibold text-amber-700 shrink-0">Áp dụng cho tất cả SKU:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-orange-500 font-medium w-20">Flash Sale</span>
+            <input type="number" placeholder="%" min={0} max={99} value={bulkFlash}
+              onChange={e => setBulkFlash(e.target.value)}
+              className="w-16 text-center text-sm border border-orange-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-300 text-orange-600 font-bold placeholder:text-slate-300 bg-white" />
+            <span className="text-xs text-slate-400">%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-blue-500 font-medium w-20">Ngày Sale</span>
+            <input type="number" placeholder="%" min={0} max={99} value={bulkNgay}
+              onChange={e => setBulkNgay(e.target.value)}
+              className="w-16 text-center text-sm border border-blue-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 text-blue-600 font-bold placeholder:text-slate-300 bg-white" />
+            <span className="text-xs text-slate-400">%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-purple-500 font-medium w-14">Live</span>
+            <input type="number" placeholder="%" min={0} max={99} value={bulkLive}
+              onChange={e => setBulkLive(e.target.value)}
+              className="w-16 text-center text-sm border border-purple-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-300 text-purple-600 font-bold placeholder:text-slate-300 bg-white" />
+            <span className="text-xs text-slate-400">%</span>
+          </div>
+          <button onClick={applyBulk}
+            className="text-xs px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-semibold transition">
+            Cập nhật tất cả
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 w-8">#</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Tên sản phẩm</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500">Giá nhập</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">
+                  <div className="flex items-center gap-1">SKU <span className="text-[10px] font-normal text-slate-300">↕ thứ tự</span></div>
+                </th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-orange-500">Flash Sale</th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-500">Ngày Sale</th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-500">Live</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredRows.length === 0 && (
+                <tr><td colSpan={9} className="text-center py-8 text-slate-400 text-sm">
+                  {loadingKho ? "Đang tải..." : "Không có sản phẩm"}
+                </td></tr>
+              )}
+              {filteredRows.map((r, i) => {
+                const realIdx = priceRows.findIndex(x => x.id === r.id);
+                const shopee = calcShopeePrice(r.giaNhap);
+                const flashPrice = shopee > 0 && parseFloat(r.flashSalePct) > 0 ? Math.round(shopee * (1 - parseFloat(r.flashSalePct) / 100)) : 0;
+                const ngayPrice  = shopee > 0 && parseFloat(r.ngaySalePct)  > 0 ? Math.round(shopee * (1 - parseFloat(r.ngaySalePct)  / 100)) : 0;
+                const livePrice  = shopee > 0 && parseFloat(r.livePct)      > 0 ? Math.round(shopee * (1 - parseFloat(r.livePct)      / 100)) : 0;
+                return (
+                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-2.5 text-xs text-slate-400">{i + 1}</td>
+                    <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[180px] truncate" title={r.ten}>{r.ten}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600 text-xs">{fmtVnd(r.giaNhap)}đ</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex flex-col gap-0.5">
+                          <button onClick={() => moveRow(r.id, -1)} disabled={realIdx === 0}
+                            className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-slate-600 transition">
+                            <ArrowUp size={11} />
+                          </button>
+                          <button onClick={() => moveRow(r.id, 1)} disabled={realIdx === priceRows.length - 1}
+                            className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-slate-600 transition">
+                            <ArrowDown size={11} />
+                          </button>
+                        </div>
+                        <span className="font-mono text-xs text-slate-400">{r.sku}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                        {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {(() => {
+                        const calc = calcLoiNhuan(r.giaNhap);
+                        if (!calc) return <span className="text-slate-300">—</span>;
+                        const pct = ((calc.loiNhuan / calc.gB) * 100).toFixed(1);
+                        return (
+                          <div>
+                            <span className={`font-bold text-sm ${calc.loiNhuan >= 0 ? "text-green-600" : "text-red-500"}`}>
+                              {fmtVnd(calc.loiNhuan)}đ
+                            </span>
+                            <div className={`text-xs ${calc.loiNhuan >= 0 ? "text-green-400" : "text-red-400"}`}>{pct}%</div>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    {/* Flash Sale */}
+                    <td className="px-2 py-2 text-center">
+                      <div className="flex items-center justify-center gap-0.5 mb-1">
+                        <input type="number" placeholder="%" min={0} max={99}
+                          value={r.flashSalePct}
+                          onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
+                          className="w-12 text-center text-xs border border-orange-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-300 text-orange-500 placeholder:text-slate-300 bg-orange-50" />
+                        <span className="text-[10px] text-slate-400">%</span>
+                      </div>
+                      <div className={`text-sm font-bold ${flashPrice > 0 ? "text-orange-500" : "text-slate-200"}`}>
+                        {flashPrice > 0 ? fmtVnd(flashPrice) + "đ" : "—"}
+                      </div>
+                    </td>
+                    {/* Ngày Sale */}
+                    <td className="px-2 py-2 text-center">
+                      <div className="flex items-center justify-center gap-0.5 mb-1">
+                        <input type="number" placeholder="%" min={0} max={99}
+                          value={r.ngaySalePct}
+                          onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
+                          className="w-12 text-center text-xs border border-blue-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-300 text-blue-500 placeholder:text-slate-300 bg-blue-50" />
+                        <span className="text-[10px] text-slate-400">%</span>
+                      </div>
+                      <div className={`text-sm font-bold ${ngayPrice > 0 ? "text-blue-500" : "text-slate-200"}`}>
+                        {ngayPrice > 0 ? fmtVnd(ngayPrice) + "đ" : "—"}
+                      </div>
+                    </td>
+                    {/* Live */}
+                    <td className="px-2 py-2 text-center">
+                      <div className="flex items-center justify-center gap-0.5 mb-1">
+                        <input type="number" placeholder="%" min={0} max={99}
+                          value={r.livePct}
+                          onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
+                          className="w-12 text-center text-xs border border-purple-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-purple-300 text-purple-500 placeholder:text-slate-300 bg-purple-50" />
+                        <span className="text-[10px] text-slate-400">%</span>
+                      </div>
+                      <div className={`text-sm font-bold ${livePrice > 0 ? "text-purple-500" : "text-slate-200"}`}>
+                        {livePrice > 0 ? fmtVnd(livePrice) + "đ" : "—"}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredRows.length > 0 && (
+          <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
+            {filteredRows.length} sản phẩm · Giá Shopee/TikTok = Giá nhập ÷ {markupPct}% · Flash Sale / Ngày Sale / Live = % giảm so với giá Shopee
+          </div>
         )}
       </div>
     </div>

@@ -17,9 +17,9 @@ type DoiTra = {
   ghiChu: string | null;
   phiShip: number;
   soChieuShip: number;
-  nguon: string | null;
   maVanDon: string | null;
   nguoiXuLy: string | null;
+  nguon: string | null;
   createdAt: string;
 };
 
@@ -38,6 +38,7 @@ type Feedback = {
   noiDung: string;
   danhGia: number | null;
   nguoiGhiNhan: string | null;
+  daXem: boolean;
   createdAt: string;
 };
 
@@ -50,11 +51,26 @@ type BuTien = {
   trangThai: string;
   ghiChu: string | null;
   nguoiXuLy: string | null;
+  nguon: string | null;
   createdAt: string;
 };
 
+type UngTien = {
+  id: string;
+  soTien: number;
+  thang: string; // YYYY-MM
+  ghiChu: string | null;
+  createdAt: string;
+};
+
+const NGUON_BU_OPTIONS = [
+  { value: "shopee",  label: "Shopee",  cls: "bg-orange-100 text-orange-700" },
+  { value: "tiktok",  label: "Tiktok",  cls: "bg-pink-100 text-pink-700" },
+  { value: "khac",    label: "Khác",    cls: "bg-slate-100 text-slate-600" },
+];
+
 const emptyBuTienForm = {
-  tenKhach: "", loiBu: "hang_loi", soTien: "", ghiChu: "",
+  tenKhach: "", sdtKhach: "", nguon: "shopee", loiBu: "hang_loi", soTien: "", ghiChu: "",
 };
 
 const emptyFeedbackForm = {
@@ -67,7 +83,7 @@ const emptyForm = {
   skuHienTai: "", skuDoiSang: "", giaTriHang: "",
   loaiVanDe: "doi_size", ghiChu: "",
   phiShip: "30000", phiShipThuCong: false,
-  soChieuShip: "2", nguon: "shopee", maVanDon: "", nguoiXuLy: "",
+  soChieuShip: "2", maVanDon: "", nguoiXuLy: "", nguon: "shopee",
 };
 
 const THANG_LABEL = ["", "T1","T2","T3","T4","T5","T6","T7","T8","T9","T10","T11","T12"];
@@ -99,10 +115,30 @@ export default function DoiTraPage() {
   const [fbDeleteTarget, setFbDeleteTarget] = useState<Feedback | null>(null);
   const [fbDeleteInput, setFbDeleteInput] = useState("");
   const [showFbForm, setShowFbForm] = useState(false);
+  const [fbShowAll, setFbShowAll] = useState(false);
 
   const fetchFeedbacks = async () => {
     const data = await fetch("/api/feedback").then((r) => r.json());
     setFeedbacks(Array.isArray(data) ? data : []);
+  };
+
+  const markDaXem = async (id: string) => {
+    setFeedbacks(prev => prev.map(f => f.id === id ? { ...f, daXem: true } : f));
+    await fetch(`/api/feedback/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ daXem: true }),
+    });
+  };
+
+  const markAllDaXem = async () => {
+    const chuaXemIds = feedbacks.filter(f => !f.daXem).map(f => f.id);
+    setFeedbacks(prev => prev.map(f => ({ ...f, daXem: true })));
+    await Promise.all(chuaXemIds.map(id =>
+      fetch(`/api/feedback/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daXem: true }),
+      })
+    ));
   };
 
   // ─── BuTien state ──────────────────────────────────────
@@ -114,9 +150,22 @@ export default function DoiTraPage() {
   const [btDeleteTarget, setBtDeleteTarget] = useState<BuTien | null>(null);
   const [btDeleteInput, setBtDeleteInput] = useState("");
 
+  // ─── UngTien state ─────────────────────────────────────
+  const [ungTiens, setUngTiens] = useState<UngTien[]>([]);
+  const [showUngModal, setShowUngModal] = useState(false);
+  const [ungEditRecord, setUngEditRecord] = useState<UngTien | null>(null);
+  const [ungForm, setUngForm] = useState({ soTien: "", thang: "", ghiChu: "" });
+  const [ungLoading, setUngLoading] = useState(false);
+  const [showUngHistory, setShowUngHistory] = useState(false);
+
   const fetchBuTiens = async () => {
     const data = await fetch("/api/bu-tien").then((r) => r.json());
     setBuTiens(Array.isArray(data) ? data : []);
+  };
+
+  const fetchUngTiens = async () => {
+    const data = await fetch("/api/ung-tien").then(r => r.json());
+    setUngTiens(Array.isArray(data) ? data : []);
   };
 
   const fetchData = async () => {
@@ -124,7 +173,7 @@ export default function DoiTraPage() {
     setRecords(Array.isArray(data) ? data : []);
   };
 
-  useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); }, []);
+  useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); fetchUngTiens(); }, []);
 
   // ─── Helpers ───────────────────────────────────────────
   const daDuocXuLy = (r: DoiTra) => !!r.maVanDon;
@@ -197,9 +246,9 @@ export default function DoiTraPage() {
           ghiChu: form.ghiChu,
           phiShip: Number(form.phiShip),
           soChieuShip: Number(form.soChieuShip),
-          nguon: form.nguon,
           maVanDon: form.maVanDon,
           nguoiXuLy: form.nguoiXuLy,
+          nguon: form.nguon,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -261,9 +310,31 @@ export default function DoiTraPage() {
     fetchBuTiens();
   };
 
+  // ─── UngTien handlers ──────────────────────────────────
+  const handleUngSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUngLoading(true);
+    try {
+      const url = ungEditRecord ? `/api/ung-tien/${ungEditRecord.id}` : "/api/ung-tien";
+      const method = ungEditRecord ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...ungForm, soTien: Number(ungForm.soTien) }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setShowUngModal(false);
+      setUngEditRecord(null);
+      setUngForm({ soTien: "", thang: "", ghiChu: "" });
+      fetchUngTiens();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Lỗi");
+    } finally { setUngLoading(false); }
+  };
+
   const openBtEdit = (r: BuTien) => {
     setBtForm({
-      tenKhach: r.tenKhach, loiBu: r.loiBu,
+      tenKhach: r.tenKhach, sdtKhach: r.sdtKhach || "", nguon: r.nguon || "shopee", loiBu: r.loiBu,
       soTien: String(r.soTien), ghiChu: r.ghiChu || "",
     });
     setBtEditRecord(r);
@@ -310,9 +381,9 @@ export default function DoiTraPage() {
       phiShip: String(r.phiShip),
       phiShipThuCong: false,
       soChieuShip: String(r.soChieuShip),
-      nguon: r.nguon || "shopee",
       maVanDon: r.maVanDon || "",
       nguoiXuLy: r.nguoiXuLy || "",
+      nguon: r.nguon || "shopee",
     });
     setEditRecord(r);
   };
@@ -373,7 +444,30 @@ export default function DoiTraPage() {
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [buTiens]);
 
+  // ─── UngTien computed ──────────────────────────────────
+  const tongUngAllTime = useMemo(() => ungTiens.reduce((s, u) => s + u.soTien, 0), [ungTiens]);
+  const tongBuAllTime = useMemo(() => buTiens.reduce((s, b) => s + b.soTien, 0), [buTiens]);
+  const duLuyKe = tongUngAllTime - tongBuAllTime;
+
+  const btStatsEnhanced = useMemo(() => {
+    const map: Record<string, { total: number; tongBu: number; tongUng: number }> = {};
+    buTiens.forEach(r => {
+      const d = new Date(r.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map[key]) map[key] = { total: 0, tongBu: 0, tongUng: 0 };
+      map[key].total++;
+      map[key].tongBu += r.soTien;
+    });
+    ungTiens.forEach(u => {
+      if (!map[u.thang]) map[u.thang] = { total: 0, tongBu: 0, tongUng: 0 };
+      map[u.thang].tongUng += u.soTien;
+    });
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [buTiens, ungTiens]);
+
   // ─── Feedback computed ─────────────────────────────────
+  const fbChuaXemCount = useMemo(() => feedbacks.filter(f => !f.daXem).length, [feedbacks]);
+
   const fbFiltered = useMemo(() => feedbacks.filter((f) => {
     const s = fbSearch.toLowerCase();
     const matchSearch = !s || (f.noiDung.toLowerCase().includes(s)) ||
@@ -381,8 +475,9 @@ export default function DoiTraPage() {
       (f.tenKhach || "").toLowerCase().includes(s);
     const matchLoai = !fbFilterLoai || f.loai === fbFilterLoai;
     const matchKenh = !fbFilterKenh || f.kenh === fbFilterKenh;
-    return matchSearch && matchLoai && matchKenh;
-  }), [feedbacks, fbSearch, fbFilterLoai, fbFilterKenh]);
+    const matchXem = fbShowAll || !f.daXem;
+    return matchSearch && matchLoai && matchKenh && matchXem;
+  }), [feedbacks, fbSearch, fbFilterLoai, fbFilterKenh, fbShowAll]);
 
   const fbStatsByLoai = useMemo(() => {
     const m: Record<string, { count: number; totalStar: number; starCount: number }> = {};
@@ -462,7 +557,11 @@ export default function DoiTraPage() {
         <button onClick={() => setTab("feedback")}
           className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition ${tab === "feedback" ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
           <MessageSquare size={15} /> Feedback
-          {feedbacks.length > 0 && <span className="bg-teal-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{feedbacks.length}</span>}
+          {feedbacks.filter(f => !f.daXem).length > 0 && (
+            <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">
+              {feedbacks.filter(f => !f.daXem).length}
+            </span>
+          )}
         </button>
         <button onClick={() => setTab("bu_tien")}
           className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition ${tab === "bu_tien" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
@@ -597,8 +696,9 @@ export default function DoiTraPage() {
               <th className="px-3 py-3 text-left">Nguồn</th>
               <th className="px-3 py-3 text-left">SĐT Khách</th>
               <th className="px-3 py-3 text-left">Tên KH</th>
-              <th className="px-3 py-3 text-left">Địa chỉ</th>
+              <th className="px-3 py-3 text-left min-w-[220px]">Địa chỉ</th>
               <th className="px-3 py-3 text-left">SKU đổi sang</th>
+              <th className="px-3 py-3 text-left">Ghi chú</th>
               <th className="px-3 py-3 text-right">Giá trị</th>
               <th className="px-3 py-3 text-left">Loại lỗi</th>
               <th className="px-3 py-3 text-right">Thu KH</th>
@@ -629,9 +729,16 @@ export default function DoiTraPage() {
                 }`}>
                   {/* Nguồn */}
                   <td className="px-3 py-2.5">
-                    {r.nguon === "shopee" && <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-600">Shopee</span>}
-                    {r.nguon === "tiktok" && <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-600">TikTok</span>}
-                    {(!r.nguon || r.nguon === "khac") && <span className="text-xs text-slate-400">—</span>}
+                    {r.nguon ? (
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        r.nguon === "shopee" ? "bg-orange-100 text-orange-700" :
+                        r.nguon === "tiktok" ? "bg-pink-100 text-pink-700" :
+                        r.nguon === "don_ngoai" ? "bg-blue-100 text-blue-700" :
+                        "bg-slate-100 text-slate-600"
+                      }`}>
+                        {r.nguon === "shopee" ? "Shopee" : r.nguon === "tiktok" ? "Tiktok" : r.nguon === "don_ngoai" ? "Đơn ngoài" : "Khác"}
+                      </span>
+                    ) : <span className="text-slate-300 text-xs">—</span>}
                   </td>
 
                   {/* SĐT */}
@@ -647,12 +754,31 @@ export default function DoiTraPage() {
                   <td className="px-3 py-2.5 font-medium text-slate-800 max-w-[120px] truncate">{r.tenKhach}</td>
 
                   {/* Địa chỉ */}
-                  <td className="px-3 py-2.5 text-slate-500 max-w-[160px] truncate" title={r.diaChi || ""}>{r.diaChi || "—"}</td>
+                  <td className="px-3 py-2.5 min-w-[220px] max-w-[280px]">
+                    <div className="group flex items-center gap-1.5">
+                      <span className="text-slate-500 truncate" title={r.diaChi || ""}>{r.diaChi || "—"}</span>
+                      {r.diaChi && (
+                        <button
+                          onClick={() => navigator.clipboard.writeText(r.diaChi!)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-slate-400 hover:text-slate-700"
+                          title="Sao chép địa chỉ">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </td>
 
                   {/* SKU */}
                   <td className="px-3 py-2.5">
                     <div className="text-xs text-slate-400">{r.skuHienTai}</div>
                     <div className="font-medium text-slate-800">{r.skuDoiSang || "—"}</div>
+                  </td>
+
+                  {/* Ghi chú */}
+                  <td className="px-3 py-2.5 max-w-[180px] truncate text-slate-500 text-xs" title={r.ghiChu || ""}>
+                    {r.ghiChu || <span className="text-slate-300">—</span>}
                   </td>
 
                   {/* Giá trị */}
@@ -816,7 +942,19 @@ export default function DoiTraPage() {
                 <X size={13} /> Xoá lọc
               </button>
             )}
-            <p className="text-xs text-slate-400 ml-auto">{fbFiltered.length} / {feedbacks.length} feedback</p>
+            <div className="ml-auto flex items-center gap-2">
+              {fbChuaXemCount > 0 && (
+                <button onClick={markAllDaXem}
+                  className="text-xs text-teal-600 hover:underline px-2 py-1 rounded hover:bg-teal-50 transition">
+                  ✓ Duyệt tất cả ({fbChuaXemCount})
+                </button>
+              )}
+              <button onClick={() => setFbShowAll(v => !v)}
+                className={`text-xs px-2.5 py-1.5 rounded-lg border transition ${fbShowAll ? "bg-slate-100 text-slate-600 border-slate-200" : "bg-teal-50 text-teal-700 border-teal-200 font-medium"}`}>
+                {fbShowAll ? "Tất cả" : `Chưa xem (${fbChuaXemCount})`}
+              </button>
+              <p className="text-xs text-slate-400">{fbFiltered.length}/{feedbacks.length}</p>
+            </div>
           </div>
 
           {/* Danh sách feedback */}
@@ -828,14 +966,24 @@ export default function DoiTraPage() {
                 className="mt-3 text-sm text-teal-500 hover:underline">+ Thêm feedback đầu tiên</button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
               {fbFiltered.map((f) => {
                 const loaiInfo = LOAI_FEEDBACK[f.loai];
+                const ngay = new Date(f.createdAt);
+                const ngayStr = ngay.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+                const gioStr = ngay.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
                 return (
-                  <div key={f.id} className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-start gap-4">
+                  <div key={f.id} className={`rounded-xl border px-4 py-3 flex items-start gap-4 transition ${f.daXem ? "bg-slate-50 border-slate-100 opacity-70" : "bg-white border-slate-200 shadow-sm"}`}>
                     <div className="text-2xl shrink-0 mt-0.5">{loaiInfo?.icon}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {/* Ngày giờ nổi bật */}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                          📅 {ngayStr} · {gioStr}
+                        </span>
+                        {f.daXem && <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">✓ Đã xem</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${KENH_FEEDBACK[f.kenh]?.color}`}>{KENH_FEEDBACK[f.kenh]?.label}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${loaiInfo?.color}`}>{loaiInfo?.label}</span>
                         {f.sku && <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{f.sku}</span>}
@@ -845,13 +993,20 @@ export default function DoiTraPage() {
                         {f.tenKhach && <span>👤 {f.tenKhach}</span>}
                         {f.sdtKhach && <span>📞 {f.sdtKhach}</span>}
                         {f.nguoiGhiNhan && <span>✍️ {f.nguoiGhiNhan}</span>}
-                        <span className="ml-auto">{formatDateTime(f.createdAt)}</span>
                       </div>
                     </div>
-                    <button onClick={() => { setFbDeleteTarget(f); setFbDeleteInput(""); }}
-                      className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition shrink-0">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {!f.daXem && (
+                        <button onClick={() => markDaXem(f.id)}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition font-medium whitespace-nowrap">
+                          ✓ Đã xem
+                        </button>
+                      )}
+                      <button onClick={() => { setFbDeleteTarget(f); setFbDeleteInput(""); }}
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1002,20 +1157,17 @@ export default function DoiTraPage() {
               {/* Vận chuyển */}
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Phân loại & Vận chuyển</p>
-                {/* Nguồn */}
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Nguồn kênh bán</label>
-                  <div className="flex gap-2">
-                    {[{ val: "shopee", label: "Shopee", cls: "bg-orange-100 text-orange-600 border-orange-200" }, { val: "tiktok", label: "TikTok", cls: "bg-pink-100 text-pink-600 border-pink-200" }, { val: "khac", label: "Khác", cls: "bg-slate-100 text-slate-600 border-slate-200" }].map(opt => (
-                      <button key={opt.val} type="button" onClick={() => setForm({ ...form, nguon: opt.val })}
-                        className={`flex-1 py-1.5 text-sm rounded-lg border font-semibold transition ${form.nguon === opt.val ? opt.cls : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Nguồn đơn *</label>
+                    <select value={form.nguon} onChange={(e) => setForm({ ...form, nguon: e.target.value })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200">
+                      <option value="shopee">🛒 Shopee</option>
+                      <option value="tiktok">🎵 Tiktok</option>
+                      <option value="don_ngoai">📦 Đơn ngoài</option>
+                      <option value="khac">🔖 Khác</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="text-xs text-slate-600 mb-1 block">Loại vấn đề *</label>
                     <select required value={form.loaiVanDe}
@@ -1086,28 +1238,54 @@ export default function DoiTraPage() {
       {tab === "bu_tien" && (
         <div className="space-y-5">
 
-          {/* Bảng tổng hợp theo tháng */}
-          {btStatsByMonth.length > 0 && (
+          {/* Summary cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
+              <p className="text-xs text-slate-500 mb-1">Tổng đã ứng</p>
+              <p className="text-xl font-bold text-indigo-600">{formatCurrency(tongUngAllTime)}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
+              <p className="text-xs text-slate-500 mb-1">Tổng đã bù</p>
+              <p className="text-xl font-bold text-red-600">{formatCurrency(tongBuAllTime)}</p>
+            </div>
+            <div className={`rounded-xl border px-5 py-4 ${duLuyKe >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+              <p className="text-xs text-slate-500 mb-1">Dư lũy kế</p>
+              <p className={`text-xl font-bold ${duLuyKe >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {duLuyKe >= 0 ? "+" : ""}{formatCurrency(duLuyKe)}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Ứng − Bù (cộng dồn tất cả tháng)</p>
+            </div>
+          </div>
+
+          {/* Stats table per month */}
+          {btStatsEnhanced.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100">
-                <span className="text-sm font-semibold text-slate-700">📊 Tổng tiền bù theo tháng</span>
+                <span className="text-sm font-semibold text-slate-700">📊 Thống kê theo tháng</span>
               </div>
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
                   <tr>
                     <th className="px-4 py-2.5 text-left">Tháng</th>
                     <th className="px-4 py-2.5 text-center">Số case</th>
-                    <th className="px-4 py-2.5 text-right text-red-500">Tổng tiền bù</th>
+                    <th className="px-4 py-2.5 text-right text-indigo-500">Đã ứng</th>
+                    <th className="px-4 py-2.5 text-right text-red-500">Tổng bù</th>
+                    <th className="px-4 py-2.5 text-right">Dư tháng</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {btStatsByMonth.map(([key, s]) => {
+                  {btStatsEnhanced.map(([key, s]) => {
                     const [yr, mo] = key.split("-");
+                    const du = s.tongUng - s.tongBu;
                     return (
                       <tr key={key} className="hover:bg-indigo-50 transition">
                         <td className="px-4 py-2.5 font-semibold text-slate-700">T{parseInt(mo)} {yr}</td>
                         <td className="px-4 py-2.5 text-center font-bold text-slate-800">{s.total}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-red-600">{formatCurrency(s.tongTien)}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-indigo-600">{s.tongUng > 0 ? formatCurrency(s.tongUng) : <span className="text-slate-300">—</span>}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-red-600">{s.tongBu > 0 ? formatCurrency(s.tongBu) : <span className="text-slate-300">—</span>}</td>
+                        <td className={`px-4 py-2.5 text-right font-bold ${du >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {du >= 0 ? "+" : ""}{formatCurrency(du)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -1116,7 +1294,69 @@ export default function DoiTraPage() {
             </div>
           )}
 
-          {/* Danh sách */}
+          {/* Đã ứng tiền section */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700">💰 Đã ứng tiền</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowUngHistory(v => !v)}
+                  className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition">
+                  {showUngHistory ? "Ẩn lịch sử" : "Lịch sử"}
+                </button>
+                <button onClick={() => { setUngEditRecord(null); const now = new Date(); setUngForm({ soTien: "", thang: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`, ghiChu: "" }); setShowUngModal(true); }}
+                  className="flex items-center gap-1 text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-600 transition">
+                  <span>+ Thêm tiền ứng</span>
+                </button>
+              </div>
+            </div>
+            {showUngHistory && (
+              ungTiens.length === 0 ? (
+                <p className="text-center py-8 text-slate-400 text-sm">Chưa có lần ứng tiền nào</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Tháng</th>
+                      <th className="px-4 py-2.5 text-right text-indigo-500">Số tiền ứng</th>
+                      <th className="px-4 py-2.5 text-left">Ghi chú</th>
+                      <th className="px-4 py-2.5 text-left">Ngày tạo</th>
+                      <th className="px-4 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ungTiens.map(u => {
+                      const [yr, mo] = u.thang.split("-");
+                      return (
+                        <tr key={u.id} className="hover:bg-indigo-50 transition">
+                          <td className="px-4 py-2.5 font-semibold text-slate-700">T{parseInt(mo)} {yr}</td>
+                          <td className="px-4 py-2.5 text-right font-bold text-indigo-600">{formatCurrency(u.soTien)}</td>
+                          <td className="px-4 py-2.5 text-slate-500 text-xs">{u.ghiChu || "—"}</td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400">{formatDateTime(u.createdAt)}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => { setUngEditRecord(u); setUngForm({ soTien: String(u.soTien), thang: u.thang, ghiChu: u.ghiChu || "" }); setShowUngModal(true); }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition">
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={async () => { if (!confirm("Xoá lần ứng này?")) return; await fetch(`/api/ung-tien/${u.id}`, { method: "DELETE" }); fetchUngTiens(); }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            )}
+            {!showUngHistory && ungTiens.length > 0 && (
+              <p className="text-xs text-slate-400 px-4 py-2">{ungTiens.length} lần ứng · bấm &quot;Lịch sử&quot; để xem</p>
+            )}
+          </div>
+
+          {/* Danh sách bù tiền */}
           {buTiens.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 py-16 text-center">
               <p className="text-slate-400 text-sm">Chưa có case bù tiền nào</p>
@@ -1129,7 +1369,8 @@ export default function DoiTraPage() {
                 <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
                   <tr>
                     <th className="px-3 py-3 text-left">Thời gian</th>
-                    <th className="px-3 py-3 text-left">Khách hàng</th>
+                    <th className="px-3 py-3 text-left">Nguồn</th>
+                    <th className="px-3 py-3 text-left">Tên KH</th>
                     <th className="px-3 py-3 text-left">Lỗi bù</th>
                     <th className="px-3 py-3 text-right">Số tiền bù</th>
                     <th className="px-3 py-3 text-left">Ghi chú</th>
@@ -1140,6 +1381,14 @@ export default function DoiTraPage() {
                   {buTiens.map((r) => (
                     <tr key={r.id} className="transition-colors hover:bg-slate-50">
                       <td className="px-3 py-2.5 text-xs text-slate-400">{formatDateTime(r.createdAt)}</td>
+                      <td className="px-3 py-2.5">
+                        {(() => {
+                          const opt = NGUON_BU_OPTIONS.find(o => o.value === r.nguon);
+                          return opt
+                            ? <span className={`px-2 py-0.5 rounded text-xs font-medium ${opt.cls}`}>{opt.label}</span>
+                            : <span className="text-slate-300 text-xs">—</span>;
+                        })()}
+                      </td>
                       <td className="px-3 py-2.5 font-medium text-slate-800">{r.tenKhach}</td>
                       <td className="px-3 py-2.5">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${LOI_BU[r.loiBu]?.color}`}>{LOI_BU[r.loiBu]?.label}</span>
@@ -1246,9 +1495,26 @@ export default function DoiTraPage() {
             </div>
             <form onSubmit={handleBtSubmit} className="p-5 space-y-4">
               <div>
-                <label className="text-xs text-slate-600 mb-1 block">Tên khách hàng *</label>
-                <input required value={btForm.tenKhach} onChange={(e) => setBtForm({ ...btForm, tenKhach: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                <label className="text-xs text-slate-600 mb-1 block">Nguồn *</label>
+                <select value={btForm.nguon} onChange={(e) => setBtForm({ ...btForm, nguon: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                  <option value="shopee">🛒 Shopee</option>
+                  <option value="tiktok">🎵 Tiktok</option>
+                  <option value="khac">🔖 Khác</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Tên khách hàng *</label>
+                  <input required value={btForm.tenKhach} onChange={(e) => setBtForm({ ...btForm, tenKhach: e.target.value })}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">SĐT khách</label>
+                  <input value={btForm.sdtKhach} onChange={(e) => setBtForm({ ...btForm, sdtKhach: e.target.value })}
+                    placeholder="0912345678"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1276,6 +1542,47 @@ export default function DoiTraPage() {
                 <button type="submit" disabled={btLoading}
                   className="flex-1 px-4 py-2.5 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 font-medium">
                   {btLoading ? "Đang lưu..." : btEditRecord ? "Lưu thay đổi" : "Tạo case"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Thêm / Sửa Ứng tiền ── */}
+      {showUngModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 text-lg">
+                {ungEditRecord ? "Sửa tiền ứng" : "Thêm tiền ứng"}
+              </h2>
+              <button onClick={() => { setShowUngModal(false); setUngEditRecord(null); }}
+                className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleUngSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Tháng *</label>
+                <input required type="month" value={ungForm.thang} onChange={e => setUngForm({ ...ungForm, thang: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Số tiền ứng (VNĐ) *</label>
+                <input required type="number" min="0" value={ungForm.soTien} onChange={e => setUngForm({ ...ungForm, soTien: e.target.value })}
+                  placeholder="1000000"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
+                <input value={ungForm.ghiChu} onChange={e => setUngForm({ ...ungForm, ghiChu: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => { setShowUngModal(false); setUngEditRecord(null); }}
+                  className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={ungLoading}
+                  className="flex-1 px-4 py-2.5 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 font-medium">
+                  {ungLoading ? "Đang lưu..." : ungEditRecord ? "Lưu" : "Thêm"}
                 </button>
               </div>
             </form>

@@ -9,16 +9,17 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await req.json();
-    const record = await prisma.feedback.update({
+    const record = await prisma.ungTien.update({
       where: { id },
       data: {
-        ...(body.daXem !== undefined && { daXem: body.daXem }),
+        ...(body.soTien !== undefined && { soTien: Number(body.soTien) }),
+        ...(body.thang  !== undefined && { thang:  body.thang }),
+        ...(body.ghiChu !== undefined && { ghiChu: body.ghiChu || null }),
       },
     });
     return NextResponse.json(record);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Lỗi server";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }
 }
 
@@ -28,10 +29,9 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    await prisma.feedback.delete({ where: { id } });
+    await prisma.ungTien.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Lỗi server";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }
 }

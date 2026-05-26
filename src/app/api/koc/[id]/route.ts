@@ -19,6 +19,7 @@ export async function PATCH(
         ...(body.linkProfile !== undefined && { linkProfile: body.linkProfile || null }),
         ...(body.sdt         !== undefined && { sdt:         body.sdt         || null }),
         ...(body.email       !== undefined && { email:       body.email       || null }),
+        ...(body.diaChi      !== undefined && { diaChi:      body.diaChi      || null }),
         ...(body.ghiChu      !== undefined && { ghiChu:      body.ghiChu      || null }),
       },
     });

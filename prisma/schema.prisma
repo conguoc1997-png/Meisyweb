@@ -88,6 +88,7 @@ model DoiTra {
   // cho_xu_ly | dang_xu_ly | da_gui | hoan_thanh
 
   nguoiXuLy String?
+  nguon     String?  // shopee | tiktok | don_ngoai | khac
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -104,6 +105,7 @@ model Feedback {
   noiDung      String
   danhGia      Int?     // 1-5 sao (tuỳ chọn)
   nguoiGhiNhan String?
+  daXem        Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
 
@@ -118,8 +120,18 @@ model BuTien {
   trangThai    String   @default("cho_bu") // cho_bu | da_bu
   ghiChu       String?
   nguoiXuLy    String?
+  nguon        String?  // shopee | tiktok | khac
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model UngTien {
+  id        String   @id @default(cuid())
+  soTien    Float    @default(0)
+  thang     String   // YYYY-MM
+  ghiChu    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ===================== MODULE KOC =====================
@@ -133,6 +145,7 @@ model KOC {
   linkProfile String?
   sdt         String?
   email       String?
+  diaChi      String?
   ghiChu      String?
   createdAt   DateTime @default(now())
 
@@ -157,6 +170,7 @@ model LoCat {
   soLaThucTe         Int?
   soSanPham          Int?
   hangThucTe         Int?
+  ngayNhanHang       DateTime? // ngày nhận hàng thực tế (tách khỏi ngày cắt)
   soLuongThieu       Int?
   xuongNhanHang      String?
   trangThai          String    @default("chua_xuat")
@@ -228,4 +242,23 @@ model HoaDonTon {
   id        String   @id
   soTon     Float    @default(0)
   updatedAt DateTime @updatedAt
+}
+
+// ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================
+
+model DonHoanTra {
+  id          String    @id @default(cuid())
+  maDon       String    // Mã đơn hàng từ sàn
+  san         String    @default("shopee") // shopee | tiktok | lazada
+  tenSP       String    @default("")
+  sku         String    @default("")
+  soLuong     Int       @default(1)
+  ngayTaoDon  DateTime? // Ngày tạo đơn trên sàn
+  lyDoHoan    String?   // Lý do hoàn trả
+  trangThai   String    @default("cho_ve") // cho_ve | da_ve | loi | huy
+  daDoiSoat   Boolean   @default(false)   // Đã tick kiểm tra thực tế
+  ghiChu      String?
+  batchId     String?   // Nhóm import cùng đợt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

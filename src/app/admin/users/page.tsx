@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Users, Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { ALL_MODULES, parseModules } from "@/lib/auth";
 
 type User = {
   id: string;
@@ -12,23 +13,22 @@ type User = {
   createdAt: string;
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin",
-  kho: "Nhân viên Kho",
-  san_xuat: "Nhân viên Sản xuất",
-};
-
-const ROLE_COLOR: Record<string, string> = {
-  admin: "bg-rose-100 text-rose-700",
-  kho: "bg-blue-100 text-blue-700",
-  san_xuat: "bg-purple-100 text-purple-700",
-};
+function roleLabel(role: string) {
+  if (role === "admin") return "Admin";
+  const mods = parseModules(role);
+  return mods.map(k => ALL_MODULES.find(m => m.key === k)?.label ?? k).join(", ") || "Không có quyền";
+}
+function roleColor(role: string) {
+  if (role === "admin") return "bg-rose-100 text-rose-700";
+  return "bg-blue-100 text-blue-700";
+}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ email: "", name: "", password: "", role: "kho" });
+  const [form, setForm] = useState({ email: "", name: "", password: "", isAdmin: false });
+  const [selectedMods, setSelectedMods] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -38,14 +38,16 @@ export default function AdminUsersPage() {
 
   function openAdd() {
     setEditUser(null);
-    setForm({ email: "", name: "", password: "", role: "kho" });
+    setForm({ email: "", name: "", password: "", isAdmin: false });
+    setSelectedMods([]);
     setError("");
     setShowForm(true);
   }
 
   function openEdit(u: User) {
     setEditUser(u);
-    setForm({ email: u.email, name: u.name, password: "", role: u.role });
+    setForm({ email: u.email, name: u.name, password: "", isAdmin: u.role === "admin" });
+    setSelectedMods(u.role === "admin" ? [] : parseModules(u.role));
     setError("");
     setShowForm(true);
   }
@@ -54,13 +56,14 @@ export default function AdminUsersPage() {
     setSaving(true);
     setError("");
     try {
+      const role = form.isAdmin ? "admin" : selectedMods.join(",") || "tong-quan";
       if (editUser) {
-        const body: Record<string, unknown> = { name: form.name, role: form.role };
+        const body: Record<string, unknown> = { name: form.name, role };
         if (form.password) body.password = form.password;
         const res = await fetch(`/api/admin/users/${editUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (!res.ok) throw new Error((await res.json()).error);
       } else {
-        const res = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+        const res = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, role }) });
         if (!res.ok) throw new Error((await res.json()).error);
       }
       setShowForm(false);
@@ -115,10 +118,19 @@ export default function AdminUsersPage() {
               <tr key={u.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
                 <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded font-semibold ${ROLE_COLOR[u.role] ?? "bg-slate-100 text-slate-600"}`}>
-                    {ROLE_LABEL[u.role] ?? u.role}
+                <td className="px-4 py-3 max-w-[220px]">
+                  <span className={`text-xs px-2 py-0.5 rounded font-semibold ${roleColor(u.role)}`}>
+                    {u.role === "admin" ? "Admin" : ""}
                   </span>
+                  {u.role !== "admin" && (
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {parseModules(u.role).map(k => (
+                        <span key={k} className="text-[11px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                          {ALL_MODULES.find(m => m.key === k)?.label ?? k}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <button onClick={() => toggleActive(u)} className={`text-xs px-2 py-0.5 rounded font-semibold transition ${u.active ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
@@ -168,12 +180,35 @@ export default function AdminUsersPage() {
                 <input type="password" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-400" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Role / Quyền</label>
-                <select className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-400" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  <option value="admin">Admin — toàn quyền</option>
-                  <option value="kho">Nhân viên Kho (/kho, /doi-tra)</option>
-                  <option value="san_xuat">Nhân viên Sản xuất (/san-xuat)</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-600 mb-2">Phân quyền theo module</label>
+                {/* Admin toggle */}
+                <label className="flex items-center gap-2 p-2.5 rounded-lg border border-rose-200 bg-rose-50 mb-2 cursor-pointer">
+                  <input type="checkbox" checked={form.isAdmin}
+                    onChange={e => setForm({ ...form, isAdmin: e.target.checked })}
+                    className="accent-rose-500" />
+                  <span className="text-sm font-semibold text-rose-700">Admin — toàn quyền</span>
+                </label>
+                {/* Module checkboxes */}
+                {!form.isAdmin && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {ALL_MODULES.map(mod => {
+                      const checked = selectedMods.includes(mod.key);
+                      return (
+                        <label key={mod.key}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition ${
+                            checked ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}>
+                          <input type="checkbox" checked={checked}
+                            onChange={() => setSelectedMods(prev =>
+                              prev.includes(mod.key) ? prev.filter(k => k !== mod.key) : [...prev, mod.key]
+                            )}
+                            className="accent-blue-500" />
+                          {mod.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
             </div>

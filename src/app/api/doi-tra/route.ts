@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
         maVanDon:      body.maVanDon      || null,
         trangThai:     "cho_xu_ly",
         nguoiXuLy:     body.nguoiXuLy     || null,
+        nguon:         body.nguon         || null,
       },
     });
     return NextResponse.json(record, { status: 201 });
