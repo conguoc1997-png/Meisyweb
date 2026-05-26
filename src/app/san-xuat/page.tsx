@@ -887,8 +887,8 @@ export default function SanXuatPage() {
         {filterXuong && <span className="text-[14px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
       </div>
 
-      {/* Stats — 4 existing + 2 HoaDonTon */}
-      <div className="grid grid-cols-3 xl:grid-cols-7 gap-4 mb-6">
+      {/* Stats — 4 ô chính */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <p className="text-xs text-slate-500 mb-1">Tổng sản phẩm</p>
           <p className="text-2xl font-bold text-slate-800">{tongSP.toLocaleString()}</p>
@@ -908,39 +908,6 @@ export default function SanXuatPage() {
           <p className="text-xs text-slate-500 mb-1">Đã nhập</p>
           <p className="text-2xl font-bold text-blue-600">{daNhapCount}</p>
           <p className="text-xs text-slate-400 mt-1">/ {losCat.length} lô</p>
-        </div>
-
-        {/* HĐ May còn */}
-        <div className={`rounded-xl p-4 border relative ${mayDuTong < 0 ? "bg-red-50 border-red-200" : "bg-purple-50 border-purple-200"}`}>
-          <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
-          <p className={`text-2xl font-bold ${mayDuTong < 0 ? "text-red-600" : "text-purple-700"}`}>{mayDuTong.toLocaleString()}</p>
-          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.may.toLocaleString()}</p>
-          <div className="absolute top-3 right-3 flex gap-1.5">
-            <button onClick={() => openHistory("may")} className="text-slate-300 hover:text-purple-500 transition" title="Lịch sử"><History size={13} /></button>
-            <button onClick={() => { setEditTonVal(String(hoaDonTon.may)); setEditTonGhiChu(""); setModalTon("may"); }} className="text-slate-300 hover:text-purple-600 transition" title="Sửa"><Pencil size={13} /></button>
-          </div>
-        </div>
-
-        {/* HĐ Vi sinh còn */}
-        <div className={`rounded-xl p-4 border relative ${viSinhDuTong < 0 ? "bg-red-50 border-red-200" : "bg-teal-50 border-teal-200"}`}>
-          <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
-          <p className={`text-2xl font-bold ${viSinhDuTong < 0 ? "text-red-600" : "text-teal-700"}`}>{viSinhDuTong.toLocaleString()}</p>
-          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
-          <div className="absolute top-3 right-3 flex gap-1.5">
-            <button onClick={() => openHistory("giat_vi_sinh")} className="text-slate-300 hover:text-teal-500 transition" title="Lịch sử"><History size={13} /></button>
-            <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_vi_sinh)); setEditTonGhiChu(""); setModalTon("giat_vi_sinh"); }} className="text-slate-300 hover:text-teal-600 transition" title="Sửa"><Pencil size={13} /></button>
-          </div>
-        </div>
-
-        {/* HĐ Màu còn */}
-        <div className={`rounded-xl p-4 border relative ${mauDuTong < 0 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
-          <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
-          <p className={`text-2xl font-bold ${mauDuTong < 0 ? "text-red-600" : "text-blue-700"}`}>{mauDuTong.toLocaleString()}</p>
-          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_mau.toLocaleString()}</p>
-          <div className="absolute top-3 right-3 flex gap-1.5">
-            <button onClick={() => openHistory("giat_mau")} className="text-slate-300 hover:text-blue-500 transition" title="Lịch sử"><History size={13} /></button>
-            <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_mau)); setEditTonGhiChu(""); setModalTon("giat_mau"); }} className="text-slate-300 hover:text-blue-600 transition" title="Sửa"><Pencil size={13} /></button>
-          </div>
         </div>
       </div>
 
@@ -1618,6 +1585,37 @@ export default function SanXuatPage() {
         });
         return (
           <div>
+            {/* 3 ô chỉ mục HĐ */}
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              <div className={`rounded-xl p-4 border relative ${mayDuTong < 0 ? "bg-red-50 border-red-200" : "bg-purple-50 border-purple-200"}`}>
+                <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
+                <p className={`text-2xl font-bold ${mayDuTong < 0 ? "text-red-600" : "text-purple-700"}`}>{mayDuTong.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.may.toLocaleString()}</p>
+                <div className="absolute top-3 right-3 flex gap-1.5">
+                  <button onClick={() => openHistory("may")} className="text-slate-300 hover:text-purple-500 transition" title="Lịch sử"><History size={13} /></button>
+                  <button onClick={() => { setEditTonVal(String(hoaDonTon.may)); setEditTonGhiChu(""); setModalTon("may"); }} className="text-slate-300 hover:text-purple-600 transition" title="Sửa"><Pencil size={13} /></button>
+                </div>
+              </div>
+              <div className={`rounded-xl p-4 border relative ${viSinhDuTong < 0 ? "bg-red-50 border-red-200" : "bg-teal-50 border-teal-200"}`}>
+                <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
+                <p className={`text-2xl font-bold ${viSinhDuTong < 0 ? "text-red-600" : "text-teal-700"}`}>{viSinhDuTong.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
+                <div className="absolute top-3 right-3 flex gap-1.5">
+                  <button onClick={() => openHistory("giat_vi_sinh")} className="text-slate-300 hover:text-teal-500 transition" title="Lịch sử"><History size={13} /></button>
+                  <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_vi_sinh)); setEditTonGhiChu(""); setModalTon("giat_vi_sinh"); }} className="text-slate-300 hover:text-teal-600 transition" title="Sửa"><Pencil size={13} /></button>
+                </div>
+              </div>
+              <div className={`rounded-xl p-4 border relative ${mauDuTong < 0 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
+                <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
+                <p className={`text-2xl font-bold ${mauDuTong < 0 ? "text-red-600" : "text-blue-700"}`}>{mauDuTong.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_mau.toLocaleString()}</p>
+                <div className="absolute top-3 right-3 flex gap-1.5">
+                  <button onClick={() => openHistory("giat_mau")} className="text-slate-300 hover:text-blue-500 transition" title="Lịch sử"><History size={13} /></button>
+                  <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_mau)); setEditTonGhiChu(""); setModalTon("giat_mau"); }} className="text-slate-300 hover:text-blue-600 transition" title="Sửa"><Pencil size={13} /></button>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold text-slate-700">Hóa đơn đã nhận ({hoaDonRows.length})</span>
             </div>
