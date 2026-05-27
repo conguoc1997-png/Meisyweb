@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
         ghiChu:        body.ghiChu        || null,
         phiShip,
         soChieuShip:   Number(body.soChieuShip) || 2,
+        nguon:         body.nguon         || null,
         maVanDon:      body.maVanDon      || null,
         trangThai:     "cho_xu_ly",
         nguoiXuLy:     body.nguoiXuLy     || null,
-        nguon:         body.nguon         || null,
       },
     });
     return NextResponse.json(record, { status: 201 });

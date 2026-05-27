@@ -77,6 +77,9 @@ model DoiTra {
   phiShip     Float  @default(0)   // 30000 nếu đổi size, 0 nếu lỗi shop
   soChieuShip Int    @default(2)   // 1 hoặc 2 chiều
 
+  // Nguồn kênh bán
+  nguon     String? // shopee | tiktok | don_ngoai | khac
+
   // Vận đơn
   maVanDon  String? // Mã vận đơn để theo dõi
 
@@ -85,7 +88,6 @@ model DoiTra {
   // cho_xu_ly | dang_xu_ly | da_gui | hoan_thanh
 
   nguoiXuLy String?
-  nguon     String?  // shopee | tiktok | don_ngoai | khac
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -182,6 +184,7 @@ model LoCat {
   hdGiatMau          Int?
   tonTruocGiatMau    Float?
   hdGiatMauDa        Boolean   @default(false)
+  xuatHoaDonDa       Boolean   @default(false) // đã xuất hoá đơn cho lô này
   daCat              Boolean   @default(false) // đã hoàn thành cắt → xoá cây khỏi tồn kho
   ghiChuMay          String?   // ghi chú kiểu cách may
   mauGiat            String?   // màu giặt: NHẠT | ĐẬM | VI_SINH | KHÓI | CHÀM
@@ -239,6 +242,132 @@ model HoaDonTon {
   id        String   @id
   soTon     Float    @default(0)
   updatedAt DateTime @updatedAt
+}
+
+// ===================== MODULE XUẤT KHO NPL =====================
+
+// Định mức NPL theo loại hàng (BOM)
+model DinhMucNPL {
+  id        String   @id @default(cuid())
+  hangCat   String   // tên loại hàng, e.g. "Áo sơ mi", "Quần âu"
+  vatTuId   String
+  soLuong   Float    // định mức trên 100 sản phẩm
+  ghiChu    String?
+  createdAt DateTime @default(now())
+
+  vatTu VatTu @relation(fields: [vatTuId], references: [id])
+}
+
+// Phiếu xuất kho NPL (liên kết lô cắt)
+model PhieuXuatKho {
+  id        String   @id @default(cuid())
+  soPhieu   String   @unique
+  loCatId   String?  // lô cắt tương ứng
+  hangCat   String?  // loại hàng cắt
+  soSanPham Int      @default(0) // số SP thực tế của lô
+  ngay      DateTime
+  lyDo      String   @default("san_xuat") // san_xuat | dieu_chinh | khac
+  ghiChu    String?
+  nguoiTao  String?
+  createdAt DateTime @default(now())
+
+  chiTiet PhieuXuatChiTiet[]
+}
+
+// Chi tiết phiếu xuất
+model PhieuXuatChiTiet {
+  id          String @id @default(cuid())
+  phieuXuatId String
+  vatTuId     String
+  soLuong     Float
+  donGia      Float  @default(0) // giá vốn bình quân tại thời điểm xuất
+  thanhTien   Float  @default(0)
+  ghiChu      String?
+
+  phieu PhieuXuatKho @relation(fields: [phieuXuatId], references: [id], onDelete: Cascade)
+  vatTu VatTu        @relation(fields: [vatTuId], references: [id])
+}
+
+// ===================== MODULE KẾ TOÁN =====================
+
+// Danh mục nguyên phụ liệu
+model VatTu {
+  id        String   @id @default(cuid())
+  ma        String   @unique
+  ten       String
+  loai      String   // "vai" | "phu_lieu"
+  nhom      String?  // chi | cuc | khoa_keo | mex | nhan | dong_goi | vai_cotton | vai_thun | khac
+  donVi     String   @default("m") // m | kg | cai | cuon | thuong | bo | met
+  ghiChu    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tonKho      TonKhoVatTu?
+  chiTiet     ChiTietNhapKho[]
+  dinhMuc     DinhMucNPL[]
+  xuatChiTiet PhieuXuatChiTiet[]
+}
+
+// Tồn kho nguyên phụ liệu (1 dòng / vật tư)
+model TonKhoVatTu {
+  id             String   @id @default(cuid())
+  vatTuId        String   @unique
+  soLuong        Float    @default(0)
+  giaTrungBinh   Float    @default(0) // giá vốn bình quân gia quyền
+  giaTriTon      Float    @default(0) // = soLuong × giaTrungBinh
+  updatedAt      DateTime @updatedAt
+
+  vatTu VatTu @relation(fields: [vatTuId], references: [id])
+}
+
+// Phiếu nhập kho
+model PhieuNhapKho {
+  id          String    @id @default(cuid())
+  soPhieu     String    @unique
+  ngay        DateTime
+  nhaCC       String    // "hac_long" | "an_huy" | "viet_hoa" | custom
+  tenNhaCC    String?
+  soHoaDon    String?
+  ngayHoaDon  DateTime?
+  tongTien    Float     @default(0)
+  trangThai   String    @default("chua_thanh_toan") // chua_thanh_toan | da_thanh_toan | thanh_toan_1_phan
+  ghiChu      String?
+  nguoiTao    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chiTiet ChiTietNhapKho[]
+}
+
+// Chi tiết phiếu nhập (từng dòng vật tư)
+model ChiTietNhapKho {
+  id          String  @id @default(cuid())
+  phieuId     String
+  vatTuId     String
+  soLuongMua  Float   @default(0) // số lượng theo đơn vị mua (cây, kg, m...)
+  donViMua    String  @default("m") // đơn vị mua: m | cay | kg
+  quyDoi      Float   @default(1)   // hệ số: soLuong = soLuongMua × quyDoi
+  soLuong     Float   // tổng theo đơn vị tồn kho (m)
+  donGia      Float   // giá / donViMua
+  thanhTien   Float
+  ghiChu      String?
+
+  phieu PhieuNhapKho @relation(fields: [phieuId], references: [id], onDelete: Cascade)
+  vatTu VatTu        @relation(fields: [vatTuId], references: [id])
+}
+
+model CongNo {
+  id         String   @id @default(cuid())
+  nhaCC      String   // "hac_long" | "an_huy" | "viet_hoa"
+  ngay       DateTime
+  soChungTu  String?  // Số hoá đơn / chứng từ
+  dienGiai   String   // Diễn giải giao dịch
+  loai       String   // "mua_hang" | "tra_tien" | "dieu_chinh_no" | "dieu_chinh_co"
+  soTien     Float    @default(0)
+  ghiChu     String?
+  nguoiTao   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 // ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================

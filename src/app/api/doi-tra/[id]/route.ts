@@ -22,6 +22,7 @@ export async function PATCH(
         ...(body.ghiChu      !== undefined && { ghiChu: body.ghiChu }),
         ...(body.phiShip     !== undefined && { phiShip: Number(body.phiShip) }),
         ...(body.soChieuShip !== undefined && { soChieuShip: Number(body.soChieuShip) }),
+        ...(body.nguon       !== undefined && { nguon: body.nguon || null }),
         ...(body.maVanDon    !== undefined && { maVanDon: body.maVanDon || null }),
         ...(body.nguoiXuLy   !== undefined && { nguoiXuLy: body.nguoiXuLy }),
         ...(body.nguon       !== undefined && { nguon: body.nguon || null }),

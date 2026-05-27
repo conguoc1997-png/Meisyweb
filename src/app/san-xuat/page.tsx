@@ -21,6 +21,7 @@ type LoCat = {
   hdGiatViSinh: number | null; tonTruocGiatViSinh: number | null; hdGiatViSinhDa: boolean;
   hdGiatMau: number | null; tonTruocGiatMau: number | null; hdGiatMauDa: boolean;
   ghiChuMay: string | null; mauGiat: string | null;
+  xuatHoaDonDa: boolean;
   ghiChu: string | null;
 };
 
@@ -546,8 +547,6 @@ export default function SanXuatPage() {
         l.id === lo.id ? { ...l, cayData: newCayData, trangThai: newLoTrangThai } : l
       ));
 
-      // Nếu tất cả cây đã nhập → chuyển sang tab hóa đơn
-      if (allDaNhap) setActiveMainTab("hoa-don");
 
       // Lưu cayData + trangThai lô cùng lúc
       fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
@@ -712,19 +711,51 @@ export default function SanXuatPage() {
     }
   };
 
-  const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
+  const handleToggleHD = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa" | "xuatHoaDonDa") => {
     const newVal = !lo[field];
-    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, [field]: newVal } : l));
+    const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, [field]: newVal } : l);
+    setLosCat(update); setAllLoCat(update);
     fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: newVal }),
     }).catch(() => fetchData());
   };
 
+  // Dùng cho tab Xuất HĐ: tick lô multi-cây sẽ toggle toàn bộ cây cùng lúc
+  const handleHDTabToggle = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa" | "xuatHoaDonDa") => {
+    if (field === "xuatHoaDonDa" || lo.soCay <= 1 || !lo.cayData) {
+      handleToggleHD(lo, field);
+      return;
+    }
+    try {
+      const parsed: Record<string, unknown>[] = JSON.parse(lo.cayData);
+      const allChecked = parsed.every(c => c[field]);
+      const newCayData = JSON.stringify(parsed.map(c => ({ ...c, [field]: !allChecked })));
+      const newLoVal = !allChecked;
+      const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, [field]: newLoVal } : l);
+      setLosCat(update); setAllLoCat(update);
+      fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newCayData, [field]: newLoVal }),
+      }).catch(() => fetchData());
+    } catch { handleToggleHD(lo, field); }
+  };
+
+  // Trạng thái hiển thị checkbox cho multi-cây trong tab HĐ
+  const getCayHDState = (lo: LoCat, field: "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa") => {
+    if (lo.soCay <= 1 || !lo.cayData) return lo[field] ? "all" : "none";
+    try {
+      const parsed: Record<string, unknown>[] = JSON.parse(lo.cayData);
+      const checked = parsed.filter(c => c[field]).length;
+      if (checked === 0) return "none";
+      if (checked === parsed.length) return "all";
+      return "partial";
+    } catch { return "none"; }
+  };
+
   const handleQuickStatus = (lo: LoCat) => {
     const next = lo.trangThai === "da_nhap" ? "chua_nhap" : "da_nhap";
     setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, trangThai: next } : l));
-    if (next === "da_nhap") setActiveMainTab("hoa-don");
     fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ trangThai: next }),
@@ -856,8 +887,8 @@ export default function SanXuatPage() {
         {filterXuong && <span className="text-[14px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
       </div>
 
-      {/* Stats — 4 existing + 2 HoaDonTon */}
-      <div className="grid grid-cols-3 xl:grid-cols-7 gap-4 mb-6">
+      {/* Stats — 4 ô chính */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <p className="text-xs text-slate-500 mb-1">Tổng sản phẩm</p>
           <p className="text-2xl font-bold text-slate-800">{tongSP.toLocaleString()}</p>
@@ -877,39 +908,6 @@ export default function SanXuatPage() {
           <p className="text-xs text-slate-500 mb-1">Đã nhập</p>
           <p className="text-2xl font-bold text-blue-600">{daNhapCount}</p>
           <p className="text-xs text-slate-400 mt-1">/ {losCat.length} lô</p>
-        </div>
-
-        {/* HĐ May còn */}
-        <div className={`rounded-xl p-4 border relative ${mayDuTong < 0 ? "bg-red-50 border-red-200" : "bg-purple-50 border-purple-200"}`}>
-          <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
-          <p className={`text-2xl font-bold ${mayDuTong < 0 ? "text-red-600" : "text-purple-700"}`}>{mayDuTong.toLocaleString()}</p>
-          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.may.toLocaleString()}</p>
-          <div className="absolute top-3 right-3 flex gap-1.5">
-            <button onClick={() => openHistory("may")} className="text-slate-300 hover:text-purple-500 transition" title="Lịch sử"><History size={13} /></button>
-            <button onClick={() => { setEditTonVal(String(hoaDonTon.may)); setEditTonGhiChu(""); setModalTon("may"); }} className="text-slate-300 hover:text-purple-600 transition" title="Sửa"><Pencil size={13} /></button>
-          </div>
-        </div>
-
-        {/* HĐ Vi sinh còn */}
-        <div className={`rounded-xl p-4 border relative ${viSinhDuTong < 0 ? "bg-red-50 border-red-200" : "bg-teal-50 border-teal-200"}`}>
-          <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
-          <p className={`text-2xl font-bold ${viSinhDuTong < 0 ? "text-red-600" : "text-teal-700"}`}>{viSinhDuTong.toLocaleString()}</p>
-          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
-          <div className="absolute top-3 right-3 flex gap-1.5">
-            <button onClick={() => openHistory("giat_vi_sinh")} className="text-slate-300 hover:text-teal-500 transition" title="Lịch sử"><History size={13} /></button>
-            <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_vi_sinh)); setEditTonGhiChu(""); setModalTon("giat_vi_sinh"); }} className="text-slate-300 hover:text-teal-600 transition" title="Sửa"><Pencil size={13} /></button>
-          </div>
-        </div>
-
-        {/* HĐ Màu còn */}
-        <div className={`rounded-xl p-4 border relative ${mauDuTong < 0 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
-          <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
-          <p className={`text-2xl font-bold ${mauDuTong < 0 ? "text-red-600" : "text-blue-700"}`}>{mauDuTong.toLocaleString()}</p>
-          <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_mau.toLocaleString()}</p>
-          <div className="absolute top-3 right-3 flex gap-1.5">
-            <button onClick={() => openHistory("giat_mau")} className="text-slate-300 hover:text-blue-500 transition" title="Lịch sử"><History size={13} /></button>
-            <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_mau)); setEditTonGhiChu(""); setModalTon("giat_mau"); }} className="text-slate-300 hover:text-blue-600 transition" title="Sửa"><Pencil size={13} /></button>
-          </div>
         </div>
       </div>
 
@@ -1118,12 +1116,14 @@ export default function SanXuatPage() {
             <option key={x} value={x}>{XUONG_LABEL[x] ?? x}</option>
           ))}
         </select>
-        <select value={filterTrangThai} onChange={e => setFilterTrangThai(e.target.value)}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
-          <option value="">Tất cả trạng thái</option>
-          <option value="da_nhap">Đã nhập</option>
-          <option value="chua_nhap">Chưa nhập</option>
-        </select>
+        <div className="flex gap-1">
+          {([["", "Tất cả"], ["chua_nhap", "⏳ Chưa nhập"], ["da_nhap", "✓ Đã nhập"]] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterTrangThai(val)}
+              className={`text-xs px-3 py-1.5 rounded-lg border transition font-medium ${filterTrangThai === val ? (val === "chua_nhap" ? "bg-amber-500 text-white border-amber-500" : val === "da_nhap" ? "bg-green-600 text-white border-green-600" : "bg-slate-700 text-white border-slate-700") : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
         {(filterThang || filterXuong || filterTrangThai) && (
           <button onClick={() => { setFilterThang(""); setFilterXuong(""); setFilterTrangThai(""); }}
             className="text-xs text-slate-400 hover:text-slate-600 px-2 py-2 rounded-lg hover:bg-slate-100">✕ Xoá lọc</button>
@@ -1585,6 +1585,37 @@ export default function SanXuatPage() {
         });
         return (
           <div>
+            {/* 3 ô chỉ mục HĐ */}
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              <div className={`rounded-xl p-4 border relative ${mayDuTong < 0 ? "bg-red-50 border-red-200" : "bg-purple-50 border-purple-200"}`}>
+                <p className="text-xs text-slate-500 mb-1">HĐ May còn</p>
+                <p className={`text-2xl font-bold ${mayDuTong < 0 ? "text-red-600" : "text-purple-700"}`}>{mayDuTong.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.may.toLocaleString()}</p>
+                <div className="absolute top-3 right-3 flex gap-1.5">
+                  <button onClick={() => openHistory("may")} className="text-slate-300 hover:text-purple-500 transition" title="Lịch sử"><History size={13} /></button>
+                  <button onClick={() => { setEditTonVal(String(hoaDonTon.may)); setEditTonGhiChu(""); setModalTon("may"); }} className="text-slate-300 hover:text-purple-600 transition" title="Sửa"><Pencil size={13} /></button>
+                </div>
+              </div>
+              <div className={`rounded-xl p-4 border relative ${viSinhDuTong < 0 ? "bg-red-50 border-red-200" : "bg-teal-50 border-teal-200"}`}>
+                <p className="text-xs text-slate-500 mb-1">HĐ Vi sinh còn</p>
+                <p className={`text-2xl font-bold ${viSinhDuTong < 0 ? "text-red-600" : "text-teal-700"}`}>{viSinhDuTong.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_vi_sinh.toLocaleString()}</p>
+                <div className="absolute top-3 right-3 flex gap-1.5">
+                  <button onClick={() => openHistory("giat_vi_sinh")} className="text-slate-300 hover:text-teal-500 transition" title="Lịch sử"><History size={13} /></button>
+                  <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_vi_sinh)); setEditTonGhiChu(""); setModalTon("giat_vi_sinh"); }} className="text-slate-300 hover:text-teal-600 transition" title="Sửa"><Pencil size={13} /></button>
+                </div>
+              </div>
+              <div className={`rounded-xl p-4 border relative ${mauDuTong < 0 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
+                <p className="text-xs text-slate-500 mb-1">HĐ Màu còn</p>
+                <p className={`text-2xl font-bold ${mauDuTong < 0 ? "text-red-600" : "text-blue-700"}`}>{mauDuTong.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-400 mt-0.5">Tổng: {hoaDonTon.giat_mau.toLocaleString()}</p>
+                <div className="absolute top-3 right-3 flex gap-1.5">
+                  <button onClick={() => openHistory("giat_mau")} className="text-slate-300 hover:text-blue-500 transition" title="Lịch sử"><History size={13} /></button>
+                  <button onClick={() => { setEditTonVal(String(hoaDonTon.giat_mau)); setEditTonGhiChu(""); setModalTon("giat_mau"); }} className="text-slate-300 hover:text-blue-600 transition" title="Sửa"><Pencil size={13} /></button>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold text-slate-700">Hóa đơn đã nhận ({hoaDonRows.length})</span>
             </div>
@@ -1598,18 +1629,35 @@ export default function SanXuatPage() {
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Size</th>
                       <th className="text-right px-4 py-2.5 text-slate-500 font-medium">Số lượng</th>
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Xưởng</th>
+                      <th className="text-center px-3 py-2.5 text-purple-500 font-medium text-xs">HĐ May</th>
+                      <th className="text-center px-3 py-2.5 text-teal-500 font-medium text-xs">HĐ Vi sinh</th>
+                      <th className="text-center px-3 py-2.5 text-blue-500 font-medium text-xs">HĐ Màu</th>
+                      <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">ĐX HĐ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {hoaDonRows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-16 text-slate-400">
+                        <td colSpan={9} className="text-center py-16 text-slate-400">
                           <p className="text-2xl mb-2">📄</p>
                           <p>Chưa có lô nào được đánh dấu "Đã nhận"</p>
                         </td>
                       </tr>
                     ) : hoaDonRows.map(lo => {
                       const soLuong = lo.hangThucTe ?? lo.soSanPham ?? 0;
+                      const mayState    = getCayHDState(lo, "hdMayDa");
+                      const viSinhState = getCayHDState(lo, "hdGiatViSinhDa");
+                      const mauState    = getCayHDState(lo, "hdGiatMauDa");
+                      const mkCb = (state: string, color: string, onClick: () => void) => (
+                        <button onClick={onClick}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition mx-auto ${
+                            state === "all"     ? `${color} border-transparent` :
+                            state === "partial" ? "bg-white border-amber-400" : "bg-white border-slate-300 hover:border-slate-400"
+                          }`}>
+                          {state === "all"     && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          {state === "partial" && <div className="w-2.5 h-0.5 bg-amber-400 rounded" />}
+                        </button>
+                      );
                       return (
                         <tr key={lo.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 text-slate-600">
@@ -1621,6 +1669,15 @@ export default function SanXuatPage() {
                             {soLuong > 0 ? soLuong.toLocaleString() : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-4 py-3 text-slate-600">{lo.xuong ? (XUONG_LABEL[lo.xuong] ?? lo.xuong) : "—"}</td>
+                          <td className="px-3 py-3">{mkCb(mayState,    "bg-purple-500", () => handleHDTabToggle(lo, "hdMayDa"))}</td>
+                          <td className="px-3 py-3">{mkCb(viSinhState, "bg-teal-500",   () => handleHDTabToggle(lo, "hdGiatViSinhDa"))}</td>
+                          <td className="px-3 py-3">{mkCb(mauState,    "bg-blue-500",   () => handleHDTabToggle(lo, "hdGiatMauDa"))}</td>
+                          <td className="px-3 py-3">
+                            <button onClick={() => handleHDTabToggle(lo, "xuatHoaDonDa")}
+                              className={`w-6 h-6 rounded border-2 flex items-center justify-center transition mx-auto ${lo.xuatHoaDonDa ? "bg-slate-600 border-transparent" : "bg-white border-slate-300 hover:border-slate-400"}`}>
+                              {lo.xuatHoaDonDa && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1632,7 +1689,7 @@ export default function SanXuatPage() {
                         <td className="px-4 py-2.5 text-right text-emerald-700">
                           {hoaDonRows.reduce((s, l) => s + (l.hangThucTe ?? l.soSanPham ?? 0), 0).toLocaleString()}
                         </td>
-                        <td></td>
+                        <td colSpan={5}></td>
                       </tr>
                     </tfoot>
                   )}

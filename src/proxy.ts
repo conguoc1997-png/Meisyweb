@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, canAccess, UserRole } from "@/lib/auth";
+import { verifyToken, canAccess } from "@/lib/auth";
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -29,7 +29,7 @@ export async function proxy(req: NextRequest) {
   }
 
   // Role-based page access
-  if (!canAccess(user.role as UserRole, pathname)) {
+  if (!canAccess(user.role, pathname)) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
