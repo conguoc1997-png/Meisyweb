@@ -151,24 +151,24 @@ export default function Sidebar() {
       onMouseLeave={() => setExpanded(false)}
       className={`min-h-screen flex flex-col flex-shrink-0 transition-all duration-200 ease-in-out z-40
         bg-[#fdfaf8] border-r border-stone-100 shadow-[1px_0_16px_0_rgba(160,120,100,0.06)]
-        ${expanded ? "w-60" : "w-[72px]"}`}
+        ${expanded ? "w-64" : "w-[84px]"}`}
     >
       {/* ── Logo ── */}
       <div className={`py-5 border-b border-stone-100/80 flex items-center overflow-hidden
         ${expanded ? "px-4 gap-3" : "px-3 justify-center"}`}>
-        <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
-          <ShoppingBag size={17} className="text-rose-400" />
+        <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+          <ShoppingBag size={21} className="text-rose-400" />
         </div>
         {expanded && (
           <div className="overflow-hidden whitespace-nowrap">
-            <p className="font-semibold text-stone-700 text-[15px] leading-none tracking-wide">Meisy</p>
+            <p className="font-semibold text-stone-700 text-[16px] leading-none tracking-wide">Meisy</p>
             <p className="text-[10px] text-stone-400 mt-1 tracking-widest uppercase">Inhouse</p>
           </div>
         )}
       </div>
 
       {/* ── Nav ── */}
-      <nav className="flex-1 py-4 space-y-0.5 overflow-y-auto overflow-x-hidden px-2">
+      <nav className="flex-1 py-3 space-y-1 overflow-y-auto overflow-x-hidden px-2">
         {MODULES.filter(m => visible(m.moduleKey)).map(mod => {
           const Icon          = mod.icon;
           const isOpen        = openKeys.has(mod.key);
@@ -181,9 +181,9 @@ export default function Sidebar() {
             : false;
 
           const iconBadge = (
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+            <span className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0
               transition-all duration-150 group-hover:shadow-sm ${mod.bg}`}>
-              <Icon size={17} className={mod.text} />
+              <Icon size={21} className={mod.text} />
             </span>
           );
 
@@ -199,7 +199,7 @@ export default function Sidebar() {
               >
                 {iconBadge}
                 {expanded && (
-                  <span className={`text-[13px] whitespace-nowrap overflow-hidden font-medium
+                  <span className={`text-[13.5px] whitespace-nowrap overflow-hidden font-medium
                     ${isActive ? "text-rose-500" : "text-stone-500 group-hover:text-stone-700"}`}>
                     {mod.label}
                   </span>
@@ -220,7 +220,7 @@ export default function Sidebar() {
                 {iconBadge}
                 {expanded && (
                   <>
-                    <span className={`flex-1 text-[13px] text-left whitespace-nowrap font-medium
+                    <span className={`flex-1 text-[13.5px] text-left whitespace-nowrap font-medium
                       ${anyChildActive ? "text-rose-500" : "text-stone-500 group-hover:text-stone-700"}`}>
                       {mod.label}
                     </span>
