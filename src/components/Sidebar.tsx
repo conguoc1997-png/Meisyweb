@@ -90,7 +90,9 @@ const MODULES: NavModule[] = [
     bg: "bg-gradient-to-br from-indigo-500 to-indigo-700", text: "text-white",
     children: [
       { href: "/ke-toan/nhap-kho",  label: "Nhập kho NPL",   icon: Package,       moduleKey: "ke-toan" },
+      { href: "/ke-toan/xuat-kho",  label: "Xuất kho NPL",   icon: Package,       moduleKey: "ke-toan" },
       { href: "/ke-toan/ton-kho",   label: "Tồn kho NPL",    icon: ClipboardList, moduleKey: "ke-toan" },
+      { href: "/ke-toan/dinh-muc",  label: "Định mức NPL",   icon: ClipboardList, moduleKey: "ke-toan" },
       { href: "/ke-toan/cong-no",   label: "Công nợ NCC",    icon: BookOpen,      moduleKey: "ke-toan" },
     ],
   },

@@ -244,6 +244,50 @@ model HoaDonTon {
   updatedAt DateTime @updatedAt
 }
 
+// ===================== MODULE XUẤT KHO NPL =====================
+
+// Định mức NPL theo loại hàng (BOM)
+model DinhMucNPL {
+  id        String   @id @default(cuid())
+  hangCat   String   // tên loại hàng, e.g. "Áo sơ mi", "Quần âu"
+  vatTuId   String
+  soLuong   Float    // định mức trên 100 sản phẩm
+  ghiChu    String?
+  createdAt DateTime @default(now())
+
+  vatTu VatTu @relation(fields: [vatTuId], references: [id])
+}
+
+// Phiếu xuất kho NPL (liên kết lô cắt)
+model PhieuXuatKho {
+  id        String   @id @default(cuid())
+  soPhieu   String   @unique
+  loCatId   String?  // lô cắt tương ứng
+  hangCat   String?  // loại hàng cắt
+  soSanPham Int      @default(0) // số SP thực tế của lô
+  ngay      DateTime
+  lyDo      String   @default("san_xuat") // san_xuat | dieu_chinh | khac
+  ghiChu    String?
+  nguoiTao  String?
+  createdAt DateTime @default(now())
+
+  chiTiet PhieuXuatChiTiet[]
+}
+
+// Chi tiết phiếu xuất
+model PhieuXuatChiTiet {
+  id          String @id @default(cuid())
+  phieuXuatId String
+  vatTuId     String
+  soLuong     Float
+  donGia      Float  @default(0) // giá vốn bình quân tại thời điểm xuất
+  thanhTien   Float  @default(0)
+  ghiChu      String?
+
+  phieu PhieuXuatKho @relation(fields: [phieuXuatId], references: [id], onDelete: Cascade)
+  vatTu VatTu        @relation(fields: [vatTuId], references: [id])
+}
+
 // ===================== MODULE KẾ TOÁN =====================
 
 // Danh mục nguyên phụ liệu
@@ -258,8 +302,10 @@ model VatTu {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  tonKho    TonKhoVatTu?
-  chiTiet   ChiTietNhapKho[]
+  tonKho      TonKhoVatTu?
+  chiTiet     ChiTietNhapKho[]
+  dinhMuc     DinhMucNPL[]
+  xuatChiTiet PhieuXuatChiTiet[]
 }
 
 // Tồn kho nguyên phụ liệu (1 dòng / vật tư)
