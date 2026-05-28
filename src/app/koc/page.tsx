@@ -204,6 +204,26 @@ export default function KocPage() {
     });
   }, [sanPhams, bookings]);
 
+  // KOC mới thêm vào chưa có booking nào
+  const newKOCs = useMemo(() => {
+    return kocs.filter(k => !bookings.some(b => b.kocId === k.id));
+  }, [kocs, bookings]);
+
+  // KOC đã hợp tác từ 2 lần trở lên (gợi ý tái booking)
+  const repeatKOCs = useMemo(() => {
+    return kocs
+      .map(k => {
+        const myBookings = bookings.filter(b => b.kocId === k.id);
+        const done = myBookings.filter(b => b.trangThai === "ket_thuc");
+        const totalCost = done.reduce((s, b) => s + b.chiPhi, 0);
+        const totalRev  = done.reduce((s, b) => s + b.doanhThu, 0);
+        const roi = totalCost > 0 ? ((totalRev - totalCost) / totalCost * 100) : null;
+        return { ...k, bookingCount: myBookings.length, doneCount: done.length, roi };
+      })
+      .filter(k => k.bookingCount >= 2)
+      .sort((a, b) => (b.roi ?? -999) - (a.roi ?? -999));
+  }, [kocs, bookings]);
+
   const kocRankings = useMemo(() => {
     return kocs.map(k => {
       const done = bookings.filter(b => b.kocId === k.id && b.trangThai === "ket_thuc");
@@ -663,9 +683,9 @@ export default function KocPage() {
         </div>
       )}
 
-      {/* Đề xuất KOC — sản phẩm mới chưa có booking */}
-      {newSanPhams.length > 0 && (
-        <div className="mb-5 bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 rounded-xl overflow-hidden">
+      {/* Gợi ý Booking */}
+      {(newKOCs.length > 0 || repeatKOCs.length > 0) && (
+        <div className="mb-5 bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setShowDeXuat(v => !v)}
             className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/30 transition text-left"
@@ -675,79 +695,76 @@ export default function KocPage() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-rose-700">
-                Đề xuất Booking — {newSanPhams.length} sản phẩm mới chưa có KOC
+                Gợi ý Booking —
+                {newKOCs.length > 0 && <span className="ml-1">{newKOCs.length} KOC mới chưa booking</span>}
+                {newKOCs.length > 0 && repeatKOCs.length > 0 && <span className="text-rose-400"> · </span>}
+                {repeatKOCs.length > 0 && <span>{repeatKOCs.length} KOC nên tái hợp tác</span>}
               </p>
-              <p className="text-xs text-rose-500">Sản phẩm thêm trong 7 ngày qua • Nhấn để {showDeXuat ? "thu gọn" : "xem"}</p>
+              <p className="text-xs text-rose-400 mt-0.5">Nhấn để {showDeXuat ? "thu gọn" : "xem chi tiết"}</p>
             </div>
             {showDeXuat ? <ChevronUp size={16} className="text-rose-400" /> : <ChevronDown size={16} className="text-rose-400" />}
           </button>
 
           {showDeXuat && (
-            <div className="border-t border-rose-100 divide-y divide-rose-100">
-              {newSanPhams.map(sp => {
-                const daysSince = Math.floor((Date.now() - new Date(sp.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-                const top3 = kocRankings.slice(0, 3);
-                return (
-                  <div key={sp.id} className="px-5 py-4">
-                    {/* Sản phẩm header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 bg-white rounded-lg border border-rose-200 flex items-center justify-center flex-shrink-0">
-                        <Package size={14} className="text-rose-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-slate-800 text-sm truncate">{sp.ten}</span>
-                          <span className="text-xs font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500">{sp.sku}</span>
-                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
-                            {daysSince === 0 ? "Hôm nay" : `${daysSince} ngày trước`}
-                          </span>
-                          {sp.giaNhap > 0 && (
-                            <span className="text-xs text-slate-400">Giá nhập: {formatCurrency(sp.giaNhap)}</span>
-                          )}
+            <div className="border-t border-rose-100">
+              {/* Nhóm 1: KOC mới chưa có booking */}
+              {newKOCs.length > 0 && (
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-bold text-rose-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+                    KOC mới — chưa có booking nào ({newKOCs.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {newKOCs.map(k => (
+                      <div key={k.id}
+                        className="flex items-center gap-2.5 bg-white border border-rose-100 rounded-xl px-3 py-2 shadow-sm hover:shadow-md transition">
+                        <div className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+                          <Users size={13} className="text-rose-400" />
                         </div>
-                      </div>
-                      <button
-                        onClick={() => openLaunch(sp)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition flex-shrink-0 font-medium"
-                      >
-                        <Plus size={12} /> Booking ngay
-                      </button>
-                    </div>
-
-                    {/* Gợi ý top KOC */}
-                    {top3.length > 0 && (
-                      <div>
-                        <p className="text-xs text-slate-400 mb-2 ml-11">Gợi ý KOC theo hiệu quả:</p>
-                        <div className="ml-11 flex flex-wrap gap-2">
-                          {top3.map((k, idx) => (
-                            <div
-                              key={k.id}
-                              className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs"
-                            >
-                              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 ${idx === 0 ? "bg-yellow-400" : idx === 1 ? "bg-slate-400" : "bg-orange-300"}`}>
-                                {idx + 1}
-                              </span>
-                              <div>
-                                <p className="font-medium text-slate-800">{k.ten}</p>
-                                <p className="text-slate-400">
-                                  {k.roi !== null
-                                    ? <span className={k.roi >= 0 ? "text-green-600 font-semibold" : "text-red-500"}>ROI {k.roi >= 0 ? "+" : ""}{k.roi.toFixed(0)}%</span>
-                                    : <span className="text-slate-400">Chưa có dữ liệu</span>
-                                  }
-                                  {k.doneCount > 0 && <span className="ml-1 text-slate-400">· {k.doneCount} chiến dịch</span>}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                          {kocRankings.length === 0 && (
-                            <span className="text-xs text-slate-400 italic">Chưa có KOC nào trong hệ thống</span>
-                          )}
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{k.ten}</p>
+                          <p className="text-[10px] text-slate-400 capitalize">
+                            {PLATFORM_LABEL[k.platform]} {k.follower > 0 && `· ${(k.follower/1000).toFixed(0)}K`}
+                          </p>
                         </div>
+                        <span className="text-[10px] bg-rose-50 text-rose-500 border border-rose-200 px-1.5 py-0.5 rounded-full font-medium">Mới</span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {/* Nhóm 2: KOC đã hợp tác ≥ 2 lần */}
+              {repeatKOCs.length > 0 && (
+                <div className={`px-5 py-4 ${newKOCs.length > 0 ? "border-t border-rose-100" : ""}`}>
+                  <p className="text-[11px] font-bold text-purple-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
+                    Đã hợp tác ≥ 2 lần — nên tái booking ({repeatKOCs.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {repeatKOCs.map((k, idx) => (
+                      <div key={k.id}
+                        className="flex items-center gap-2.5 bg-white border border-purple-100 rounded-xl px-3 py-2 shadow-sm hover:shadow-md transition">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold ${
+                          idx === 0 ? "bg-yellow-400" : idx === 1 ? "bg-slate-400" : "bg-orange-300"}`}>
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{k.ten}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {k.bookingCount} lần booking
+                            {k.roi !== null && (
+                              <span className={`ml-1 font-semibold ${k.roi >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                · ROI {k.roi >= 0 ? "+" : ""}{k.roi.toFixed(0)}%
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
