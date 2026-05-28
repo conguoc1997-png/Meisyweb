@@ -577,40 +577,6 @@ export default function KocPage() {
         <p className="text-slate-500 text-sm mt-1">Quản lý và đánh giá hiệu quả booking KOC</p>
       </div>
 
-      {/* ── Reminder banner: ngayLenVideo trong 2 ngày tới ── */}
-      {showReminder && reminders.length > 0 && (
-        <div className="mb-5 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Bell size={15} className="text-orange-500 animate-pulse" />
-              <span className="text-sm font-semibold text-orange-700">
-                {reminders.length} KOC sắp lên video trong 2 ngày tới
-              </span>
-            </div>
-            <button onClick={() => setShowReminder(false)} className="text-orange-400 hover:text-orange-600 transition">
-              <XCircle size={15} />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {reminders.map(r => {
-              const d = r.ngayLenVideo ? new Date(r.ngayLenVideo) : null;
-              const daysLeft = d ? Math.ceil((d.getTime() - Date.now()) / 86400000) : null;
-              return (
-                <div key={r.id} className="flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-1.5 text-xs">
-                  <CalendarDays size={11} className="text-orange-400" />
-                  <span className="font-semibold text-slate-700">{r.koc.ten}</span>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-slate-500">{r.sanPham?.ten ?? "Chưa chọn SP"}</span>
-                  <span className={`font-bold ${daysLeft === 0 ? "text-red-600" : "text-orange-600"}`}>
-                    {daysLeft === 0 ? "Hôm nay!" : daysLeft === 1 ? "Ngày mai" : `${daysLeft} ngày nữa`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Stats */}
       <div className="grid grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
@@ -634,6 +600,68 @@ export default function KocPage() {
           <p className={`text-xl font-bold ${Number(roiTB) >= 0 ? "text-green-600" : "text-red-600"}`}>{roiTB}%</p>
         </div>
       </div>
+
+      {/* ── Reminder: lịch lên video sắp tới ── */}
+      {reminders.length > 0 && (
+        <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowReminder(v => !v)}
+            className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/30 transition text-left"
+          >
+            <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0 relative">
+              <Bell size={14} className="text-white" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">
+                {reminders.length}
+              </span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-800">
+                Lịch lên video sắp tới — {reminders.length} KOC
+              </p>
+              <p className="text-xs text-amber-600">Nhấn để {showReminder ? "thu gọn" : "xem chi tiết"}</p>
+            </div>
+            {showReminder ? <ChevronUp size={16} className="text-amber-400" /> : <ChevronDown size={16} className="text-amber-400" />}
+          </button>
+
+          {showReminder && (() => {
+            const today     = reminders.filter(r => { const d = new Date(r.ngayLenVideo!); const now = new Date(); return d.toDateString() === now.toDateString(); });
+            const tomorrow  = reminders.filter(r => { const d = new Date(r.ngayLenVideo!); const tm = new Date(); tm.setDate(tm.getDate() + 1); return d.toDateString() === tm.toDateString(); });
+            const in2days   = reminders.filter(r => { const d = new Date(r.ngayLenVideo!); const t2 = new Date(); t2.setDate(t2.getDate() + 2); return d.toDateString() === t2.toDateString(); });
+
+            const Section = ({ label, items, color }: { label: string; items: typeof reminders; color: string }) =>
+              items.length === 0 ? null : (
+                <div className="border-t border-amber-100 px-5 py-3">
+                  <p className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${color}`}>{label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {items.map(r => (
+                      <div key={r.id} className="flex items-center gap-2 bg-white border border-amber-100 rounded-lg px-3 py-1.5 shadow-sm">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${color.replace("text-", "bg-")}`} />
+                        <span className="text-xs font-semibold text-slate-700">{r.koc.ten}</span>
+                        {r.sanPham && (
+                          <>
+                            <span className="text-amber-300">·</span>
+                            <span className="text-xs text-slate-500 max-w-[120px] truncate">{r.sanPham.ten}</span>
+                          </>
+                        )}
+                        <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                          {r.ngayLenVideo ? new Date(r.ngayLenVideo).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }) : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+
+            return (
+              <>
+                <Section label="🔴  Hôm nay" items={today}   color="text-red-600" />
+                <Section label="🟠  1 ngày nữa" items={tomorrow} color="text-orange-500" />
+                <Section label="🟡  2 ngày nữa" items={in2days}  color="text-amber-500" />
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Đề xuất KOC — sản phẩm mới chưa có booking */}
       {newSanPhams.length > 0 && (
