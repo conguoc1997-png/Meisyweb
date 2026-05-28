@@ -50,6 +50,10 @@ export async function PATCH(
           chiPhiSP: Number(body.chiPhiSP),
           chiPhi: Number(body.chiPhiCast ?? 0) + Number(body.chiPhiSP),
         }),
+        // Ngày lên video + trạng thái gửi/nhận
+        ...(body.ngayLenVideo !== undefined && { ngayLenVideo: body.ngayLenVideo ? new Date(body.ngayLenVideo) : null }),
+        ...(body.daSent !== undefined && { daSent: Boolean(body.daSent) }),
+        ...(body.daRecv !== undefined && { daRecv: Boolean(body.daRecv) }),
       },
       include: { koc: true, sanPham: true },
     });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download, Bell, Circle, CalendarDays, Send, PackageCheck } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -11,6 +11,7 @@ type Booking = {
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
   ngayBat: string; ngayKet: string | null;
   trangThai: string; doanhThu: number; donHang: number; luotXem: number; ghiChu: string | null;
+  ngayLenVideo: string | null; daSent: boolean; daRecv: boolean;
   koc: KOC; sanPham: SanPham | null;
 };
 
@@ -84,6 +85,10 @@ export default function KocPage() {
   const [editingGCId, setEditingGCId] = useState<string | null>(null);
   const slRef = useRef<HTMLInputElement>(null);
   const gcRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Reminder: bookings có ngayLenVideo trong 2 ngày tới ──
+  const [reminders, setReminders] = useState<Booking[]>([]);
+  const [showReminder, setShowReminder] = useState(true);
 
   const patchBookingBackground = (id: string, data: Record<string, unknown>) => {
     // Fire-and-forget — không chờ response, UI đã cập nhật optimistic rồi
@@ -168,14 +173,16 @@ export default function KocPage() {
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
   const fetchData = async () => {
-    const [k, b, sp] = await Promise.all([
+    const [k, b, sp, rem] = await Promise.all([
       fetch("/api/koc").then((r) => r.json()),
       fetch("/api/koc/booking").then((r) => r.json()),
       fetch("/api/kho/san-pham").then((r) => r.json()),
+      fetch("/api/koc/remind").then((r) => r.json()),
     ]);
     setKocs(k);
     setBookings(b);
     setSanPhams(Array.isArray(sp) ? sp : sp.data ?? []);
+    if (Array.isArray(rem)) setReminders(rem);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -570,6 +577,40 @@ export default function KocPage() {
         <p className="text-slate-500 text-sm mt-1">Quản lý và đánh giá hiệu quả booking KOC</p>
       </div>
 
+      {/* ── Reminder banner: ngayLenVideo trong 2 ngày tới ── */}
+      {showReminder && reminders.length > 0 && (
+        <div className="mb-5 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Bell size={15} className="text-orange-500 animate-pulse" />
+              <span className="text-sm font-semibold text-orange-700">
+                {reminders.length} KOC sắp lên video trong 2 ngày tới
+              </span>
+            </div>
+            <button onClick={() => setShowReminder(false)} className="text-orange-400 hover:text-orange-600 transition">
+              <XCircle size={15} />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {reminders.map(r => {
+              const d = r.ngayLenVideo ? new Date(r.ngayLenVideo) : null;
+              const daysLeft = d ? Math.ceil((d.getTime() - Date.now()) / 86400000) : null;
+              return (
+                <div key={r.id} className="flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-1.5 text-xs">
+                  <CalendarDays size={11} className="text-orange-400" />
+                  <span className="font-semibold text-slate-700">{r.koc.ten}</span>
+                  <span className="text-slate-400">·</span>
+                  <span className="text-slate-500">{r.sanPham?.ten ?? "Chưa chọn SP"}</span>
+                  <span className={`font-bold ${daysLeft === 0 ? "text-red-600" : "text-orange-600"}`}>
+                    {daysLeft === 0 ? "Hôm nay!" : daysLeft === 1 ? "Ngày mai" : `${daysLeft} ngày nữa`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
@@ -896,6 +937,15 @@ export default function KocPage() {
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá cast</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Trạng thái</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Ghi chú</th>
+                              <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">
+                                <div className="flex items-center gap-1 justify-center"><CalendarDays size={11} /> Ngày lên video</div>
+                              </th>
+                              <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">
+                                <div className="flex items-center gap-1 justify-center"><Send size={11} /> Đã gửi</div>
+                              </th>
+                              <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">
+                                <div className="flex items-center gap-1 justify-center"><PackageCheck size={11} /> Đã nhận</div>
+                              </th>
                               <th className="px-4 py-2.5"></th>
                             </tr>
                           </thead>
@@ -969,6 +1019,57 @@ export default function KocPage() {
                                         : <span className="text-slate-300 italic">+ ghi chú</span>}
                                     </button>
                                   )}
+                                </td>
+                                {/* Ngày lên video — date picker */}
+                                <td className="px-3 py-3 text-center">
+                                  {(() => {
+                                    const isNear = b.ngayLenVideo
+                                      ? (new Date(b.ngayLenVideo).getTime() - Date.now()) / 86400000 <= 2
+                                        && new Date(b.ngayLenVideo) > new Date()
+                                      : false;
+                                    return (
+                                      <div className="relative">
+                                        <input
+                                          type="date"
+                                          defaultValue={b.ngayLenVideo ? b.ngayLenVideo.slice(0, 10) : ""}
+                                          onChange={e => {
+                                            const val = e.target.value || null;
+                                            setBookings(prev => prev.map(x => x.id === b.id ? { ...x, ngayLenVideo: val } : x));
+                                            patchBookingBackground(b.id, { ngayLenVideo: val });
+                                          }}
+                                          className={`text-xs px-2 py-1 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer
+                                            ${isNear ? "border-orange-300 bg-orange-50 text-orange-700 font-semibold" : "border-slate-200 bg-white text-slate-600"}`}
+                                        />
+                                        {isNear && <Bell size={10} className="absolute -top-1 -right-1 text-orange-500 animate-pulse" />}
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+                                {/* Đã gửi */}
+                                <td className="px-3 py-3 text-center">
+                                  <button onClick={() => {
+                                    const next = !b.daSent;
+                                    setBookings(prev => prev.map(x => x.id === b.id ? { ...x, daSent: next } : x));
+                                    patchBookingBackground(b.id, { daSent: next });
+                                  }}
+                                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
+                                      b.daSent ? "bg-blue-500 border-blue-500 text-white shadow-sm" : "border-slate-300 hover:border-blue-400 bg-white"
+                                    }`}>
+                                    {b.daSent ? <CheckCircle size={14} /> : <Circle size={14} className="text-slate-300" />}
+                                  </button>
+                                </td>
+                                {/* Đã nhận */}
+                                <td className="px-3 py-3 text-center">
+                                  <button onClick={() => {
+                                    const next = !b.daRecv;
+                                    setBookings(prev => prev.map(x => x.id === b.id ? { ...x, daRecv: next } : x));
+                                    patchBookingBackground(b.id, { daRecv: next });
+                                  }}
+                                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
+                                      b.daRecv ? "bg-green-500 border-green-500 text-white shadow-sm" : "border-slate-300 hover:border-green-400 bg-white"
+                                    }`}>
+                                    {b.daRecv ? <CheckCircle size={14} /> : <Circle size={14} className="text-slate-300" />}
+                                  </button>
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center gap-1 justify-end">
