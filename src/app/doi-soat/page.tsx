@@ -117,12 +117,6 @@ export default function DoiSoatPage() {
     const maDon = raw.trim();
     if (!maDon) return;
     setAddScanInput("");
-    // Kiểm tra trùng trong dons hiện tại
-    const exists = dons.some(d => d.maDon.toLowerCase() === maDon.toLowerCase());
-    if (exists) {
-      setAddScanLog(prev => [{ maDon, status: "dup" as const, ts: Date.now() }, ...prev].slice(0, 50));
-      return;
-    }
     try {
       const res = await fetch("/api/doi-soat", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -135,7 +129,7 @@ export default function DoiSoatPage() {
     } catch {
       setAddScanLog(prev => [{ maDon, status: "err" as const, ts: Date.now() }, ...prev].slice(0, 50));
     }
-  }, [dons, addScanSan]);
+  }, [addScanSan]);
 
   // Chọn nhiều để bulk action
   const [selected, setSelected] = useState<Set<string>>(new Set());
