@@ -500,6 +500,11 @@ export default function DoiSoatPage() {
             {scanActive ? "Đang quét" : "Quét mã vạch"}
           </button>
 
+          {/* Hướng dẫn */}
+          <span className="text-xs font-medium text-red-500 whitespace-nowrap">
+            Hãy điền mã đơn shipper trả vào
+          </span>
+
           {/* Input nhận scan */}
           <input ref={scanRef} type="text" value={scanInput}
             onChange={e => setScanInput(e.target.value)}
