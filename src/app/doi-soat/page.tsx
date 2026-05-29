@@ -501,7 +501,10 @@ export default function DoiSoatPage() {
           </button>
 
           {/* Hướng dẫn */}
-          <span className="text-xs font-medium text-red-500 whitespace-nowrap">
+          <span
+            className="text-xs font-medium text-red-500 whitespace-nowrap cursor-pointer hover:text-red-600"
+            onClick={() => { setScanActive(true); setTimeout(() => scanRef.current?.focus(), 50); }}
+          >
             Hãy điền mã đơn shipper trả vào
           </span>
 
@@ -509,8 +512,9 @@ export default function DoiSoatPage() {
           <input ref={scanRef} type="text" value={scanInput}
             onChange={e => setScanInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") handleScan(scanInput); }}
+            onClick={() => { if (!scanActive) { setScanActive(true); scanRef.current?.focus(); } }}
             placeholder={scanActive ? "Đưa mã vạch vào đây — quét hoặc nhập tay rồi Enter..." : "Bấm 'Quét mã vạch' để bắt đầu"}
-            disabled={!scanActive}
+            disabled={false}
             className={`flex-1 min-w-[260px] text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono transition ${
               scanActive ? "border-indigo-300 bg-white" : "border-slate-200 bg-slate-50 text-slate-400"
             }`}
