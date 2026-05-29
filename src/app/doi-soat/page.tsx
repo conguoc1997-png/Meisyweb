@@ -111,12 +111,23 @@ export default function DoiSoatPage() {
   const [addScanInput, setAddScanInput] = useState("");
   const [addScanSan, setAddScanSan] = useState("shopee");
   const [addScanLog, setAddScanLog] = useState<AddScanLog[]>([]);
+  const [addScanDupWarning, setAddScanDupWarning] = useState<{ maDon: string; createdAt: string } | null>(null);
   const addScanRef = useRef<HTMLInputElement>(null);
 
   const handleAddScan = useCallback(async (raw: string) => {
     const maDon = raw.trim();
     if (!maDon) return;
     setAddScanInput("");
+    setAddScanDupWarning(null);
+
+    // Kiểm tra trùng — nếu có thì cảnh báo, không thêm
+    const existing = dons.find(d => d.maDon.toLowerCase() === maDon.toLowerCase());
+    if (existing) {
+      setAddScanDupWarning({ maDon, createdAt: existing.createdAt });
+      setAddScanLog(prev => [{ maDon, status: "dup" as const, ts: Date.now() }, ...prev].slice(0, 50));
+      return;
+    }
+
     try {
       const res = await fetch("/api/doi-soat", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -129,7 +140,7 @@ export default function DoiSoatPage() {
     } catch {
       setAddScanLog(prev => [{ maDon, status: "err" as const, ts: Date.now() }, ...prev].slice(0, 50));
     }
-  }, [addScanSan]);
+  }, [dons, addScanSan]);
 
   // Chọn nhiều để bulk action
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -917,19 +928,46 @@ export default function DoiSoatPage() {
                 </div>
 
                 {/* Input quét */}
-                <div className={`rounded-xl border-2 p-3 transition-colors border-indigo-400 bg-indigo-50/50`}>
-                  <p className="text-xs text-indigo-600 font-medium mb-2">Quét mã vạch đơn hàng — Enter để thêm</p>
+                <div className={`rounded-xl border-2 p-3 transition-colors ${addScanDupWarning ? "border-red-400 bg-red-50/50" : "border-indigo-400 bg-indigo-50/50"}`}>
+                  <p className={`text-xs font-medium mb-2 ${addScanDupWarning ? "text-red-500" : "text-indigo-600"}`}>
+                    Quét mã vạch đơn hàng — Enter để thêm
+                  </p>
                   <input
                     ref={addScanRef}
                     autoFocus
                     type="text"
                     value={addScanInput}
-                    onChange={e => setAddScanInput(e.target.value)}
+                    onChange={e => { setAddScanInput(e.target.value); setAddScanDupWarning(null); }}
                     onKeyDown={e => { if (e.key === "Enter") handleAddScan(addScanInput); }}
                     placeholder="Đưa mã vạch vào đây hoặc nhập tay rồi Enter..."
-                    className="w-full text-sm font-mono px-3 py-2 rounded-lg border border-indigo-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className={`w-full text-sm font-mono px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 ${addScanDupWarning ? "border-red-300 focus:ring-red-300" : "border-indigo-300 focus:ring-indigo-400"}`}
                   />
                 </div>
+
+                {/* Cảnh báo trùng đơn */}
+                {addScanDupWarning && (
+                  <div className="rounded-xl bg-red-50 border-2 border-red-300 px-4 py-3 flex items-start gap-3">
+                    <span className="text-red-500 text-2xl leading-none mt-0.5">⚠️</span>
+                    <div>
+                      <p className="text-red-600 font-bold text-base leading-snug">
+                        Đơn này đã được nhập rồi!
+                      </p>
+                      <p className="text-red-500 font-mono font-semibold text-sm mt-0.5">
+                        {addScanDupWarning.maDon}
+                      </p>
+                      <p className="text-red-400 text-sm mt-1">
+                        Đã nhập lúc{" "}
+                        <span className="font-semibold">
+                          {new Date(addScanDupWarning.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {" "}ngày{" "}
+                        <span className="font-semibold">
+                          {new Date(addScanDupWarning.createdAt).toLocaleDateString("vi-VN")}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Log thêm đơn */}
                 {addScanLog.length > 0 && (
