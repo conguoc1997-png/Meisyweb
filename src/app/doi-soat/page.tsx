@@ -89,7 +89,9 @@ export default function DoiSoatPage() {
   const [search, setSearch] = useState("");
   const [filterSan, setFilterSan] = useState("");
   const [filterTT, setFilterTT] = useState("");
-  const [filterDoiSoat, setFilterDoiSoat] = useState<"" | "da" | "chua">(""); // "" | "da" | "chua"
+  const [filterDoiSoat, setFilterDoiSoat] = useState<"" | "da" | "chua">("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
 
   // Import modal
   const [showImport, setShowImport] = useState(false);
@@ -364,6 +366,14 @@ export default function DoiSoatPage() {
     if (filterTT  && d.trangThai !== filterTT) return false;
     if (filterDoiSoat === "da"   && !d.daDoiSoat) return false;
     if (filterDoiSoat === "chua" &&  d.daDoiSoat) return false;
+    if (filterFrom) {
+      const from = new Date(filterFrom); from.setHours(0,0,0,0);
+      if (new Date(d.createdAt) < from) return false;
+    }
+    if (filterTo) {
+      const to = new Date(filterTo); to.setHours(23,59,59,999);
+      if (new Date(d.createdAt) > to) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       if (!d.maDon.toLowerCase().includes(q) &&
@@ -371,7 +381,7 @@ export default function DoiSoatPage() {
           !d.tenSP.toLowerCase().includes(q)) return false;
     }
     return true;
-  }), [dons, filterSan, filterTT, filterDoiSoat, search]);
+  }), [dons, filterSan, filterTT, filterDoiSoat, filterFrom, filterTo, search]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
@@ -459,8 +469,24 @@ export default function DoiSoatPage() {
           <option value="da">Đã đối soát ✓</option>
           <option value="chua">Chưa đối soát</option>
         </select>
-        {(search || filterSan || filterTT || filterDoiSoat) && (
-          <button onClick={() => { setSearch(""); setFilterSan(""); setFilterTT(""); setFilterDoiSoat(""); }}
+        {/* Lọc ngày */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 whitespace-nowrap">Từ</span>
+          <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white" />
+          <span className="text-xs text-slate-400 whitespace-nowrap">đến</span>
+          <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+            min={filterFrom || undefined}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white" />
+          {(filterFrom || filterTo) && (
+            <button onClick={() => { setFilterFrom(""); setFilterTo(""); }}
+              className="text-slate-300 hover:text-slate-500 transition">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {(search || filterSan || filterTT || filterDoiSoat || filterFrom || filterTo) && (
+          <button onClick={() => { setSearch(""); setFilterSan(""); setFilterTT(""); setFilterDoiSoat(""); setFilterFrom(""); setFilterTo(""); }}
             className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 rounded hover:bg-slate-100 transition">
             ✕ Xoá lọc
           </button>
