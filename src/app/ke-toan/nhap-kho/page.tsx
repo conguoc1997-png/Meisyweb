@@ -132,7 +132,10 @@ export default function NhapKhoPage() {
       if (patch.donViMua && patch.donViMua !== r.donViMua) {
         updated.quyDoi = DEFAULT_QUY_DOI[patch.donViMua] ?? 1;
       }
-      updated.soLuong = updated.soLuongMua * updated.quyDoi;
+      // Chỉ tự tính lại soLuong khi KHÔNG chỉnh tay soLuong
+      if (patch.soLuong === undefined) {
+        updated.soLuong = updated.soLuongMua * updated.quyDoi;
+      }
       updated.thanhTien = updated.soLuongMua * updated.donGia;
       return updated;
     }));
@@ -430,12 +433,18 @@ export default function NhapKhoPage() {
                               )}
                             </td>
 
-                            {/* Tổng mét — chỉ hiện khi đơn vị có quy đổi */}
+                            {/* Tổng mét — editable, auto-fill từ soLuongMua×quyDoi */}
                             <td className="px-3 py-1.5 align-top">
                               {showQD ? (
-                                <span className={`text-xs font-semibold ${row.soLuong > 0 ? "text-teal-600" : "text-slate-300"}`}>
-                                  {row.soLuong > 0 ? `${fmt(row.soLuong)} m` : "—"}
-                                </span>
+                                <div>
+                                  <input
+                                    type="number" min={0} step="0.01"
+                                    value={row.soLuong || ""}
+                                    onChange={e => updateRow(i, { soLuong: parseFloat(e.target.value) || 0 })}
+                                    className="w-full border border-teal-200 rounded-lg px-2 py-1.5 text-xs text-right font-semibold text-teal-700 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50"
+                                  />
+                                  <p className="text-[10px] text-slate-400 mt-0.5">m</p>
+                                </div>
                               ) : (
                                 <span className="text-xs text-slate-300">—</span>
                               )}
