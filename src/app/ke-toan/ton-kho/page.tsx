@@ -27,7 +27,22 @@ const LOAI_OPTIONS = [
 
 const NHOM_OPTIONS: Record<string, string[]> = {
   vai:      ["vai_cotton", "vai_thun", "vai_lua", "khac"],
-  phu_lieu: ["chi", "cuc", "khoa_keo", "mex", "nhan", "dong_goi", "khac"],
+  phu_lieu: ["chi", "cuc", "khoa_keo", "lot", "dinh_tan", "mex", "nhan", "dong_goi", "khac"],
+};
+
+const NHOM_LABEL: Record<string, string> = {
+  vai_cotton: "Vải cotton",
+  vai_thun:   "Vải thun",
+  vai_lua:    "Vải lụa",
+  chi:        "Chỉ",
+  cuc:        "Cúc",
+  khoa_keo:   "Khóa / Kéo",
+  lot:        "Lót",
+  dinh_tan:   "Đinh tán",
+  mex:        "Mex",
+  nhan:       "Nhãn",
+  dong_goi:   "Đóng gói",
+  khac:       "Khác",
 };
 
 const DON_VI_OPTIONS = ["m", "yard", "kg", "cai", "cuon", "thuong", "bo", "met"];
@@ -156,7 +171,7 @@ export default function TonKhoPage() {
           <select value={filterNhom} onChange={e => setFilterNhom(e.target.value)}
             className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
             <option value="">Tất cả nhóm</option>
-            {allNhom.map(n => <option key={n} value={n}>{n}</option>)}
+            {allNhom.map(n => <option key={n} value={n}>{NHOM_LABEL[n] ?? n}</option>)}
           </select>
         )}
       </div>
@@ -192,7 +207,7 @@ export default function TonKhoPage() {
                   <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${t.vatTu.loai === "vai" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"}`}>
                     {LOAI_OPTIONS.find(l => l.value === t.vatTu.loai)?.label}
                   </span>
-                  {t.vatTu.nhom && <span className="ml-1.5 text-xs text-slate-400">{t.vatTu.nhom}</span>}
+                  {t.vatTu.nhom && <span className="ml-1.5 text-xs text-slate-400">{NHOM_LABEL[t.vatTu.nhom] ?? t.vatTu.nhom}</span>}
                 </td>
                 <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(t.soLuong)}</td>
                 <td className="px-4 py-3 text-right text-slate-500">{t.vatTu.donVi}</td>
@@ -259,7 +274,7 @@ export default function TonKhoPage() {
                   <select value={form.nhom} onChange={e => setForm(f => ({ ...f, nhom: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                     <option value="">— Chọn nhóm —</option>
-                    {nhomOptions.map(n => <option key={n} value={n}>{n}</option>)}
+                    {nhomOptions.map(n => <option key={n} value={n}>{NHOM_LABEL[n] ?? n}</option>)}
                   </select>
                 </div>
               </div>
