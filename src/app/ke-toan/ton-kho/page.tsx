@@ -26,7 +26,7 @@ const LOAI_OPTIONS = [
 ];
 
 const NHOM_OPTIONS: Record<string, string[]> = {
-  vai:      ["vai_cotton", "vai_thun", "vai_lua", "khac"],
+  vai:      ["vai_cotton", "vai_thun", "vai_lua", "vai_kaki", "vai_jean", "khac"],
   phu_lieu: ["chi", "cuc", "khoa_keo", "lot", "dinh_tan", "mex", "nhan", "dong_goi", "khac"],
 };
 
@@ -34,6 +34,8 @@ const NHOM_LABEL: Record<string, string> = {
   vai_cotton: "Vải cotton",
   vai_thun:   "Vải thun",
   vai_lua:    "Vải lụa",
+  vai_kaki:   "Kaki",
+  vai_jean:   "Jean / Bò",
   chi:        "Chỉ",
   cuc:        "Cúc",
   khoa_keo:   "Khóa / Kéo",
