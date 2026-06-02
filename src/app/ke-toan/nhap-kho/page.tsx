@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle, UserPlus, ArrowLeftRight } from "lucide-react";
+import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle, UserPlus, ArrowLeftRight, Pencil } from "lucide-react";
 
 type VatTu = {
   id: string; ma: string; ten: string; loai: string; nhom: string | null; donVi: string;
@@ -65,8 +65,9 @@ export default function NhapKhoPage() {
   const [search, setSearch]     = useState("");
   const [filterNCC, setFilterNCC] = useState("");
 
-  const [modal, setModal]       = useState<"create" | "view" | "addNCC" | "quyDoi" | null>(null);
+  const [modal, setModal]       = useState<"create" | "edit" | "view" | "addNCC" | "quyDoi" | null>(null);
   const [selected, setSelected] = useState<PhieuNhap | null>(null);
+  const [editId, setEditId]     = useState<string | null>(null);
 
   // Form nhập kho
   const [form, setForm] = useState({
@@ -174,6 +175,54 @@ export default function NhapKhoPage() {
     }
   }
 
+  function openEdit(p: PhieuNhap) {
+    setEditId(p.id);
+    setForm({
+      soPhieu:    p.soPhieu,
+      ngay:       p.ngay.slice(0, 10),
+      nhaCC:      p.nhaCC,
+      tenNhaCC:   p.tenNhaCC || "",
+      soHoaDon:   p.soHoaDon || "",
+      ngayHoaDon: p.ngayHoaDon ? p.ngayHoaDon.slice(0, 10) : "",
+      ghiChu:     p.ghiChu || "",
+      nguoiTao:   p.nguoiTao || "",
+    });
+    const rows = p.chiTiet.map(r => ({
+      id:         r.id,
+      vatTuId:    r.vatTuId,
+      vatTu:      r.vatTu,
+      soLuongMua: r.soLuongMua,
+      donViMua:   r.donViMua,
+      quyDoi:     r.quyDoi,
+      soLuong:    r.soLuong,
+      donGia:     r.donGia,
+      thanhTien:  r.thanhTien,
+      ghiChu:     r.ghiChu || "",
+    }));
+    setChiTiet(rows.length ? rows : [newRow()]);
+    setVtSearch(rows.map(() => ""));
+    setModal("edit");
+  }
+
+  async function handleUpdate() {
+    if (!editId || !form.soPhieu || !form.ngay || !form.nhaCC) return;
+    const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
+    if (!validRows.length) return;
+    setSaving(true);
+    const res = await fetch(`/api/ke-toan/nhap-kho/${editId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, chiTiet: validRows }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setModal(null);
+      setEditId(null);
+      setChiTiet([newRow()]); setVtSearch([""]);
+      fetchAll();
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Xoá phiếu này?")) return;
     await fetch(`/api/ke-toan/nhap-kho/${id}`, { method: "DELETE" });
@@ -201,7 +250,7 @@ export default function NhapKhoPage() {
     if (res.ok) {
       const ncc = await res.json();
       setNccForm({ ma:"", ten:"", sdt:"", diaChi:"" });
-      setModal("create");
+      setModal(editId ? "edit" : "create");
       setForm(f => ({ ...f, nhaCC: ncc.id }));
       await fetchAll();
     }
@@ -308,8 +357,9 @@ export default function NhapKhoPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      <button onClick={()=>{setSelected(p);setModal("view");}} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><Eye size={14}/></button>
-                      <button onClick={()=>handleDelete(p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={14}/></button>
+                      <button onClick={()=>{setSelected(p);setModal("view");}} title="Xem" className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><Eye size={14}/></button>
+                      <button onClick={()=>openEdit(p)} title="Sửa" className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50"><Pencil size={14}/></button>
+                      <button onClick={()=>handleDelete(p.id)} title="Xoá" className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={14}/></button>
                     </div>
                   </td>
                 </tr>
@@ -320,12 +370,14 @@ export default function NhapKhoPage() {
       </div>
 
       {/* ── CREATE MODAL ── */}
-      {modal==="create" && (
+      {(modal==="create" || modal==="edit") && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-8 px-4 pb-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">Tạo phiếu nhập kho</h2>
-              <button onClick={()=>setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
+              <h2 className="text-lg font-bold text-slate-800">
+                {modal==="edit" ? "✏️ Sửa phiếu nhập kho" : "Tạo phiếu nhập kho"}
+              </h2>
+              <button onClick={()=>{setModal(null);setEditId(null);}} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
             </div>
             <div className="p-6 space-y-5">
               <div className="grid grid-cols-3 gap-4">
@@ -525,10 +577,11 @@ export default function NhapKhoPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={()=>setModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
-              <button onClick={handleCreate} disabled={saving}
-                className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
-                {saving?"Đang lưu...":"Lưu phiếu"}
+              <button onClick={()=>{setModal(null);setEditId(null);}} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+              <button onClick={modal==="edit" ? handleUpdate : handleCreate} disabled={saving}
+                className={`px-5 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50
+                  ${modal==="edit" ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"}`}>
+                {saving ? "Đang lưu..." : modal==="edit" ? "Cập nhật" : "Lưu phiếu"}
               </button>
             </div>
           </div>
@@ -541,7 +594,7 @@ export default function NhapKhoPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-base font-bold text-slate-800">Thêm nhà cung cấp mới</h2>
-              <button onClick={()=>setModal("create")} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
+              <button onClick={()=>setModal(editId ? "edit" : "create")} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
             </div>
             <div className="p-6 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -570,7 +623,7 @@ export default function NhapKhoPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={()=>setModal("create")} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+              <button onClick={()=>setModal(editId ? "edit" : "create")} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
               <button onClick={handleAddNCC} disabled={savingNCC||!nccForm.ma||!nccForm.ten}
                 className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
                 {savingNCC?"Đang lưu...":"Thêm NCC"}
