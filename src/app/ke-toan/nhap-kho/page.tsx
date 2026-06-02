@@ -1,17 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle, UserPlus, ArrowLeftRight } from "lucide-react";
 
 type VatTu = {
   id: string; ma: string; ten: string; loai: string; nhom: string | null; donVi: string;
   tonKho?: { soLuong: number; giaTrungBinh: number };
 };
 
+type NCC = { id: string; ma: string; ten: string; sdt?: string | null; diaChi?: string | null };
+type QuyDoi = { id: string; tuDonVi: string; veDonVi: string; heSo: number; ghiChu?: string | null };
+
 type ChiTiet = {
   id?: string; vatTuId: string; vatTu?: VatTu;
   soLuongMua: number; donViMua: string; quyDoi: number;
-  soLuong: number; // tổng đơn vị cơ bản (m)
+  soLuong: number;
   donGia: number; thanhTien: number; ghiChu: string;
 };
 
@@ -23,23 +26,16 @@ type PhieuNhap = {
   createdAt: string;
 };
 
-const NHA_CC = [
-  { value: "hac_long", label: "Hắc Long" },
-  { value: "an_huy",   label: "An Huy" },
-  { value: "viet_hoa", label: "Việt Hoa" },
-  { value: "khac",     label: "Khác" },
-];
-
-const DON_VI_MUA = [
-  { value: "m",     label: "Mét (m)",    showQuyDoi: false, placeholder: "" },
-  { value: "cay",   label: "Cây",         showQuyDoi: true,  placeholder: "m/cây" },
-  { value: "kg",    label: "KG",          showQuyDoi: true,  placeholder: "m/kg" },
-  { value: "chiec", label: "Chiếc",       showQuyDoi: false, placeholder: "" },
-  { value: "goi",   label: "Gói",         showQuyDoi: false, placeholder: "" },
-  { value: "cuon",  label: "Cuộn",        showQuyDoi: false, placeholder: "" },
-  { value: "hop",   label: "Hộp",         showQuyDoi: false, placeholder: "" },
-  { value: "bo",    label: "Bộ",          showQuyDoi: false, placeholder: "" },
-  { value: "cai",   label: "Cái",         showQuyDoi: false, placeholder: "" },
+const DON_VI_MUA_BASE = [
+  { value: "m",     label: "Mét (m)",  showQuyDoi: false },
+  { value: "cay",   label: "Cây",       showQuyDoi: true,  placeholder: "m/cây" },
+  { value: "kg",    label: "KG",        showQuyDoi: true,  placeholder: "m/kg" },
+  { value: "chiec", label: "Chiếc",    showQuyDoi: false },
+  { value: "goi",   label: "Gói",      showQuyDoi: false },
+  { value: "cuon",  label: "Cuộn",     showQuyDoi: false },
+  { value: "hop",   label: "Hộp",      showQuyDoi: false },
+  { value: "bo",    label: "Bộ",       showQuyDoi: false },
+  { value: "cai",   label: "Cái",      showQuyDoi: false },
 ];
 
 const DEFAULT_QUY_DOI: Record<string, number> = { m: 1, cay: 50, kg: 1.5 };
@@ -52,154 +48,208 @@ const TRANG_THAI_MAP: Record<string, { label: string; color: string; icon: React
 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN");
-
 function newRow(): ChiTiet {
   return { vatTuId: "", soLuongMua: 0, donViMua: "m", quyDoi: 1, soLuong: 0, donGia: 0, thanhTien: 0, ghiChu: "" };
 }
-
-function genSoPhieu(): string {
+function genSoPhieu() {
   const now = new Date();
-  const y = now.getFullYear().toString().slice(-2);
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const r = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0");
-  return `NK${y}${m}${d}-${r}`;
+  return `NK${now.getFullYear().toString().slice(-2)}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}-${String(Math.floor(Math.random()*999)+1).padStart(3,"0")}`;
 }
 
 export default function NhapKhoPage() {
-  const [phieus, setPhieus]   = useState<PhieuNhap[]>([]);
-  const [vatTus, setVatTus]   = useState<VatTu[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch]   = useState("");
-  const [filterNhaCC, setFilterNhaCC] = useState("");
+  const [phieus, setPhieus]     = useState<PhieuNhap[]>([]);
+  const [vatTus, setVatTus]     = useState<VatTu[]>([]);
+  const [nccList, setNccList]   = useState<NCC[]>([]);
+  const [quyDois, setQuyDois]   = useState<QuyDoi[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
+  const [filterNCC, setFilterNCC] = useState("");
 
-  const [modal, setModal]     = useState<"create" | "view" | null>(null);
+  const [modal, setModal]       = useState<"create" | "view" | "addNCC" | "quyDoi" | null>(null);
   const [selected, setSelected] = useState<PhieuNhap | null>(null);
 
+  // Form nhập kho
   const [form, setForm] = useState({
-    soPhieu: genSoPhieu(),
-    ngay: new Date().toISOString().slice(0, 10),
-    nhaCC: "hac_long",
-    tenNhaCC: "",
-    soHoaDon: "",
-    ngayHoaDon: "",
-    ghiChu: "",
-    nguoiTao: "",
+    soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0,10),
+    nhaCC: "", tenNhaCC: "", soHoaDon: "", ngayHoaDon: "", ghiChu: "", nguoiTao: "",
   });
   const [chiTiet, setChiTiet] = useState<ChiTiet[]>([newRow()]);
   const [saving, setSaving]   = useState(false);
   const [vtSearch, setVtSearch] = useState<string[]>([""]);
 
+  // Form thêm NCC nhanh
+  const [nccForm, setNccForm] = useState({ ma: "", ten: "", sdt: "", diaChi: "" });
+  const [savingNCC, setSavingNCC] = useState(false);
+
+  // Form quy đổi đơn vị
+  const [qdForm, setQdForm] = useState({ tuDonVi: "", veDonVi: "", heSo: "", ghiChu: "" });
+  const [savingQD, setSavingQD]   = useState(false);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [p, v] = await Promise.all([
+    const [p, v, n, q] = await Promise.all([
       fetch("/api/ke-toan/nhap-kho").then(r => r.json()),
       fetch("/api/ke-toan/vat-tu").then(r => r.json()),
+      fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()),
+      fetch("/api/ke-toan/quy-doi-don-vi").then(r => r.json()),
     ]);
     setPhieus(Array.isArray(p) ? p : []);
     setVatTus(Array.isArray(v) ? v : []);
+    setNccList(Array.isArray(n) ? n : []);
+    setQuyDois(Array.isArray(q) ? q : []);
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Đơn vị mua = base + quy đổi từ DB (gói→chiếc, cuộn→m, v.v.)
+  const donViMuaOptions = useMemo(() => {
+    const extra = quyDois.map(qd => ({
+      value: qd.tuDonVi,
+      label: `${qd.tuDonVi} (1 = ${qd.heSo} ${qd.veDonVi})`,
+      showQuyDoi: false,
+      heSo: qd.heSo,
+      veDonVi: qd.veDonVi,
+    }));
+    const existingValues = new Set(DON_VI_MUA_BASE.map(d => d.value));
+    return [...DON_VI_MUA_BASE, ...extra.filter(e => !existingValues.has(e.value))];
+  }, [quyDois]);
+
   const filtered = useMemo(() => phieus.filter(p => {
     const s = search.toLowerCase();
-    const matchSearch = !s || p.soPhieu.toLowerCase().includes(s) ||
-      (p.soHoaDon || "").toLowerCase().includes(s) ||
-      NHA_CC.find(n => n.value === p.nhaCC)?.label.toLowerCase().includes(s);
-    const matchNhaCC = !filterNhaCC || p.nhaCC === filterNhaCC;
-    return matchSearch && matchNhaCC;
-  }), [phieus, search, filterNhaCC]);
+    const ncc = nccList.find(n => n.ma === p.nhaCC || n.id === p.nhaCC);
+    const matchS = !s || p.soPhieu.toLowerCase().includes(s) ||
+      (p.soHoaDon||"").toLowerCase().includes(s) ||
+      (ncc?.ten||"").toLowerCase().includes(s);
+    return matchS && (!filterNCC || p.nhaCC === filterNCC);
+  }), [phieus, search, filterNCC, nccList]);
 
-  const tongTienForm = chiTiet.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
+  const getNccLabel = (nhaCC: string) =>
+    nccList.find(n => n.id === nhaCC || n.ma === nhaCC)?.ten || nhaCC;
 
-  function addRow() {
-    setChiTiet(prev => [...prev, newRow()]);
-    setVtSearch(prev => [...prev, ""]);
-  }
-
+  // ── Row helpers ──
+  function addRow() { setChiTiet(p=>[...p,newRow()]); setVtSearch(p=>[...p,""]); }
   function removeRow(i: number) {
-    setChiTiet(prev => prev.filter((_, idx) => idx !== i));
-    setVtSearch(prev => prev.filter((_, idx) => idx !== i));
+    setChiTiet(p=>p.filter((_,idx)=>idx!==i));
+    setVtSearch(p=>p.filter((_,idx)=>idx!==i));
   }
-
   function updateRow(i: number, patch: Partial<ChiTiet>) {
     setChiTiet(prev => prev.map((r, idx) => {
       if (idx !== i) return r;
       const updated = { ...r, ...patch };
-      // Nếu đổi donViMua thì reset quyDoi về mặc định
       if (patch.donViMua && patch.donViMua !== r.donViMua) {
-        updated.quyDoi = DEFAULT_QUY_DOI[patch.donViMua] ?? 1;
+        const qd = quyDois.find(q => q.tuDonVi === patch.donViMua);
+        updated.quyDoi = qd ? qd.heSo : (DEFAULT_QUY_DOI[patch.donViMua] ?? 1);
       }
-      updated.soLuong = updated.soLuongMua * updated.quyDoi;
+      updated.soLuong   = updated.soLuongMua * updated.quyDoi;
       updated.thanhTien = updated.soLuongMua * updated.donGia;
       return updated;
     }));
   }
 
+  // ── Submit phiếu nhập ──
   async function handleCreate() {
     if (!form.soPhieu || !form.ngay || !form.nhaCC) return;
     const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
-    if (validRows.length === 0) return;
+    if (!validRows.length) return;
     setSaving(true);
     const res = await fetch("/api/ke-toan/nhap-kho", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, chiTiet: validRows }),
     });
     setSaving(false);
     if (res.ok) {
       setModal(null);
-      setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0, 10), nhaCC: "hac_long", tenNhaCC: "", soHoaDon: "", ngayHoaDon: "", ghiChu: "", nguoiTao: "" });
-      setChiTiet([newRow()]);
-      setVtSearch([""]);
+      setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0,10), nhaCC: nccList[0]?.id||"", tenNhaCC:"", soHoaDon:"", ngayHoaDon:"", ghiChu:"", nguoiTao:"" });
+      setChiTiet([newRow()]); setVtSearch([""]);
       fetchAll();
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Xoá phiếu này? Sẽ hoàn ngược tồn kho.")) return;
+    if (!confirm("Xoá phiếu này?")) return;
     await fetch(`/api/ke-toan/nhap-kho/${id}`, { method: "DELETE" });
     fetchAll();
   }
 
   async function handlePatchTrangThai(id: string, trangThai: string) {
     await fetch(`/api/ke-toan/nhap-kho/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      method:"PATCH", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ trangThai }),
     });
     fetchAll();
-    if (selected) setSelected(prev => prev ? { ...prev, trangThai } : prev);
+    setSelected(prev => prev ? {...prev, trangThai} : prev);
   }
 
-  const totalStats = useMemo(() => ({
+  // ── Thêm NCC nhanh ──
+  async function handleAddNCC() {
+    if (!nccForm.ma || !nccForm.ten) return;
+    setSavingNCC(true);
+    const res = await fetch("/api/ke-toan/nha-cung-cap", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(nccForm),
+    });
+    setSavingNCC(false);
+    if (res.ok) {
+      const ncc = await res.json();
+      setNccForm({ ma:"", ten:"", sdt:"", diaChi:"" });
+      setModal("create");
+      setForm(f => ({ ...f, nhaCC: ncc.id }));
+      await fetchAll();
+    }
+  }
+
+  // ── Thêm quy đổi ──
+  async function handleAddQuyDoi() {
+    if (!qdForm.tuDonVi || !qdForm.veDonVi || !qdForm.heSo) return;
+    setSavingQD(true);
+    await fetch("/api/ke-toan/quy-doi-don-vi", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ ...qdForm, heSo: parseFloat(qdForm.heSo) }),
+    });
+    setSavingQD(false);
+    setQdForm({ tuDonVi:"", veDonVi:"", heSo:"", ghiChu:"" });
+    await fetchAll();
+  }
+
+  async function deleteQuyDoi(id: string) {
+    await fetch(`/api/ke-toan/quy-doi-don-vi/${id}`, { method:"DELETE" });
+    fetchAll();
+  }
+
+  const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
+  const stats = useMemo(()=>({
     soPhieu: filtered.length,
-    tongTien: filtered.reduce((s, p) => s + p.tongTien, 0),
-    chuaTT: filtered.filter(p => p.trangThai === "chua_thanh_toan").reduce((s, p) => s + p.tongTien, 0),
-  }), [filtered]);
+    tongTien: filtered.reduce((s,p)=>s+p.tongTien,0),
+    chuaTT: filtered.filter(p=>p.trangThai==="chua_thanh_toan").reduce((s,p)=>s+p.tongTien,0),
+  }),[filtered]);
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Phiếu Nhập Kho NPL</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Quản lý nhập kho nguyên phụ liệu — tự động cập nhật tồn kho & công nợ</p>
+          <p className="text-sm text-slate-500 mt-0.5">Tự động cập nhật tồn kho & công nợ NCC</p>
         </div>
-        <button onClick={() => { setModal("create"); setForm(f => ({ ...f, soPhieu: genSoPhieu() })); }}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-          <Plus size={16} /> Tạo phiếu nhập
-        </button>
+        <div className="flex gap-2">
+          <button onClick={()=>setModal("quyDoi")}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+            <ArrowLeftRight size={14}/> Quy đổi ĐV
+          </button>
+          <button onClick={()=>{ setModal("create"); setForm(f=>({...f,soPhieu:genSoPhieu(),nhaCC:nccList[0]?.id||""})); }}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700">
+            <Plus size={16}/> Tạo phiếu nhập
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Số phiếu", value: String(totalStats.soPhieu), color: "text-slate-800" },
-          { label: "Tổng tiền hàng", value: `${fmt(totalStats.tongTien)}₫`, color: "text-indigo-700" },
-          { label: "Chưa thanh toán", value: `${fmt(totalStats.chuaTT)}₫`, color: "text-red-600" },
-        ].map(s => (
+          { label:"Số phiếu",       value: String(stats.soPhieu),         color:"text-slate-800" },
+          { label:"Tổng tiền hàng", value:`${fmt(stats.tongTien)}₫`,      color:"text-indigo-700" },
+          { label:"Chưa thanh toán",value:`${fmt(stats.chuaTT)}₫`,        color:"text-red-600" },
+        ].map(s=>(
           <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -210,15 +260,14 @@ export default function NhapKhoPage() {
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Tìm số phiếu, hoá đơn..."
-            className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-52 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm số phiếu, hoá đơn..."
+            className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-52 focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
         </div>
-        <select value={filterNhaCC} onChange={e => setFilterNhaCC(e.target.value)}
+        <select value={filterNCC} onChange={e=>setFilterNCC(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="">Tất cả NCC</option>
-          {NHA_CC.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+          {nccList.map(n=><option key={n.id} value={n.id}>{n.ten}</option>)}
         </select>
       </div>
 
@@ -227,44 +276,32 @@ export default function NhapKhoPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-left">
-              <th className="px-4 py-3 font-semibold text-slate-600">Số phiếu</th>
-              <th className="px-4 py-3 font-semibold text-slate-600">Ngày</th>
-              <th className="px-4 py-3 font-semibold text-slate-600">Nhà CC</th>
-              <th className="px-4 py-3 font-semibold text-slate-600">Số HĐ</th>
-              <th className="px-4 py-3 font-semibold text-slate-600 text-right">Tổng tiền</th>
-              <th className="px-4 py-3 font-semibold text-slate-600">Trạng thái</th>
-              <th className="px-4 py-3"></th>
+              {["Số phiếu","Ngày","Nhà CC","Số HĐ","Tổng tiền","Trạng thái",""].map(h=>(
+                <th key={h} className={`px-4 py-3 font-semibold text-slate-600 ${h==="Tổng tiền"?"text-right":""}`}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {loading && <tr><td colSpan={7} className="text-center py-12 text-slate-400">Đang tải...</td></tr>}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-slate-400">Chưa có phiếu nhập nào</td></tr>
-            )}
-            {filtered.map(p => {
-              const tt = TRANG_THAI_MAP[p.trangThai] || TRANG_THAI_MAP.chua_thanh_toan;
+            {!loading && filtered.length===0 && <tr><td colSpan={7} className="text-center py-12 text-slate-400">Chưa có phiếu nhập nào</td></tr>}
+            {filtered.map(p=>{
+              const tt = TRANG_THAI_MAP[p.trangThai]||TRANG_THAI_MAP.chua_thanh_toan;
               return (
-                <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50">
                   <td className="px-4 py-3 font-mono text-indigo-700 font-medium">{p.soPhieu}</td>
                   <td className="px-4 py-3 text-slate-600">{fmtDate(p.ngay)}</td>
-                  <td className="px-4 py-3 text-slate-700">{NHA_CC.find(n => n.value === p.nhaCC)?.label || p.nhaCC}</td>
-                  <td className="px-4 py-3 text-slate-500">{p.soHoaDon || "—"}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(p.tongTien)}₫</td>
+                  <td className="px-4 py-3 text-slate-700">{getNccLabel(p.nhaCC)}</td>
+                  <td className="px-4 py-3 text-slate-500">{p.soHoaDon||"—"}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{fmt(p.tongTien)}₫</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${tt.color}`}>
                       {tt.icon} {tt.label}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => { setSelected(p); setModal("view"); }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                        <Eye size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(p.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+                    <div className="flex gap-1">
+                      <button onClick={()=>{setSelected(p);setModal("view");}} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><Eye size={14}/></button>
+                      <button onClick={()=>handleDelete(p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={14}/></button>
                     </div>
                   </td>
                 </tr>
@@ -275,59 +312,58 @@ export default function NhapKhoPage() {
       </div>
 
       {/* ── CREATE MODAL ── */}
-      {modal === "create" && (
+      {modal==="create" && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-8 px-4 pb-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-800">Tạo phiếu nhập kho</h2>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+              <button onClick={()=>setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
             </div>
             <div className="p-6 space-y-5">
-              {/* Header */}
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Số phiếu *</label>
-                  <input value={form.soPhieu} onChange={e => setForm(f => ({ ...f, soPhieu: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input value={form.soPhieu} onChange={e=>setForm(f=>({...f,soPhieu:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Ngày nhập *</label>
-                  <input type="date" value={form.ngay} onChange={e => setForm(f => ({ ...f, ngay: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input type="date" value={form.ngay} onChange={e=>setForm(f=>({...f,ngay:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Nhà cung cấp *</label>
-                  <select value={form.nhaCC} onChange={e => setForm(f => ({ ...f, nhaCC: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    {NHA_CC.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
-                  </select>
-                </div>
-                {form.nhaCC === "khac" && (
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 block mb-1">Tên NCC</label>
-                    <input value={form.tenNhaCC} onChange={e => setForm(f => ({ ...f, tenNhaCC: e.target.value }))}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <div className="flex gap-2">
+                    <select value={form.nhaCC} onChange={e=>setForm(f=>({...f,nhaCC:e.target.value}))}
+                      className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                      <option value="">— Chọn NCC —</option>
+                      {nccList.map(n=><option key={n.id} value={n.id}>{n.ten}</option>)}
+                    </select>
+                    <button onClick={()=>setModal("addNCC")} title="Thêm NCC mới"
+                      className="px-2.5 rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors">
+                      <UserPlus size={15}/>
+                    </button>
                   </div>
-                )}
+                </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Số hoá đơn</label>
-                  <input value={form.soHoaDon} onChange={e => setForm(f => ({ ...f, soHoaDon: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input value={form.soHoaDon} onChange={e=>setForm(f=>({...f,soHoaDon:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Ngày HĐ</label>
-                  <input type="date" value={form.ngayHoaDon} onChange={e => setForm(f => ({ ...f, ngayHoaDon: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input type="date" value={form.ngayHoaDon} onChange={e=>setForm(f=>({...f,ngayHoaDon:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Người tạo</label>
-                  <input value={form.nguoiTao} onChange={e => setForm(f => ({ ...f, nguoiTao: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input value={form.nguoiTao} onChange={e=>setForm(f=>({...f,nguoiTao:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-500 block mb-1">Ghi chú</label>
-                  <input value={form.ghiChu} onChange={e => setForm(f => ({ ...f, ghiChu: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <input value={form.ghiChu} onChange={e=>setForm(f=>({...f,ghiChu:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
               </div>
 
@@ -335,19 +371,25 @@ export default function NhapKhoPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-slate-700">Chi tiết hàng hoá</h3>
-                  <button onClick={addRow} className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                    <Plus size={12} /> Thêm dòng
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={()=>setModal("quyDoi")}
+                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600">
+                      <ArrowLeftRight size={11}/> Quản lý quy đổi ĐV
+                    </button>
+                    <button onClick={addRow} className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                      <Plus size={12}/> Thêm dòng
+                    </button>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead>
                       <tr className="bg-slate-50">
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-56">Vật tư</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">ĐV mua</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-32">ĐV mua</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-20">Số lượng</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">Quy đổi</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-20">≈ Tổng m</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-20">≈ Tổng</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-28">Đơn giá</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-28">Thành tiền</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ghi chú</th>
@@ -356,121 +398,97 @@ export default function NhapKhoPage() {
                     </thead>
                     <tbody>
                       {chiTiet.map((row, i) => {
-                        const selectedVT = vatTus.find(v => v.id === row.vatTuId);
-                        const filteredVTs = vatTus.filter(v => {
-                          const q = (vtSearch[i] || "").toLowerCase();
-                          return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
+                        const selVT = vatTus.find(v=>v.id===row.vatTuId);
+                        const filtVTs = vatTus.filter(v=>{
+                          const q=(vtSearch[i]||"").toLowerCase();
+                          return !q||v.ten.toLowerCase().includes(q)||v.ma.toLowerCase().includes(q);
                         });
-                        const dvInfo = DON_VI_MUA.find(d => d.value === row.donViMua);
+                        const dvInfo = donViMuaOptions.find(d=>d.value===row.donViMua);
                         const showQD = dvInfo?.showQuyDoi ?? false;
+                        // Tìm quy đổi từ DB cho đơn vị này
+                        const dbQD = quyDois.find(q=>q.tuDonVi===row.donViMua);
 
                         return (
                           <tr key={i} className="border-t border-slate-100">
-                            {/* Vật tư */}
                             <td className="px-3 py-1.5 align-top">
                               <div className="relative">
-                                <input
-                                  value={vtSearch[i] || (selectedVT ? `${selectedVT.ma} – ${selectedVT.ten}` : "")}
-                                  onChange={e => {
-                                    const ns = [...vtSearch]; ns[i] = e.target.value; setVtSearch(ns);
-                                    if (!e.target.value) updateRow(i, { vatTuId: "" });
-                                  }}
+                                <input value={vtSearch[i]||(selVT?`${selVT.ma} – ${selVT.ten}`:"")}
+                                  onChange={e=>{const ns=[...vtSearch];ns[i]=e.target.value;setVtSearch(ns);if(!e.target.value)updateRow(i,{vatTuId:""});}}
                                   placeholder="Tìm vật tư..."
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                                />
-                                {vtSearch[i] && filteredVTs.length > 0 && (
-                                  <div className="absolute top-full left-0 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-44 overflow-y-auto">
-                                    {filteredVTs.map(v => (
-                                      <button key={v.id}
-                                        className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 flex gap-2"
-                                        onClick={() => {
-                                          updateRow(i, { vatTuId: v.id });
-                                          const ns = [...vtSearch]; ns[i] = ""; setVtSearch(ns);
-                                        }}>
-                                        <span className="font-mono text-slate-400 shrink-0">{v.ma}</span>
-                                        <span className="text-slate-700">{v.ten}</span>
-                                        <span className="text-slate-400 ml-auto shrink-0">{v.donVi}</span>
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
+                                {vtSearch[i] && filtVTs.length>0 && (
+                                  <div className="absolute top-full left-0 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
+                                    {filtVTs.map(v=>(
+                                      <button key={v.id} className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 flex gap-2"
+                                        onClick={()=>{updateRow(i,{vatTuId:v.id});const ns=[...vtSearch];ns[i]="";setVtSearch(ns);}}>
+                                        <span className="font-mono text-slate-400">{v.ma}</span>
+                                        <span>{v.ten}</span>
+                                        <span className="text-slate-400 ml-auto">{v.donVi}</span>
                                       </button>
                                     ))}
                                   </div>
                                 )}
-                                {selectedVT && !vtSearch[i] && (
-                                  <p className="text-[10px] text-slate-400 mt-0.5">{selectedVT.donVi} · {selectedVT.nhom || selectedVT.loai}</p>
+                                {selVT && !vtSearch[i] && (
+                                  <p className="text-[10px] text-slate-400 mt-0.5">{selVT.donVi} · {selVT.nhom||selVT.loai}</p>
                                 )}
                               </div>
                             </td>
-
-                            {/* Đơn vị mua */}
                             <td className="px-3 py-1.5 align-top">
-                              <select value={row.donViMua}
-                                onChange={e => updateRow(i, { donViMua: e.target.value })}
+                              <select value={row.donViMua} onChange={e=>updateRow(i,{donViMua:e.target.value})}
                                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300">
-                                {DON_VI_MUA.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                                {donViMuaOptions.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}
                               </select>
+                              {dbQD && (
+                                <p className="text-[10px] text-indigo-500 mt-0.5">1 {dbQD.tuDonVi} = {dbQD.heSo} {dbQD.veDonVi}</p>
+                              )}
                             </td>
-
-                            {/* Số lượng */}
                             <td className="px-3 py-1.5 align-top">
-                              <input type="number" min={0} value={row.soLuongMua || ""}
-                                onChange={e => updateRow(i, { soLuongMua: parseFloat(e.target.value) || 0 })}
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                              <input type="number" min={0} value={row.soLuongMua||""}
+                                onChange={e=>updateRow(i,{soLuongMua:parseFloat(e.target.value)||0})}
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
                             </td>
-
-                            {/* Quy đổi */}
                             <td className="px-3 py-1.5 align-top">
                               {showQD ? (
                                 <div>
-                                  <input type="number" min={0} step="0.01" value={row.quyDoi || ""}
-                                    onChange={e => updateRow(i, { quyDoi: parseFloat(e.target.value) || 1 })}
-                                    className="w-full border border-indigo-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-indigo-50" />
-                                  <p className="text-[10px] text-slate-400 mt-0.5">{dvInfo?.placeholder}</p>
+                                  <input type="number" min={0} step="0.01" value={row.quyDoi||""}
+                                    onChange={e=>updateRow(i,{quyDoi:parseFloat(e.target.value)||1})}
+                                    className="w-full border border-indigo-200 bg-indigo-50 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
                                 </div>
+                              ) : dbQD ? (
+                                <span className="text-[10px] text-indigo-600 px-1">×{dbQD.heSo}</span>
                               ) : (
                                 <span className="text-xs text-slate-300 px-2">—</span>
                               )}
                             </td>
-
-                            {/* Tổng mét — chỉ hiện khi đơn vị có quy đổi */}
-                            <td className="px-3 py-1.5 align-top">
-                              {showQD ? (
-                                <span className={`text-xs font-semibold ${row.soLuong > 0 ? "text-teal-600" : "text-slate-300"}`}>
-                                  {row.soLuong > 0 ? `${fmt(row.soLuong)} m` : "—"}
+                            <td className="px-3 py-1.5 align-top pt-2.5">
+                              {(showQD || dbQD) && row.soLuong > 0 ? (
+                                <span className="text-xs font-semibold text-teal-600">
+                                  {fmt(row.soLuong)} {dbQD?.veDonVi || selVT?.donVi || ""}
                                 </span>
-                              ) : (
-                                <span className="text-xs text-slate-300">—</span>
-                              )}
+                              ) : <span className="text-xs text-slate-300">—</span>}
                             </td>
-
-                            {/* Đơn giá */}
                             <td className="px-3 py-1.5 align-top">
                               <div>
-                                <input type="number" min={0} value={row.donGia || ""}
-                                  onChange={e => updateRow(i, { donGia: parseFloat(e.target.value) || 0 })}
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300" />
-                                {row.donViMua !== "m" && row.soLuong > 0 && row.donGia > 0 && (
+                                <input type="number" min={0} value={row.donGia||""}
+                                  onChange={e=>updateRow(i,{donGia:parseFloat(e.target.value)||0})}
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
+                                {(showQD||dbQD) && row.soLuong>0 && row.donGia>0 && (
                                   <p className="text-[10px] text-slate-400 mt-0.5">
-                                    ≈ {fmt(Math.round(row.soLuongMua * row.donGia / row.soLuong))}₫/m
+                                    ≈{fmt(Math.round(row.soLuongMua*row.donGia/row.soLuong))}₫/{dbQD?.veDonVi||selVT?.donVi||"đvị"}
                                   </p>
                                 )}
                               </div>
                             </td>
-
-                            {/* Thành tiền */}
-                            <td className="px-3 py-1.5 text-right font-semibold text-slate-700 text-xs align-top pt-3">
-                              {fmt(row.soLuongMua * row.donGia)}₫
+                            <td className="px-3 py-1.5 text-right font-medium text-slate-700 text-xs align-top pt-3">
+                              {fmt(row.soLuongMua*row.donGia)}₫
                             </td>
-
-                            {/* Ghi chú */}
                             <td className="px-3 py-1.5 align-top">
-                              <input value={row.ghiChu} onChange={e => updateRow(i, { ghiChu: e.target.value })}
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                              <input value={row.ghiChu} onChange={e=>updateRow(i,{ghiChu:e.target.value})}
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
                             </td>
-
                             <td className="px-2 py-1.5 align-top">
-                              {chiTiet.length > 1 && (
-                                <button onClick={() => removeRow(i)} className="p-1 text-slate-300 hover:text-red-500 mt-1">
-                                  <X size={12} />
-                                </button>
+                              {chiTiet.length>1 && (
+                                <button onClick={()=>removeRow(i)} className="p-1 text-slate-300 hover:text-red-500 mt-1"><X size={12}/></button>
                               )}
                             </td>
                           </tr>
@@ -489,72 +507,177 @@ export default function NhapKhoPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={() => setModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Huỷ</button>
+              <button onClick={()=>setModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
               <button onClick={handleCreate} disabled={saving}
-                className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                {saving ? "Đang lưu..." : "Lưu phiếu"}
+                className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                {saving?"Đang lưu...":"Lưu phiếu"}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── MODAL THÊM NCC NHANH ── */}
+      {modal==="addNCC" && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-800">Thêm nhà cung cấp mới</h2>
+              <button onClick={()=>setModal("create")} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
+            </div>
+            <div className="p-6 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Mã NCC *</label>
+                  <input value={nccForm.ma} onChange={e=>setNccForm(f=>({...f,ma:e.target.value}))}
+                    placeholder="VD: HL, AH..."
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">SĐT</label>
+                  <input value={nccForm.sdt} onChange={e=>setNccForm(f=>({...f,sdt:e.target.value}))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Tên NCC *</label>
+                <input value={nccForm.ten} onChange={e=>setNccForm(f=>({...f,ten:e.target.value}))}
+                  placeholder="VD: Công ty TNHH Hắc Long"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Địa chỉ</label>
+                <input value={nccForm.diaChi} onChange={e=>setNccForm(f=>({...f,diaChi:e.target.value}))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+              <button onClick={()=>setModal("create")} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+              <button onClick={handleAddNCC} disabled={savingNCC||!nccForm.ma||!nccForm.ten}
+                className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                {savingNCC?"Đang lưu...":"Thêm NCC"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL QUY ĐỔI ĐƠN VỊ ── */}
+      {modal==="quyDoi" && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">Quy đổi đơn vị</h2>
+                <p className="text-xs text-slate-400 mt-0.5">VD: 1 gói = 100 chiếc · 1 cuộn = 500m</p>
+              </div>
+              <button onClick={()=>setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Danh sách hiện có */}
+              {quyDois.length>0 && (
+                <div className="space-y-1.5">
+                  {quyDois.map(qd=>(
+                    <div key={qd.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-2.5">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="font-semibold text-slate-700">1 {qd.tuDonVi}</span>
+                        <span className="text-slate-400">=</span>
+                        <span className="font-bold text-indigo-600">{fmt(qd.heSo)}</span>
+                        <span className="text-slate-700">{qd.veDonVi}</span>
+                        {qd.ghiChu && <span className="text-xs text-slate-400">· {qd.ghiChu}</span>}
+                      </div>
+                      <button onClick={()=>deleteQuyDoi(qd.id)} className="p-1 text-slate-400 hover:text-red-500"><X size={13}/></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {quyDois.length===0 && (
+                <p className="text-center text-sm text-slate-400 py-2">Chưa có quy đổi nào</p>
+              )}
+              {/* Thêm mới */}
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-xs font-semibold text-slate-600 mb-3">Thêm quy đổi mới</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500 shrink-0">1</span>
+                  <input value={qdForm.tuDonVi} onChange={e=>setQdForm(f=>({...f,tuDonVi:e.target.value}))}
+                    placeholder="đơn vị (gói, cuộn...)"
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+                  <span className="text-sm text-slate-500 shrink-0">=</span>
+                  <input type="number" min={0} step="0.01" value={qdForm.heSo} onChange={e=>setQdForm(f=>({...f,heSo:e.target.value}))}
+                    placeholder="hệ số"
+                    className="w-24 border border-slate-200 rounded-xl px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+                  <input value={qdForm.veDonVi} onChange={e=>setQdForm(f=>({...f,veDonVi:e.target.value}))}
+                    placeholder="đvị đích (chiếc, m...)"
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+                  <button onClick={handleAddQuyDoi} disabled={savingQD||!qdForm.tuDonVi||!qdForm.veDonVi||!qdForm.heSo}
+                    className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 shrink-0">
+                    <Plus size={14}/>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end px-6 py-4 border-t border-slate-100">
+              <button onClick={()=>setModal(null)} className="px-4 py-2 rounded-xl bg-slate-100 text-sm text-slate-700 hover:bg-slate-200">Xong</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── VIEW MODAL ── */}
-      {modal === "view" && selected && (
+      {modal==="view" && selected && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-10 px-4 pb-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <h2 className="text-lg font-bold text-slate-800 font-mono">{selected.soPhieu}</h2>
-                <p className="text-xs text-slate-400">{NHA_CC.find(n => n.value === selected.nhaCC)?.label} · {fmtDate(selected.ngay)}</p>
+                <p className="text-xs text-slate-400">{getNccLabel(selected.nhaCC)} · {fmtDate(selected.ngay)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative group">
-                  <button className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${TRANG_THAI_MAP[selected.trangThai]?.color || ""}`}>
-                    {TRANG_THAI_MAP[selected.trangThai]?.label} <ChevronDown size={12} />
+                  <button className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium ${TRANG_THAI_MAP[selected.trangThai]?.color||""}`}>
+                    {TRANG_THAI_MAP[selected.trangThai]?.label} <ChevronDown size={12}/>
                   </button>
                   <div className="hidden group-hover:block absolute right-0 top-full bg-white border border-slate-100 rounded-xl shadow-lg z-10 w-40 py-1">
-                    {Object.entries(TRANG_THAI_MAP).map(([k, v]) => (
-                      <button key={k} onClick={() => handlePatchTrangThai(selected.id, k)}
+                    {Object.entries(TRANG_THAI_MAP).map(([k,v])=>(
+                      <button key={k} onClick={()=>handlePatchTrangThai(selected.id,k)}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 flex items-center gap-2">
                         <span className={`px-1.5 py-0.5 rounded-full ${v.color} flex items-center gap-1`}>{v.icon} {v.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-                <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+                <button onClick={()=>setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
               </div>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-3 gap-3 text-sm">
-                <div><span className="text-slate-400 text-xs">Số HĐ</span><p className="font-medium">{selected.soHoaDon || "—"}</p></div>
-                <div><span className="text-slate-400 text-xs">Ngày HĐ</span><p className="font-medium">{selected.ngayHoaDon ? fmtDate(selected.ngayHoaDon) : "—"}</p></div>
-                <div><span className="text-slate-400 text-xs">Người tạo</span><p className="font-medium">{selected.nguoiTao || "—"}</p></div>
+                <div><span className="text-slate-400 text-xs">Số HĐ</span><p className="font-medium">{selected.soHoaDon||"—"}</p></div>
+                <div><span className="text-slate-400 text-xs">Ngày HĐ</span><p className="font-medium">{selected.ngayHoaDon?fmtDate(selected.ngayHoaDon):"—"}</p></div>
+                <div><span className="text-slate-400 text-xs">Người tạo</span><p className="font-medium">{selected.nguoiTao||"—"}</p></div>
               </div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 text-left">
                     <th className="px-3 py-2 text-xs font-medium text-slate-500">Vật tư</th>
                     <th className="px-3 py-2 text-xs font-medium text-slate-500">Mua</th>
-                    <th className="px-3 py-2 text-xs font-medium text-slate-500 text-teal-600">Tổng m</th>
+                    <th className="px-3 py-2 text-xs font-medium text-teal-600">Quy đổi</th>
                     <th className="px-3 py-2 text-xs font-medium text-slate-500 text-right">Đơn giá</th>
                     <th className="px-3 py-2 text-xs font-medium text-slate-500 text-right">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selected.chiTiet.map((r, i) => (
+                  {selected.chiTiet.map((r,i)=>(
                     <tr key={i} className="border-t border-slate-50">
                       <td className="px-3 py-2">
-                        <p className="font-medium text-slate-700">{r.vatTu?.ten || r.vatTuId}</p>
+                        <p className="font-medium text-slate-700">{r.vatTu?.ten||r.vatTuId}</p>
                         {r.vatTu && <p className="text-[10px] text-slate-400">{r.vatTu.ma}</p>}
                       </td>
                       <td className="px-3 py-2 text-xs text-slate-600">
                         {r.soLuongMua} {r.donViMua}
-                        {r.donViMua !== "m" && r.quyDoi !== 1 && (
-                          <span className="text-slate-400"> × {r.quyDoi} m/{r.donViMua}</span>
-                        )}
                       </td>
-                      <td className="px-3 py-2 text-xs font-semibold text-teal-600">{fmt(r.soLuong)} m</td>
+                      <td className="px-3 py-2 text-xs font-semibold text-teal-600">
+                        {r.quyDoi!==1 ? `= ${fmt(r.soLuong)} ${r.vatTu?.donVi||""}` : "—"}
+                      </td>
                       <td className="px-3 py-2 text-right text-xs">{fmt(r.donGia)}₫</td>
                       <td className="px-3 py-2 text-right font-semibold">{fmt(r.thanhTien)}₫</td>
                     </tr>
@@ -567,7 +690,6 @@ export default function NhapKhoPage() {
                   </tr>
                 </tfoot>
               </table>
-              {selected.ghiChu && <p className="text-sm text-slate-500 italic">{selected.ghiChu}</p>}
             </div>
           </div>
         </div>
