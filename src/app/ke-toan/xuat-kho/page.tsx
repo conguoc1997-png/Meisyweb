@@ -83,16 +83,21 @@ export default function XuatKhoPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [p, v, l] = await Promise.all([
-      fetch("/api/ke-toan/xuat-kho").then(r => r.json()),
-      fetch("/api/ke-toan/vat-tu").then(r => r.json()),
-      fetch("/api/san-xuat/lo-cat?limit=300").then(r => r.json()).catch(() => []),
-    ]);
-    setPhieus(Array.isArray(p) ? p : []);
-    setVatTus(Array.isArray(v) ? v : []);
-    const loData = Array.isArray(l) ? l : (Array.isArray(l?.data) ? l.data : []);
-    setLoCats(loData);
-    setLoading(false);
+    try {
+      const [p, v, l] = await Promise.all([
+        fetch("/api/ke-toan/xuat-kho").then(r => r.json()),
+        fetch("/api/ke-toan/vat-tu").then(r => r.json()),
+        fetch("/api/san-xuat/lo-cat?limit=300").then(r => r.json()).catch(() => []),
+      ]);
+      setPhieus(Array.isArray(p) ? p : []);
+      setVatTus(Array.isArray(v) ? v : []);
+      const loData = Array.isArray(l) ? l : (Array.isArray(l?.data) ? l.data : []);
+      setLoCats(loData);
+    } catch (e) {
+      console.error("fetchAll xuat-kho:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);

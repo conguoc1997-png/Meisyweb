@@ -12,27 +12,35 @@ type RowInput = {
 };
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const nhaCC = searchParams.get("nhaCC");
-  const trangThai = searchParams.get("trangThai");
-  const from = searchParams.get("from");
-  const to = searchParams.get("to");
+  try {
+    const { searchParams } = new URL(req.url);
+    const nhaCC = searchParams.get("nhaCC");
+    const trangThai = searchParams.get("trangThai");
+    const from = searchParams.get("from");
+    const to = searchParams.get("to");
 
-  const phieus = await prisma.phieuNhapKho.findMany({
-    where: {
-      ...(nhaCC && { nhaCC }),
-      ...(trangThai && { trangThai }),
-      ...(from || to ? {
-        ngay: {
-          ...(from && { gte: new Date(from) }),
-          ...(to && { lte: new Date(to + "T23:59:59") }),
-        }
-      } : {}),
-    },
-    include: { chiTiet: { include: { vatTu: true } } },
-    orderBy: { ngay: "desc" },
-  });
-  return NextResponse.json(phieus);
+    const phieus = await prisma.phieuNhapKho.findMany({
+      where: {
+        ...(nhaCC && { nhaCC }),
+        ...(trangThai && { trangThai }),
+        ...(from || to ? {
+          ngay: {
+            ...(from && { gte: new Date(from) }),
+            ...(to && { lte: new Date(to + "T23:59:59") }),
+          }
+        } : {}),
+      },
+      include: { chiTiet: { include: { vatTu: true } } },
+      orderBy: { ngay: "desc" },
+    });
+    return NextResponse.json(phieus);
+  } catch (e: unknown) {
+    console.error("[nhap-kho GET]", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Lỗi server" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {

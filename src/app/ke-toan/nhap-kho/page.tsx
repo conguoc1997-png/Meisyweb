@@ -87,17 +87,22 @@ export default function NhapKhoPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [p, v, n, q] = await Promise.all([
-      fetch("/api/ke-toan/nhap-kho").then(r => r.json()),
-      fetch("/api/ke-toan/vat-tu").then(r => r.json()),
-      fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()),
-      fetch("/api/ke-toan/quy-doi-don-vi").then(r => r.json()),
-    ]);
-    setPhieus(Array.isArray(p) ? p : []);
-    setVatTus(Array.isArray(v) ? v : []);
-    setNccList(Array.isArray(n) ? n : []);
-    setQuyDois(Array.isArray(q) ? q : []);
-    setLoading(false);
+    try {
+      const [p, v, n, q] = await Promise.all([
+        fetch("/api/ke-toan/nhap-kho").then(r => r.json()),
+        fetch("/api/ke-toan/vat-tu").then(r => r.json()),
+        fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()),
+        fetch("/api/ke-toan/quy-doi-don-vi").then(r => r.json()),
+      ]);
+      setPhieus(Array.isArray(p) ? p : []);
+      setVatTus(Array.isArray(v) ? v : []);
+      setNccList(Array.isArray(n) ? n : []);
+      setQuyDois(Array.isArray(q) ? q : []);
+    } catch (e) {
+      console.error("fetchAll nhap-kho:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);

@@ -34,13 +34,18 @@ export default function DinhMucPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [d, v] = await Promise.all([
-      fetch("/api/ke-toan/dinh-muc").then(r => r.json()),
-      fetch("/api/ke-toan/vat-tu").then(r => r.json()),
-    ]);
-    setItems(Array.isArray(d) ? d : []);
-    setVatTus(Array.isArray(v) ? v : []);
-    setLoading(false);
+    try {
+      const [d, v] = await Promise.all([
+        fetch("/api/ke-toan/dinh-muc").then(r => r.json()),
+        fetch("/api/ke-toan/vat-tu").then(r => r.json()),
+      ]);
+      setItems(Array.isArray(d) ? d : []);
+      setVatTus(Array.isArray(v) ? v : []);
+    } catch (e) {
+      console.error("fetchAll dinh-muc:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);

@@ -3,8 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const items = await prisma.quyDoiDonVi.findMany({ orderBy: { tuDonVi: "asc" } });
-  return NextResponse.json(items);
+  try {
+    const items = await prisma.quyDoiDonVi.findMany({ orderBy: { tuDonVi: "asc" } });
+    return NextResponse.json(items);
+  } catch (e: unknown) {
+    console.error("[quy-doi-don-vi GET]", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Lỗi server" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {
