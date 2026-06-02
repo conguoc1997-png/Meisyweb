@@ -226,13 +226,16 @@ model KOCBooking {
   chiPhi     Float     @default(0) // tổng = chiPhiCast + chiPhiSP
   ngayBat    DateTime
   ngayKet    DateTime?
-  trangThai  String    @default("dang_chay")
-  doanhThu   Float     @default(0)
-  donHang    Int       @default(0)
-  luotXem    Int       @default(0)
-  ghiChu     String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  trangThai    String    @default("dang_chay")
+  doanhThu     Float     @default(0)
+  donHang      Int       @default(0)
+  luotXem      Int       @default(0)
+  ghiChu       String?
+  ngayLenVideo DateTime?
+  daSent       Boolean   @default(false)
+  daRecv       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   koc     KOC      @relation(fields: [kocId], references: [id])
   sanPham SanPham? @relation(fields: [sanPhamId], references: [id])

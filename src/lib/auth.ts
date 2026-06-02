@@ -12,10 +12,10 @@ export const ALL_MODULES = [
   { key: "tong-quan", label: "Tổng quan",       routes: ["/tong-quan", "/api/dashboard"] },
   { key: "kho",       label: "Quản lý Kho",      routes: ["/kho", "/api/kho", "/doi-soat", "/api/doi-soat"] },
   { key: "san-xuat",  label: "Sản xuất",          routes: ["/san-xuat", "/api/san-xuat"] },
-  { key: "doi-tra",   label: "Đổi trả / Sự cố",  routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
+  { key: "doi-tra",   label: "Chăm sóc KH",      routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
   { key: "koc",       label: "KOC Booking",       routes: ["/koc", "/api/koc"] },
-  { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban"] },
-  { key: "ke-toan",   label: "Kế toán",            routes: ["/ke-toan", "/api/ke-toan/cong-no", "/api/ke-toan/vat-tu", "/api/ke-toan/nhap-kho", "/api/ke-toan/ton-kho"] },
+  { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban", "/api/gia-ban"] },
+  { key: "ke-toan",   label: "Kế toán",           routes: ["/ke-toan", "/api/ke-toan"] },
   { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
 ] as const;
 

@@ -89,7 +89,9 @@ export default function DoiSoatPage() {
   const [search, setSearch] = useState("");
   const [filterSan, setFilterSan] = useState("");
   const [filterTT, setFilterTT] = useState("");
-  const [filterDoiSoat, setFilterDoiSoat] = useState<"" | "da" | "chua">(""); // "" | "da" | "chua"
+  const [filterDoiSoat, setFilterDoiSoat] = useState<"" | "da" | "chua">("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
 
   // Import modal
   const [showImport, setShowImport] = useState(false);
@@ -111,18 +113,23 @@ export default function DoiSoatPage() {
   const [addScanInput, setAddScanInput] = useState("");
   const [addScanSan, setAddScanSan] = useState("shopee");
   const [addScanLog, setAddScanLog] = useState<AddScanLog[]>([]);
+  const [addScanDupWarning, setAddScanDupWarning] = useState<{ maDon: string; createdAt: string } | null>(null);
   const addScanRef = useRef<HTMLInputElement>(null);
 
   const handleAddScan = useCallback(async (raw: string) => {
     const maDon = raw.trim();
     if (!maDon) return;
     setAddScanInput("");
-    // Kiểm tra trùng trong dons hiện tại
-    const exists = dons.some(d => d.maDon.toLowerCase() === maDon.toLowerCase());
-    if (exists) {
+    setAddScanDupWarning(null);
+
+    // Kiểm tra trùng — nếu có thì cảnh báo, không thêm
+    const existing = dons.find(d => d.maDon.toLowerCase() === maDon.toLowerCase());
+    if (existing) {
+      setAddScanDupWarning({ maDon, createdAt: existing.createdAt });
       setAddScanLog(prev => [{ maDon, status: "dup" as const, ts: Date.now() }, ...prev].slice(0, 50));
       return;
     }
+
     try {
       const res = await fetch("/api/doi-soat", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -359,6 +366,14 @@ export default function DoiSoatPage() {
     if (filterTT  && d.trangThai !== filterTT) return false;
     if (filterDoiSoat === "da"   && !d.daDoiSoat) return false;
     if (filterDoiSoat === "chua" &&  d.daDoiSoat) return false;
+    if (filterFrom) {
+      const from = new Date(filterFrom); from.setHours(0,0,0,0);
+      if (new Date(d.createdAt) < from) return false;
+    }
+    if (filterTo) {
+      const to = new Date(filterTo); to.setHours(23,59,59,999);
+      if (new Date(d.createdAt) > to) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       if (!d.maDon.toLowerCase().includes(q) &&
@@ -366,7 +381,7 @@ export default function DoiSoatPage() {
           !d.tenSP.toLowerCase().includes(q)) return false;
     }
     return true;
-  }), [dons, filterSan, filterTT, filterDoiSoat, search]);
+  }), [dons, filterSan, filterTT, filterDoiSoat, filterFrom, filterTo, search]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
@@ -387,7 +402,7 @@ export default function DoiSoatPage() {
           )}
           <button onClick={() => setShowAdd(true)}
             className="flex items-center gap-1.5 text-sm px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition">
-            <Plus size={15} /> Thêm thủ công
+            <Plus size={15} /> Đơn hệ thống
           </button>
           <button onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 text-sm px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
@@ -454,8 +469,24 @@ export default function DoiSoatPage() {
           <option value="da">Đã đối soát ✓</option>
           <option value="chua">Chưa đối soát</option>
         </select>
-        {(search || filterSan || filterTT || filterDoiSoat) && (
-          <button onClick={() => { setSearch(""); setFilterSan(""); setFilterTT(""); setFilterDoiSoat(""); }}
+        {/* Lọc ngày */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 whitespace-nowrap">Từ</span>
+          <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white" />
+          <span className="text-xs text-slate-400 whitespace-nowrap">đến</span>
+          <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+            min={filterFrom || undefined}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white" />
+          {(filterFrom || filterTo) && (
+            <button onClick={() => { setFilterFrom(""); setFilterTo(""); }}
+              className="text-slate-300 hover:text-slate-500 transition">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {(search || filterSan || filterTT || filterDoiSoat || filterFrom || filterTo) && (
+          <button onClick={() => { setSearch(""); setFilterSan(""); setFilterTT(""); setFilterDoiSoat(""); setFilterFrom(""); setFilterTo(""); }}
             className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 rounded hover:bg-slate-100 transition">
             ✕ Xoá lọc
           </button>
@@ -506,12 +537,21 @@ export default function DoiSoatPage() {
             {scanActive ? "Đang quét" : "Quét mã vạch"}
           </button>
 
+          {/* Hướng dẫn */}
+          <span
+            className="text-xs font-medium text-red-500 whitespace-nowrap cursor-pointer hover:text-red-600"
+            onClick={() => { setScanActive(true); setTimeout(() => scanRef.current?.focus(), 50); }}
+          >
+            Hãy điền mã đơn shipper trả vào
+          </span>
+
           {/* Input nhận scan */}
           <input ref={scanRef} type="text" value={scanInput}
             onChange={e => setScanInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") handleScan(scanInput); }}
+            onClick={() => { if (!scanActive) { setScanActive(true); scanRef.current?.focus(); } }}
             placeholder={scanActive ? "Đưa mã vạch vào đây — quét hoặc nhập tay rồi Enter..." : "Bấm 'Quét mã vạch' để bắt đầu"}
-            disabled={!scanActive}
+            disabled={false}
             className={`flex-1 min-w-[260px] text-sm px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono transition ${
               scanActive ? "border-indigo-300 bg-white" : "border-slate-200 bg-slate-50 text-slate-400"
             }`}
@@ -869,7 +909,7 @@ export default function DoiSoatPage() {
             {/* Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <Plus size={18} className="text-indigo-500" /> Thêm đơn hoàn trả
+                <Plus size={18} className="text-indigo-500" /> Đơn hệ thống
               </h2>
               <button onClick={() => { setShowAdd(false); setAddScanLog([]); setAddScanInput(""); }}
                 className="p-1.5 rounded-lg hover:bg-slate-100 transition">
@@ -914,19 +954,46 @@ export default function DoiSoatPage() {
                 </div>
 
                 {/* Input quét */}
-                <div className={`rounded-xl border-2 p-3 transition-colors border-indigo-400 bg-indigo-50/50`}>
-                  <p className="text-xs text-indigo-600 font-medium mb-2">Quét mã vạch đơn hàng — Enter để thêm</p>
+                <div className={`rounded-xl border-2 p-3 transition-colors ${addScanDupWarning ? "border-red-400 bg-red-50/50" : "border-indigo-400 bg-indigo-50/50"}`}>
+                  <p className={`text-xs font-medium mb-2 ${addScanDupWarning ? "text-red-500" : "text-indigo-600"}`}>
+                    Quét mã vạch đơn hàng — Enter để thêm
+                  </p>
                   <input
                     ref={addScanRef}
                     autoFocus
                     type="text"
                     value={addScanInput}
-                    onChange={e => setAddScanInput(e.target.value)}
+                    onChange={e => { setAddScanInput(e.target.value); setAddScanDupWarning(null); }}
                     onKeyDown={e => { if (e.key === "Enter") handleAddScan(addScanInput); }}
                     placeholder="Đưa mã vạch vào đây hoặc nhập tay rồi Enter..."
-                    className="w-full text-sm font-mono px-3 py-2 rounded-lg border border-indigo-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className={`w-full text-sm font-mono px-3 py-2 rounded-lg border bg-white focus:outline-none focus:ring-2 ${addScanDupWarning ? "border-red-300 focus:ring-red-300" : "border-indigo-300 focus:ring-indigo-400"}`}
                   />
                 </div>
+
+                {/* Cảnh báo trùng đơn */}
+                {addScanDupWarning && (
+                  <div className="rounded-xl bg-red-50 border-2 border-red-300 px-4 py-3 flex items-start gap-3">
+                    <span className="text-red-500 text-2xl leading-none mt-0.5">⚠️</span>
+                    <div>
+                      <p className="text-red-600 font-bold text-base leading-snug">
+                        Đơn này đã được nhập rồi!
+                      </p>
+                      <p className="text-red-500 font-mono font-semibold text-sm mt-0.5">
+                        {addScanDupWarning.maDon}
+                      </p>
+                      <p className="text-red-400 text-sm mt-1">
+                        Đã nhập lúc{" "}
+                        <span className="font-semibold">
+                          {new Date(addScanDupWarning.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {" "}ngày{" "}
+                        <span className="font-semibold">
+                          {new Date(addScanDupWarning.createdAt).toLocaleDateString("vi-VN")}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Log thêm đơn */}
                 {addScanLog.length > 0 && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download, Bell, Circle, CalendarDays, Send, PackageCheck } from "lucide-react";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -11,6 +11,7 @@ type Booking = {
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
   ngayBat: string; ngayKet: string | null;
   trangThai: string; doanhThu: number; donHang: number; luotXem: number; ghiChu: string | null;
+  ngayLenVideo: string | null; daSent: boolean; daRecv: boolean;
   koc: KOC; sanPham: SanPham | null;
 };
 
@@ -84,6 +85,10 @@ export default function KocPage() {
   const [editingGCId, setEditingGCId] = useState<string | null>(null);
   const slRef = useRef<HTMLInputElement>(null);
   const gcRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Reminder: bookings có ngayLenVideo trong 2 ngày tới ──
+  const [reminders, setReminders] = useState<Booking[]>([]);
+  const [showReminder, setShowReminder] = useState(true);
 
   const patchBookingBackground = (id: string, data: Record<string, unknown>) => {
     // Fire-and-forget — không chờ response, UI đã cập nhật optimistic rồi
@@ -168,14 +173,16 @@ export default function KocPage() {
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
   const fetchData = async () => {
-    const [k, b, sp] = await Promise.all([
+    const [k, b, sp, rem] = await Promise.all([
       fetch("/api/koc").then((r) => r.json()),
       fetch("/api/koc/booking").then((r) => r.json()),
       fetch("/api/kho/san-pham").then((r) => r.json()),
+      fetch("/api/koc/remind").then((r) => r.json()),
     ]);
     setKocs(k);
     setBookings(b);
     setSanPhams(Array.isArray(sp) ? sp : sp.data ?? []);
+    if (Array.isArray(rem)) setReminders(rem);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -196,6 +203,26 @@ export default function KocPage() {
       return age >= cutoff && !hasBooking;
     });
   }, [sanPhams, bookings]);
+
+  // KOC mới thêm vào chưa có booking nào
+  const newKOCs = useMemo(() => {
+    return kocs.filter(k => !bookings.some(b => b.kocId === k.id));
+  }, [kocs, bookings]);
+
+  // KOC đã hợp tác từ 2 lần trở lên (gợi ý tái booking)
+  const repeatKOCs = useMemo(() => {
+    return kocs
+      .map(k => {
+        const myBookings = bookings.filter(b => b.kocId === k.id);
+        const done = myBookings.filter(b => b.trangThai === "ket_thuc");
+        const totalCost = done.reduce((s, b) => s + b.chiPhi, 0);
+        const totalRev  = done.reduce((s, b) => s + b.doanhThu, 0);
+        const roi = totalCost > 0 ? ((totalRev - totalCost) / totalCost * 100) : null;
+        return { ...k, bookingCount: myBookings.length, doneCount: done.length, roi };
+      })
+      .filter(k => k.bookingCount >= 2)
+      .sort((a, b) => (b.roi ?? -999) - (a.roi ?? -999));
+  }, [kocs, bookings]);
 
   const kocRankings = useMemo(() => {
     return kocs.map(k => {
@@ -594,9 +621,71 @@ export default function KocPage() {
         </div>
       </div>
 
-      {/* Đề xuất KOC — sản phẩm mới chưa có booking */}
-      {newSanPhams.length > 0 && (
-        <div className="mb-5 bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 rounded-xl overflow-hidden">
+      {/* ── Reminder: lịch lên video sắp tới ── */}
+      {reminders.length > 0 && (
+        <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowReminder(v => !v)}
+            className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/30 transition text-left"
+          >
+            <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0 relative">
+              <Bell size={14} className="text-white" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">
+                {reminders.length}
+              </span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-800">
+                Lịch lên video sắp tới — {reminders.length} KOC
+              </p>
+              <p className="text-xs text-amber-600">Nhấn để {showReminder ? "thu gọn" : "xem chi tiết"}</p>
+            </div>
+            {showReminder ? <ChevronUp size={16} className="text-amber-400" /> : <ChevronDown size={16} className="text-amber-400" />}
+          </button>
+
+          {showReminder && (() => {
+            const today     = reminders.filter(r => { const d = new Date(r.ngayLenVideo!); const now = new Date(); return d.toDateString() === now.toDateString(); });
+            const tomorrow  = reminders.filter(r => { const d = new Date(r.ngayLenVideo!); const tm = new Date(); tm.setDate(tm.getDate() + 1); return d.toDateString() === tm.toDateString(); });
+            const in2days   = reminders.filter(r => { const d = new Date(r.ngayLenVideo!); const t2 = new Date(); t2.setDate(t2.getDate() + 2); return d.toDateString() === t2.toDateString(); });
+
+            const Section = ({ label, items, color }: { label: string; items: typeof reminders; color: string }) =>
+              items.length === 0 ? null : (
+                <div className="border-t border-amber-100 px-5 py-3">
+                  <p className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${color}`}>{label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {items.map(r => (
+                      <div key={r.id} className="flex items-center gap-2 bg-white border border-amber-100 rounded-lg px-3 py-1.5 shadow-sm">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${color.replace("text-", "bg-")}`} />
+                        <span className="text-xs font-semibold text-slate-700">{r.koc.ten}</span>
+                        {r.sanPham && (
+                          <>
+                            <span className="text-amber-300">·</span>
+                            <span className="text-xs text-slate-500 max-w-[120px] truncate">{r.sanPham.ten}</span>
+                          </>
+                        )}
+                        <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                          {r.ngayLenVideo ? new Date(r.ngayLenVideo).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }) : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+
+            return (
+              <>
+                <Section label="🔴  Hôm nay" items={today}   color="text-red-600" />
+                <Section label="🟠  1 ngày nữa" items={tomorrow} color="text-orange-500" />
+                <Section label="🟡  2 ngày nữa" items={in2days}  color="text-amber-500" />
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Gợi ý Booking */}
+      {(newKOCs.length > 0 || repeatKOCs.length > 0) && (
+        <div className="mb-5 bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setShowDeXuat(v => !v)}
             className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/30 transition text-left"
@@ -606,79 +695,76 @@ export default function KocPage() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-rose-700">
-                Đề xuất Booking — {newSanPhams.length} sản phẩm mới chưa có KOC
+                Gợi ý Booking —
+                {newKOCs.length > 0 && <span className="ml-1">{newKOCs.length} KOC mới chưa booking</span>}
+                {newKOCs.length > 0 && repeatKOCs.length > 0 && <span className="text-rose-400"> · </span>}
+                {repeatKOCs.length > 0 && <span>{repeatKOCs.length} KOC nên tái hợp tác</span>}
               </p>
-              <p className="text-xs text-rose-500">Sản phẩm thêm trong 7 ngày qua • Nhấn để {showDeXuat ? "thu gọn" : "xem"}</p>
+              <p className="text-xs text-rose-400 mt-0.5">Nhấn để {showDeXuat ? "thu gọn" : "xem chi tiết"}</p>
             </div>
             {showDeXuat ? <ChevronUp size={16} className="text-rose-400" /> : <ChevronDown size={16} className="text-rose-400" />}
           </button>
 
           {showDeXuat && (
-            <div className="border-t border-rose-100 divide-y divide-rose-100">
-              {newSanPhams.map(sp => {
-                const daysSince = Math.floor((Date.now() - new Date(sp.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-                const top3 = kocRankings.slice(0, 3);
-                return (
-                  <div key={sp.id} className="px-5 py-4">
-                    {/* Sản phẩm header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 bg-white rounded-lg border border-rose-200 flex items-center justify-center flex-shrink-0">
-                        <Package size={14} className="text-rose-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-slate-800 text-sm truncate">{sp.ten}</span>
-                          <span className="text-xs font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500">{sp.sku}</span>
-                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
-                            {daysSince === 0 ? "Hôm nay" : `${daysSince} ngày trước`}
-                          </span>
-                          {sp.giaNhap > 0 && (
-                            <span className="text-xs text-slate-400">Giá nhập: {formatCurrency(sp.giaNhap)}</span>
-                          )}
+            <div className="border-t border-rose-100">
+              {/* Nhóm 1: KOC mới chưa có booking */}
+              {newKOCs.length > 0 && (
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-bold text-rose-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+                    KOC mới — chưa có booking nào ({newKOCs.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {newKOCs.map(k => (
+                      <div key={k.id}
+                        className="flex items-center gap-2.5 bg-white border border-rose-100 rounded-xl px-3 py-2 shadow-sm hover:shadow-md transition">
+                        <div className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+                          <Users size={13} className="text-rose-400" />
                         </div>
-                      </div>
-                      <button
-                        onClick={() => openLaunch(sp)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition flex-shrink-0 font-medium"
-                      >
-                        <Plus size={12} /> Booking ngay
-                      </button>
-                    </div>
-
-                    {/* Gợi ý top KOC */}
-                    {top3.length > 0 && (
-                      <div>
-                        <p className="text-xs text-slate-400 mb-2 ml-11">Gợi ý KOC theo hiệu quả:</p>
-                        <div className="ml-11 flex flex-wrap gap-2">
-                          {top3.map((k, idx) => (
-                            <div
-                              key={k.id}
-                              className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs"
-                            >
-                              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 ${idx === 0 ? "bg-yellow-400" : idx === 1 ? "bg-slate-400" : "bg-orange-300"}`}>
-                                {idx + 1}
-                              </span>
-                              <div>
-                                <p className="font-medium text-slate-800">{k.ten}</p>
-                                <p className="text-slate-400">
-                                  {k.roi !== null
-                                    ? <span className={k.roi >= 0 ? "text-green-600 font-semibold" : "text-red-500"}>ROI {k.roi >= 0 ? "+" : ""}{k.roi.toFixed(0)}%</span>
-                                    : <span className="text-slate-400">Chưa có dữ liệu</span>
-                                  }
-                                  {k.doneCount > 0 && <span className="ml-1 text-slate-400">· {k.doneCount} chiến dịch</span>}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                          {kocRankings.length === 0 && (
-                            <span className="text-xs text-slate-400 italic">Chưa có KOC nào trong hệ thống</span>
-                          )}
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{k.ten}</p>
+                          <p className="text-[10px] text-slate-400 capitalize">
+                            {PLATFORM_LABEL[k.platform]} {k.follower > 0 && `· ${(k.follower/1000).toFixed(0)}K`}
+                          </p>
                         </div>
+                        <span className="text-[10px] bg-rose-50 text-rose-500 border border-rose-200 px-1.5 py-0.5 rounded-full font-medium">Mới</span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {/* Nhóm 2: KOC đã hợp tác ≥ 2 lần */}
+              {repeatKOCs.length > 0 && (
+                <div className={`px-5 py-4 ${newKOCs.length > 0 ? "border-t border-rose-100" : ""}`}>
+                  <p className="text-[11px] font-bold text-purple-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
+                    Đã hợp tác ≥ 2 lần — nên tái booking ({repeatKOCs.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {repeatKOCs.map((k, idx) => (
+                      <div key={k.id}
+                        className="flex items-center gap-2.5 bg-white border border-purple-100 rounded-xl px-3 py-2 shadow-sm hover:shadow-md transition">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold ${
+                          idx === 0 ? "bg-yellow-400" : idx === 1 ? "bg-slate-400" : "bg-orange-300"}`}>
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">{k.ten}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {k.bookingCount} lần booking
+                            {k.roi !== null && (
+                              <span className={`ml-1 font-semibold ${k.roi >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                · ROI {k.roi >= 0 ? "+" : ""}{k.roi.toFixed(0)}%
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -896,6 +982,15 @@ export default function KocPage() {
                               <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá cast</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Trạng thái</th>
                               <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Ghi chú</th>
+                              <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">
+                                <div className="flex items-center gap-1 justify-center"><CalendarDays size={11} /> Ngày lên video</div>
+                              </th>
+                              <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">
+                                <div className="flex items-center gap-1 justify-center"><Send size={11} /> Đã gửi</div>
+                              </th>
+                              <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">
+                                <div className="flex items-center gap-1 justify-center"><PackageCheck size={11} /> Đã nhận</div>
+                              </th>
                               <th className="px-4 py-2.5"></th>
                             </tr>
                           </thead>
@@ -969,6 +1064,57 @@ export default function KocPage() {
                                         : <span className="text-slate-300 italic">+ ghi chú</span>}
                                     </button>
                                   )}
+                                </td>
+                                {/* Ngày lên video — date picker */}
+                                <td className="px-3 py-3 text-center">
+                                  {(() => {
+                                    const isNear = b.ngayLenVideo
+                                      ? (new Date(b.ngayLenVideo).getTime() - Date.now()) / 86400000 <= 2
+                                        && new Date(b.ngayLenVideo) > new Date()
+                                      : false;
+                                    return (
+                                      <div className="relative">
+                                        <input
+                                          type="date"
+                                          defaultValue={b.ngayLenVideo ? b.ngayLenVideo.slice(0, 10) : ""}
+                                          onChange={e => {
+                                            const val = e.target.value || null;
+                                            setBookings(prev => prev.map(x => x.id === b.id ? { ...x, ngayLenVideo: val } : x));
+                                            patchBookingBackground(b.id, { ngayLenVideo: val });
+                                          }}
+                                          className={`text-xs px-2 py-1 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-pointer
+                                            ${isNear ? "border-orange-300 bg-orange-50 text-orange-700 font-semibold" : "border-slate-200 bg-white text-slate-600"}`}
+                                        />
+                                        {isNear && <Bell size={10} className="absolute -top-1 -right-1 text-orange-500 animate-pulse" />}
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+                                {/* Đã gửi */}
+                                <td className="px-3 py-3 text-center">
+                                  <button onClick={() => {
+                                    const next = !b.daSent;
+                                    setBookings(prev => prev.map(x => x.id === b.id ? { ...x, daSent: next } : x));
+                                    patchBookingBackground(b.id, { daSent: next });
+                                  }}
+                                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
+                                      b.daSent ? "bg-blue-500 border-blue-500 text-white shadow-sm" : "border-slate-300 hover:border-blue-400 bg-white"
+                                    }`}>
+                                    {b.daSent ? <CheckCircle size={14} /> : <Circle size={14} className="text-slate-300" />}
+                                  </button>
+                                </td>
+                                {/* Đã nhận */}
+                                <td className="px-3 py-3 text-center">
+                                  <button onClick={() => {
+                                    const next = !b.daRecv;
+                                    setBookings(prev => prev.map(x => x.id === b.id ? { ...x, daRecv: next } : x));
+                                    patchBookingBackground(b.id, { daRecv: next });
+                                  }}
+                                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
+                                      b.daRecv ? "bg-green-500 border-green-500 text-white shadow-sm" : "border-slate-300 hover:border-green-400 bg-white"
+                                    }`}>
+                                    {b.daRecv ? <CheckCircle size={14} /> : <Circle size={14} className="text-slate-300" />}
+                                  </button>
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center gap-1 justify-end">

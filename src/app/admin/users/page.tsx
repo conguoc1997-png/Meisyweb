@@ -108,8 +108,9 @@ export default function AdminUsersPage() {
             <tr>
               <th className="text-left px-4 py-3 text-slate-600 font-semibold">Tên</th>
               <th className="text-left px-4 py-3 text-slate-600 font-semibold">Email</th>
-              <th className="text-left px-4 py-3 text-slate-600 font-semibold">Role</th>
+              <th className="text-left px-4 py-3 text-slate-600 font-semibold">Phân quyền</th>
               <th className="text-left px-4 py-3 text-slate-600 font-semibold">Trạng thái</th>
+              <th className="text-left px-4 py-3 text-slate-600 font-semibold">Ngày tạo</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -117,25 +118,35 @@ export default function AdminUsersPage() {
             {users.map((u) => (
               <tr key={u.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
-                <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                <td className="px-4 py-3 max-w-[220px]">
-                  <span className={`text-xs px-2 py-0.5 rounded font-semibold ${roleColor(u.role)}`}>
-                    {u.role === "admin" ? "Admin" : ""}
-                  </span>
-                  {u.role !== "admin" && (
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {parseModules(u.role).map(k => (
-                        <span key={k} className="text-[11px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                          {ALL_MODULES.find(m => m.key === k)?.label ?? k}
-                        </span>
-                      ))}
+                <td className="px-4 py-3 text-slate-500 text-sm">{u.email}</td>
+                <td className="px-4 py-3 max-w-[280px]">
+                  {u.role === "admin" ? (
+                    <span className="text-xs px-2 py-0.5 rounded font-semibold bg-rose-100 text-rose-700">
+                      Admin — Toàn quyền
+                    </span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {parseModules(u.role).map(k => {
+                        const mod = ALL_MODULES.find(m => m.key === k);
+                        return (
+                          <span key={k} className="text-[11px] px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded font-medium">
+                            {mod?.label ?? k}
+                          </span>
+                        );
+                      })}
+                      {parseModules(u.role).length === 0 && (
+                        <span className="text-[11px] text-slate-400 italic">Chưa có quyền</span>
+                      )}
                     </div>
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick={() => toggleActive(u)} className={`text-xs px-2 py-0.5 rounded font-semibold transition ${u.active ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
-                    {u.active ? "Hoạt động" : "Khoá"}
+                  <button onClick={() => toggleActive(u)} className={`text-xs px-2 py-1 rounded-full font-semibold transition ${u.active ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                    {u.active ? "● Hoạt động" : "○ Khoá"}
                   </button>
+                </td>
+                <td className="px-4 py-3 text-xs text-slate-400">
+                  {new Date(u.createdAt).toLocaleDateString("vi-VN")}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
@@ -150,7 +161,7 @@ export default function AdminUsersPage() {
               </tr>
             ))}
             {users.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-8 text-slate-400">Chưa có tài khoản nào</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-slate-400">Chưa có tài khoản nào</td></tr>
             )}
           </tbody>
         </table>
