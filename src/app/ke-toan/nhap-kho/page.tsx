@@ -63,9 +63,11 @@ export default function NhapKhoPage() {
   const [search, setSearch]     = useState("");
   const [filterNCC, setFilterNCC] = useState("");
 
-  const [modal, setModal]       = useState<"create" | "edit" | "view" | "addNCC" | "quyDoi" | null>(null);
+  const [modal, setModal]       = useState<"create" | "edit" | "view" | "addNCC" | "quyDoi" | "confirmDelete" | null>(null);
   const [selected, setSelected] = useState<PhieuNhap | null>(null);
   const [editId, setEditId]     = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PhieuNhap | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form nhập kho
   const [form, setForm] = useState({
@@ -201,9 +203,13 @@ export default function NhapKhoPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Xoá phiếu này?")) return;
-    await fetch(`/api/ke-toan/nhap-kho/${id}`, { method: "DELETE" });
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await fetch(`/api/ke-toan/nhap-kho/${deleteTarget.id}`, { method: "DELETE" });
+    setDeleting(false);
+    setDeleteTarget(null);
+    setModal(null);
     fetchAll();
   }
 
@@ -315,7 +321,7 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
                     <div className="flex gap-1">
                       <button onClick={()=>{setSelected(p);setModal("view");}} title="Xem" className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><Eye size={14}/></button>
                       <button onClick={()=>openEdit(p)} title="Sửa" className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50"><Pencil size={14}/></button>
-                      <button onClick={()=>handleDelete(p.id)} title="Xoá" className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={14}/></button>
+                      <button onClick={()=>{setDeleteTarget(p);setModal("confirmDelete");}} title="Xoá" className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={14}/></button>
                     </div>
                   </td>
                 </tr>
@@ -683,6 +689,45 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL XÁC NHẬN XOÁ ── */}
+      {modal==="confirmDelete" && deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-red-50 px-6 py-5 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <Trash2 size={18} className="text-red-500"/>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-800">Xoá phiếu nhập kho?</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Hành động này không thể hoàn tác</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <div className="bg-slate-50 rounded-xl px-4 py-3 space-y-1 text-sm">
+                <p><span className="text-slate-400 text-xs">Số phiếu:</span> <span className="font-mono font-semibold text-slate-800">{deleteTarget.soPhieu}</span></p>
+                <p><span className="text-slate-400 text-xs">Nhà CC:</span> <span className="text-slate-700">{getNccLabel(deleteTarget.nhaCC)}</span></p>
+                <p><span className="text-slate-400 text-xs">Tổng tiền:</span> <span className="font-semibold text-red-600">{fmt(deleteTarget.tongTien)}₫</span></p>
+              </div>
+              <p className="text-xs text-slate-500">
+                ⚠️ Tồn kho và công nợ liên quan sẽ được <strong>đảo ngược</strong> tự động.
+              </p>
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100">
+              <button onClick={()=>{setModal(null);setDeleteTarget(null);}}
+                className="flex-1 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+                Huỷ
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-2 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50">
+                {deleting ? "Đang xoá..." : "Xoá phiếu"}
+              </button>
             </div>
           </div>
         </div>
