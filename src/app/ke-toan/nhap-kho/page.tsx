@@ -81,6 +81,7 @@ export default function NhapKhoPage() {
   // Form thêm NCC nhanh
   const [nccForm, setNccForm] = useState({ ma: "", ten: "", sdt: "", diaChi: "" });
   const [savingNCC, setSavingNCC] = useState(false);
+  const [nccError, setNccError]   = useState("");
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -225,18 +226,29 @@ export default function NhapKhoPage() {
   // ── Thêm NCC nhanh ──
   async function handleAddNCC() {
     if (!nccForm.ma || !nccForm.ten) return;
+    setNccError("");
     setSavingNCC(true);
-    const res = await fetch("/api/ke-toan/nha-cung-cap", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(nccForm),
-    });
-    setSavingNCC(false);
-    if (res.ok) {
-      const ncc = await res.json();
-      setNccForm({ ma:"", ten:"", sdt:"", diaChi:"" });
-      setModal(editId ? "edit" : "create");
-      setForm(f => ({ ...f, nhaCC: ncc.id }));
+    try {
+      const res = await fetch("/api/ke-toan/nha-cung-cap", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nccForm),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNccError(data?.error || `Lỗi ${res.status} — thử lại sau`);
+        return;
+      }
+      setNccForm({ ma: "", ten: "", sdt: "", diaChi: "" });
+      setNccError("");
       await fetchAll();
+      // Tự động chọn NCC vừa thêm vào form
+      setForm(f => ({ ...f, nhaCC: data.id }));
+      // Quay về modal gốc nếu đang ở trong create/edit, ngược lại đóng
+      setModal(editId ? "edit" : modal === "addNCC" ? "create" : null);
+    } catch (e) {
+      setNccError("Không kết nối được server — kiểm tra lại kết nối");
+    } finally {
+      setSavingNCC(false);
     }
   }
 
@@ -582,14 +594,19 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-base font-bold text-slate-800">Thêm nhà cung cấp mới</h2>
-              <button onClick={()=>setModal(editId ? "edit" : "create")} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
+              <button onClick={()=>{setNccError("");setModal(editId?"edit":"create");}} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
             </div>
             <div className="p-6 space-y-3">
+              {nccError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">
+                  ❌ {nccError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Mã NCC *</label>
-                  <input value={nccForm.ma} onChange={e=>setNccForm(f=>({...f,ma:e.target.value}))}
-                    placeholder="VD: HL, AH..."
+                  <input value={nccForm.ma} onChange={e=>setNccForm(f=>({...f,ma:e.target.value.toUpperCase()}))}
+                    placeholder="VD: DL, HL..."
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
                 </div>
                 <div>
@@ -601,7 +618,7 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Tên NCC *</label>
                 <input value={nccForm.ten} onChange={e=>setNccForm(f=>({...f,ten:e.target.value}))}
-                  placeholder="VD: Công ty TNHH Hắc Long"
+                  placeholder="VD: Dũng Linh, Hắc Long..."
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
               </div>
               <div>
@@ -611,7 +628,7 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
               </div>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={()=>setModal(editId ? "edit" : "create")} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+              <button onClick={()=>{setNccError("");setModal(editId?"edit":"create");}} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
               <button onClick={handleAddNCC} disabled={savingNCC||!nccForm.ma||!nccForm.ten}
                 className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
                 {savingNCC?"Đang lưu...":"Thêm NCC"}
