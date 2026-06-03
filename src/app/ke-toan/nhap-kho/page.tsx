@@ -68,6 +68,7 @@ export default function NhapKhoPage() {
   const [editId, setEditId]     = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PhieuNhap | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // Form nhập kho
   const [form, setForm] = useState({
@@ -143,20 +144,31 @@ export default function NhapKhoPage() {
     const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
     if (!validRows.length) return;
     setSaving(true);
-    const res = await fetch("/api/ke-toan/nhap-kho", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, chiTiet: validRows }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      setModal(null);
-      setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0,10), nhaCC: nccList[0]?.id||"", tenNhaCC:"", soHoaDon:"", ngayHoaDon:"", ghiChu:"", nguoiTao:"" });
-      setChiTiet([newRow()]); setVtSearch([""]);
-      fetchAll();
+    setSaveError("");
+    try {
+      const res = await fetch("/api/ke-toan/nhap-kho", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, chiTiet: validRows }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setModal(null);
+        setSaveError("");
+        setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0,10), nhaCC: nccList[0]?.id||"", tenNhaCC:"", soHoaDon:"", ngayHoaDon:"", ghiChu:"", nguoiTao:"" });
+        setChiTiet([newRow()]); setVtSearch([""]);
+        fetchAll();
+      } else {
+        setSaveError(data?.error || `Lỗi ${res.status} — thử lại sau`);
+      }
+    } catch {
+      setSaveError("Không kết nối được server");
+    } finally {
+      setSaving(false);
     }
   }
 
   function openEdit(p: PhieuNhap) {
+    setSaveError("");
     setEditId(p.id);
     setForm({
       soPhieu:    p.soPhieu,
@@ -190,17 +202,29 @@ export default function NhapKhoPage() {
     const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
     if (!validRows.length) return;
     setSaving(true);
-    const res = await fetch(`/api/ke-toan/nhap-kho/${editId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, chiTiet: validRows }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      setModal(null);
-      setEditId(null);
-      setChiTiet([newRow()]); setVtSearch([""]);
-      fetchAll();
+    setSaveError("");
+    try {
+      const res = await fetch(`/api/ke-toan/nhap-kho/${editId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, chiTiet: validRows }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Thành công → đóng modal, reset form
+        setModal(null);
+        setEditId(null);
+        setSaveError("");
+        setChiTiet([newRow()]);
+        setVtSearch([""]);
+        fetchAll();
+      } else {
+        setSaveError(data?.error || `Lỗi ${res.status} — thử lại sau`);
+      }
+    } catch {
+      setSaveError("Không kết nối được server");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -576,13 +600,21 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={()=>{setModal(null);setEditId(null);}} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
-              <button onClick={modal==="edit" ? handleUpdate : handleCreate} disabled={saving}
-                className={`px-5 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50
-                  ${modal==="edit" ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"}`}>
-                {saving ? "Đang lưu..." : modal==="edit" ? "Cập nhật" : "Lưu phiếu"}
-              </button>
+            <div className="px-6 py-4 border-t border-slate-100 space-y-3">
+              {saveError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-600 flex items-center gap-2">
+                  <span>❌</span>
+                  <span>{saveError}</span>
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                <button onClick={()=>{setModal(null);setEditId(null);setSaveError("");}} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+                <button onClick={modal==="edit" ? handleUpdate : handleCreate} disabled={saving}
+                  className={`px-5 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50
+                    ${modal==="edit" ? "bg-amber-500 hover:bg-amber-600" : "bg-indigo-600 hover:bg-indigo-700"}`}>
+                  {saving ? "Đang lưu..." : modal==="edit" ? "Cập nhật" : "Lưu phiếu"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
