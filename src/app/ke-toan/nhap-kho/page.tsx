@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle, UserPlus, ArrowLeftRight, Pencil } from "lucide-react";
+import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle, UserPlus, Pencil } from "lucide-react";
 
 type VatTu = {
-  id: string; ma: string; ten: string; loai: string; nhom: string | null; donVi: string;
+  id: string; ma: string; ten: string; loai: string; nhom: string | null;
+  donVi: string; donViMua: string; quyDoi: number;
   tonKho?: { soLuong: number; giaTrungBinh: number };
 };
 
 type NCC = { id: string; ma: string; ten: string; sdt?: string | null; diaChi?: string | null };
-type QuyDoi = { id: string; tuDonVi: string; veDonVi: string; heSo: number; ghiChu?: string | null };
 
 type ChiTiet = {
   id?: string; vatTuId: string; vatTu?: VatTu;
@@ -38,7 +38,6 @@ const DON_VI_MUA_BASE = [
   { value: "cai",   label: "Cái",      showQuyDoi: false },
 ];
 
-const DEFAULT_QUY_DOI: Record<string, number> = { m: 1, cay: 50, kg: 1.5 };
 
 const TRANG_THAI_MAP: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   chua_thanh_toan:    { label: "Chưa TT",    color: "bg-yellow-100 text-yellow-700", icon: <Clock size={12} /> },
@@ -60,7 +59,6 @@ export default function NhapKhoPage() {
   const [phieus, setPhieus]     = useState<PhieuNhap[]>([]);
   const [vatTus, setVatTus]     = useState<VatTu[]>([]);
   const [nccList, setNccList]   = useState<NCC[]>([]);
-  const [quyDois, setQuyDois]   = useState<QuyDoi[]>([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
   const [filterNCC, setFilterNCC] = useState("");
@@ -82,23 +80,17 @@ export default function NhapKhoPage() {
   const [nccForm, setNccForm] = useState({ ma: "", ten: "", sdt: "", diaChi: "" });
   const [savingNCC, setSavingNCC] = useState(false);
 
-  // Form quy đổi đơn vị
-  const [qdForm, setQdForm] = useState({ tuDonVi: "", veDonVi: "", heSo: "", ghiChu: "" });
-  const [savingQD, setSavingQD]   = useState(false);
-
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, n, q] = await Promise.all([
+      const [p, v, n] = await Promise.all([
         fetch("/api/ke-toan/nhap-kho").then(r => r.json()),
         fetch("/api/ke-toan/vat-tu").then(r => r.json()),
         fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()),
-        fetch("/api/ke-toan/quy-doi-don-vi").then(r => r.json()),
       ]);
       setPhieus(Array.isArray(p) ? p : []);
       setVatTus(Array.isArray(v) ? v : []);
       setNccList(Array.isArray(n) ? n : []);
-      setQuyDois(Array.isArray(q) ? q : []);
     } catch (e) {
       console.error("fetchAll nhap-kho:", e);
     } finally {
@@ -108,18 +100,8 @@ export default function NhapKhoPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Đơn vị mua = base + quy đổi từ DB (gói→chiếc, cuộn→m, v.v.)
-  const donViMuaOptions = useMemo(() => {
-    const extra = quyDois.map(qd => ({
-      value: qd.tuDonVi,
-      label: `${qd.tuDonVi} (1 = ${qd.heSo} ${qd.veDonVi})`,
-      showQuyDoi: false,
-      heSo: qd.heSo,
-      veDonVi: qd.veDonVi,
-    }));
-    const existingValues = new Set(DON_VI_MUA_BASE.map(d => d.value));
-    return [...DON_VI_MUA_BASE, ...extra.filter(e => !existingValues.has(e.value))];
-  }, [quyDois]);
+  // Đơn vị mua = danh sách cố định (quy đổi lưu theo từng vật tư, không global)
+  const donViMuaOptions = DON_VI_MUA_BASE;
 
   const filtered = useMemo(() => phieus.filter(p => {
     const s = search.toLowerCase();
@@ -143,10 +125,6 @@ export default function NhapKhoPage() {
     setChiTiet(prev => prev.map((r, idx) => {
       if (idx !== i) return r;
       const updated = { ...r, ...patch };
-      if (patch.donViMua && patch.donViMua !== r.donViMua) {
-        const qd = quyDois.find(q => q.tuDonVi === patch.donViMua);
-        updated.quyDoi = qd ? qd.heSo : (DEFAULT_QUY_DOI[patch.donViMua] ?? 1);
-      }
       // Chỉ tự tính lại soLuong khi KHÔNG chỉnh tay soLuong
       if (patch.soLuong === undefined) {
         updated.soLuong = updated.soLuongMua * updated.quyDoi;
@@ -256,25 +234,7 @@ export default function NhapKhoPage() {
     }
   }
 
-  // ── Thêm quy đổi ──
-  async function handleAddQuyDoi() {
-    if (!qdForm.tuDonVi || !qdForm.veDonVi || !qdForm.heSo) return;
-    setSavingQD(true);
-    await fetch("/api/ke-toan/quy-doi-don-vi", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ ...qdForm, heSo: parseFloat(qdForm.heSo) }),
-    });
-    setSavingQD(false);
-    setQdForm({ tuDonVi:"", veDonVi:"", heSo:"", ghiChu:"" });
-    await fetchAll();
-  }
-
-  async function deleteQuyDoi(id: string) {
-    await fetch(`/api/ke-toan/quy-doi-don-vi/${id}`, { method:"DELETE" });
-    fetchAll();
-  }
-
-  const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
+const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
   const stats = useMemo(()=>({
     soPhieu: filtered.length,
     tongTien: filtered.reduce((s,p)=>s+p.tongTien,0),
@@ -289,10 +249,6 @@ export default function NhapKhoPage() {
           <p className="text-sm text-slate-500 mt-0.5">Tự động cập nhật tồn kho & công nợ NCC</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={()=>setModal("quyDoi")}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
-            <ArrowLeftRight size={14}/> Quy đổi ĐV
-          </button>
           <button onClick={()=>{ setModal("create"); setForm(f=>({...f,soPhieu:genSoPhieu(),nhaCC:nccList[0]?.id||""})); }}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700">
             <Plus size={16}/> Tạo phiếu nhập
@@ -432,10 +388,6 @@ export default function NhapKhoPage() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-slate-700">Chi tiết hàng hoá</h3>
                   <div className="flex items-center gap-2">
-                    <button onClick={()=>setModal("quyDoi")}
-                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600">
-                      <ArrowLeftRight size={11}/> Quản lý quy đổi ĐV
-                    </button>
                     <button onClick={addRow} className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
                       <Plus size={12}/> Thêm dòng
                     </button>
@@ -463,10 +415,8 @@ export default function NhapKhoPage() {
                           const q=(vtSearch[i]||"").toLowerCase();
                           return !q||v.ten.toLowerCase().includes(q)||v.ma.toLowerCase().includes(q);
                         });
-                        const dvInfo = donViMuaOptions.find(d=>d.value===row.donViMua);
-                        const showQD = dvInfo?.showQuyDoi ?? false;
-                        // Tìm quy đổi từ DB cho đơn vị này
-                        const dbQD = quyDois.find(q=>q.tuDonVi===row.donViMua);
+                        // Có quy đổi nếu quyDoi != 1 (donViMua ≠ donVi)
+                        const hasConversion = row.quyDoi !== 1 || (selVT && selVT.donViMua !== selVT.donVi);
 
                         return (
                           <tr key={i} className="border-t border-slate-100">
@@ -480,10 +430,22 @@ export default function NhapKhoPage() {
                                   <div className="absolute top-full left-0 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
                                     {filtVTs.map(v=>(
                                       <button key={v.id} className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 flex gap-2"
-                                        onClick={()=>{updateRow(i,{vatTuId:v.id});const ns=[...vtSearch];ns[i]="";setVtSearch(ns);}}>
+                                        onClick={()=>{
+                                          // Tự điền donViMua + quyDoi từ vật tư
+                                          updateRow(i,{
+                                            vatTuId:  v.id,
+                                            donViMua: v.donViMua || v.donVi,
+                                            quyDoi:   v.quyDoi   || 1,
+                                          });
+                                          const ns=[...vtSearch];ns[i]="";setVtSearch(ns);
+                                        }}>
                                         <span className="font-mono text-slate-400">{v.ma}</span>
                                         <span>{v.ten}</span>
-                                        <span className="text-slate-400 ml-auto">{v.donVi}</span>
+                                        <span className="text-slate-400 ml-auto">
+                                          {v.donViMua !== v.donVi
+                                            ? `${v.donViMua}→${v.donVi}`
+                                            : v.donVi}
+                                        </span>
                                       </button>
                                     ))}
                                   </div>
@@ -493,58 +455,61 @@ export default function NhapKhoPage() {
                                 )}
                               </div>
                             </td>
+                            {/* ĐV mua — auto từ vật tư, vẫn chỉnh được */}
                             <td className="px-3 py-1.5 align-top">
                               <select value={row.donViMua} onChange={e=>updateRow(i,{donViMua:e.target.value})}
                                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300">
                                 {donViMuaOptions.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}
                               </select>
-                              {dbQD && (
-                                <p className="text-[10px] text-indigo-500 mt-0.5">1 {dbQD.tuDonVi} = {dbQD.heSo} {dbQD.veDonVi}</p>
+                              {selVT && selVT.donViMua !== selVT.donVi && (
+                                <p className="text-[10px] text-indigo-500 mt-0.5">
+                                  1 {selVT.donViMua} = {selVT.quyDoi} {selVT.donVi}
+                                </p>
                               )}
                             </td>
+
+                            {/* Số lượng mua */}
                             <td className="px-3 py-1.5 align-top">
                               <input type="number" min={0} value={row.soLuongMua||""}
                                 onChange={e=>updateRow(i,{soLuongMua:parseFloat(e.target.value)||0})}
                                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
                             </td>
+
+                            {/* Hệ số quy đổi — editable nếu có conversion */}
                             <td className="px-3 py-1.5 align-top">
-                              {showQD ? (
-                                <div>
-                                  <input type="number" min={0} step="0.01" value={row.quyDoi||""}
-                                    onChange={e=>updateRow(i,{quyDoi:parseFloat(e.target.value)||1})}
-                                    className="w-full border border-indigo-200 bg-indigo-50 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
-                                </div>
-                              ) : dbQD ? (
-                                <span className="text-[10px] text-indigo-600 px-1">×{dbQD.heSo}</span>
+                              {hasConversion ? (
+                                <input type="number" min={0} step="0.01" value={row.quyDoi||""}
+                                  onChange={e=>updateRow(i,{quyDoi:parseFloat(e.target.value)||1})}
+                                  className="w-full border border-indigo-200 bg-indigo-50 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
                               ) : (
                                 <span className="text-xs text-slate-300 px-2">—</span>
                               )}
                             </td>
 
-                            {/* Tổng mét — editable, auto-fill từ soLuongMua×quyDoi */}
+                            {/* Tổng quy đổi — editable */}
                             <td className="px-3 py-1.5 align-top">
-                              {showQD ? (
+                              {hasConversion ? (
                                 <div>
-                                  <input
-                                    type="number" min={0} step="0.01"
+                                  <input type="number" min={0} step="0.01"
                                     value={row.soLuong || ""}
                                     onChange={e => updateRow(i, { soLuong: parseFloat(e.target.value) || 0 })}
-                                    className="w-full border border-teal-200 rounded-lg px-2 py-1.5 text-xs text-right font-semibold text-teal-700 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50"
-                                  />
-                                  <p className="text-[10px] text-slate-400 mt-0.5">m</p>
+                                    className="w-full border border-teal-200 rounded-lg px-2 py-1.5 text-xs text-right font-semibold text-teal-700 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50"/>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">{selVT?.donVi||"đvị"}</p>
                                 </div>
                               ) : (
                                 <span className="text-xs text-slate-300">—</span>
                               )}
                             </td>
+
+                            {/* Đơn giá */}
                             <td className="px-3 py-1.5 align-top">
                               <div>
                                 <input type="number" min={0} value={row.donGia||""}
                                   onChange={e=>updateRow(i,{donGia:parseFloat(e.target.value)||0})}
                                   className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"/>
-                                {(showQD||dbQD) && row.soLuong>0 && row.donGia>0 && (
+                                {hasConversion && row.soLuong>0 && row.donGia>0 && (
                                   <p className="text-[10px] text-slate-400 mt-0.5">
-                                    ≈{fmt(Math.round(row.soLuongMua*row.donGia/row.soLuong))}₫/{dbQD?.veDonVi||selVT?.donVi||"đvị"}
+                                    ≈{fmt(Math.round(row.soLuongMua*row.donGia/row.soLuong))}₫/{selVT?.donVi||"đvị"}
                                   </p>
                                 )}
                               </div>
@@ -633,66 +598,6 @@ export default function NhapKhoPage() {
         </div>
       )}
 
-      {/* ── MODAL QUY ĐỔI ĐƠN VỊ ── */}
-      {modal==="quyDoi" && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-base font-bold text-slate-800">Quy đổi đơn vị</h2>
-                <p className="text-xs text-slate-400 mt-0.5">VD: 1 gói = 100 chiếc · 1 cuộn = 500m</p>
-              </div>
-              <button onClick={()=>setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18}/></button>
-            </div>
-            <div className="p-6 space-y-4">
-              {/* Danh sách hiện có */}
-              {quyDois.length>0 && (
-                <div className="space-y-1.5">
-                  {quyDois.map(qd=>(
-                    <div key={qd.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-2.5">
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="font-semibold text-slate-700">1 {qd.tuDonVi}</span>
-                        <span className="text-slate-400">=</span>
-                        <span className="font-bold text-indigo-600">{fmt(qd.heSo)}</span>
-                        <span className="text-slate-700">{qd.veDonVi}</span>
-                        {qd.ghiChu && <span className="text-xs text-slate-400">· {qd.ghiChu}</span>}
-                      </div>
-                      <button onClick={()=>deleteQuyDoi(qd.id)} className="p-1 text-slate-400 hover:text-red-500"><X size={13}/></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {quyDois.length===0 && (
-                <p className="text-center text-sm text-slate-400 py-2">Chưa có quy đổi nào</p>
-              )}
-              {/* Thêm mới */}
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-semibold text-slate-600 mb-3">Thêm quy đổi mới</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-500 shrink-0">1</span>
-                  <input value={qdForm.tuDonVi} onChange={e=>setQdForm(f=>({...f,tuDonVi:e.target.value}))}
-                    placeholder="đơn vị (gói, cuộn...)"
-                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
-                  <span className="text-sm text-slate-500 shrink-0">=</span>
-                  <input type="number" min={0} step="0.01" value={qdForm.heSo} onChange={e=>setQdForm(f=>({...f,heSo:e.target.value}))}
-                    placeholder="hệ số"
-                    className="w-24 border border-slate-200 rounded-xl px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
-                  <input value={qdForm.veDonVi} onChange={e=>setQdForm(f=>({...f,veDonVi:e.target.value}))}
-                    placeholder="đvị đích (chiếc, m...)"
-                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
-                  <button onClick={handleAddQuyDoi} disabled={savingQD||!qdForm.tuDonVi||!qdForm.veDonVi||!qdForm.heSo}
-                    className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 shrink-0">
-                    <Plus size={14}/>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end px-6 py-4 border-t border-slate-100">
-              <button onClick={()=>setModal(null)} className="px-4 py-2 rounded-xl bg-slate-100 text-sm text-slate-700 hover:bg-slate-200">Xong</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── VIEW MODAL ── */}
       {modal==="view" && selected && (

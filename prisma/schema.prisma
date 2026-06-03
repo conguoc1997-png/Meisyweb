@@ -326,7 +326,9 @@ model VatTu {
   ten       String
   loai      String   // "vai" | "phu_lieu"
   nhom      String?  // chi | cuc | khoa_keo | mex | nhan | dong_goi | vai_cotton | vai_thun | khac
-  donVi     String   @default("m") // m | kg | cai | cuon | thuong | bo | met
+  donVi     String   @default("m")    // đơn vị tồn kho (cơ bản): m | chiếc | kg...
+  donViMua  String   @default("m")    // đơn vị mua thường dùng: cây | gói | cuộn...
+  quyDoi    Float    @default(1)      // 1 donViMua = quyDoi donVi (VD: 1 cây = 50m)
   ghiChu    String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())

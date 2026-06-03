@@ -33,13 +33,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const item = await prisma.vatTu.create({
       data: {
-        ma: body.ma,
-        ten: body.ten,
-        loai: body.loai,
-        nhom: body.nhom || null,
-        donVi: body.donVi || "m",
-        ghiChu: body.ghiChu || null,
-        active: body.active !== false,
+        ma:       body.ma,
+        ten:      body.ten,
+        loai:     body.loai,
+        nhom:     body.nhom     || null,
+        donVi:    body.donVi    || "m",
+        donViMua: body.donViMua || body.donVi || "m",
+        quyDoi:   body.quyDoi   ?? 1,
+        ghiChu:   body.ghiChu   || null,
+        active:   body.active !== false,
       },
       include: { tonKho: true },
     });
