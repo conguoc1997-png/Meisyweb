@@ -349,17 +349,34 @@ const tongTienForm = chiTiet.reduce((s,r)=>s+r.soLuongMua*r.donGia,0);
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Nhà cung cấp *</label>
-                  <div className="flex gap-2">
-                    <select value={form.nhaCC} onChange={e=>setForm(f=>({...f,nhaCC:e.target.value}))}
-                      className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                      <option value="">— Chọn NCC —</option>
-                      {nccList.map(n=><option key={n.id} value={n.id}>{n.ten}</option>)}
-                    </select>
-                    <button onClick={()=>setModal("addNCC")} title="Thêm NCC mới"
-                      className="px-2.5 rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors">
-                      <UserPlus size={15}/>
-                    </button>
-                  </div>
+                  {nccList.length > 0 ? (
+                    <div className="flex gap-2">
+                      <select value={form.nhaCC} onChange={e=>setForm(f=>({...f,nhaCC:e.target.value}))}
+                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">— Chọn NCC —</option>
+                        {nccList.map(n=><option key={n.id} value={n.id}>{n.ten}</option>)}
+                      </select>
+                      <button onClick={()=>setModal("addNCC")} title="Thêm NCC mới"
+                        className="px-2.5 rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors">
+                        <UserPlus size={15}/>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input value={form.nhaCC} onChange={e=>setForm(f=>({...f,nhaCC:e.target.value}))}
+                        placeholder="Nhập tên NCC..."
+                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+                      <button onClick={()=>setModal("addNCC")} title="Thêm NCC vào danh sách"
+                        className="flex items-center gap-1.5 px-3 rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-xs font-medium transition-colors whitespace-nowrap">
+                        <UserPlus size={13}/> Thêm NCC
+                      </button>
+                    </div>
+                  )}
+                  {nccList.length === 0 && (
+                    <p className="text-[10px] text-amber-500 mt-1">
+                      Chưa có NCC nào — bấm &quot;Thêm NCC&quot; để tạo hoặc nhập tên tạm thời
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Số hoá đơn</label>
