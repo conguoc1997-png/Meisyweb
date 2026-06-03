@@ -37,23 +37,22 @@ export async function PATCH(
       const rows: RowInput[] = body.chiTiet;
       const tongTien = rows.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
 
-      const phieu = await prisma.$transaction(async (tx) => {
-        // 1. Lấy chi tiết cũ để đảo tồn kho
+      // ── Phase 1: transaction tồn kho (không có CongNo để tránh timeout) ──
+      let soPhieuCu = "";
+      await prisma.$transaction(async (tx) => {
         const old = await tx.phieuNhapKho.findUnique({
           where: { id },
           include: { chiTiet: true },
         });
         if (!old) throw new Error("Không tìm thấy phiếu");
+        soPhieuCu = old.soPhieu;
 
-        // 2. Đảo tồn kho cũ (reverse)
+        // Đảo tồn kho cũ
         for (const row of old.chiTiet) {
           const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
           if (ton) {
             const newSL = Math.max(0, ton.soLuong - row.soLuong);
-            // tính lại giá bình quân khi bỏ dòng cũ
-            const oldGiaTriTon = ton.soLuong * ton.giaTrungBinh;
-            const removedGiaTri = row.soLuong * row.donGia;
-            const newGiaTri = Math.max(0, oldGiaTriTon - removedGiaTri);
+            const newGiaTri = Math.max(0, ton.soLuong * ton.giaTrungBinh - row.soLuong * row.donGia);
             const newGia = newSL > 0 ? newGiaTri / newSL : ton.giaTrungBinh;
             await tx.tonKhoVatTu.update({
               where: { vatTuId: row.vatTuId },
@@ -62,10 +61,10 @@ export async function PATCH(
           }
         }
 
-        // 3. Xoá chi tiết cũ
+        // Xoá chi tiết cũ
         await tx.chiTietNhapKho.deleteMany({ where: { phieuId: id } });
 
-        // 4. Cập nhật header
+        // Cập nhật header
         await tx.phieuNhapKho.update({
           where: { id },
           data: {
@@ -81,7 +80,7 @@ export async function PATCH(
           },
         });
 
-        // 5. Nhập chi tiết mới + cập nhật tồn kho (bình quân gia quyền)
+        // Tạo chi tiết mới + cập nhật tồn kho
         for (const row of rows) {
           await tx.chiTietNhapKho.create({
             data: {
@@ -96,48 +95,44 @@ export async function PATCH(
               ghiChu:     row.ghiChu || null,
             },
           });
-
           const existing = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
           if (existing) {
             const newSL = existing.soLuong + row.soLuong;
             const newGT = existing.giaTriTon + row.soLuong * row.donGia;
-            const newGia = newSL > 0 ? newGT / newSL : row.donGia;
             await tx.tonKhoVatTu.update({
               where: { vatTuId: row.vatTuId },
-              data: { soLuong: newSL, giaTrungBinh: newGia, giaTriTon: newGT },
+              data: { soLuong: newSL, giaTrungBinh: newSL > 0 ? newGT / newSL : row.donGia, giaTriTon: newGT },
             });
           } else {
             await tx.tonKhoVatTu.create({
-              data: {
-                vatTuId: row.vatTuId,
-                soLuong: row.soLuong,
-                giaTrungBinh: row.donGia,
-                giaTriTon: row.soLuong * row.donGia,
-              },
+              data: { vatTuId: row.vatTuId, soLuong: row.soLuong, giaTrungBinh: row.donGia, giaTriTon: row.soLuong * row.donGia },
             });
           }
         }
+      }, { maxWait: 10000, timeout: 30000 });
 
-        // 6. Cập nhật CongNo
-        await tx.congNo.deleteMany({ where: { soChungTu: old.soPhieu, loai: "mua_hang" } });
-        const nccInfo = await tx.nhaCungCap.findFirst({ where: { OR: [{ id: body.nhaCC }, { ma: body.nhaCC }] } });
-        await tx.congNo.create({
+      // ── Phase 2: CongNo ngoài transaction (best-effort, không rollback phiếu nếu lỗi) ──
+      try {
+        const nccInfo = await prisma.nhaCungCap.findFirst({ where: { OR: [{ id: body.nhaCC }, { ma: body.nhaCC }] } });
+        await prisma.congNo.deleteMany({ where: { soChungTu: soPhieuCu, loai: "mua_hang" } });
+        await prisma.congNo.create({
           data: {
             nhaCC:     body.nhaCC,
             ngay:      body.ngay ? new Date(body.ngay) : new Date(),
-            soChungTu: old.soPhieu,
+            soChungTu: soPhieuCu,
             dienGiai:  `Nhập hàng ${nccInfo?.ten || body.nhaCC}`,
             loai:      "mua_hang",
             soTien:    tongTien,
           },
         });
+      } catch (congNoErr) {
+        console.warn("[nhap-kho PATCH] CongNo update failed (non-fatal):", congNoErr);
+      }
 
-        return tx.phieuNhapKho.findUnique({
-          where: { id },
-          include: { chiTiet: { include: { vatTu: true } } },
-        });
+      const phieu = await prisma.phieuNhapKho.findUnique({
+        where: { id },
+        include: { chiTiet: { include: { vatTu: true } } },
       });
-
       return NextResponse.json(phieu);
     }
 

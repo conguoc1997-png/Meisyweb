@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
     // Tổng tiền = sum(soLuongMua × donGia)
     const tongTien = rows.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
 
+    // Phase 1: tạo phiếu + tồn kho (transaction ngắn, không có CongNo)
     const phieu = await prisma.$transaction(async (tx) => {
-      // 1. Tạo phiếu nhập + chi tiết
       const p = await tx.phieuNhapKho.create({
         data: {
           soPhieu: body.soPhieu,
@@ -67,64 +67,57 @@ export async function POST(req: NextRequest) {
           nguoiTao: body.nguoiTao || null,
           chiTiet: {
             create: rows.map(r => ({
-              vatTuId: r.vatTuId,
+              vatTuId:    r.vatTuId,
               soLuongMua: r.soLuongMua,
-              donViMua: r.donViMua || "m",
-              quyDoi: r.quyDoi || 1,
-              soLuong: r.soLuongMua * (r.quyDoi || 1), // tổng mét
-              donGia: r.donGia,
-              thanhTien: r.soLuongMua * r.donGia,
-              ghiChu: r.ghiChu || null,
+              donViMua:   r.donViMua || "m",
+              quyDoi:     r.quyDoi || 1,
+              soLuong:    r.soLuong ?? r.soLuongMua * (r.quyDoi || 1),
+              donGia:     r.donGia,
+              thanhTien:  r.soLuongMua * r.donGia,
+              ghiChu:     r.ghiChu || null,
             })),
           },
         },
         include: { chiTiet: { include: { vatTu: true } } },
       });
 
-      // 2. Cập nhật tồn kho bình quân gia quyền
+      // Cập nhật tồn kho bình quân gia quyền
       for (const r of rows) {
-        const soLuong = r.soLuongMua * (r.quyDoi || 1); // tổng đơn vị cơ bản (m)
-        const thanhTien = r.soLuongMua * r.donGia;
-        // giá/đơn vị cơ bản
-        const giaCoBan = soLuong > 0 ? thanhTien / soLuong : r.donGia;
-
+        const soLuong  = r.soLuong ?? r.soLuongMua * (r.quyDoi || 1);
+        const giaCoBan = soLuong > 0 ? (r.soLuongMua * r.donGia) / soLuong : r.donGia;
         const existing = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: r.vatTuId } });
         if (existing) {
-          const newSoLuong = existing.soLuong + soLuong;
-          const newGiaTB = newSoLuong > 0
-            ? (existing.giaTriTon + thanhTien) / newSoLuong
-            : giaCoBan;
+          const newSL = existing.soLuong + soLuong;
+          const newGT = existing.giaTriTon + r.soLuongMua * r.donGia;
           await tx.tonKhoVatTu.update({
             where: { vatTuId: r.vatTuId },
-            data: { soLuong: newSoLuong, giaTrungBinh: newGiaTB, giaTriTon: newSoLuong * newGiaTB },
+            data: { soLuong: newSL, giaTrungBinh: newSL > 0 ? newGT / newSL : giaCoBan, giaTriTon: newGT },
           });
         } else {
           await tx.tonKhoVatTu.create({
-            data: {
-              vatTuId: r.vatTuId,
-              soLuong,
-              giaTrungBinh: giaCoBan,
-              giaTriTon: thanhTien,
-            },
+            data: { vatTuId: r.vatTuId, soLuong, giaTrungBinh: giaCoBan, giaTriTon: soLuong * giaCoBan },
           });
         }
       }
+      return p;
+    }, { maxWait: 10000, timeout: 30000 });
 
-      // 3. Bút toán công nợ
-      await tx.congNo.create({
+    // Phase 2: CongNo ngoài transaction (best-effort)
+    try {
+      await prisma.congNo.create({
         data: {
-          nhaCC: body.nhaCC,
-          ngay: new Date(body.ngay),
+          nhaCC:     body.nhaCC,
+          ngay:      new Date(body.ngay),
           soChungTu: body.soPhieu,
-          dienGiai: `Nhập kho NPL - ${body.soPhieu}${body.soHoaDon ? ` / HĐ ${body.soHoaDon}` : ""}`,
-          loai: "mua_hang",
-          soTien: tongTien,
-          nguoiTao: body.nguoiTao || null,
+          dienGiai:  `Nhập kho NPL - ${body.soPhieu}${body.soHoaDon ? ` / HĐ ${body.soHoaDon}` : ""}`,
+          loai:      "mua_hang",
+          soTien:    tongTien,
+          nguoiTao:  body.nguoiTao || null,
         },
       });
-
-      return p;
-    });
+    } catch (e) {
+      console.warn("[nhap-kho POST] CongNo create failed (non-fatal):", e);
+    }
 
     return NextResponse.json(phieu, { status: 201 });
   } catch (e: unknown) {
