@@ -12,7 +12,7 @@ type ChiTiet = {
   id?: string; vatTuId: string; vatTu?: VatTu;
   soLuongMua: number; donViMua: string; quyDoi: number;
   soLuong: number; // tổng đơn vị cơ bản (m)
-  donGia: number; thanhTien: number; ghiChu: string;
+  donGia: number; thanhTien: number; vat: number; ghiChu: string;
 };
 
 type PhieuNhap = {
@@ -30,17 +30,30 @@ const NHA_CC = [
   { value: "khac",     label: "Khác" },
 ];
 
-const DON_VI_MUA = [
-  { value: "m",     label: "Mét (m)",    showQuyDoi: false, placeholder: "" },
-  { value: "cay",   label: "Cây",         showQuyDoi: true,  placeholder: "m/cây" },
-  { value: "kg",    label: "KG",          showQuyDoi: true,  placeholder: "m/kg" },
-  { value: "chiec", label: "Chiếc",       showQuyDoi: false, placeholder: "" },
-  { value: "goi",   label: "Gói",         showQuyDoi: false, placeholder: "" },
-  { value: "cuon",  label: "Cuộn",        showQuyDoi: false, placeholder: "" },
-  { value: "hop",   label: "Hộp",         showQuyDoi: false, placeholder: "" },
-  { value: "bo",    label: "Bộ",          showQuyDoi: false, placeholder: "" },
-  { value: "cai",   label: "Cái",         showQuyDoi: false, placeholder: "" },
+// ĐV mua cho VẢI (có quy đổi sang mét)
+const DON_VI_VAI = [
+  { value: "m",   label: "Mét (m)", showQuyDoi: false, placeholder: "" },
+  { value: "cay", label: "Cây",     showQuyDoi: true,  placeholder: "m/cây" },
+  { value: "kg",  label: "KG",      showQuyDoi: true,  placeholder: "m/kg" },
 ];
+
+// ĐV mua cho PHỤ LIỆU (không cần quy đổi)
+const DON_VI_PHU_LIEU = [
+  { value: "cai",    label: "Cái" },
+  { value: "cuon",   label: "Cuộn" },
+  { value: "kg",     label: "KG" },
+  { value: "goi",    label: "Gói" },
+  { value: "hop",    label: "Hộp" },
+  { value: "bo",     label: "Bộ" },
+  { value: "thuong", label: "Thương" },
+  { value: "m",      label: "Mét (m)" },
+];
+
+// Map donVi của vật tư sang donViMua mặc định
+const DON_VI_DEFAULT: Record<string, string> = {
+  m: "m", cay: "cay", kg: "kg",
+  cai: "cai", cuon: "cuon", thuong: "thuong", bo: "bo", met: "m",
+};
 
 const DEFAULT_QUY_DOI: Record<string, number> = { m: 1, cay: 50, kg: 1.5 };
 
@@ -54,7 +67,7 @@ const fmt = (n: number) => n.toLocaleString("vi-VN");
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN");
 
 function newRow(): ChiTiet {
-  return { vatTuId: "", soLuongMua: 0, donViMua: "m", quyDoi: 1, soLuong: 0, donGia: 0, thanhTien: 0, ghiChu: "" };
+  return { vatTuId: "", soLuongMua: 0, donViMua: "m", quyDoi: 1, soLuong: 0, donGia: 0, thanhTien: 0, vat: 0, ghiChu: "" };
 }
 
 function genSoPhieu(): string {
@@ -112,7 +125,9 @@ export default function NhapKhoPage() {
     return matchSearch && matchNhaCC;
   }), [phieus, search, filterNhaCC]);
 
-  const tongTienForm = chiTiet.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
+  const tongTienHang = chiTiet.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
+  const tongVAT = chiTiet.reduce((s, r) => s + r.soLuongMua * r.donGia * (r.vat / 100), 0);
+  const tongTienForm = tongTienHang + tongVAT;
 
   function addRow() {
     setChiTiet(prev => [...prev, newRow()]);
@@ -124,15 +139,27 @@ export default function NhapKhoPage() {
     setVtSearch(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  function updateRow(i: number, patch: Partial<ChiTiet>) {
+  function updateRow(i: number, patch: Partial<ChiTiet>, allVatTus?: VatTu[]) {
+    const vts = allVatTus ?? vatTus;
     setChiTiet(prev => prev.map((r, idx) => {
       if (idx !== i) return r;
       const updated = { ...r, ...patch };
-      // Nếu đổi donViMua thì reset quyDoi về mặc định
-      if (patch.donViMua && patch.donViMua !== r.donViMua) {
+
+      // Khi chọn vật tư mới → tự set đơn vị mua phù hợp
+      if (patch.vatTuId && patch.vatTuId !== r.vatTuId) {
+        const vt = vts.find(v => v.id === patch.vatTuId);
+        if (vt) {
+          updated.vatTu = vt;
+          const defaultDV = DON_VI_DEFAULT[vt.donVi] ?? (vt.loai === "vai" ? "m" : "cai");
+          updated.donViMua = defaultDV;
+          updated.quyDoi = DEFAULT_QUY_DOI[defaultDV] ?? 1;
+        }
+      }
+      // Nếu đổi donViMua thủ công → reset quyDoi
+      if (patch.donViMua && patch.donViMua !== r.donViMua && !patch.vatTuId) {
         updated.quyDoi = DEFAULT_QUY_DOI[patch.donViMua] ?? 1;
       }
-      // Chỉ tự tính lại soLuong khi KHÔNG chỉnh tay soLuong
+      // Tự tính lại soLuong (trừ khi chỉnh tay)
       if (patch.soLuong === undefined) {
         updated.soLuong = updated.soLuongMua * updated.quyDoi;
       }
@@ -349,10 +376,11 @@ export default function NhapKhoPage() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-56">Vật tư</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">ĐV mua</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-20">Số lượng</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">Quy đổi</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-20">≈ Tổng m</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 w-24">Quy đổi <span className="text-[10px]">(vải)</span></th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-20">≈ Tổng m <span className="text-[10px] text-teal-400">(vải)</span></th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-28">Đơn giá</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-28">Thành tiền</th>
+                        <th className="px-3 py-2 text-center text-xs font-medium text-orange-500 w-16">VAT %</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ghi chú</th>
                         <th className="w-6"></th>
                       </tr>
@@ -360,12 +388,13 @@ export default function NhapKhoPage() {
                     <tbody>
                       {chiTiet.map((row, i) => {
                         const selectedVT = vatTus.find(v => v.id === row.vatTuId);
+                        const isVai = selectedVT?.loai === "vai";
                         const filteredVTs = vatTus.filter(v => {
                           const q = (vtSearch[i] || "").toLowerCase();
                           return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
                         });
-                        const dvInfo = DON_VI_MUA.find(d => d.value === row.donViMua);
-                        const showQD = dvInfo?.showQuyDoi ?? false;
+                        const dvInfo = isVai ? DON_VI_VAI.find(d => d.value === row.donViMua) : null;
+                        const showQD = isVai && (dvInfo?.showQuyDoi ?? false);
 
                         return (
                           <tr key={i} className="border-t border-slate-100">
@@ -408,7 +437,9 @@ export default function NhapKhoPage() {
                               <select value={row.donViMua}
                                 onChange={e => updateRow(i, { donViMua: e.target.value })}
                                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300">
-                                {DON_VI_MUA.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                                {(isVai ? DON_VI_VAI : DON_VI_PHU_LIEU).map(d => (
+                                  <option key={d.value} value={d.value}>{d.label}</option>
+                                ))}
                               </select>
                             </td>
 
@@ -465,8 +496,26 @@ export default function NhapKhoPage() {
                             </td>
 
                             {/* Thành tiền */}
-                            <td className="px-3 py-1.5 text-right font-semibold text-slate-700 text-xs align-top pt-3">
-                              {fmt(row.soLuongMua * row.donGia)}₫
+                            <td className="px-3 py-1.5 align-top pt-3">
+                              <p className="text-right font-semibold text-slate-700 text-xs">
+                                {fmt(row.soLuongMua * row.donGia)}₫
+                              </p>
+                              {row.vat > 0 && (
+                                <p className="text-right text-[10px] text-orange-500 mt-0.5">
+                                  +{fmt(Math.round(row.soLuongMua * row.donGia * row.vat / 100))}₫ VAT
+                                </p>
+                              )}
+                            </td>
+
+                            {/* VAT % */}
+                            <td className="px-3 py-1.5 align-top">
+                              <input
+                                type="number" min={0} max={100} step={1}
+                                value={row.vat || ""}
+                                placeholder="0"
+                                onChange={e => updateRow(i, { vat: parseFloat(e.target.value) || 0 })}
+                                className="w-full border border-orange-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-orange-300 bg-orange-50"
+                              />
                             </td>
 
                             {/* Ghi chú */}
@@ -487,10 +536,24 @@ export default function NhapKhoPage() {
                       })}
                     </tbody>
                     <tfoot>
+                      {tongVAT > 0 && (
+                        <>
+                          <tr className="border-t border-slate-200 bg-slate-50">
+                            <td colSpan={6} className="px-3 py-1.5 text-xs text-slate-500 text-right">Tiền hàng:</td>
+                            <td className="px-3 py-1.5 text-right text-xs text-slate-600">{fmt(tongTienHang)}₫</td>
+                            <td colSpan={3}></td>
+                          </tr>
+                          <tr className="bg-slate-50">
+                            <td colSpan={6} className="px-3 py-1.5 text-xs text-orange-500 text-right">Thuế VAT:</td>
+                            <td className="px-3 py-1.5 text-right text-xs text-orange-600">+{fmt(Math.round(tongVAT))}₫</td>
+                            <td colSpan={3}></td>
+                          </tr>
+                        </>
+                      )}
                       <tr className="border-t-2 border-slate-200 bg-slate-50">
-                        <td colSpan={6} className="px-3 py-2 text-xs font-semibold text-slate-600 text-right">Tổng cộng:</td>
-                        <td className="px-3 py-2 text-right font-bold text-indigo-700">{fmt(tongTienForm)}₫</td>
-                        <td colSpan={2}></td>
+                        <td colSpan={6} className="px-3 py-2 text-xs font-semibold text-slate-600 text-right">Tổng cộng{tongVAT > 0 ? " (đã VAT)" : ""}:</td>
+                        <td className="px-3 py-2 text-right font-bold text-indigo-700">{fmt(Math.round(tongTienForm))}₫</td>
+                        <td colSpan={3}></td>
                       </tr>
                     </tfoot>
                   </table>
@@ -544,30 +607,38 @@ export default function NhapKhoPage() {
                 <thead>
                   <tr className="bg-slate-50 text-left">
                     <th className="px-3 py-2 text-xs font-medium text-slate-500">Vật tư</th>
-                    <th className="px-3 py-2 text-xs font-medium text-slate-500">Mua</th>
-                    <th className="px-3 py-2 text-xs font-medium text-slate-500 text-teal-600">Tổng m</th>
+                    <th className="px-3 py-2 text-xs font-medium text-slate-500">Số lượng mua</th>
+                    <th className="px-3 py-2 text-xs font-medium text-teal-600">Tổng (quy đổi)</th>
                     <th className="px-3 py-2 text-xs font-medium text-slate-500 text-right">Đơn giá</th>
                     <th className="px-3 py-2 text-xs font-medium text-slate-500 text-right">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selected.chiTiet.map((r, i) => (
-                    <tr key={i} className="border-t border-slate-50">
-                      <td className="px-3 py-2">
-                        <p className="font-medium text-slate-700">{r.vatTu?.ten || r.vatTuId}</p>
-                        {r.vatTu && <p className="text-[10px] text-slate-400">{r.vatTu.ma}</p>}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-slate-600">
-                        {r.soLuongMua} {r.donViMua}
-                        {r.donViMua !== "m" && r.quyDoi !== 1 && (
-                          <span className="text-slate-400"> × {r.quyDoi} m/{r.donViMua}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs font-semibold text-teal-600">{fmt(r.soLuong)} m</td>
-                      <td className="px-3 py-2 text-right text-xs">{fmt(r.donGia)}₫</td>
-                      <td className="px-3 py-2 text-right font-semibold">{fmt(r.thanhTien)}₫</td>
-                    </tr>
-                  ))}
+                  {selected.chiTiet.map((r, i) => {
+                    const isVaiRow = r.vatTu?.loai === "vai";
+                    return (
+                      <tr key={i} className="border-t border-slate-50">
+                        <td className="px-3 py-2">
+                          <p className="font-medium text-slate-700">{r.vatTu?.ten || r.vatTuId}</p>
+                          {r.vatTu && <p className="text-[10px] text-slate-400">{r.vatTu.ma} · {r.vatTu.nhom || r.vatTu.loai}</p>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-600">
+                          {r.soLuongMua} {r.donViMua}
+                          {isVaiRow && r.donViMua !== "m" && r.quyDoi !== 1 && (
+                            <span className="text-slate-400"> × {r.quyDoi} m/{r.donViMua}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-xs font-semibold">
+                          {isVaiRow
+                            ? <span className="text-teal-600">{fmt(r.soLuong)} m</span>
+                            : <span className="text-slate-500">{fmt(r.soLuongMua)} {r.donViMua}</span>
+                          }
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs">{fmt(r.donGia)}₫</td>
+                        <td className="px-3 py-2 text-right font-semibold">{fmt(r.thanhTien)}₫</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-slate-200 bg-slate-50">

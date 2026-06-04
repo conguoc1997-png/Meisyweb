@@ -246,7 +246,7 @@ export default function SanXuatPage() {
     setSelectedVaiCayIdxs([]); // manual change clears fabric selection
   };
 
-  const updateCayRow = (idx: number, field: "soY" | "soM" | "soLaTT" | "mauGiat" | "ghiChuMay" | "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa", val: string | boolean) => {
+  const updateCayRow = (idx: number, field: "soY" | "soM" | "soLaTT" | "hangThucTe" | "mauGiat" | "ghiChuMay" | "hdMayDa" | "hdGiatViSinhDa" | "hdGiatMauDa", val: string | boolean) => {
     setCayRows(prev => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: val };
@@ -421,15 +421,30 @@ export default function SanXuatPage() {
       const soMTotal = numCay > 1
         ? cayRows.reduce((s, r) => s + (Number(r.soM) || 0), 0)
         : Number(form.soM) || 0;
+      // Khi nhiều cây: tổng nhận về = tổng từng cây; 1 cây: dùng form.hangThucTe
+      const hangThucTeTotal = numCay > 1
+        ? (() => {
+            const total = cayRows.reduce((s, r) => s + (Number(r.hangThucTe) || 0), 0);
+            return total > 0 ? String(total) : "";
+          })()
+        : form.hangThucTe;
+      const soLuongThieuFinal = soSanPham_calc > 0 && hangThucTeTotal
+        ? soSanPham_calc - Number(hangThucTeTotal)
+        : soLuongThieu_calc;
       const payload = {
         ...form,
+        hangThucTe: hangThucTeTotal,
         soCay: numCay,
-        cayData: numCay > 1 ? JSON.stringify(cayRows) : null,
+        cayData: numCay > 1 ? JSON.stringify(cayRows.map(r => ({
+          ...r,
+          // Normalize hangThucTe: "" → null, số → number để tránh blank button trên main table
+          hangThucTe: r.hangThucTe !== "" ? Number(r.hangThucTe) : null,
+        }))) : null,
         soM: soMTotal || form.soM,
         soY: numCay === 1 ? form.soY : null,
         soLa: soLa_calc || null,
         soSanPham: soSanPham_calc || null,
-        soLuongThieu: soLuongThieu_calc,
+        soLuongThieu: soLuongThieuFinal,
       };
       const url = modalEdit ? `/api/san-xuat/lo-cat/${modalEdit.id}` : "/api/san-xuat/lo-cat";
       const method = modalEdit ? "PATCH" : "POST";
@@ -1349,27 +1364,29 @@ export default function SanXuatPage() {
                     </td>
                     <td className="px-3 py-2.5 text-right font-bold text-slate-800 bg-orange-50 hidden">{lo.soSanPham?.toLocaleString() ?? "—"}</td>
                     <td className="px-1.5 py-1 text-right">
-                      {editingNhanVe?.id === lo.id ? (
+                      {hasCay ? (
+                        /* Lô nhiều cây: hiện tổng read-only */
+                        <span className="text-green-700 font-semibold text-sm px-2">
+                          {lo.hangThucTe != null ? lo.hangThucTe.toLocaleString() : <span className="text-slate-300 text-xs font-normal">—</span>}
+                        </span>
+                      ) : (
+                        /* Lô 1 cây: ô input xanh cố định */
                         <input
                           type="number"
-                          autoFocus
-                          value={editingNhanVe.val}
-                          onChange={e => setEditingNhanVe({ id: lo.id, val: e.target.value })}
-                          onBlur={() => saveNhanVe(lo, editingNhanVe.val)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") saveNhanVe(lo, editingNhanVe.val);
-                            if (e.key === "Escape") setEditingNhanVe(null);
+                          min="0"
+                          value={lo.hangThucTe != null ? String(lo.hangThucTe) : ""}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const hangThucTe = val === "" ? null : Math.round(Number(val));
+                            const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
+                            setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
+                            setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
                           }}
-                          className="w-20 text-right border border-green-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-300 bg-green-50"
+                          onBlur={e => saveNhanVe(lo, e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          placeholder="0"
+                          className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
                         />
-                      ) : (
-                        <button
-                          onClick={() => setEditingNhanVe({ id: lo.id, val: lo.hangThucTe != null ? String(lo.hangThucTe) : "" })}
-                          className="text-green-700 font-semibold hover:bg-green-50 rounded px-2 py-1 text-xs w-full text-right transition"
-                          title="Click để nhập số nhận về"
-                        >
-                          {lo.hangThucTe?.toLocaleString() ?? <span className="text-slate-300 font-normal">— nhập</span>}
-                        </button>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-center">
@@ -1402,7 +1419,7 @@ export default function SanXuatPage() {
                     const laTT = cay.soLaTT !== "" && cay.soLaTT != null ? Number(cay.soLaTT) : null;
                     const chenh = laKH != null && laTT != null ? laTT - laKH : null;
                     const spPerCay = laTT != null && lo.tongSize != null ? laTT * lo.tongSize : null;
-                    const nhanVeCay = cay.hangThucTe != null ? cay.hangThucTe : null;
+                    const nhanVeCay = (cay.hangThucTe != null && cay.hangThucTe !== "") ? cay.hangThucTe : null;
                     const thieuCay = spPerCay != null && nhanVeCay != null ? spPerCay - nhanVeCay : null;
                     return (
                       <tr key={`${lo.id}-cay-${ci}`} className="bg-slate-50/80 border-l-2 border-rose-200">
@@ -1519,29 +1536,29 @@ export default function SanXuatPage() {
                         {/* col 11: Số SP per cây */}
                         <td className="px-3 py-1.5 text-right text-[14px] font-bold text-slate-700 bg-orange-50 hidden">{spPerCay != null ? spPerCay.toLocaleString() : "—"}</td>
                         {/* col 12: Nhận về per-cây — inline edit */}
-                        <td className="px-1 py-1 text-right">
-                          {editingCayNhanVe?.id === lo.id && editingCayNhanVe.ci === ci ? (
-                            <input
-                              type="number"
-                              autoFocus
-                              value={editingCayNhanVe.val}
-                              onChange={e => setEditingCayNhanVe({ id: lo.id, ci, val: e.target.value })}
-                              onBlur={() => saveCayNhanVe(lo, ci, editingCayNhanVe.val)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter") { e.preventDefault(); saveCayNhanVe(lo, ci, editingCayNhanVe.val); }
-                                if (e.key === "Escape") setEditingCayNhanVe(null);
-                              }}
-                              className="w-14 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] focus:outline-none focus:ring-1 focus:ring-green-300 bg-green-50"
-                            />
-                          ) : (
-                            <button
-                              onClick={() => setEditingCayNhanVe({ id: lo.id, ci, val: nhanVeCay != null ? String(nhanVeCay) : "" })}
-                              className="text-green-700 font-semibold hover:bg-green-50 rounded px-2 py-0.5 text-[14px] w-full text-right transition"
-                              title="Click để nhập số nhận về"
-                            >
-                              {nhanVeCay != null ? nhanVeCay.toLocaleString() : <span className="text-slate-400 font-normal text-xs">— nhập</span>}
-                            </button>
-                          )}
+                        <td className="px-1 py-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={nhanVeCay != null ? String(nhanVeCay) : ""}
+                            onChange={e => {
+                              const val = e.target.value;
+                              // Optimistic update local state ngay khi gõ
+                              const htVal = val === "" ? null : Math.round(Number(val));
+                              try {
+                                const parsed = JSON.parse(lo.cayData!);
+                                parsed[ci] = { ...parsed[ci], hangThucTe: htVal };
+                                const newCayData = JSON.stringify(parsed);
+                                setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData } : l));
+                              } catch { /* ignore */ }
+                            }}
+                            onBlur={e => saveCayNhanVe(lo, ci, e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+                            }}
+                            placeholder="0"
+                            className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
+                          />
                         </td>
                         {/* col 14: Trạng thái per-cây toggle */}
                         <td className="px-2 py-1.5 text-center">
@@ -2255,6 +2272,7 @@ export default function SanXuatPage() {
                                 <th className="px-2 py-2 text-right text-slate-500 font-medium">Lá KH</th>
                                 <th className="px-2 py-2 text-center text-rose-500 font-medium">Lá TT</th>
                                 <th className="px-2 py-2 text-right text-slate-500 font-medium">Chênh</th>
+                                <th className="px-2 py-2 text-center text-green-600 font-medium">Nhận về</th>
                                 <th className="px-2 py-2 text-slate-500 font-medium">Ghi chú</th>
                                 <th className="px-2 py-2 text-slate-500 font-medium">Màu giặt</th>
                               </tr>
@@ -2287,6 +2305,11 @@ export default function SanXuatPage() {
                                     </td>
                                     <td className={`px-2 py-2 text-right text-xs ${chenhColor}`}>
                                       {chenh != null ? (chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)) : "—"}
+                                    </td>
+                                    <td className="px-1.5 py-1.5">
+                                      <input type="number" min="0" value={row.hangThucTe}
+                                        onChange={e => updateCayRow(i, "hangThucTe", e.target.value)}
+                                        placeholder="SP" className="w-full border border-green-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-300 bg-green-50 text-center" />
                                     </td>
                                     <td className="px-1.5 py-1.5">
                                       <input value={row.ghiChuMay}
@@ -2324,6 +2347,12 @@ export default function SanXuatPage() {
                                     if (!totalKH || !totalTT) return "—";
                                     const d = totalTT - totalKH;
                                     return <span className={d < -1.5 ? "text-red-600" : d < 0 ? "text-amber-600" : "text-green-600"}>{d >= 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}</span>;
+                                  })()}
+                                </td>
+                                <td className="px-2 py-2 text-center text-xs font-bold text-green-700">
+                                  {(() => {
+                                    const total = cayRows.reduce((s, r) => s + (Number(r.hangThucTe) || 0), 0);
+                                    return total > 0 ? total.toLocaleString() : "—";
                                   })()}
                                 </td>
                               </tr>
@@ -2421,8 +2450,20 @@ export default function SanXuatPage() {
                   <p className="text-xs font-bold text-rose-500 uppercase tracking-wide mb-3 pb-1 border-b border-slate-100">Giao nhận</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <div>
-                      <label className="text-xs text-slate-600 mb-1 block">Hàng nhận về thực tế</label>
-                      <input type="number" value={form.hangThucTe} onChange={sf("hangThucTe")} className={inp} />
+                      <label className="text-xs text-slate-600 mb-1 block">
+                        Hàng nhận về thực tế
+                        {numCay > 1 && <span className="ml-1 text-green-500 font-normal text-[13px]">(tổng từng cây)</span>}
+                      </label>
+                      {numCay > 1 ? (
+                        <div className={`${inpRo} font-bold text-green-700`}>
+                          {(() => {
+                            const total = cayRows.reduce((s, r) => s + (Number(r.hangThucTe) || 0), 0);
+                            return total > 0 ? total.toLocaleString() : "— (nhập từng cây ở bảng trên)";
+                          })()}
+                        </div>
+                      ) : (
+                        <input type="number" value={form.hangThucTe} onChange={sf("hangThucTe")} className={inp} />
+                      )}
                     </div>
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Số lượng thiếu
