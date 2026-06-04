@@ -1471,9 +1471,9 @@ export default function SanXuatPage() {
                         </td>
                         {/* col 9: Thiếu per-cây + chênh lệch lá */}
                         <td className="px-2 py-1.5 text-right">
-                          {thieuCay != null && (
-                            <span className={`text-[14px] px-1.5 py-0.5 rounded block mb-0.5 ${thieuCay > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                              {thieuCay > 0 ? thieuCay.toLocaleString() : "0"}
+                          {spPerCay != null && (
+                            <span className="text-[14px] font-bold text-slate-800 block">
+                              {spPerCay.toLocaleString()}
                             </span>
                           )}
                           {chenh != null && (
