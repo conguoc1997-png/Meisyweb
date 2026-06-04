@@ -22,19 +22,134 @@ export async function PATCH(
   const { id } = await params;
   try {
     const body = await req.json();
-    // Only allow updating header fields (trangThai, ghiChu, soHoaDon, ngayHoaDon)
+
+    // ── Nếu có chiTiet → sửa toàn bộ phiếu (header + chi tiết + tồn kho) ──
+    if (Array.isArray(body.chiTiet)) {
+      type RowInput = {
+        vatTuId: string;
+        soLuongMua: number;
+        donViMua: string;
+        quyDoi: number;
+        soLuong: number;
+        donGia: number;
+        ghiChu?: string;
+      };
+      const rows: RowInput[] = body.chiTiet;
+      const tongTien = rows.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
+
+      // ── Phase 1: transaction tồn kho (không có CongNo để tránh timeout) ──
+      let soPhieuCu = "";
+      await prisma.$transaction(async (tx) => {
+        const old = await tx.phieuNhapKho.findUnique({
+          where: { id },
+          include: { chiTiet: true },
+        });
+        if (!old) throw new Error("Không tìm thấy phiếu");
+        soPhieuCu = old.soPhieu;
+
+        // Đảo tồn kho cũ
+        for (const row of old.chiTiet) {
+          const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
+          if (ton) {
+            const newSL = Math.max(0, ton.soLuong - row.soLuong);
+            const newGiaTri = Math.max(0, ton.soLuong * ton.giaTrungBinh - row.soLuong * row.donGia);
+            const newGia = newSL > 0 ? newGiaTri / newSL : ton.giaTrungBinh;
+            await tx.tonKhoVatTu.update({
+              where: { vatTuId: row.vatTuId },
+              data: { soLuong: newSL, giaTrungBinh: newGia, giaTriTon: newSL * newGia },
+            });
+          }
+        }
+
+        // Xoá chi tiết cũ
+        await tx.chiTietNhapKho.deleteMany({ where: { phieuId: id } });
+
+        // Cập nhật header
+        await tx.phieuNhapKho.update({
+          where: { id },
+          data: {
+            ngay:       body.ngay       ? new Date(body.ngay) : undefined,
+            nhaCC:      body.nhaCC      ?? undefined,
+            tenNhaCC:   body.tenNhaCC   ?? undefined,
+            soHoaDon:   body.soHoaDon   || null,
+            ngayHoaDon: body.ngayHoaDon ? new Date(body.ngayHoaDon) : null,
+            trangThai:  body.trangThai  ?? undefined,
+            ghiChu:     body.ghiChu     || null,
+            nguoiTao:   body.nguoiTao   || null,
+            tongTien,
+          },
+        });
+
+        // Tạo chi tiết mới + cập nhật tồn kho
+        for (const row of rows) {
+          await tx.chiTietNhapKho.create({
+            data: {
+              phieuId:    id,
+              vatTuId:    row.vatTuId,
+              soLuongMua: row.soLuongMua,
+              donViMua:   row.donViMua,
+              quyDoi:     row.quyDoi,
+              soLuong:    row.soLuong,
+              donGia:     row.donGia,
+              thanhTien:  row.soLuongMua * row.donGia,
+              ghiChu:     row.ghiChu || null,
+            },
+          });
+          const existing = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
+          if (existing) {
+            const newSL = existing.soLuong + row.soLuong;
+            const newGT = existing.giaTriTon + row.soLuong * row.donGia;
+            await tx.tonKhoVatTu.update({
+              where: { vatTuId: row.vatTuId },
+              data: { soLuong: newSL, giaTrungBinh: newSL > 0 ? newGT / newSL : row.donGia, giaTriTon: newGT },
+            });
+          } else {
+            await tx.tonKhoVatTu.create({
+              data: { vatTuId: row.vatTuId, soLuong: row.soLuong, giaTrungBinh: row.donGia, giaTriTon: row.soLuong * row.donGia },
+            });
+          }
+        }
+      }, { maxWait: 10000, timeout: 30000 });
+
+      // ── Phase 2: CongNo ngoài transaction (best-effort, không rollback phiếu nếu lỗi) ──
+      try {
+        const nccInfo = await prisma.nhaCungCap.findFirst({ where: { OR: [{ id: body.nhaCC }, { ma: body.nhaCC }] } });
+        await prisma.congNo.deleteMany({ where: { soChungTu: soPhieuCu, loai: "mua_hang" } });
+        await prisma.congNo.create({
+          data: {
+            nhaCC:     body.nhaCC,
+            ngay:      body.ngay ? new Date(body.ngay) : new Date(),
+            soChungTu: soPhieuCu,
+            dienGiai:  `Nhập hàng ${nccInfo?.ten || body.nhaCC}`,
+            loai:      "mua_hang",
+            soTien:    tongTien,
+          },
+        });
+      } catch (congNoErr) {
+        console.warn("[nhap-kho PATCH] CongNo update failed (non-fatal):", congNoErr);
+      }
+
+      const phieu = await prisma.phieuNhapKho.findUnique({
+        where: { id },
+        include: { chiTiet: { include: { vatTu: true } } },
+      });
+      return NextResponse.json(phieu);
+    }
+
+    // ── Chỉ sửa header (trangThai, ghiChu, soHoaDon…) ──
     const phieu = await prisma.phieuNhapKho.update({
       where: { id },
       data: {
-        ...(body.trangThai   !== undefined && { trangThai: body.trangThai }),
-        ...(body.ghiChu      !== undefined && { ghiChu: body.ghiChu || null }),
-        ...(body.soHoaDon    !== undefined && { soHoaDon: body.soHoaDon || null }),
-        ...(body.ngayHoaDon  !== undefined && { ngayHoaDon: body.ngayHoaDon ? new Date(body.ngayHoaDon) : null }),
+        ...(body.trangThai  !== undefined && { trangThai: body.trangThai }),
+        ...(body.ghiChu     !== undefined && { ghiChu: body.ghiChu || null }),
+        ...(body.soHoaDon   !== undefined && { soHoaDon: body.soHoaDon || null }),
+        ...(body.ngayHoaDon !== undefined && { ngayHoaDon: body.ngayHoaDon ? new Date(body.ngayHoaDon) : null }),
       },
       include: { chiTiet: { include: { vatTu: true } } },
     });
     return NextResponse.json(phieu);
   } catch (e: unknown) {
+    console.error("[nhap-kho PATCH]", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }
 }
@@ -45,7 +160,6 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    // Cascade deletes chiTiet; also reverse TonKho and delete CongNo entry
     const phieu = await prisma.phieuNhapKho.findUnique({
       where: { id },
       include: { chiTiet: true },
@@ -53,28 +167,23 @@ export async function DELETE(
     if (!phieu) return NextResponse.json({ error: "Không tìm thấy" }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
-      // Reverse tồn kho
       for (const row of phieu.chiTiet) {
         const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
         if (ton) {
           const newSoLuong = Math.max(0, ton.soLuong - row.soLuong);
           await tx.tonKhoVatTu.update({
             where: { vatTuId: row.vatTuId },
-            data: {
-              soLuong: newSoLuong,
-              giaTriTon: newSoLuong * ton.giaTrungBinh,
-            },
+            data: { soLuong: newSoLuong, giaTriTon: newSoLuong * ton.giaTrungBinh },
           });
         }
       }
-      // Delete CongNo auto-created for this phieu
       await tx.congNo.deleteMany({ where: { soChungTu: phieu.soPhieu, loai: "mua_hang" } });
-      // Delete phieu (cascade chiTiet)
       await tx.phieuNhapKho.delete({ where: { id } });
     });
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
+    console.error("[nhap-kho DELETE]", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }
 }

@@ -247,14 +247,40 @@ model HoaDonTon {
   updatedAt DateTime @updatedAt
 }
 
+// ===================== MODULE NHÀ CUNG CẤP =====================
+
+model NhaCungCap {
+  id        String   @id @default(cuid())
+  ma        String   @unique
+  ten       String
+  sdt       String?
+  diaChi    String?
+  email     String?
+  ghiChu    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// Quy đổi đơn vị: 1 gói = 100 chiếc, 1 cuộn = 500m...
+model QuyDoiDonVi {
+  id        String   @id @default(cuid())
+  tuDonVi   String   // đơn vị nguồn (goi, cuon, hop...)
+  veDonVi   String   // đơn vị đích (chiec, m, cai...)
+  heSo      Float    // 1 tuDonVi = heSo veDonVi
+  ghiChu    String?
+  createdAt DateTime @default(now())
+}
+
 // ===================== MODULE XUẤT KHO NPL =====================
 
 // Định mức NPL theo loại hàng (BOM)
 model DinhMucNPL {
   id        String   @id @default(cuid())
-  hangCat   String   // tên loại hàng, e.g. "Áo sơ mi", "Quần âu"
+  hangCat   String   // mã/tên loại hàng, e.g. "Áo sơ mi", "Quần short"
   vatTuId   String
-  soLuong   Float    // định mức trên 100 sản phẩm
+  soLuong   Float    // định mức / 100 sản phẩm (theo đơn vị cơ bản)
+  donViMua  String   @default("m") // đơn vị mua (có thể khác đơn vị cơ bản)
+  quyDoi    Float    @default(1)   // hệ số quy đổi sang đơn vị cơ bản
   ghiChu    String?
   createdAt DateTime @default(now())
 
@@ -300,7 +326,9 @@ model VatTu {
   ten       String
   loai      String   // "vai" | "phu_lieu"
   nhom      String?  // chi | cuc | khoa_keo | mex | nhan | dong_goi | vai_cotton | vai_thun | khac
-  donVi     String   @default("m") // m | kg | cai | cuon | thuong | bo | met
+  donVi     String   @default("m")    // đơn vị tồn kho (cơ bản): m | chiếc | kg...
+  donViMua  String   @default("m")    // đơn vị mua thường dùng: cây | gói | cuộn...
+  quyDoi    Float    @default(1)      // 1 donViMua = quyDoi donVi (VD: 1 cây = 50m)
   ghiChu    String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
