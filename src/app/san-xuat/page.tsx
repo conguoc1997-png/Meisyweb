@@ -1580,11 +1580,10 @@ export default function SanXuatPage() {
             {losCat.length > 0 && (
               <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-semibold text-xs">
                 <tr>
-                  <td colSpan={10} className="px-3 py-2 text-slate-500">Tổng</td>
-                  <td className="px-3 py-2 text-right bg-orange-50 hidden">{tongSP.toLocaleString()}</td>
+                  <td colSpan={12} className="px-3 py-2 text-slate-500">Tổng</td>
                   <td className="px-3 py-2 text-right text-green-700">{tongNhan.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-red-600">{tongThieu > 0 ? tongThieu.toLocaleString() : <span className="text-green-600">0</span>}</td>
-                  <td colSpan={5}></td>
+                  <td colSpan={2}></td>
                 </tr>
               </tfoot>
             )}
