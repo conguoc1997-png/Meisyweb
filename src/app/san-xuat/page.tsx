@@ -1197,7 +1197,7 @@ export default function SanXuatPage() {
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá KH</th>
                 <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[14px]">Đã cắt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá TT</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Thiếu</th>
+                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">SP / Lá</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ghi chú may</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu giặt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50 hidden">Số SP</th>
@@ -1291,18 +1291,16 @@ export default function SanXuatPage() {
                         <span className="text-slate-600 text-xs px-2">{lo.soLaThucTe ?? "—"}</span>
                       )}
                     </td>
-                    {/* Thiếu — ngay sau Lá TT */}
+                    {/* SP cắt được + lá chênh */}
                     <td className="px-3 py-2.5 text-right">
                       {(() => {
-                        // Nếu main row hangThucTe đã điền → dùng nó; cayThieuAgg chỉ dùng khi chưa có main row value
-                        const val = lo.hangThucTe != null
-                          ? (lo.soSanPham != null ? lo.soSanPham - lo.hangThucTe : null)
-                          : (cayThieuAgg ?? (lo.soSanPham != null ? lo.soSanPham : null));
+                        // Luôn hiện soSanPham (tổng SP cắt được = lá TT × tongSize)
+                        const soSP = lo.soSanPham != null ? lo.soSanPham : null;
                         const laChenh = lo.soLaThucTe != null && lo.soLa != null ? lo.soLaThucTe - lo.soLa : null;
                         return (
                           <>
-                            {val != null
-                              ? <span className={`block ${val > 0 ? "text-red-600 font-bold" : "text-green-600 font-semibold"}`}>{val > 0 ? val.toLocaleString() : "0"}</span>
+                            {soSP != null
+                              ? <span className="block text-slate-800 font-bold">{soSP.toLocaleString()}</span>
                               : <span className="text-slate-300">—</span>}
                             {laChenh != null && (
                               <span className={`text-[13px] px-1 py-0.5 rounded ${laChenh < -1.5 ? "bg-red-100 text-red-700" : laChenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
