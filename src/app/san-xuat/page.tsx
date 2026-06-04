@@ -1363,28 +1363,48 @@ export default function SanXuatPage() {
                     <td className="px-3 py-2.5 text-right font-bold text-slate-800 bg-orange-50 hidden">{lo.soSanPham?.toLocaleString() ?? "—"}</td>
                     <td className="px-1.5 py-1 text-right">
                       {hasCay ? (
-                        /* Lô nhiều cây: hiện tổng read-only */
-                        <span className="text-green-700 font-semibold text-sm px-2">
-                          {lo.hangThucTe != null ? lo.hangThucTe.toLocaleString() : <span className="text-slate-300 text-xs font-normal">—</span>}
-                        </span>
+                        /* Lô nhiều cây: hiện tổng read-only + thiếu */
+                        <>
+                          <span className="text-green-700 font-semibold text-sm px-1 block">
+                            {lo.hangThucTe != null ? lo.hangThucTe.toLocaleString() : <span className="text-slate-300 text-xs font-normal">—</span>}
+                          </span>
+                          {lo.hangThucTe != null && lo.soSanPham != null && (() => {
+                            const thieu = lo.soSanPham - lo.hangThucTe;
+                            return thieu !== 0 ? (
+                              <span className={`text-[12px] font-medium ${thieu > 0 ? "text-red-500" : "text-green-500"}`}>
+                                {thieu > 0 ? `-${thieu.toLocaleString()}` : `+${Math.abs(thieu).toLocaleString()}`}
+                              </span>
+                            ) : <span className="text-[12px] text-green-500">✓</span>;
+                          })()}
+                        </>
                       ) : (
-                        /* Lô 1 cây: ô input xanh cố định */
-                        <input
-                          type="number"
-                          min="0"
-                          value={lo.hangThucTe != null ? String(lo.hangThucTe) : ""}
-                          onChange={e => {
-                            const val = e.target.value;
-                            const hangThucTe = val === "" ? null : Math.round(Number(val));
-                            const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
-                            setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
-                            setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
-                          }}
-                          onBlur={e => saveNhanVe(lo, e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                          placeholder="0"
-                          className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
-                        />
+                        /* Lô 1 cây: ô input xanh cố định + thiếu */
+                        <>
+                          <input
+                            type="number"
+                            min="0"
+                            value={lo.hangThucTe != null ? String(lo.hangThucTe) : ""}
+                            onChange={e => {
+                              const val = e.target.value;
+                              const hangThucTe = val === "" ? null : Math.round(Number(val));
+                              const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
+                              setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
+                              setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
+                            }}
+                            onBlur={e => saveNhanVe(lo, e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                            placeholder="0"
+                            className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
+                          />
+                          {lo.hangThucTe != null && lo.soSanPham != null && (() => {
+                            const thieu = lo.soSanPham - lo.hangThucTe;
+                            return thieu !== 0 ? (
+                              <span className={`text-[12px] font-medium block mt-0.5 ${thieu > 0 ? "text-red-500" : "text-green-500"}`}>
+                                {thieu > 0 ? `-${thieu.toLocaleString()}` : `+${Math.abs(thieu).toLocaleString()}`}
+                              </span>
+                            ) : <span className="text-[12px] text-green-500 block mt-0.5">✓</span>;
+                          })()}
+                        </>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-center">
@@ -1557,6 +1577,14 @@ export default function SanXuatPage() {
                             placeholder="0"
                             className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
                           />
+                          {nhanVeCay != null && spPerCay != null && (() => {
+                            const thieu = spPerCay - Number(nhanVeCay);
+                            return thieu !== 0 ? (
+                              <span className={`text-[12px] font-medium block mt-0.5 text-right ${thieu > 0 ? "text-red-500" : "text-green-500"}`}>
+                                {thieu > 0 ? `-${thieu.toLocaleString()}` : `+${Math.abs(thieu).toLocaleString()}`}
+                              </span>
+                            ) : <span className="text-[12px] text-green-500 block mt-0.5 text-right">✓</span>;
+                          })()}
                         </td>
                         {/* col 14: Trạng thái per-cây toggle */}
                         <td className="px-2 py-1.5 text-center">
