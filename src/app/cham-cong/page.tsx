@@ -61,6 +61,7 @@ export default function ChamCongPage() {
     setHolidaysRaw(list);
     try { localStorage.setItem(`meisy_holidays_${year}`, JSON.stringify(list)); } catch {}
   };
+  const [activeTab, setActiveTab] = useState<"chamcong" | "luong">("chamcong");
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayLabel, setNewHolidayLabel] = useState("");
@@ -280,6 +281,18 @@ export default function ChamCongPage() {
         </div>
       </div>
 
+      {/* Tab switcher */}
+      <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 w-fit mb-4">
+        <button onClick={() => setActiveTab("chamcong")}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === "chamcong" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          📋 Chấm công
+        </button>
+        <button onClick={() => setActiveTab("luong")}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === "luong" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          💰 Bảng lương
+        </button>
+      </div>
+
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 shadow-sm">
@@ -301,8 +314,8 @@ export default function ChamCongPage() {
         </div>
       </div>
 
-      {/* Bảng chấm công */}
-      {loading ? (
+      {/* ─── TAB CHẤM CÔNG ─── */}
+      {activeTab === "chamcong" && (loading ? (
         <div className="text-center py-16 text-slate-400">Đang tải...</div>
       ) : nhanViens.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
@@ -464,6 +477,124 @@ export default function ChamCongPage() {
                 </tr>
               </tfoot>
             </table>
+          </div>
+        </div>
+      ))}
+
+      {/* ─── TAB BẢNG LƯƠNG ─── */}
+      {activeTab === "luong" && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-slate-800">Bảng Lương — Tháng {month}/{year}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {soNgayLamViec} ngày làm việc · Lương TC = (LCB ÷ {soNgayLamViec}ngày ÷ 8h) × 1.5 × giờ TC
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs">
+                <tr>
+                  <th className="px-3 py-2.5 text-left text-slate-500 w-8">STT</th>
+                  <th className="px-3 py-2.5 text-left text-slate-500 min-w-[150px]">Nhân viên</th>
+                  <th className="px-3 py-2.5 text-right text-slate-500">Lương CB</th>
+                  <th className="px-3 py-2.5 text-center text-emerald-600">Công</th>
+                  <th className="px-3 py-2.5 text-center text-blue-600">NP</th>
+                  <th className="px-3 py-2.5 text-center text-red-500">Vắng</th>
+                  <th className="px-3 py-2.5 text-center text-amber-600">Muộn</th>
+                  <th className="px-3 py-2.5 text-center text-cyan-600">½</th>
+                  <th className="px-3 py-2.5 text-center text-orange-600">TC giờ</th>
+                  <th className="px-3 py-2.5 text-right text-slate-500">Lương công</th>
+                  <th className="px-3 py-2.5 text-right text-orange-600">Lương TC</th>
+                  <th className="px-3 py-2.5 text-right font-bold text-indigo-700 bg-indigo-50 border-l border-indigo-100">Thực lĩnh</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nhanViens.length === 0 && (
+                  <tr><td colSpan={12} className="text-center py-10 text-slate-400">Chưa có nhân viên</td></tr>
+                )}
+                {nhanViens.map((nv, idx) => {
+                  const summary = getSummary(nv.id);
+                  const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
+                  const lcb = nv.luongCB ?? 0;
+
+                  // Ngày công tính lương: có mặt + muộn + ½×0.5 + phép + lễ (vắng = không tính)
+                  const congCoMat  = summary["di_lam"]    ?? 0;
+                  const congMuon   = summary["di_muon"]   ?? 0;
+                  const congNuaNgay= summary["nua_ngay"]  ?? 0;
+                  const congPhep   = summary["nghi_phep"] ?? 0;
+                  const congLe     = summary["nghi_le"]   ?? 0;
+                  const congVang   = summary["vang"]      ?? 0;
+                  const congTinhLuong = congCoMat + congMuon + congNuaNgay * 0.5 + congPhep + congLe;
+
+                  const luongNgay = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
+                  const luongCong = luongNgay * congTinhLuong;
+                  const luongTC   = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * 1.5 * tongTC : 0;
+                  const thucLinh  = luongCong + luongTC;
+
+                  return (
+                    <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
+                      <td className="px-3 py-2 text-center text-slate-400 text-xs">{idx + 1}</td>
+                      <td className="px-3 py-2">
+                        <p className="font-semibold text-slate-800">{nv.ten}</p>
+                        {nv.chucVu && <p className="text-xs text-slate-400">{nv.chucVu}</p>}
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-600">
+                        {lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
+                      </td>
+                      <td className="px-3 py-2 text-center font-semibold text-emerald-700">{congTinhLuong || "—"}</td>
+                      <td className="px-3 py-2 text-center text-blue-600">{congPhep || ""}</td>
+                      <td className="px-3 py-2 text-center text-red-500 font-semibold">{congVang || ""}</td>
+                      <td className="px-3 py-2 text-center text-amber-600">{congMuon || ""}</td>
+                      <td className="px-3 py-2 text-center text-cyan-600">{congNuaNgay || ""}</td>
+                      <td className="px-3 py-2 text-center text-orange-600 font-semibold">{tongTC > 0 ? tongTC : ""}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">
+                        {lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right text-orange-600">
+                        {lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : ""}
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
+                        {lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {nhanViens.length > 0 && (
+                <tfoot className="bg-slate-100 border-t-2 border-slate-200 font-semibold text-xs">
+                  <tr>
+                    <td colSpan={3} className="px-3 py-2 text-slate-600">Tổng ({nhanViens.length} NV)</td>
+                    <td className="px-3 py-2 text-center text-emerald-700">
+                      {nhanViens.reduce((s, nv) => {
+                        const sum = getSummary(nv.id);
+                        return s + (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0)*0.5 + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
+                      }, 0) || "—"}
+                    </td>
+                    <td colSpan={4}></td>
+                    <td className="px-3 py-2 text-center text-orange-600">
+                      {nhanViens.reduce((s, nv) => s + days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0), 0) || ""}
+                    </td>
+                    <td colSpan={2}></td>
+                    <td className="px-3 py-2 text-right text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
+                      {fmt(Math.round(nhanViens.reduce((s, nv) => {
+                        const sum = getSummary(nv.id);
+                        const tongTC = days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0);
+                        const lcb = nv.luongCB ?? 0;
+                        const cong = (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0)*0.5 + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
+                        const luongCong = soNgayLamViec > 0 ? (lcb / soNgayLamViec) * cong : 0;
+                        const luongTC = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * 1.5 * tongTC : 0;
+                        return s + luongCong + luongTC;
+                      }, 0)))}₫
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+          <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-400">
+            💡 Công tính lương = Đi làm + Đi muộn + Nửa ngày×0.5 + Nghỉ phép + Nghỉ lễ (Vắng không tính lương)
           </div>
         </div>
       )}
