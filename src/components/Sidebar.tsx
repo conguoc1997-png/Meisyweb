@@ -18,6 +18,7 @@ import {
   ClipboardList,
   BookOpen,
   CalendarCheck,
+  DatabaseBackup,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -102,6 +103,12 @@ const MODULES: NavModule[] = [
     label: "Chấm công", icon: CalendarCheck,
     bg: "bg-orange-50", text: "text-orange-400",
     href: "/cham-cong",
+  },
+  {
+    key: "backup", moduleKey: "users",
+    label: "Backup & Restore", icon: DatabaseBackup,
+    bg: "bg-emerald-50", text: "text-emerald-500",
+    href: "/backup",
   },
   {
     key: "quantri", moduleKey: "users",
