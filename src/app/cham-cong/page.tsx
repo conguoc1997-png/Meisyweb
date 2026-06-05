@@ -400,7 +400,7 @@ export default function ChamCongPage() {
                         const tc = tcMap[key];
                         const sun = isSunday(d);
                         return (
-                          <td key={d} className={`p-0.5 border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/30"}`}>
+                          <td key={d} className={`p-px border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/40"}`}>
                             {!sun ? (
                               <input
                                 type="number"
@@ -422,7 +422,7 @@ export default function ChamCongPage() {
                                 onBlur={e => handleTCChange(nv.id, d, e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                                 placeholder=""
-                                className="w-full h-6 text-center text-[11px] font-semibold text-orange-700 bg-transparent border border-orange-200 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 placeholder-orange-200"
+                                className="w-full h-7 text-center text-xs font-bold text-orange-700 bg-transparent border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50"
                                 title="Số giờ tăng ca"
                               />
                             ) : (
