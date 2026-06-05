@@ -1294,7 +1294,6 @@ export default function SanXuatPage() {
                     {/* SP cắt được + lá chênh */}
                     <td className="px-3 py-2.5 text-right">
                       {(() => {
-                        // Luôn hiện soSanPham (tổng SP cắt được = lá TT × tongSize)
                         const soSP = lo.soSanPham != null ? lo.soSanPham : null;
                         const laChenh = lo.soLaThucTe != null && lo.soLa != null ? lo.soLaThucTe - lo.soLa : null;
                         return (
@@ -1302,11 +1301,14 @@ export default function SanXuatPage() {
                             {soSP != null
                               ? <span className="block text-slate-800 font-bold">{soSP.toLocaleString()}</span>
                               : <span className="text-slate-300">—</span>}
-                            {laChenh != null && (
+                            {/* Nếu có soMSoDo → hiện chênh; không thì hiện laTT đơn thuần */}
+                            {laChenh != null ? (
                               <span className={`text-[13px] px-1 py-0.5 rounded ${laChenh < -1.5 ? "bg-red-100 text-red-700" : laChenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
                                 {laChenh >= 0 ? `+${laChenh.toFixed(1)}` : laChenh.toFixed(1)} lá
                               </span>
-                            )}
+                            ) : lo.soLaThucTe != null ? (
+                              <span className="text-[13px] text-slate-400">{lo.soLaThucTe} lá</span>
+                            ) : null}
                           </>
                         );
                       })()}
@@ -1496,11 +1498,14 @@ export default function SanXuatPage() {
                               {spPerCay.toLocaleString()}
                             </span>
                           )}
-                          {chenh != null && (
+                          {/* Có soMSoDo → hiện chênh có màu; không thì hiện laTT đơn thuần */}
+                          {chenh != null ? (
                             <span className={`text-[13px] px-1 py-0.5 rounded ${chenh < -1.5 ? "bg-red-100 text-red-700" : chenh < 0 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
                               {chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)} lá
                             </span>
-                          )}
+                          ) : laTT != null ? (
+                            <span className="text-[13px] text-slate-400">{laTT} lá</span>
+                          ) : null}
                         </td>
                         {/* col 10: Ghi chú may — per-cây inline edit */}
                         <td className="px-1.5 py-1 max-w-[150px]">
