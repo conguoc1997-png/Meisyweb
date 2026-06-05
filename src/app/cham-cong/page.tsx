@@ -10,7 +10,8 @@ type NhanVien = {
 };
 
 type ChamCong = {
-  id: string; nhanVienId: string; ngay: string; trangThai: string; ghiChu: string | null;
+  id: string; nhanVienId: string; ngay: string; trangThai: string;
+  tangCa: number | null; ghiChu: string | null;
 };
 
 // Trạng thái chấm công
@@ -79,8 +80,20 @@ export default function ChamCongPage() {
   const ccMap = useMemo(() => {
     const m: Record<string, string> = {};
     chamCongs.forEach(c => {
-      const dateKey = c.ngay.slice(0, 10); // YYYY-MM-DD
+      const dateKey = c.ngay.slice(0, 10);
       m[`${c.nhanVienId}_${dateKey}`] = c.trangThai;
+    });
+    return m;
+  }, [chamCongs]);
+
+  // Map tăng ca: "nvId_ngayISO" → số giờ TC
+  const tcMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    chamCongs.forEach(c => {
+      if (c.tangCa != null && c.tangCa > 0) {
+        const dateKey = c.ngay.slice(0, 10);
+        m[`${c.nhanVienId}_${dateKey}`] = c.tangCa;
+      }
     });
     return m;
   }, [chamCongs]);
@@ -109,6 +122,24 @@ export default function ChamCongPage() {
       body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null }),
     }).catch(() => fetchData());
     setSaving(null);
+  };
+
+  // Tăng ca: lưu số giờ
+  const handleTCChange = async (nvId: string, day: number, val: string) => {
+    const ngay = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const tangCa = val === "" ? null : parseFloat(val);
+    // Optimistic
+    setChamCongs(prev => {
+      const existing = prev.find(c => c.nhanVienId === nvId && c.ngay.slice(0, 10) === ngay);
+      if (existing) return prev.map(c => c.nhanVienId === nvId && c.ngay.slice(0, 10) === ngay ? { ...c, tangCa } : c);
+      if (!tangCa) return prev;
+      return [...prev, { id: "tmp2", nhanVienId: nvId, ngay: ngay + "T00:00:00.000Z", trangThai: "", tangCa, ghiChu: null }];
+    });
+    await fetch("/api/cham-cong", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nhanVienId: nvId, ngay, tangCa }),
+    }).catch(() => fetchData());
   };
 
   // Summary per employee
@@ -253,24 +284,29 @@ export default function ChamCongPage() {
                   <th className="px-2 py-2 text-center font-semibold text-amber-700 bg-amber-50 w-8">M</th>
                   <th className="px-2 py-2 text-center font-semibold text-cyan-700 bg-cyan-50 w-8">½</th>
                   <th className="px-2 py-2 text-center font-semibold text-purple-700 bg-purple-50 w-8">L</th>
+                  <th className="px-2 py-2 text-center font-semibold text-orange-700 bg-orange-50 border-l border-orange-200 w-10">TC giờ</th>
                 </tr>
               </thead>
               <tbody>
                 {nhanViens.map((nv, idx) => {
                   const summary = getSummary(nv.id);
                   const cong = (summary["di_lam"] ?? 0) + (summary["di_muon"] ?? 0) + (summary["nua_ngay"] ?? 0);
+                  const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
+                  const rowBg = idx % 2 === 0 ? "bg-white" : "bg-slate-50/40";
                   return (
-                    <tr key={nv.id} className={`border-b border-slate-100 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"} hover:bg-rose-50/20 transition`}>
-                      {/* STT */}
-                      <td className={`sticky left-0 z-10 px-3 py-1.5 text-center text-slate-400 border-r border-slate-100 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}>
+                    <>
+                    {/* ── Dòng 1: chấm công ── */}
+                    <tr key={nv.id} className={`${rowBg} hover:bg-rose-50/20 transition`}>
+                      {/* STT — rowSpan=2 */}
+                      <td rowSpan={2} className={`sticky left-0 z-10 px-3 py-1.5 text-center text-slate-400 border-r border-slate-100 border-b-2 border-b-slate-200 ${rowBg}`}>
                         {idx + 1}
                       </td>
-                      {/* Tên NV */}
-                      <td className={`sticky left-8 z-10 px-3 py-1.5 border-r border-slate-100 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}>
+                      {/* Tên NV — rowSpan=2 */}
+                      <td rowSpan={2} className={`sticky left-8 z-10 px-3 py-1.5 border-r border-slate-100 border-b-2 border-b-slate-200 ${rowBg}`}>
                         <p className="font-semibold text-slate-800 text-[13px]">{nv.ten}</p>
                         {nv.chucVu && <p className="text-[11px] text-slate-400">{nv.chucVu}</p>}
                       </td>
-                      {/* Cells */}
+                      {/* Cells chấm công */}
                       {days.map(d => {
                         const key = getKey(nv.id, d);
                         const tt = ccMap[key] ?? "";
@@ -279,33 +315,76 @@ export default function ChamCongPage() {
                         const weekend = isWeekend(d);
                         return (
                           <td key={d}
-                            className={`p-0 text-center cursor-pointer select-none border border-slate-100 transition
+                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition
                               ${weekend ? "bg-slate-100/80" : ""}
                               ${isSaving ? "opacity-50" : ""}
                             `}
                             onClick={() => !weekend && handleCellClick(nv.id, d)}
-                            title={info?.title ?? (weekend ? getDayLabel(d) : "Click để chấm")}
+                            title={info?.title ?? (weekend ? getDayLabel(d) : "Click để chấm công")}
                           >
                             {info ? (
                               <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-[11px] font-bold ${info.bg} ${info.text}`}>
                                 {info.label}
                               </span>
                             ) : (
-                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-[10px] ${weekend ? "text-slate-300" : "text-slate-200 hover:text-slate-400"}`}>
+                              <span className={`inline-flex items-center justify-center w-7 h-7 text-[10px] ${weekend ? "text-slate-300" : "text-slate-200 hover:text-slate-400"}`}>
                                 {weekend ? "—" : ""}
                               </span>
                             )}
                           </td>
                         );
                       })}
-                      {/* Summary */}
-                      <td className="px-2 py-1.5 text-center font-bold text-emerald-700 bg-emerald-50/50 border-l border-slate-200">{cong || "—"}</td>
-                      <td className="px-2 py-1.5 text-center text-blue-700 bg-blue-50/50">{summary["nghi_phep"] || ""}</td>
-                      <td className="px-2 py-1.5 text-center text-red-700 bg-red-50/50 font-semibold">{summary["vang"] || ""}</td>
-                      <td className="px-2 py-1.5 text-center text-amber-700 bg-amber-50/50">{summary["di_muon"] || ""}</td>
-                      <td className="px-2 py-1.5 text-center text-cyan-700 bg-cyan-50/50">{summary["nua_ngay"] || ""}</td>
-                      <td className="px-2 py-1.5 text-center text-purple-700 bg-purple-50/50">{summary["nghi_le"] || ""}</td>
+                      {/* Summary row 1 — rowSpan=2 */}
+                      <td rowSpan={2} className="px-2 py-1.5 text-center font-bold text-emerald-700 bg-emerald-50/50 border-l border-slate-200 border-b-2 border-b-slate-200">{cong || "—"}</td>
+                      <td rowSpan={2} className="px-2 py-1.5 text-center text-blue-700 bg-blue-50/50 border-b-2 border-b-slate-200">{summary["nghi_phep"] || ""}</td>
+                      <td rowSpan={2} className="px-2 py-1.5 text-center text-red-700 bg-red-50/50 font-semibold border-b-2 border-b-slate-200">{summary["vang"] || ""}</td>
+                      <td rowSpan={2} className="px-2 py-1.5 text-center text-amber-700 bg-amber-50/50 border-b-2 border-b-slate-200">{summary["di_muon"] || ""}</td>
+                      <td rowSpan={2} className="px-2 py-1.5 text-center text-cyan-700 bg-cyan-50/50 border-b-2 border-b-slate-200">{summary["nua_ngay"] || ""}</td>
+                      <td rowSpan={2} className="px-2 py-1.5 text-center text-purple-700 bg-purple-50/50 border-b-2 border-b-slate-200">{summary["nghi_le"] || ""}</td>
+                      <td rowSpan={2} className={`px-1 py-1.5 text-center font-bold border-l border-orange-200 border-b-2 border-b-slate-200 ${tongTC > 0 ? "text-orange-700 bg-orange-50/60" : "bg-orange-50/20 text-slate-300"}`}>
+                        {tongTC > 0 ? tongTC : "—"}
+                      </td>
                     </tr>
+                    {/* ── Dòng 2: tăng ca ── */}
+                    <tr key={`${nv.id}-tc`} className={`border-b-2 border-slate-200 ${rowBg}`}>
+                      {days.map(d => {
+                        const key = getKey(nv.id, d);
+                        const tc = tcMap[key];
+                        const weekend = isWeekend(d);
+                        return (
+                          <td key={d} className={`p-0.5 border-x border-slate-100 ${weekend ? "bg-slate-100/60" : "bg-orange-50/30"}`}>
+                            {!weekend ? (
+                              <input
+                                type="number"
+                                min="0"
+                                max="24"
+                                step="0.5"
+                                value={tc ?? ""}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  const tcVal = val === "" ? null : Math.min(24, parseFloat(val));
+                                  setChamCongs(prev => {
+                                    const ngay = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                                    const existing = prev.find(c => c.nhanVienId === nv.id && c.ngay.slice(0,10) === ngay);
+                                    if (existing) return prev.map(c => c.nhanVienId === nv.id && c.ngay.slice(0,10) === ngay ? { ...c, tangCa: tcVal } : c);
+                                    if (!tcVal) return prev;
+                                    return [...prev, { id: "tmp3", nhanVienId: nv.id, ngay: ngay + "T00:00:00.000Z", trangThai: "", tangCa: tcVal, ghiChu: null }];
+                                  });
+                                }}
+                                onBlur={e => handleTCChange(nv.id, d, e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                placeholder=""
+                                className="w-full h-6 text-center text-[11px] font-semibold text-orange-700 bg-transparent border border-orange-200 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 placeholder-orange-200"
+                                title="Số giờ tăng ca"
+                              />
+                            ) : (
+                              <div className="h-6" />
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    </>
                   );
                 })}
               </tbody>
@@ -328,6 +407,12 @@ export default function ChamCongPage() {
                     );
                   })}
                   <td colSpan={6} className="bg-slate-100 border-l border-slate-200"></td>
+                  <td className="bg-orange-50/60 border-l border-orange-200 text-center text-orange-700">
+                    {(() => {
+                      const total = nhanViens.reduce((s, nv) => s + days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0), 0);
+                      return total > 0 ? total : "";
+                    })()}
+                  </td>
                 </tr>
               </tfoot>
             </table>

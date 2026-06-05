@@ -8,6 +8,10 @@ type VatTu = {
   tonKho?: { soLuong: number; giaTrungBinh: number };
 };
 
+type NhaCungCapDB = {
+  id: string; ma: string; ten: string; sdt?: string | null; diaChi?: string | null;
+};
+
 type ChiTiet = {
   id?: string; vatTuId: string; vatTu?: VatTu;
   soLuongMua: number; donViMua: string; quyDoi: number;
@@ -63,6 +67,9 @@ const TRANG_THAI_MAP: Record<string, { label: string; color: string; icon: React
   da_thanh_toan:      { label: "Đã TT",       color: "bg-green-100 text-green-700",  icon: <CheckCircle size={12} /> },
 };
 
+// NHA_CC cứng (4 nhà lớn hay dùng) — giữ lại để backward compat
+const NHA_CC_STATIC = NHA_CC.filter(n => n.value !== "khac");
+
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN");
 
@@ -82,6 +89,7 @@ function genSoPhieu(): string {
 export default function NhapKhoPage() {
   const [phieus, setPhieus]   = useState<PhieuNhap[]>([]);
   const [vatTus, setVatTus]   = useState<VatTu[]>([]);
+  const [nhaCCs, setNhaCCs]   = useState<NhaCungCapDB[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
   const [filterNhaCC, setFilterNhaCC] = useState("");
@@ -106,12 +114,14 @@ export default function NhapKhoPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [p, v] = await Promise.all([
+    const [p, v, ncc] = await Promise.all([
       fetch("/api/ke-toan/nhap-kho").then(r => r.json()),
       fetch("/api/ke-toan/vat-tu").then(r => r.json()),
+      fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()),
     ]);
     setPhieus(Array.isArray(p) ? p : []);
     setVatTus(Array.isArray(v) ? v : []);
+    setNhaCCs(Array.isArray(ncc) ? ncc : []);
     setLoading(false);
   }, []);
 
@@ -211,12 +221,39 @@ export default function NhapKhoPage() {
     const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
     if (validRows.length === 0) return;
     setSaving(true);
+
+    // Nếu chọn "khác" + nhập tên mới → tự tạo NhaCungCap
+    let finalNhaCC = form.nhaCC;
+    let finalTenNhaCC = form.tenNhaCC;
+    if (form.nhaCC === "khac" && form.tenNhaCC.trim()) {
+      const tenClean = form.tenNhaCC.trim();
+      // Kiểm tra đã tồn tại chưa (theo tên)
+      const existing = nhaCCs.find(n => n.ten.toLowerCase() === tenClean.toLowerCase());
+      if (existing) {
+        finalNhaCC = existing.id;
+        finalTenNhaCC = existing.ten;
+      } else {
+        const maAuto = "NCC" + Date.now().toString().slice(-6);
+        const nccRes = await fetch("/api/ke-toan/nha-cung-cap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ma: maAuto, ten: tenClean }),
+        });
+        if (nccRes.ok) {
+          const newNCC: NhaCungCapDB = await nccRes.json();
+          finalNhaCC = newNCC.id;
+          finalTenNhaCC = newNCC.ten;
+          setNhaCCs(prev => [...prev, newNCC]);
+        }
+      }
+    }
+
     const url = editingId ? `/api/ke-toan/nhap-kho/${editingId}` : "/api/ke-toan/nhap-kho";
     const method = editingId ? "PATCH" : "POST";
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, chiTiet: validRows }),
+      body: JSON.stringify({ ...form, nhaCC: finalNhaCC, tenNhaCC: finalTenNhaCC, chiTiet: validRows }),
     });
     setSaving(false);
     if (res.ok) {
@@ -285,7 +322,8 @@ export default function NhapKhoPage() {
         <select value={filterNhaCC} onChange={e => setFilterNhaCC(e.target.value)}
           className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="">Tất cả NCC</option>
-          {NHA_CC.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+          {NHA_CC_STATIC.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+          {nhaCCs.map(n => <option key={n.id} value={n.id}>{n.ten}</option>)}
         </select>
       </div>
 
@@ -314,7 +352,13 @@ export default function NhapKhoPage() {
                 <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-indigo-700 font-medium">{p.soPhieu}</td>
                   <td className="px-4 py-3 text-slate-600">{fmtDate(p.ngay)}</td>
-                  <td className="px-4 py-3 text-slate-700">{NHA_CC.find(n => n.value === p.nhaCC)?.label || p.nhaCC}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {nhaCCs.find(n => n.id === p.nhaCC)?.ten
+                      || (p.nhaCC === "khac" && p.tenNhaCC ? p.tenNhaCC : null)
+                      || NHA_CC_STATIC.find(n => n.value === p.nhaCC)?.label
+                      || p.tenNhaCC
+                      || p.nhaCC}
+                  </td>
                   <td className="px-4 py-3 text-slate-500">{p.soHoaDon || "—"}</td>
                   <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(p.tongTien)}₫</td>
                   <td className="px-4 py-3">
@@ -368,9 +412,13 @@ export default function NhapKhoPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Nhà cung cấp *</label>
-                  <select value={form.nhaCC} onChange={e => setForm(f => ({ ...f, nhaCC: e.target.value }))}
+                  <select value={form.nhaCC} onChange={e => setForm(f => ({ ...f, nhaCC: e.target.value, tenNhaCC: "" }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    {NHA_CC.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+                    {NHA_CC_STATIC.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+                    {nhaCCs.filter(n => !NHA_CC_STATIC.some(s => s.value === n.id)).map(n => (
+                      <option key={n.id} value={n.id}>{n.ten}</option>
+                    ))}
+                    <option value="khac">+ Thêm mới...</option>
                   </select>
                 </div>
                 {form.nhaCC === "khac" && (
@@ -619,7 +667,14 @@ export default function NhapKhoPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <h2 className="text-lg font-bold text-slate-800 font-mono">{selected.soPhieu}</h2>
-                <p className="text-xs text-slate-400">{NHA_CC.find(n => n.value === selected.nhaCC)?.label} · {fmtDate(selected.ngay)}</p>
+                <p className="text-xs text-slate-400">
+                  {nhaCCs.find(n => n.id === selected.nhaCC)?.ten
+                    || (selected.nhaCC === "khac" && selected.tenNhaCC ? selected.tenNhaCC : null)
+                    || NHA_CC_STATIC.find(n => n.value === selected.nhaCC)?.label
+                    || selected.tenNhaCC
+                    || selected.nhaCC}
+                  {" · "}{fmtDate(selected.ngay)}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative group">

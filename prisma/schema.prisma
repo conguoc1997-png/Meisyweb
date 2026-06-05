@@ -423,6 +423,7 @@ model ChamCong {
   ngay       DateTime // chỉ lấy phần ngày (date)
   trangThai  String   @default("di_lam")
   // di_lam | nghi_phep | vang | di_muon | nua_ngay | nghi_le
+  tangCa     Float?   // số giờ tăng ca (null = không TC)
   ghiChu     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

@@ -24,24 +24,43 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ nhanViens, chamCongs });
 }
 
-// POST /api/cham-cong — upsert 1 ô
+// POST /api/cham-cong — upsert 1 ô (trangThai hoặc tangCa)
 export async function POST(req: NextRequest) {
-  const { nhanVienId, ngay, trangThai, ghiChu } = await req.json();
+  const { nhanVienId, ngay, trangThai, tangCa, ghiChu } = await req.json();
   if (!nhanVienId || !ngay) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
   const date = new Date(ngay);
   date.setUTCHours(0, 0, 0, 0);
 
-  if (!trangThai) {
-    // Xoá record (ô trống)
-    await prisma.chamCong.deleteMany({ where: { nhanVienId, ngay: date } });
-    return NextResponse.json({ ok: true });
+  // Nếu xoá trangThai VÀ tangCa null → xoá record hoàn toàn
+  if (!trangThai && (tangCa === null || tangCa === undefined)) {
+    // Chỉ xoá nếu không còn tangCa
+    const existing = await prisma.chamCong.findUnique({ where: { nhanVienId_ngay: { nhanVienId, ngay: date } } });
+    if (!existing || (!existing.tangCa && existing.tangCa !== 0)) {
+      await prisma.chamCong.deleteMany({ where: { nhanVienId, ngay: date } });
+      return NextResponse.json({ ok: true });
+    }
+    // Còn tangCa → chỉ xoá trangThai
+    const record = await prisma.chamCong.update({
+      where: { nhanVienId_ngay: { nhanVienId, ngay: date } },
+      data: { trangThai: "" },
+    });
+    return NextResponse.json(record);
   }
+
+  const updateData: Record<string, unknown> = { ghiChu: ghiChu ?? null };
+  if (trangThai !== undefined) updateData.trangThai = trangThai || "";
+  if (tangCa !== undefined) updateData.tangCa = tangCa !== null ? Number(tangCa) : null;
 
   const record = await prisma.chamCong.upsert({
     where: { nhanVienId_ngay: { nhanVienId, ngay: date } },
-    update: { trangThai, ghiChu: ghiChu ?? null },
-    create: { nhanVienId, ngay: date, trangThai, ghiChu: ghiChu ?? null },
+    update: updateData,
+    create: {
+      nhanVienId, ngay: date,
+      trangThai: trangThai || "",
+      tangCa: tangCa !== null && tangCa !== undefined ? Number(tangCa) : null,
+      ghiChu: ghiChu ?? null,
+    },
   });
   return NextResponse.json(record);
 }
