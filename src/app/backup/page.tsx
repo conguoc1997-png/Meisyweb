@@ -26,6 +26,9 @@ export default function BackupPage() {
       a.click();
       URL.revokeObjectURL(url);
 
+      // Lưu ngày backup để BackupReminder biết
+      localStorage.setItem("meisy_last_backup_date", new Date().toISOString());
+
       // Tổng số records
       const total = Object.values(data.tables as Record<string, unknown[]>)
         .reduce((s, arr) => s + (Array.isArray(arr) ? arr.length : 0), 0);

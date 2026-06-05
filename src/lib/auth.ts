@@ -18,6 +18,7 @@ export const ALL_MODULES = [
   { key: "ke-toan",   label: "Kế toán",           routes: ["/ke-toan", "/api/ke-toan"] },
   { key: "cham-cong", label: "Chấm công",           routes: ["/cham-cong", "/api/cham-cong"] },
   { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
+  { key: "backup",    label: "Backup & Restore",  routes: ["/backup", "/api/backup"] },
 ] as const;
 
 // Chuyển đổi role cũ sang module keys mới (backward compat)

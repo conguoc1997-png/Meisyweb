@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import BackupReminder from "@/components/BackupReminder";
 import { UserProvider } from "@/lib/user-context";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default function RootLayout({
           <main className="flex-1 overflow-auto">
             {children}
           </main>
+          <BackupReminder />
         </UserProvider>
       </body>
     </html>
