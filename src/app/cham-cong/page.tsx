@@ -42,6 +42,7 @@ export default function ChamCongPage() {
   const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "" });
   const [editingNV, setEditingNV] = useState<NhanVien | null>(null);
   const [savingNV, setSavingNV] = useState(false);
+  const [nvError, setNvError] = useState("");
 
   // Parse tháng
   const [year, month] = thang.split("-").map(Number);
@@ -124,33 +125,52 @@ export default function ChamCongPage() {
   // Working days in month (excluding weekends)
   const soNgayLamViec = days.filter(d => !isWeekend(d)).length;
 
+  // Auto-generate maNV: NV001, NV002...
+  const genMaNV = (list: NhanVien[]) => {
+    const nums = list.map(n => parseInt(n.maNV.replace(/\D/g, ""))).filter(n => !isNaN(n));
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    return `NV${String(next).padStart(3, "0")}`;
+  };
+
   // Open NV modal
   const openNVModal = async () => {
     const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-    setAllNVs(Array.isArray(data) ? data : []);
+    const list = Array.isArray(data) ? data : [];
+    setAllNVs(list);
+    // Tự điền maNV tiếp theo
+    setNvForm(f => ({ ...f, maNV: genMaNV(list) }));
+    setNvError("");
     setShowNVModal(true);
   };
 
   const saveNV = async () => {
-    if (!nvForm.maNV || !nvForm.ten) return;
+    setNvError("");
+    if (!nvForm.ten.trim()) { setNvError("Vui lòng nhập họ tên nhân viên"); return; }
+    if (!nvForm.maNV.trim()) { setNvError("Vui lòng nhập mã nhân viên"); return; }
     setSavingNV(true);
-    if (editingNV) {
-      await fetch(`/api/cham-cong/nhan-vien/${editingNV.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ten: nvForm.ten, chucVu: nvForm.chucVu, phongBan: nvForm.phongBan, luongCB: nvForm.luongCB }),
-      });
-    } else {
-      await fetch("/api/cham-cong/nhan-vien", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nvForm),
-      });
+    try {
+      if (editingNV) {
+        const res = await fetch(`/api/cham-cong/nhan-vien/${editingNV.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: nvForm.ten, chucVu: nvForm.chucVu, phongBan: nvForm.phongBan, luongCB: nvForm.luongCB }),
+        });
+        if (!res.ok) { const e = await res.json(); setNvError(e.error ?? "Lỗi cập nhật"); return; }
+      } else {
+        const res = await fetch("/api/cham-cong/nhan-vien", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nvForm),
+        });
+        if (!res.ok) { const e = await res.json(); setNvError(e.error ?? "Lỗi thêm nhân viên"); return; }
+      }
+      const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
+      const list = Array.isArray(data) ? data : [];
+      setAllNVs(list);
+      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", luongCB: "" });
+      setEditingNV(null);
+      fetchData();
+    } finally {
+      setSavingNV(false);
     }
-    setSavingNV(false);
-    setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "" });
-    setEditingNV(null);
-    const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-    setAllNVs(Array.isArray(data) ? data : []);
-    fetchData();
   };
 
   const toggleActiveNV = async (nv: NhanVien) => {
@@ -321,13 +341,14 @@ export default function ChamCongPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-800">Quản lý Nhân viên</h2>
-              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "" }); }}
+              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "" }); }}
                 className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-5">
               {/* Form thêm/sửa */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-slate-700">{editingNV ? `Sửa: ${editingNV.ten}` : "Thêm nhân viên"}</h3>
+                {nvError && <p className="text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg">{nvError}</p>}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-slate-500 block mb-1">Mã NV *</label>
@@ -366,8 +387,8 @@ export default function ChamCongPage() {
                     <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "" }); }}
                       className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-100 transition">Huỷ</button>
                   )}
-                  <button onClick={saveNV} disabled={!nvForm.ten || !nvForm.maNV || savingNV}
-                    className="px-5 py-2 rounded-xl bg-rose-500 text-white text-sm font-medium hover:bg-rose-600 transition disabled:opacity-50">
+                  <button onClick={saveNV} disabled={savingNV}
+                    className="px-5 py-2 rounded-xl bg-rose-500 text-white text-sm font-medium hover:bg-rose-600 transition disabled:opacity-60">
                     {savingNV ? "Đang lưu..." : editingNV ? "Cập nhật" : "+ Thêm"}
                   </button>
                 </div>
