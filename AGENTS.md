@@ -24,6 +24,21 @@ npx prisma db push   ← CHỈ chạy khi user yêu cầu rõ ràng
 3. **HỎI USER** trước khi chạy `prisma db push`
 4. User tự chạy hoặc xác nhận rõ ràng bằng văn bản
 
+## ⚠️ QUY TẮC XÁC NHẬN 5 LẦN TRƯỚC KHI XÓA DATA:
+
+Trước khi thực hiện BẤT KỲ hành động nào có thể xóa data trên Supabase/DB,
+Claude PHẢI hỏi user đủ 5 câu xác nhận bằng **tiếng Việt**, theo thứ tự:
+
+1. "Bạn có chắc muốn xóa dữ liệu này không?"
+2. "Hành động này sẽ xóa vĩnh viễn, không thể khôi phục. Bạn vẫn muốn tiếp tục?"
+3. "Bạn đã backup dữ liệu chưa? (vào /backup để xuất file trước)"
+4. "Xác nhận lần 4: Bạn THỰC SỰ muốn xóa toàn bộ [tên bảng/dữ liệu] chứ?"
+5. "Xác nhận cuối cùng (lần 5): Gõ chính xác chữ 'XÁC NHẬN XÓA' để tiếp tục"
+
+Nếu user không trả lời đủ 5 lần hoặc không gõ đúng 'XÁC NHẬN XÓA' → DỪNG LẠI, không thực hiện.
+
+Áp dụng cho: prisma db push --force-reset, deleteMany, DELETE, truncate, drop table, migrate reset
+
 ## Backup:
 - Trang `/backup` — export/import toàn bộ DB
 - Backup trước mọi thay đổi schema
