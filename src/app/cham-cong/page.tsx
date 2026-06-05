@@ -63,6 +63,17 @@ export default function ChamCongPage() {
     try { localStorage.setItem(`meisy_holidays_${year}`, JSON.stringify(list)); } catch {}
   };
   const [activeTab, setActiveTab] = useState<"chamcong" | "luong">("chamcong");
+  // Danh sách phòng ban — lưu localStorage
+  const DEFAULT_PHONG_BAN = ["Kho", "May", "CSKH", "Livestream"];
+  const [phongBanList, setPhongBanListRaw] = useState<string[]>(() => {
+    try { const s = localStorage.getItem("meisy_phong_ban"); return s ? JSON.parse(s) : DEFAULT_PHONG_BAN; } catch { return DEFAULT_PHONG_BAN; }
+  });
+  const setPhongBanList = (list: string[]) => {
+    setPhongBanListRaw(list);
+    try { localStorage.setItem("meisy_phong_ban", JSON.stringify(list)); } catch {}
+  };
+  const [newPhongBan, setNewPhongBan] = useState("");
+
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayLabel, setNewHolidayLabel] = useState("");
@@ -799,9 +810,40 @@ export default function ChamCongPage() {
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 block mb-1">Phòng ban</label>
-                    <input value={nvForm.phongBan} onChange={e => setNvForm(f => ({ ...f, phongBan: e.target.value }))}
-                      placeholder="Kho, Sản xuất..."
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                    <select value={nvForm.phongBan} onChange={e => setNvForm(f => ({ ...f, phongBan: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
+                      <option value="">— Chọn phòng ban —</option>
+                      {phongBanList.map(pb => <option key={pb} value={pb}>{pb}</option>)}
+                    </select>
+                    {/* Thêm phòng ban mới */}
+                    <div className="flex gap-1 mt-1.5">
+                      <input value={newPhongBan} onChange={e => setNewPhongBan(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && newPhongBan.trim()) {
+                            if (!phongBanList.includes(newPhongBan.trim())) setPhongBanList([...phongBanList, newPhongBan.trim()]);
+                            setNewPhongBan("");
+                          }
+                        }}
+                        placeholder="Thêm phòng ban mới..."
+                        className="flex-1 border border-dashed border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200" />
+                      <button type="button"
+                        onClick={() => {
+                          if (!newPhongBan.trim()) return;
+                          if (!phongBanList.includes(newPhongBan.trim())) setPhongBanList([...phongBanList, newPhongBan.trim()]);
+                          setNewPhongBan("");
+                        }}
+                        className="px-2 py-1 bg-rose-500 text-white rounded-lg text-xs hover:bg-rose-600 transition">+</button>
+                    </div>
+                    {/* Danh sách quick-delete */}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {phongBanList.map(pb => (
+                        <span key={pb} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-600">
+                          {pb}
+                          <button onClick={() => setPhongBanList(phongBanList.filter(p => p !== pb))}
+                            className="text-slate-400 hover:text-red-500 transition leading-none">×</button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 block mb-1">Lương cơ bản</label>
