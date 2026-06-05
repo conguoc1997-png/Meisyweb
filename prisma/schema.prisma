@@ -411,9 +411,10 @@ model NhanVien {
   ten        String
   chucVu     String?
   phongBan   String?
-  luongCB    Float?
-  phuCap     Float?     // phụ cấp cố định hàng tháng
-  heSoTC     Float      @default(1.5) // hệ số tăng ca (1.5 = x1.5 lương giờ)
+  luongCB         Float?
+  phuCapChuyenCan Float?  // phụ cấp chuyên cần cố định/tháng
+  phuCapAn        Float?  // phụ cấp ăn mỗi ngày (chỉ tính ngày đi làm đủ)
+  heSoTC          Float   @default(1.5) // hệ số tăng ca
   active     Boolean    @default(true)
   createdAt  DateTime   @default(now())
   chamCongs  ChamCong[]

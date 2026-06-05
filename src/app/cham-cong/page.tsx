@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2 } fr
 type NhanVien = {
   id: string; maNV: string; ten: string;
   chucVu: string | null; phongBan: string | null;
-  luongCB: number | null; phuCap: number | null; heSoTC: number;
+  luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; heSoTC: number;
   active: boolean;
 };
 
@@ -509,7 +509,7 @@ export default function ChamCongPage() {
                   <th className="px-3 py-2.5 text-center text-orange-500">Hệ số TC</th>
                   <th className="px-3 py-2.5 text-right text-slate-500">Lương công</th>
                   <th className="px-3 py-2.5 text-right text-orange-600">Lương TC</th>
-                  <th className="px-3 py-2.5 text-right text-teal-600">Phụ cấp</th>
+                  <th className="px-3 py-2.5 text-center text-teal-600 min-w-[130px]">Phụ cấp<div className="text-[10px] font-normal text-slate-400">CC + Ăn/ngày</div></th>
                   <th className="px-3 py-2.5 text-right font-bold text-indigo-700 bg-indigo-50 border-l border-indigo-100">Thực lĩnh</th>
                 </tr>
               </thead>
@@ -531,12 +531,16 @@ export default function ChamCongPage() {
                   const congVang   = summary["vang"]      ?? 0;
                   const congTinhLuong = congCoMat + congMuon + congNuaNgay * 0.5 + congPhep + congLe;
 
-                  const heSoTC   = nv.heSoTC ?? 1.5;
-                  const phuCap   = nv.phuCap ?? 0;
-                  const luongNgay = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
-                  const luongCong = luongNgay * congTinhLuong;
-                  const luongTC   = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * heSoTC * tongTC : 0;
-                  const thucLinh  = luongCong + luongTC + phuCap;
+                  const heSoTC        = nv.heSoTC ?? 1.5;
+                  const phuCapCC      = nv.phuCapChuyenCan ?? 0;
+                  const phuCapAnNgay  = nv.phuCapAn ?? 0;
+                  // Ngày đủ công cho PC ăn = chỉ di_lam + di_muon (đủ 1 ngày)
+                  const ngayAnDuCong  = congCoMat + congMuon;
+                  const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong;
+                  const luongNgay     = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
+                  const luongCong     = luongNgay * congTinhLuong;
+                  const luongTC       = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * heSoTC * tongTC : 0;
+                  const thucLinh      = luongCong + luongTC + tongPhuCap;
 
                   return (
                     <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
@@ -577,23 +581,52 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right text-orange-600">
                         {lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : ""}
                       </td>
-                      {/* Phụ cấp — inline edit */}
-                      <td className="px-2 py-1.5 text-right">
-                        <input
-                          type="number" step="100000" min="0"
-                          defaultValue={phuCap || ""}
-                          placeholder="0"
-                          onBlur={async e => {
-                            const val = parseFloat(e.target.value) || 0;
-                            await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                              method: "PATCH", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ phuCap: val || null }),
-                            });
-                            fetchData();
-                          }}
-                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                          className="w-24 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                        />
+                      {/* Phụ cấp — 2 ô: Chuyên cần + Ăn/ngày */}
+                      <td className="px-2 py-1">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-400 w-7 shrink-0">CC</span>
+                            <input
+                              type="number" step="50000" min="0"
+                              defaultValue={phuCapCC || ""}
+                              placeholder="0"
+                              onBlur={async e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                                  method: "PATCH", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ phuCapChuyenCan: val || null }),
+                                });
+                                fetchData();
+                              }}
+                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-400 w-7 shrink-0">Ăn</span>
+                            <input
+                              type="number" step="10000" min="0"
+                              defaultValue={phuCapAnNgay || ""}
+                              placeholder="0"
+                              onBlur={async e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                                  method: "PATCH", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ phuCapAn: val || null }),
+                                });
+                                fetchData();
+                              }}
+                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            {phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
+                          </div>
+                          {tongPhuCap > 0 && (
+                            <div className="text-[11px] font-bold text-teal-700 text-right pr-1">
+                              = {fmt(Math.round(tongPhuCap))}₫
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
                         {lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>}
