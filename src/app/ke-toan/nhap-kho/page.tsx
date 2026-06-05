@@ -532,7 +532,7 @@ export default function NhapKhoPage() {
                         const selectedVT = vatTus.find(v => v.id === row.vatTuId);
                         const isVai = selectedVT?.loai === "vai";
                         const filteredVTs = vatTus.filter(v => {
-                          const q = (vtSearch[i] || "").toLowerCase();
+                          const q = (vtSearch[i] || "").trim().toLowerCase();
                           return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
                         });
                         const dvInfo = isVai ? DON_VI_VAI.find(d => d.value === row.donViMua) : null;
