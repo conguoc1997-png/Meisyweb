@@ -403,6 +403,37 @@ model CongNo {
 
 // ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================
 
+// ===================== MODULE CHẤM CÔNG =====================
+
+model NhanVien {
+  id         String     @id @default(cuid())
+  maNV       String     @unique
+  ten        String
+  chucVu     String?
+  phongBan   String?
+  luongCB    Float?
+  active     Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  chamCongs  ChamCong[]
+}
+
+model ChamCong {
+  id         String   @id @default(cuid())
+  nhanVienId String
+  ngay       DateTime // chỉ lấy phần ngày (date)
+  trangThai  String   @default("di_lam")
+  // di_lam | nghi_phep | vang | di_muon | nua_ngay | nghi_le
+  ghiChu     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  nhanVien NhanVien @relation(fields: [nhanVienId], references: [id])
+
+  @@unique([nhanVienId, ngay])
+}
+
+// ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================
+
 model DonHoanTra {
   id          String    @id @default(cuid())
   maDon       String    // Mã đơn hàng từ sàn

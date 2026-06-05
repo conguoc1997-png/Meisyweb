@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, X, ChevronDown, Trash2, Eye, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Plus, Search, X, ChevronDown, Trash2, Eye, Pencil, CheckCircle, Clock, AlertCircle } from "lucide-react";
 
 type VatTu = {
   id: string; ma: string; ten: string; loai: string; nhom: string | null; donVi: string;
@@ -88,6 +88,7 @@ export default function NhapKhoPage() {
 
   const [modal, setModal]     = useState<"create" | "view" | null>(null);
   const [selected, setSelected] = useState<PhieuNhap | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     soPhieu: genSoPhieu(),
@@ -168,22 +169,58 @@ export default function NhapKhoPage() {
     }));
   }
 
+  function openEdit(p: PhieuNhap) {
+    setEditingId(p.id);
+    setForm({
+      soPhieu: p.soPhieu,
+      ngay: p.ngay.slice(0, 10),
+      nhaCC: p.nhaCC,
+      tenNhaCC: p.tenNhaCC || "",
+      soHoaDon: p.soHoaDon || "",
+      ngayHoaDon: p.ngayHoaDon ? p.ngayHoaDon.slice(0, 10) : "",
+      ghiChu: p.ghiChu || "",
+      nguoiTao: p.nguoiTao || "",
+    });
+    setChiTiet(p.chiTiet.map(r => ({
+      id: r.id,
+      vatTuId: r.vatTuId,
+      vatTu: r.vatTu,
+      soLuongMua: r.soLuongMua,
+      donViMua: r.donViMua,
+      quyDoi: r.quyDoi,
+      soLuong: r.soLuong,
+      donGia: r.donGia,
+      thanhTien: r.thanhTien,
+      vat: 0,
+      ghiChu: r.ghiChu,
+    })));
+    setVtSearch(p.chiTiet.map(() => ""));
+    setModal("create");
+  }
+
+  function closeModal() {
+    setModal(null);
+    setEditingId(null);
+    setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0, 10), nhaCC: "hac_long", tenNhaCC: "", soHoaDon: "", ngayHoaDon: "", ghiChu: "", nguoiTao: "" });
+    setChiTiet([newRow()]);
+    setVtSearch([""]);
+  }
+
   async function handleCreate() {
     if (!form.soPhieu || !form.ngay || !form.nhaCC) return;
     const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
     if (validRows.length === 0) return;
     setSaving(true);
-    const res = await fetch("/api/ke-toan/nhap-kho", {
-      method: "POST",
+    const url = editingId ? `/api/ke-toan/nhap-kho/${editingId}` : "/api/ke-toan/nhap-kho";
+    const method = editingId ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, chiTiet: validRows }),
     });
     setSaving(false);
     if (res.ok) {
-      setModal(null);
-      setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0, 10), nhaCC: "hac_long", tenNhaCC: "", soHoaDon: "", ngayHoaDon: "", ghiChu: "", nguoiTao: "" });
-      setChiTiet([newRow()]);
-      setVtSearch([""]);
+      closeModal();
       fetchAll();
     }
   }
@@ -217,7 +254,7 @@ export default function NhapKhoPage() {
           <h1 className="text-2xl font-bold text-slate-800">Phiếu Nhập Kho NPL</h1>
           <p className="text-sm text-slate-500 mt-0.5">Quản lý nhập kho nguyên phụ liệu — tự động cập nhật tồn kho & công nợ</p>
         </div>
-        <button onClick={() => { setModal("create"); setForm(f => ({ ...f, soPhieu: genSoPhieu() })); }}
+        <button onClick={() => { setEditingId(null); setForm(f => ({ ...f, soPhieu: genSoPhieu() })); setModal("create"); }}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
           <Plus size={16} /> Tạo phiếu nhập
         </button>
@@ -291,6 +328,10 @@ export default function NhapKhoPage() {
                         className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                         <Eye size={14} />
                       </button>
+                      <button onClick={() => openEdit(p)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                        <Pencil size={14} />
+                      </button>
                       <button onClick={() => handleDelete(p.id)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                         <Trash2 size={14} />
@@ -309,8 +350,8 @@ export default function NhapKhoPage() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-8 px-4 pb-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">Tạo phiếu nhập kho</h2>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+              <h2 className="text-lg font-bold text-slate-800">{editingId ? "Sửa phiếu nhập kho" : "Tạo phiếu nhập kho"}</h2>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-5">
               {/* Header */}
@@ -561,10 +602,10 @@ export default function NhapKhoPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={() => setModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Huỷ</button>
+              <button onClick={closeModal} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Huỷ</button>
               <button onClick={handleCreate} disabled={saving}
                 className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                {saving ? "Đang lưu..." : "Lưu phiếu"}
+                {saving ? "Đang lưu..." : editingId ? "Cập nhật" : "Lưu phiếu"}
               </button>
             </div>
           </div>
