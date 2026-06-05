@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ClipboardList,
   BookOpen,
+  CalendarCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -95,6 +96,12 @@ const MODULES: NavModule[] = [
       { href: "/ke-toan/dinh-muc",  label: "Định mức NPL",   icon: ClipboardList, moduleKey: "ke-toan" },
       { href: "/ke-toan/cong-no",   label: "Công nợ NCC",    icon: BookOpen,      moduleKey: "ke-toan" },
     ],
+  },
+  {
+    key: "cham-cong", moduleKey: "cham-cong",
+    label: "Chấm công", icon: CalendarCheck,
+    bg: "bg-orange-50", text: "text-orange-400",
+    href: "/cham-cong",
   },
   {
     key: "quantri", moduleKey: "users",
