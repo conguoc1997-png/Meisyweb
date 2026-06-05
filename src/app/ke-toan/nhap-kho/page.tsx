@@ -12,10 +12,14 @@ type NhaCungCapDB = {
   id: string; ma: string; ten: string; sdt?: string | null; diaChi?: string | null;
 };
 
+type QuyDoiRecord = {
+  id: string; tuDonVi: string; veDonVi: string; heSo: number; ghiChu?: string | null;
+};
+
 type ChiTiet = {
   id?: string; vatTuId: string; vatTu?: VatTu;
   soLuongMua: number; donViMua: string; quyDoi: number;
-  soLuong: number; // tổng đơn vị cơ bản (m)
+  soLuong: number; donViQuyDoi: string; // đơn vị sau quy đổi (m, cái, chiếc...)
   donGia: number; thanhTien: number; vat: number; ghiChu: string;
 };
 
@@ -74,7 +78,7 @@ const fmt = (n: number) => n.toLocaleString("vi-VN");
 const fmtDate = (s: string) => new Date(s).toLocaleDateString("vi-VN");
 
 function newRow(): ChiTiet {
-  return { vatTuId: "", soLuongMua: 0, donViMua: "m", quyDoi: 1, soLuong: 0, donGia: 0, thanhTien: 0, vat: 0, ghiChu: "" };
+  return { vatTuId: "", soLuongMua: 0, donViMua: "m", quyDoi: 1, soLuong: 0, donViQuyDoi: "", donGia: 0, thanhTien: 0, vat: 0, ghiChu: "" };
 }
 
 function genSoPhieu(): string {
@@ -90,6 +94,7 @@ export default function NhapKhoPage() {
   const [phieus, setPhieus]   = useState<PhieuNhap[]>([]);
   const [vatTus, setVatTus]   = useState<VatTu[]>([]);
   const [nhaCCs, setNhaCCs]   = useState<NhaCungCapDB[]>([]);
+  const [quyDois, setQuyDois] = useState<QuyDoiRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
   const [filterNhaCC, setFilterNhaCC] = useState("");
@@ -114,14 +119,16 @@ export default function NhapKhoPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [p, v, ncc] = await Promise.all([
+    const [p, v, ncc, qd] = await Promise.all([
       fetch("/api/ke-toan/nhap-kho").then(r => r.json()),
       fetch("/api/ke-toan/vat-tu").then(r => r.json()),
       fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()),
+      fetch("/api/ke-toan/quy-doi-don-vi").then(r => r.json()),
     ]);
     setPhieus(Array.isArray(p) ? p : []);
     setVatTus(Array.isArray(v) ? v : []);
     setNhaCCs(Array.isArray(ncc) ? ncc : []);
+    setQuyDois(Array.isArray(qd) ? qd : []);
     setLoading(false);
   }, []);
 
@@ -150,6 +157,15 @@ export default function NhapKhoPage() {
     setVtSearch(prev => prev.filter((_, idx) => idx !== i));
   }
 
+  function autoFillQuyDoi(donViMua: string, isVai: boolean): { quyDoi: number; donViQuyDoi: string } {
+    if (isVai) {
+      return { quyDoi: DEFAULT_QUY_DOI[donViMua] ?? 1, donViQuyDoi: "m" };
+    }
+    const dbRecord = quyDois.find(q => q.tuDonVi === donViMua);
+    if (dbRecord) return { quyDoi: dbRecord.heSo, donViQuyDoi: dbRecord.veDonVi };
+    return { quyDoi: 1, donViQuyDoi: "" };
+  }
+
   function updateRow(i: number, patch: Partial<ChiTiet>, allVatTus?: VatTu[]) {
     const vts = allVatTus ?? vatTus;
     setChiTiet(prev => prev.map((r, idx) => {
@@ -163,12 +179,17 @@ export default function NhapKhoPage() {
           updated.vatTu = vt;
           const defaultDV = DON_VI_DEFAULT[vt.donVi] ?? (vt.loai === "vai" ? "m" : "cai");
           updated.donViMua = defaultDV;
-          updated.quyDoi = DEFAULT_QUY_DOI[defaultDV] ?? 1;
+          const qdInfo = autoFillQuyDoi(defaultDV, vt.loai === "vai");
+          updated.quyDoi = qdInfo.quyDoi;
+          updated.donViQuyDoi = qdInfo.donViQuyDoi;
         }
       }
-      // Nếu đổi donViMua thủ công → reset quyDoi
+      // Nếu đổi donViMua thủ công → auto-fill quyDoi từ DB
       if (patch.donViMua && patch.donViMua !== r.donViMua && !patch.vatTuId) {
-        updated.quyDoi = DEFAULT_QUY_DOI[patch.donViMua] ?? 1;
+        const isVai = updated.vatTu?.loai === "vai";
+        const qdInfo = autoFillQuyDoi(patch.donViMua, isVai);
+        updated.quyDoi = qdInfo.quyDoi;
+        updated.donViQuyDoi = qdInfo.donViQuyDoi;
       }
       // Tự tính lại soLuong (trừ khi chỉnh tay)
       if (patch.soLuong === undefined) {
@@ -199,6 +220,7 @@ export default function NhapKhoPage() {
       donViMua: r.donViMua,
       quyDoi: r.quyDoi,
       soLuong: r.soLuong,
+      donViQuyDoi: "",
       donGia: r.donGia,
       thanhTien: r.thanhTien,
       vat: 0,
@@ -484,7 +506,15 @@ export default function NhapKhoPage() {
                           return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
                         });
                         const dvInfo = isVai ? DON_VI_VAI.find(d => d.value === row.donViMua) : null;
-                        const showQD = isVai && (dvInfo?.showQuyDoi ?? false);
+                        // Quy đổi vải: khi không phải mét; phụ liệu: khi có hệ số trong DB hoặc user đã nhập
+                        const dbQD = !isVai ? quyDois.find(q => q.tuDonVi === row.donViMua) : null;
+                        const showQD = isVai
+                          ? (dvInfo?.showQuyDoi ?? false)
+                          : (row.donViMua !== "cai" && row.donViMua !== "m"); // luôn cho phép nhập hệ số cho phụ liệu có đơn vị phức
+                        const quyDoiLabel = isVai
+                          ? (dvInfo?.placeholder || "m/ĐVT")
+                          : (dbQD ? `${dbQD.veDonVi}/${row.donViMua}` : (row.donViQuyDoi ? `${row.donViQuyDoi}/${row.donViMua}` : "đv nhỏ"));
+                        const tongLabel = isVai ? "m" : (row.donViQuyDoi || dbQD?.veDonVi || "đv");
 
                         return (
                           <tr key={i} className="border-t border-slate-100">
@@ -547,14 +577,14 @@ export default function NhapKhoPage() {
                                   <input type="number" min={0} step="0.01" value={row.quyDoi || ""}
                                     onChange={e => updateRow(i, { quyDoi: parseFloat(e.target.value) || 1 })}
                                     className="w-full border border-indigo-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-indigo-50" />
-                                  <p className="text-[10px] text-slate-400 mt-0.5">{dvInfo?.placeholder}</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">{quyDoiLabel}</p>
                                 </div>
                               ) : (
                                 <span className="text-xs text-slate-300 px-2">—</span>
                               )}
                             </td>
 
-                            {/* Tổng mét — editable, auto-fill từ soLuongMua×quyDoi */}
+                            {/* Tổng (quy đổi) — editable */}
                             <td className="px-3 py-1.5 align-top">
                               {showQD ? (
                                 <div>
@@ -564,7 +594,7 @@ export default function NhapKhoPage() {
                                     onChange={e => updateRow(i, { soLuong: parseFloat(e.target.value) || 0 })}
                                     className="w-full border border-teal-200 rounded-lg px-2 py-1.5 text-xs text-right font-semibold text-teal-700 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50"
                                   />
-                                  <p className="text-[10px] text-slate-400 mt-0.5">m</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">{tongLabel}</p>
                                 </div>
                               ) : (
                                 <span className="text-xs text-slate-300">—</span>
@@ -577,9 +607,9 @@ export default function NhapKhoPage() {
                                 <input type="number" min={0} value={row.donGia || ""}
                                   onChange={e => updateRow(i, { donGia: parseFloat(e.target.value) || 0 })}
                                   className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300" />
-                                {row.donViMua !== "m" && row.soLuong > 0 && row.donGia > 0 && (
+                                {row.donViMua !== "m" && row.donViMua !== "cai" && row.soLuong > 0 && row.donGia > 0 && (
                                   <p className="text-[10px] text-slate-400 mt-0.5">
-                                    ≈ {fmt(Math.round(row.soLuongMua * row.donGia / row.soLuong))}₫/m
+                                    ≈ {fmt(Math.round(row.soLuongMua * row.donGia / row.soLuong))}₫/{tongLabel}
                                   </p>
                                 )}
                               </div>
