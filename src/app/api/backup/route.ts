@@ -23,6 +23,8 @@ export async function GET() {
     const nhanVien    = await prisma.nhanVien.findMany();
     const chamCong    = await prisma.chamCong.findMany();
     const donHoanTra  = await prisma.donHoanTra.findMany();
+    const sanPham     = await prisma.sanPham.findMany();
+    const nhapXuatKho = await prisma.nhapXuatKho.findMany();
 
     const backup = {
       version: "1.0",
@@ -35,6 +37,7 @@ export async function GET() {
         phieuNhapKho, congNo,
         nhanVien, chamCong,
         donHoanTra,
+        sanPham, nhapXuatKho,
       },
     };
 
@@ -104,6 +107,8 @@ export async function POST(req: NextRequest) {
     results.kocBooking  = await save("kOCBooking",  t.kocBooking  || []);
     results.congNo      = await save("congNo",      t.congNo      || []);
     results.donHoanTra  = await save("donHoanTra",  t.donHoanTra  || []);
+    results.sanPham     = await save("sanPham",     t.sanPham     || []);
+    results.nhapXuatKho = await save("nhapXuatKho", t.nhapXuatKho || []);
 
     // PhieuNhapKho + chiTiet (nested)
     let phieuCount = 0;
