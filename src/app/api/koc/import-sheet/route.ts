@@ -98,9 +98,9 @@ export async function POST(req: NextRequest) {
     const colOrder   = findCol(["đơn hàng", "don hang", "đơn", "order"]);
     const colRevenue = findCol(["doanh thu", "revenue", "doanh"]);
 
-    // Cột I = index 8 = SĐT, Cột J = index 9 = ĐCHI (cố định theo vị trí)
-    const colSdt    = 8;  // Cột I
-    const colDiaChi = 9;  // Cột J
+    // Dùng keyword thay vì hardcode index
+    const colSdt    = findCol(["sđt", "sdt", "điện thoại", "dien thoai", "phone", "tel"]);
+    const colDiaChi = findCol(["địa chỉ", "dia chi", "address", "diachi"]);
 
     if (colTen < 0) {
       return NextResponse.json({
@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
       const luotXem    = colView    >= 0 ? parseNum(r[colView]    ?? "") : 0;
       const donHang    = colOrder   >= 0 ? parseNum(r[colOrder]   ?? "") : 0;
       const doanhThu   = colRevenue >= 0 ? parseNum(r[colRevenue] ?? "") : 0;
-      const sdt        = r[colSdt]?.trim()    || null;
-      const diaChi     = r[colDiaChi]?.trim() || null;
+      const sdt        = colSdt    >= 0 ? (r[colSdt]?.trim()    || null) : null;
+      const diaChi     = colDiaChi >= 0 ? (r[colDiaChi]?.trim() || null) : null;
 
       if (!kocName) return null;
 
