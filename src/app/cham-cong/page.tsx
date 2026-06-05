@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Users, Printer } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2 } from "lucide-react";
 
 type NhanVien = {
   id: string; maNV: string; ten: string;
@@ -29,6 +29,18 @@ const CYCLE = ["di_lam", "nghi_phep", "vang", "di_muon", "nua_ngay", "nghi_le", 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 const DAY_OF_WEEK = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
+// Ngày lễ cố định hàng năm (MM-DD)
+const FIXED_HOLIDAYS: { key: string; label: string }[] = [
+  { key: "01-01", label: "Tết Dương lịch" },
+  { key: "04-30", label: "Giải phóng miền Nam" },
+  { key: "05-01", label: "Quốc tế Lao động" },
+  { key: "09-02", label: "Quốc khánh" },
+];
+
+// Tạo danh sách ngày lễ mặc định cho 1 năm (YYYY-MM-DD)
+const buildDefaultHolidays = (y: number): string[] =>
+  FIXED_HOLIDAYS.map(h => `${y}-${h.key}`);
+
 export default function ChamCongPage() {
   const now = new Date();
   const [thang, setThang] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
@@ -36,6 +48,29 @@ export default function ChamCongPage() {
   const [chamCongs, setChamCongs] = useState<ChamCong[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null); // "nvId_ngay"
+
+  // Ngày lễ — lưu vào localStorage theo năm
+  const [holidays, setHolidaysRaw] = useState<string[]>(() => {
+    try {
+      const y = new Date().getFullYear();
+      const saved = localStorage.getItem(`meisy_holidays_${y}`);
+      return saved ? JSON.parse(saved) : buildDefaultHolidays(y);
+    } catch { return buildDefaultHolidays(new Date().getFullYear()); }
+  });
+  const setHolidays = (list: string[]) => {
+    setHolidaysRaw(list);
+    try { localStorage.setItem(`meisy_holidays_${year}`, JSON.stringify(list)); } catch {}
+  };
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [newHolidayDate, setNewHolidayDate] = useState("");
+  const [newHolidayLabel, setNewHolidayLabel] = useState("");
+  // Lưu nhãn ngày lễ
+  const [holidayLabels, setHolidayLabelsRaw] = useState<Record<string, string>>(() => {
+    try { const s = localStorage.getItem("meisy_holiday_labels"); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
+  const setHolidayLabels = (m: Record<string, string>) => {
+    setHolidayLabelsRaw(m); try { localStorage.setItem("meisy_holiday_labels", JSON.stringify(m)); } catch {};
+  };
 
   // Modal quản lý NV
   const [showNVModal, setShowNVModal] = useState(false);
@@ -59,11 +94,14 @@ export default function ChamCongPage() {
     setThang(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   };
 
-  const isWeekend = (day: number) => {
-    const dow = new Date(year, month - 1, day).getDay();
-    return dow === 0 || dow === 6;
+  const isSunday = (day: number) => new Date(year, month - 1, day).getDay() === 0;
+  const isSaturday = (day: number) => new Date(year, month - 1, day).getDay() === 6;
+  const isHoliday = (day: number) => {
+    const key = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    return holidays.includes(key);
   };
-
+  // Ngày nghỉ mặc định = CN hoặc ngày lễ (nhưng vẫn click được)
+  const isDayOff = (day: number) => isSunday(day) || isHoliday(day);
   const getDayLabel = (day: number) => DAY_OF_WEEK[new Date(year, month - 1, day).getDay()];
 
   const fetchData = useCallback(async () => {
@@ -146,7 +184,7 @@ export default function ChamCongPage() {
   const getSummary = (nvId: string) => {
     const counts: Record<string, number> = {};
     days.forEach(d => {
-      if (isWeekend(d)) return;
+      if (isDayOff(d)) return;
       const tt = ccMap[getKey(nvId, d)] ?? "";
       if (tt) counts[tt] = (counts[tt] ?? 0) + (tt === "nua_ngay" ? 0.5 : 1);
     });
@@ -154,7 +192,7 @@ export default function ChamCongPage() {
   };
 
   // Working days in month (excluding weekends)
-  const soNgayLamViec = days.filter(d => !isWeekend(d)).length;
+  const soNgayLamViec = days.filter(d => !isDayOff(d)).length;
 
   // Auto-generate maNV: NV001, NV002...
   const genMaNV = (list: NhanVien[]) => {
@@ -223,6 +261,10 @@ export default function ChamCongPage() {
           <p className="text-sm text-slate-400 mt-0.5">{nhanViens.length} nhân viên · {soNgayLamViec} ngày làm việc tháng này</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowHolidayModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-purple-200 text-sm text-purple-600 hover:bg-purple-50 transition">
+            <CalendarDays size={14} /> Ngày lễ
+          </button>
           <button onClick={openNVModal}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition">
             <Users size={14} /> Nhân viên
@@ -273,9 +315,10 @@ export default function ChamCongPage() {
                   <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-600 border-r border-slate-200 w-8">STT</th>
                   <th className="sticky left-8 z-10 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-600 border-r border-slate-200 min-w-[160px]">Nhân viên</th>
                   {days.map(d => (
-                    <th key={d} className={`px-0 py-1 text-center w-[34px] font-semibold ${isWeekend(d) ? "bg-slate-100 text-slate-400" : "text-slate-600"}`}>
+                    <th key={d} className={`px-0 py-1 text-center w-[34px] font-semibold
+                      ${isSunday(d) ? "bg-slate-100 text-slate-400" : isHoliday(d) ? "bg-purple-50 text-purple-500" : isSaturday(d) ? "bg-blue-50/50 text-blue-400" : "text-slate-600"}`}>
                       <div>{d}</div>
-                      <div className={`text-[10px] font-normal ${isWeekend(d) ? "text-slate-400" : "text-slate-400"}`}>{getDayLabel(d)}</div>
+                      <div className="text-[10px] font-normal">{getDayLabel(d)}</div>
                     </th>
                   ))}
                   <th className="px-2 py-2 text-center font-semibold text-emerald-700 bg-emerald-50 border-l border-slate-200 w-10">Công</th>
@@ -312,24 +355,26 @@ export default function ChamCongPage() {
                         const tt = ccMap[key] ?? "";
                         const info = TT_MAP[tt];
                         const isSaving = saving === key;
-                        const weekend = isWeekend(d);
+                        const sun = isSunday(d);
+                        const holiday = isHoliday(d);
+                        const sat = isSaturday(d);
+                        const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : sat ? "bg-blue-50/30" : "";
                         return (
                           <td key={d}
-                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition
-                              ${weekend ? "bg-slate-100/80" : ""}
-                              ${isSaving ? "opacity-50" : ""}
-                            `}
-                            onClick={() => !weekend && handleCellClick(nv.id, d)}
-                            title={info?.title ?? (weekend ? getDayLabel(d) : "Click để chấm công")}
+                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition hover:brightness-95 ${defaultBg} ${isSaving ? "opacity-50" : ""}`}
+                            onClick={() => handleCellClick(nv.id, d)}
+                            title={info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
                               <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-[11px] font-bold ${info.bg} ${info.text}`}>
                                 {info.label}
                               </span>
+                            ) : sun ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-slate-300">CN</span>
+                            ) : holiday ? (
+                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-purple-300">L</span>
                             ) : (
-                              <span className={`inline-flex items-center justify-center w-7 h-7 text-[10px] ${weekend ? "text-slate-300" : "text-slate-200 hover:text-slate-400"}`}>
-                                {weekend ? "—" : ""}
-                              </span>
+                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-slate-200 hover:text-slate-400"></span>
                             )}
                           </td>
                         );
@@ -350,10 +395,10 @@ export default function ChamCongPage() {
                       {days.map(d => {
                         const key = getKey(nv.id, d);
                         const tc = tcMap[key];
-                        const weekend = isWeekend(d);
+                        const sun = isSunday(d);
                         return (
-                          <td key={d} className={`p-0.5 border-x border-slate-100 ${weekend ? "bg-slate-100/60" : "bg-orange-50/30"}`}>
-                            {!weekend ? (
+                          <td key={d} className={`p-0.5 border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/30"}`}>
+                            {!sun ? (
                               <input
                                 type="number"
                                 min="0"
@@ -399,7 +444,7 @@ export default function ChamCongPage() {
                       const tt = ccMap[getKey(nv.id, d)] ?? "";
                       return tt === "di_lam" || tt === "di_muon";
                     }).length;
-                    const weekend = isWeekend(d);
+                    const weekend = isDayOff(d);
                     return (
                       <td key={d} className={`text-center py-2 ${weekend ? "bg-slate-200/60 text-slate-400" : count > 0 ? "text-slate-700" : "text-slate-300"}`}>
                         {!weekend && count > 0 ? count : ""}
@@ -416,6 +461,97 @@ export default function ChamCongPage() {
                 </tr>
               </tfoot>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL NGÀY LỄ ═══ */}
+      {showHolidayModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-10 px-4 pb-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Quản lý Ngày lễ</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Ngày nghỉ lễ — CN luôn nghỉ, lễ hiển thị chữ L tím (vẫn bấm được để override)</p>
+              </div>
+              <button onClick={() => setShowHolidayModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Thêm ngày lễ */}
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 block mb-1">Ngày (YYYY-MM-DD)</label>
+                  <input type="date" value={newHolidayDate} onChange={e => setNewHolidayDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 block mb-1">Tên ngày lễ</label>
+                  <input value={newHolidayLabel} onChange={e => setNewHolidayLabel(e.target.value)}
+                    placeholder="VD: Giỗ Tổ Hùng Vương"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200" />
+                </div>
+                <button
+                  onClick={() => {
+                    if (!newHolidayDate) return;
+                    if (!holidays.includes(newHolidayDate)) {
+                      setHolidays([...holidays, newHolidayDate].sort());
+                      if (newHolidayLabel) setHolidayLabels({ ...holidayLabels, [newHolidayDate]: newHolidayLabel });
+                    }
+                    setNewHolidayDate(""); setNewHolidayLabel("");
+                  }}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600 transition whitespace-nowrap">
+                  + Thêm
+                </button>
+              </div>
+
+              {/* Danh sách ngày lễ */}
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                <p className="text-xs font-semibold text-slate-500 mb-2">Danh sách ngày lễ ({year})</p>
+                {holidays.filter(h => h.startsWith(String(year))).length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-4">Chưa có ngày lễ nào</p>
+                )}
+                {holidays.filter(h => h.startsWith(String(year))).sort().map(date => {
+                  const d = new Date(date + "T00:00:00");
+                  const label = holidayLabels[date] ?? FIXED_HOLIDAYS.find(f => date.endsWith(f.key))?.label ?? "";
+                  return (
+                    <div key={date} className="flex items-center justify-between px-3 py-2 rounded-lg bg-purple-50 border border-purple-100">
+                      <div>
+                        <span className="font-semibold text-purple-700 text-sm">
+                          {d.getDate()}/{d.getMonth()+1}/{d.getFullYear()}
+                        </span>
+                        <span className="text-xs text-slate-500 ml-2">{DAY_OF_WEEK[d.getDay()]}</span>
+                        {label && <span className="text-xs text-purple-600 ml-2 italic">{label}</span>}
+                      </div>
+                      <button onClick={() => {
+                        setHolidays(holidays.filter(h => h !== date));
+                        const { [date]: _, ...rest } = holidayLabels; void _; setHolidayLabels(rest);
+                      }} className="text-slate-300 hover:text-red-500 transition p-1">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Nút thêm nhanh ngày lễ cố định năm hiện tại */}
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-xs text-slate-400 mb-2">Thêm nhanh ngày lễ cố định {year}:</p>
+                <div className="flex flex-wrap gap-2">
+                  {FIXED_HOLIDAYS.map(h => {
+                    const full = `${year}-${h.key}`;
+                    const added = holidays.includes(full);
+                    return (
+                      <button key={h.key} onClick={() => {
+                        if (!added) { setHolidays([...holidays, full].sort()); setHolidayLabels({ ...holidayLabels, [full]: h.label }); }
+                      }}
+                        className={`text-xs px-3 py-1 rounded-full border transition ${added ? "bg-purple-100 text-purple-600 border-purple-200 cursor-default" : "bg-white text-slate-600 border-slate-200 hover:border-purple-300 hover:bg-purple-50"}`}>
+                        {added ? "✓" : "+"} {h.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

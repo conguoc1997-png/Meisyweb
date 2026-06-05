@@ -369,15 +369,16 @@ export default function NhapKhoPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button onClick={() => { setSelected(p); setModal("view"); }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Xem">
                         <Eye size={14} />
                       </button>
                       <button onClick={() => openEdit(p)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Sửa">
                         <Pencil size={14} />
                       </button>
+                      <div className="w-px h-4 bg-slate-200 mx-1" />
                       <button onClick={() => handleDelete(p.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors" title="Xoá">
                         <Trash2 size={14} />
                       </button>
                     </div>
