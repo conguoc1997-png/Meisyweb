@@ -320,7 +320,7 @@ export default function ChamCongPage() {
                   <th className="sticky left-8 z-10 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-600 border-r border-slate-200 min-w-[160px]">Nhân viên</th>
                   {days.map(d => (
                     <th key={d} className={`px-0 py-1 text-center w-[34px] font-semibold
-                      ${isSunday(d) ? "bg-slate-100 text-slate-400" : isHoliday(d) ? "bg-purple-50 text-purple-500" : isSaturday(d) ? "bg-blue-50/50 text-blue-400" : "text-slate-600"}`}>
+                      ${isSunday(d) ? "bg-slate-100 text-slate-400" : isHoliday(d) ? "bg-purple-50 text-purple-500" : "text-slate-600"}`}>
                       <div>{d}</div>
                       <div className="text-[10px] font-normal">{getDayLabel(d)}</div>
                     </th>
@@ -361,8 +361,7 @@ export default function ChamCongPage() {
                         const isSaving = saving === key;
                         const sun = isSunday(d);
                         const holiday = isHoliday(d);
-                        const sat = isSaturday(d);
-                        const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : sat ? "bg-blue-50/30" : "";
+                        const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
                         return (
                           <td key={d}
                             className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition hover:brightness-95 ${defaultBg} ${isSaving ? "opacity-50" : ""}`}
