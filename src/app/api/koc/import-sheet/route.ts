@@ -91,8 +91,10 @@ export async function POST(req: NextRequest) {
     const findCol = (keywords: string[]) =>
       headers.findIndex(h => keywords.some(kw => h.includes(kw)));
 
-    const colTen     = findCol(["tên kênh", "ten kenh", "kênh", "kenh", "creator", "tên", "ten", "name", "channel"]);
-    const colView    = findCol(["lượt xem", "luot xem", "view", "xem"]);
+    const colTen     = findCol(["tên koc", "ten koc", "tên kênh", "ten kenh", "kênh", "kenh", "creator", "tên", "ten", "name", "channel"]);
+    const colCast    = findCol(["cast", "giá cast", "gia cast", "phí cast", "phi cast"]);
+    const colLink    = findCol(["link", "url", "tiktok"]);
+    const colView    = findCol(["view/tháng", "view/thang", "lượt xem", "luot xem", "view", "xem"]);
     const colOrder   = findCol(["đơn hàng", "don hang", "đơn", "order"]);
     const colRevenue = findCol(["doanh thu", "revenue", "doanh"]);
 
@@ -116,12 +118,14 @@ export async function POST(req: NextRequest) {
 
     // Tạo preview
     const preview = rows.slice(headerIdx + 1).map((r, idx) => {
-      const kocName  = r[colTen]?.trim() ?? "";
-      const luotXem  = colView    >= 0 ? parseNum(r[colView]    ?? "") : 0;
-      const donHang  = colOrder   >= 0 ? parseNum(r[colOrder]   ?? "") : 0;
-      const doanhThu = colRevenue >= 0 ? parseNum(r[colRevenue] ?? "") : 0;
-      const sdt      = r[colSdt]?.trim()    || null;   // Cột I
-      const diaChi   = r[colDiaChi]?.trim() || null;   // Cột J
+      const kocName    = r[colTen]?.trim() ?? "";
+      const giaCast    = colCast    >= 0 ? parseNum(r[colCast]    ?? "") : 0;
+      const linkProfile = colLink   >= 0 ? (r[colLink]?.trim()   ?? "") : "";
+      const luotXem    = colView    >= 0 ? parseNum(r[colView]    ?? "") : 0;
+      const donHang    = colOrder   >= 0 ? parseNum(r[colOrder]   ?? "") : 0;
+      const doanhThu   = colRevenue >= 0 ? parseNum(r[colRevenue] ?? "") : 0;
+      const sdt        = r[colSdt]?.trim()    || null;
+      const diaChi     = r[colDiaChi]?.trim() || null;
 
       if (!kocName) return null;
 
@@ -135,6 +139,8 @@ export async function POST(req: NextRequest) {
       return {
         rowIndex: idx,
         kocName,
+        giaCast,
+        linkProfile,
         kocId:      matchedKoc?.id     ?? null,
         kocTen:     matchedKoc?.ten    ?? null,
         bookingId:  matchedBooking?.id ?? null,
