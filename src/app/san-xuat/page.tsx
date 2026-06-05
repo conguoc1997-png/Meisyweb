@@ -1307,7 +1307,7 @@ export default function SanXuatPage() {
                                 {laChenh >= 0 ? `+${laChenh.toFixed(1)}` : laChenh.toFixed(1)} lá
                               </span>
                             ) : lo.soLaThucTe != null ? (
-                              <span className="text-[13px] text-slate-400">{lo.soLaThucTe} lá</span>
+                              <span className="text-[13px] px-1 py-0.5 rounded bg-slate-100 text-slate-500">{lo.soLaThucTe} lá</span>
                             ) : null}
                           </>
                         );
@@ -1504,7 +1504,7 @@ export default function SanXuatPage() {
                               {chenh >= 0 ? `+${chenh.toFixed(1)}` : chenh.toFixed(1)} lá
                             </span>
                           ) : laTT != null ? (
-                            <span className="text-[13px] text-slate-400">{laTT} lá</span>
+                            <span className="text-[13px] px-1 py-0.5 rounded bg-slate-100 text-slate-500">{laTT} lá</span>
                           ) : null}
                         </td>
                         {/* col 10: Ghi chú may — per-cây inline edit */}
