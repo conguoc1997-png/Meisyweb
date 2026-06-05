@@ -1,36 +1,28 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Vercel Pro: 60s, Hobby: 10s
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // ── GET: Export toàn bộ DB ra JSON ──────────────────────────
 export async function GET() {
   try {
-    const [
-      doiTra, feedback, buTien, ungTien,
-      loCat, vaiTon,
-      koc, kocBooking,
-      vatTu, nhaCungCap, quyDoiDonVi,
-      phieuNhapKho, congNo,
-      nhanVien, chamCong,
-      donHoanTra,
-    ] = await Promise.all([
-      prisma.doiTra.findMany(),
-      prisma.feedback.findMany(),
-      prisma.buTien.findMany(),
-      prisma.ungTien.findMany(),
-      prisma.loCat.findMany(),
-      prisma.vaiTon.findMany(),
-      prisma.kOC.findMany(),
-      prisma.kOCBooking.findMany(),
-      prisma.vatTu.findMany(),
-      prisma.nhaCungCap.findMany(),
-      prisma.quyDoiDonVi.findMany(),
-      prisma.phieuNhapKho.findMany({ include: { chiTiet: true } }),
-      prisma.congNo.findMany(),
-      prisma.nhanVien.findMany(),
-      prisma.chamCong.findMany(),
-      prisma.donHoanTra.findMany(),
-    ]);
+    // Fetch tuần tự để tránh timeout & connection pool
+    const doiTra      = await prisma.doiTra.findMany();
+    const feedback    = await prisma.feedback.findMany();
+    const buTien      = await prisma.buTien.findMany();
+    const ungTien     = await prisma.ungTien.findMany();
+    const loCat       = await prisma.loCat.findMany();
+    const vaiTon      = await prisma.vaiTon.findMany();
+    const koc         = await prisma.kOC.findMany();
+    const kocBooking  = await prisma.kOCBooking.findMany();
+    const vatTu       = await prisma.vatTu.findMany();
+    const nhaCungCap  = await prisma.nhaCungCap.findMany();
+    const quyDoiDonVi = await prisma.quyDoiDonVi.findMany();
+    const phieuNhapKho = await prisma.phieuNhapKho.findMany({ include: { chiTiet: true } });
+    const congNo      = await prisma.congNo.findMany();
+    const nhanVien    = await prisma.nhanVien.findMany();
+    const chamCong    = await prisma.chamCong.findMany();
+    const donHoanTra  = await prisma.donHoanTra.findMany();
 
     const backup = {
       version: "1.0",
@@ -48,7 +40,10 @@ export async function GET() {
 
     return NextResponse.json(backup);
   } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi export" }, { status: 500 });
+    console.error("[backup GET]", e);
+    return NextResponse.json({
+      error: e instanceof Error ? e.message : "Lỗi export"
+    }, { status: 500 });
   }
 }
 
