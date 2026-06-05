@@ -103,6 +103,11 @@ export default function NhapKhoPage() {
   const [selected, setSelected] = useState<PhieuNhap | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Mini-form thêm vật tư mới
+  const [newVtModal, setNewVtModal] = useState<{ rowIdx: number } | null>(null);
+  const [newVtForm, setNewVtForm] = useState({ ten: "", loai: "phu_lieu", donVi: "cai", nhom: "" });
+  const [savingVt, setSavingVt] = useState(false);
+
   const [form, setForm] = useState({
     soPhieu: genSoPhieu(),
     ngay: new Date().toISOString().slice(0, 10),
@@ -236,6 +241,25 @@ export default function NhapKhoPage() {
     setForm({ soPhieu: genSoPhieu(), ngay: new Date().toISOString().slice(0, 10), nhaCC: "hac_long", tenNhaCC: "", soHoaDon: "", ngayHoaDon: "", ghiChu: "", nguoiTao: "" });
     setChiTiet([newRow()]);
     setVtSearch([""]);
+  }
+
+  async function handleSaveNewVt() {
+    if (!newVtForm.ten.trim() || !newVtModal) return;
+    setSavingVt(true);
+    const ma = "VT" + Date.now().toString().slice(-6);
+    const res = await fetch("/api/ke-toan/vat-tu", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ma, ten: newVtForm.ten.trim(), loai: newVtForm.loai, donVi: newVtForm.donVi, nhom: newVtForm.nhom || null }),
+    });
+    setSavingVt(false);
+    if (res.ok) {
+      const newVt: VatTu = await res.json();
+      setVatTus(prev => [...prev, newVt]);
+      updateRow(newVtModal.rowIdx, { vatTuId: newVt.id });
+      setNewVtModal(null);
+      setNewVtForm({ ten: "", loai: "phu_lieu", donVi: "cai", nhom: "" });
+    }
   }
 
   async function handleCreate() {
@@ -528,19 +552,33 @@ export default function NhapKhoPage() {
                             <td className="px-3 py-1.5 align-top">
                               <div className="relative">
                                 <input
-                                  value={vtSearch[i] || (selectedVT ? `${selectedVT.ma} – ${selectedVT.ten}` : "")}
+                                  value={vtSearch[i] !== undefined && vtSearch[i] !== null
+                                    ? vtSearch[i]
+                                    : (selectedVT ? `${selectedVT.ma} – ${selectedVT.ten}` : "")}
                                   onChange={e => {
                                     const ns = [...vtSearch]; ns[i] = e.target.value; setVtSearch(ns);
                                     if (!e.target.value) updateRow(i, { vatTuId: "" });
                                   }}
-                                  placeholder="Tìm vật tư..."
-                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                  onFocus={() => {
+                                    if (!vtSearch[i]) {
+                                      const ns = [...vtSearch]; ns[i] = " "; setVtSearch(ns);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      const ns = [...vtSearch];
+                                      if (ns[i] === " ") { ns[i] = ""; setVtSearch(ns); }
+                                    }, 200);
+                                  }}
+                                  placeholder="Chọn hoặc tìm vật tư..."
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300 cursor-pointer"
                                 />
-                                {vtSearch[i] && filteredVTs.length > 0 && (
-                                  <div className="absolute top-full left-0 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-44 overflow-y-auto">
+                                {vtSearch[i] && (
+                                  <div className="absolute top-full left-0 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-52 overflow-y-auto">
                                     {filteredVTs.map(v => (
                                       <button key={v.id}
                                         className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 flex gap-2"
+                                        onMouseDown={e => e.preventDefault()}
                                         onClick={() => {
                                           updateRow(i, { vatTuId: v.id });
                                           const ns = [...vtSearch]; ns[i] = ""; setVtSearch(ns);
@@ -550,6 +588,16 @@ export default function NhapKhoPage() {
                                         <span className="text-slate-400 ml-auto shrink-0">{v.donVi}</span>
                                       </button>
                                     ))}
+                                    <button
+                                      onMouseDown={e => e.preventDefault()}
+                                      onClick={() => {
+                                        const ns = [...vtSearch]; ns[i] = ""; setVtSearch(ns);
+                                        setNewVtModal({ rowIdx: i });
+                                        setNewVtForm({ ten: vtSearch[i]?.trim() || "", loai: "phu_lieu", donVi: "cai", nhom: "" });
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-xs text-indigo-600 hover:bg-indigo-50 font-medium border-t border-slate-100 flex items-center gap-1">
+                                      <Plus size={11} /> Thêm vật tư mới...
+                                    </button>
                                   </div>
                                 )}
                                 {selectedVT && !vtSearch[i] && (
@@ -781,6 +829,62 @@ export default function NhapKhoPage() {
                 </tfoot>
               </table>
               {selected.ghiChu && <p className="text-sm text-slate-500 italic">{selected.ghiChu}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MINI MODAL THÊM VẬT TƯ MỚI ── */}
+      {newVtModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Thêm vật tư mới</h3>
+              <button onClick={() => setNewVtModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Tên vật tư *</label>
+                <input
+                  autoFocus
+                  value={newVtForm.ten}
+                  onChange={e => setNewVtForm(f => ({ ...f, ten: e.target.value }))}
+                  placeholder="Vd: Khoá kéo 20cm, Cúc bấm..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Loại</label>
+                  <select value={newVtForm.loai} onChange={e => setNewVtForm(f => ({ ...f, loai: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="vai">Vải</option>
+                    <option value="phu_lieu">Phụ liệu</option>
+                    <option value="dong_goi">Đóng gói</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Đơn vị</label>
+                  <select value={newVtForm.donVi} onChange={e => setNewVtForm(f => ({ ...f, donVi: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="cai">Cái</option>
+                    <option value="goi">Gói</option>
+                    <option value="cuon">Cuộn</option>
+                    <option value="m">Mét (m)</option>
+                    <option value="kg">KG</option>
+                    <option value="hop">Hộp</option>
+                    <option value="bo">Bộ</option>
+                    <option value="cay">Cây</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
+              <button onClick={() => setNewVtModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+              <button onClick={handleSaveNewVt} disabled={savingVt || !newVtForm.ten.trim()}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                {savingVt ? "Đang lưu..." : "Thêm & chọn"}
+              </button>
             </div>
           </div>
         </div>
