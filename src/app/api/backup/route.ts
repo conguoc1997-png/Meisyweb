@@ -23,18 +23,25 @@ export async function GET() {
     const nhanVien    = await prisma.nhanVien.findMany();
     const chamCong    = await prisma.chamCong.findMany();
     const donHoanTra  = await prisma.donHoanTra.findMany();
-    const sanPham     = await prisma.sanPham.findMany();
-    const nhapXuatKho = await prisma.nhapXuatKho.findMany();
+    const sanPham          = await prisma.sanPham.findMany();
+    const nhapXuatKho      = await prisma.nhapXuatKho.findMany();
+    const hoaDonTon        = await prisma.hoaDonTon.findMany();
+    const hoaDonTonHistory = await prisma.hoaDonTonHistory.findMany();
+    const dinhMucNPL       = await prisma.dinhMucNPL.findMany();
+    const phieuXuatKho     = await prisma.phieuXuatKho.findMany();
+    const phieuXuatChiTiet = await prisma.phieuXuatChiTiet.findMany();
+    const tonKhoVatTu      = await prisma.tonKhoVatTu.findMany();
 
     const backup = {
-      version: "1.0",
+      version: "1.1",
       exportedAt: new Date().toISOString(),
       tables: {
         doiTra, feedback, buTien, ungTien,
-        loCat, vaiTon,
+        loCat, vaiTon, hoaDonTon, hoaDonTonHistory,
         koc, kocBooking,
-        vatTu, nhaCungCap, quyDoiDonVi,
-        phieuNhapKho, congNo,
+        vatTu, nhaCungCap, quyDoiDonVi, dinhMucNPL,
+        phieuNhapKho, congNo, tonKhoVatTu,
+        phieuXuatKho, phieuXuatChiTiet,
         nhanVien, chamCong,
         donHoanTra,
         sanPham, nhapXuatKho,
@@ -107,8 +114,14 @@ export async function POST(req: NextRequest) {
     results.kocBooking  = await save("kOCBooking",  t.kocBooking  || []);
     results.congNo      = await save("congNo",      t.congNo      || []);
     results.donHoanTra  = await save("donHoanTra",  t.donHoanTra  || []);
-    results.sanPham     = await save("sanPham",     t.sanPham     || []);
-    results.nhapXuatKho = await save("nhapXuatKho", t.nhapXuatKho || []);
+    results.sanPham          = await save("sanPham",          t.sanPham          || []);
+    results.nhapXuatKho      = await save("nhapXuatKho",      t.nhapXuatKho      || []);
+    results.hoaDonTon        = await save("hoaDonTon",        t.hoaDonTon        || []);
+    results.hoaDonTonHistory = await save("hoaDonTonHistory", t.hoaDonTonHistory || []);
+    results.dinhMucNPL       = await save("dinhMucNPL",       t.dinhMucNPL       || []);
+    results.tonKhoVatTu      = await save("tonKhoVatTu",      t.tonKhoVatTu      || []);
+    results.phieuXuatKho     = await save("phieuXuatKho",     t.phieuXuatKho     || []);
+    results.phieuXuatChiTiet = await save("phieuXuatChiTiet", t.phieuXuatChiTiet || []);
 
     // PhieuNhapKho + chiTiet (nested)
     let phieuCount = 0;
