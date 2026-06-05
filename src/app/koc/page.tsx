@@ -502,12 +502,24 @@ export default function KocPage() {
     if (!toAdd.length) return;
     setAddingNew(true);
     try {
-      const added = await Promise.all(toAdd.map(r =>
-        fetch("/api/koc", {
+      // Kiểm tra KOC đã tồn tại chưa → update thay vì tạo mới tránh trùng
+      const existingKocs: KOC[] = await fetch("/api/koc").then(r => r.json());
+      const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+      const added = await Promise.all(toAdd.map(r => {
+        const existing = existingKocs.find(k => norm(k.ten) === norm(r.kocName));
+        if (existing) {
+          // Update KOC đã có
+          return fetch(`/api/koc/${existing.id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ giaCast: r.giaCast || existing.giaCast, linkProfile: r.linkProfile || existing.linkProfile }),
+          }).then(() => existing);
+        }
+        // Tạo mới
+        return fetch("/api/koc", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ten: r.kocName, platform: "tiktok", follower: r.luotXem || 0, giaCast: r.giaCast || 0, linkProfile: r.linkProfile || "" }),
-        }).then(res => res.json())
-      ));
+        }).then(res => res.json());
+      }));
       // Auto-match những dòng vừa thêm vào manualMatches
       const newMatches: typeof manualMatches = { ...manualMatches };
       toAdd.forEach((r, i) => {
