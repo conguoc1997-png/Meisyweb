@@ -422,7 +422,7 @@ export default function ChamCongPage() {
                                 onBlur={e => handleTCChange(nv.id, d, e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                                 placeholder=""
-                                className="w-full h-7 text-center text-xs font-bold text-orange-700 bg-transparent border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50"
+                                className="w-full h-7 text-center text-xs font-bold text-orange-700 bg-transparent border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 title="Số giờ tăng ca"
                               />
                             ) : (
