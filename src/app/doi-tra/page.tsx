@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus, Search, AlertTriangle, Pencil, Trash2, X, ChevronDown, Star, MessageSquare, RefreshCcw } from "lucide-react";
+import { Plus, Search, AlertTriangle, Pencil, Trash2, X, ChevronDown, Star, MessageSquare, RefreshCcw, Download } from "lucide-react";
 import { formatDateTime, formatCurrency, LOAI_VAN_DE, LOAI_FEEDBACK, KENH_FEEDBACK, LOI_BU, TRANG_THAI_BU } from "@/lib/utils";
 
 type DoiTra = {
@@ -174,6 +174,39 @@ export default function DoiTraPage() {
   };
 
   useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); fetchUngTiens(); }, []);
+
+  // ─── Export CSV ────────────────────────────────────────
+  const exportCSV = () => {
+    const headers = ["Mã ĐT","Ngày tạo","Nguồn","Tên KH","SĐT","Địa chỉ","SKU hiện tại","SKU đổi sang","Loại vấn đề","Giá trị","Phí ship","Số chiều","Thu KH","Mã vận đơn","Trạng thái","Ghi chú"];
+    const rows = records.map(r => [
+      r.maDoiTra,
+      new Date(r.createdAt).toLocaleDateString("vi-VN"),
+      r.nguon || "",
+      r.tenKhach || "",
+      r.sdtHienTai || "",
+      r.diaChi || "",
+      r.skuHienTai || "",
+      r.skuDoiSang || "",
+      LOAI_VAN_DE[r.loaiVanDe]?.label || r.loaiVanDe,
+      r.giaTriHang || 0,
+      r.phiShip || 0,
+      r.soChieuShip || 0,
+      (r.phiShip || 0) * (r.soChieuShip || 0),
+      r.maVanDon || "",
+      r.maVanDon ? "Đã xử lý" : "Chưa xử lý",
+      r.ghiChu || "",
+    ]);
+    const csv = [headers, ...rows].map(row =>
+      row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `doi-tra-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // ─── Helpers ───────────────────────────────────────────
   const daDuocXuLy = (r: DoiTra) => !!r.maVanDon;
@@ -528,10 +561,16 @@ export default function DoiTraPage() {
           <p className="text-slate-500 text-sm mt-1">Quản lý đổi hàng & ghi nhận feedback khách</p>
         </div>
         {tab === "doi_hang" && (
-          <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition">
-            <Plus size={15} /> Tạo case mới
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={exportCSV}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition">
+              <Download size={14} /> Xuất Excel
+            </button>
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition">
+              <Plus size={15} /> Tạo case mới
+            </button>
+          </div>
         )}
         {tab === "feedback" && (
           <button onClick={() => setShowFbForm(true)}
