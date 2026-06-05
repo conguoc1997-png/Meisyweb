@@ -6,7 +6,8 @@ import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2 } fr
 type NhanVien = {
   id: string; maNV: string; ten: string;
   chucVu: string | null; phongBan: string | null;
-  luongCB: number | null; active: boolean;
+  luongCB: number | null; phuCap: number | null; heSoTC: number;
+  active: boolean;
 };
 
 type ChamCong = {
@@ -505,8 +506,10 @@ export default function ChamCongPage() {
                   <th className="px-3 py-2.5 text-center text-amber-600">Muộn</th>
                   <th className="px-3 py-2.5 text-center text-cyan-600">½</th>
                   <th className="px-3 py-2.5 text-center text-orange-600">TC giờ</th>
+                  <th className="px-3 py-2.5 text-center text-orange-500">Hệ số TC</th>
                   <th className="px-3 py-2.5 text-right text-slate-500">Lương công</th>
                   <th className="px-3 py-2.5 text-right text-orange-600">Lương TC</th>
+                  <th className="px-3 py-2.5 text-right text-teal-600">Phụ cấp</th>
                   <th className="px-3 py-2.5 text-right font-bold text-indigo-700 bg-indigo-50 border-l border-indigo-100">Thực lĩnh</th>
                 </tr>
               </thead>
@@ -528,10 +531,12 @@ export default function ChamCongPage() {
                   const congVang   = summary["vang"]      ?? 0;
                   const congTinhLuong = congCoMat + congMuon + congNuaNgay * 0.5 + congPhep + congLe;
 
+                  const heSoTC   = nv.heSoTC ?? 1.5;
+                  const phuCap   = nv.phuCap ?? 0;
                   const luongNgay = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
                   const luongCong = luongNgay * congTinhLuong;
-                  const luongTC   = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * 1.5 * tongTC : 0;
-                  const thucLinh  = luongCong + luongTC;
+                  const luongTC   = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * heSoTC * tongTC : 0;
+                  const thucLinh  = luongCong + luongTC + phuCap;
 
                   return (
                     <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
@@ -549,11 +554,46 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-center text-amber-600">{congMuon || ""}</td>
                       <td className="px-3 py-2 text-center text-cyan-600">{congNuaNgay || ""}</td>
                       <td className="px-3 py-2 text-center text-orange-600 font-semibold">{tongTC > 0 ? tongTC : ""}</td>
+                      {/* Hệ số TC — inline edit */}
+                      <td className="px-2 py-1.5 text-center">
+                        <input
+                          type="number" step="0.1" min="1" max="5"
+                          defaultValue={heSoTC}
+                          onBlur={async e => {
+                            const val = parseFloat(e.target.value) || 1.5;
+                            await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                              method: "PATCH", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ heSoTC: val }),
+                            });
+                            fetchData();
+                          }}
+                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          className="w-14 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </td>
                       <td className="px-3 py-2 text-right text-slate-700">
                         {lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-3 py-2 text-right text-orange-600">
                         {lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : ""}
+                      </td>
+                      {/* Phụ cấp — inline edit */}
+                      <td className="px-2 py-1.5 text-right">
+                        <input
+                          type="number" step="100000" min="0"
+                          defaultValue={phuCap || ""}
+                          placeholder="0"
+                          onBlur={async e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                              method: "PATCH", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ phuCap: val || null }),
+                            });
+                            fetchData();
+                          }}
+                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          className="w-24 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
                         {lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>}
@@ -576,7 +616,7 @@ export default function ChamCongPage() {
                     <td className="px-3 py-2 text-center text-orange-600">
                       {nhanViens.reduce((s, nv) => s + days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0), 0) || ""}
                     </td>
-                    <td colSpan={2}></td>
+                    <td colSpan={4}></td>
                     <td className="px-3 py-2 text-right text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
                       {fmt(Math.round(nhanViens.reduce((s, nv) => {
                         const sum = getSummary(nv.id);
@@ -594,7 +634,7 @@ export default function ChamCongPage() {
             </table>
           </div>
           <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-400">
-            💡 Công tính lương = Đi làm + Đi muộn + Nửa ngày×0.5 + Nghỉ phép + Nghỉ lễ (Vắng không tính lương)
+            💡 Lương TC = (LCB ÷ ngày ÷ 8h) × <b>Hệ số TC</b> × giờ TC &nbsp;|&nbsp; Thực lĩnh = Lương công + Lương TC + Phụ cấp &nbsp;|&nbsp; Vắng không tính lương
           </div>
         </div>
       )}
