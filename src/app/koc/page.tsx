@@ -51,6 +51,7 @@ export default function KocPage() {
   type PreviewRow = {
     rowIndex: number; kocName: string; kocId: string | null; kocTen: string | null;
     bookingId: string | null; bookingSP: string | null;
+    giaCast: number; linkProfile: string;
     luotXem: number; donHang: number; doanhThu: number;
     sdt: string | null; diaChi: string | null;
     matched: boolean;
@@ -504,7 +505,7 @@ export default function KocPage() {
       const added = await Promise.all(toAdd.map(r =>
         fetch("/api/koc", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ten: r.kocName, platform: "tiktok", follower: 0, giaCast: 0 }),
+          body: JSON.stringify({ ten: r.kocName, platform: "tiktok", follower: r.luotXem || 0, giaCast: r.giaCast || 0, linkProfile: r.linkProfile || "" }),
         }).then(res => res.json())
       ));
       // Auto-match những dòng vừa thêm vào manualMatches

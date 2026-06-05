@@ -26,8 +26,10 @@ export async function POST(req: NextRequest) {
     const findCol = (keywords: string[]) =>
       headers.find(h => keywords.some(kw => h.toLowerCase().includes(kw.toLowerCase()))) ?? null;
 
-    const colTen     = findCol(["tên kênh", "ten kenh", "kênh", "kenh", "creator", "tên", "ten", "name", "channel"]);
-    const colView    = findCol(["lượt xem", "luot xem", "view", "xem"]);
+    const colTen     = findCol(["tên koc", "ten koc", "tên kênh", "ten kenh", "kênh", "kenh", "creator", "tên", "ten", "name", "channel"]);
+    const colCast    = findCol(["cast", "giá cast", "gia cast", "phí cast", "phi cast", "chi phí"]);
+    const colLink    = findCol(["link", "url", "tiktok", "profile"]);
+    const colView    = findCol(["view/tháng", "view/thang", "lượt xem", "luot xem", "view", "xem"]);
     const colOrder   = findCol(["đơn hàng", "don hang", "đơn", "order"]);
     const colRevenue = findCol(["doanh thu", "revenue", "doanh"]);
 
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest) {
 
     const preview = rows.map((row, idx) => {
       const kocName  = String(row[colTen!] ?? "").trim();
+      const giaCast  = colCast    ? Number(String(row[colCast]).replace(/[^0-9.]/g, ""))    || 0 : 0;
+      const linkProfile = colLink ? String(row[colLink] ?? "").trim() : "";
       const luotXem  = colView    ? Number(String(row[colView]).replace(/[^0-9.]/g, ""))    || 0 : 0;
       const donHang  = colOrder   ? Number(String(row[colOrder]).replace(/[^0-9.]/g, ""))   || 0 : 0;
       const doanhThu = colRevenue ? Number(String(row[colRevenue]).replace(/[^0-9.]/g, "")) || 0 : 0;
@@ -62,6 +66,8 @@ export async function POST(req: NextRequest) {
       return {
         rowIndex: idx,
         kocName,
+        giaCast,
+        linkProfile,
         kocId:      matchedKoc?.id     ?? null,
         kocTen:     matchedKoc?.ten    ?? null,
         bookingId:  matchedBooking?.id ?? null,
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
       };
     }).filter(r => r.kocName !== "");
 
-    return NextResponse.json({ preview, columns: { colTen, colView, colOrder, colRevenue } });
+    return NextResponse.json({ preview, columns: { colTen, colCast, colLink, colView, colOrder, colRevenue } });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }
