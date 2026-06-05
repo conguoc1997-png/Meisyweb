@@ -140,8 +140,12 @@ export default function ChamCongPage() {
     `${nvId}_${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
   const handleCellClick = async (nvId: string, day: number) => {
+    // Xác nhận khi bấm vào ngày CN (chưa có dữ liệu)
     const key = getKey(nvId, day);
     const cur = ccMap[key] ?? "";
+    if (isSunday(day) && !cur) {
+      if (!confirm(`Ngày ${day}/${month} là Chủ Nhật.\nBạn có chắc muốn chấm công ngày này không?`)) return;
+    }
     const next = CYCLE[(CYCLE.indexOf(cur) + 1) % CYCLE.length];
     const ngay = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
