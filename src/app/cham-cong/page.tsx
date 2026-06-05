@@ -360,7 +360,31 @@ export default function ChamCongPage() {
                 </tr>
               </thead>
               <tbody>
-                {nhanViens.map((nv, idx) => {
+                {nhanViens.length === 0 && (
+                  <tr><td colSpan={50} className="text-center py-10 text-slate-400">Chưa có nhân viên</td></tr>
+                )}
+                {(() => {
+                  // Group theo phòng ban
+                  const groups = new Map<string, typeof nhanViens>();
+                  nhanViens.forEach(nv => {
+                    const pb = nv.phongBan?.trim() || "Chưa phân phòng";
+                    if (!groups.has(pb)) groups.set(pb, []);
+                    groups.get(pb)!.push(nv);
+                  });
+                  let globalIdx = 0;
+                  return Array.from(groups.entries()).map(([phongBan, nvList]) => (
+                    <>
+                      {/* Header phòng ban */}
+                      <tr key={`pb-${phongBan}`}>
+                        <td colSpan={50} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
+                          <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
+                            🏢 {phongBan}
+                          </span>
+                          <span className="ml-2 text-xs text-indigo-400">({nvList.length} NV)</span>
+                        </td>
+                      </tr>
+                      {nvList.map((nv) => {
+                  const idx = globalIdx++;
                   const summary = getSummary(nv.id);
                   const cong = (summary["di_lam"] ?? 0) + (summary["di_muon"] ?? 0) + (summary["nua_ngay"] ?? 0);
                   const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
@@ -459,7 +483,10 @@ export default function ChamCongPage() {
                     </tr>
                     </>
                   );
-                })}
+                      })}
+                    </>
+                  ));
+                })()}
               </tbody>
               {/* Footer tổng */}
               <tfoot className="bg-slate-100 border-t-2 border-slate-300 font-semibold text-[12px]">
@@ -528,7 +555,24 @@ export default function ChamCongPage() {
                 {nhanViens.length === 0 && (
                   <tr><td colSpan={12} className="text-center py-10 text-slate-400">Chưa có nhân viên</td></tr>
                 )}
-                {nhanViens.map((nv, idx) => {
+                {(() => {
+                  const groups = new Map<string, typeof nhanViens>();
+                  nhanViens.forEach(nv => {
+                    const pb = nv.phongBan?.trim() || "Chưa phân phòng";
+                    if (!groups.has(pb)) groups.set(pb, []);
+                    groups.get(pb)!.push(nv);
+                  });
+                  let globalIdx = 0;
+                  return Array.from(groups.entries()).map(([phongBan, nvList]) => (
+                    <>
+                      <tr key={`pb-luong-${phongBan}`}>
+                        <td colSpan={12} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
+                          <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">🏢 {phongBan}</span>
+                          <span className="ml-2 text-xs text-indigo-400">({nvList.length} NV)</span>
+                        </td>
+                      </tr>
+                      {nvList.map((nv) => {
+                  const idx = globalIdx++;
                   const summary = getSummary(nv.id);
                   const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                   const lcb = nv.luongCB ?? 0;
@@ -550,7 +594,7 @@ export default function ChamCongPage() {
                   const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong;
                   const luongNgay     = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
                   const luongCong     = luongNgay * congTinhLuong;
-                  const luongTC       = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * heSoTC * tongTC : 0;
+                  const luongTC       = heSoTC * tongTC; // đơn giá/giờ × số giờ TC
                   const thucLinh      = luongCong + luongTC + tongPhuCap;
 
                   return (
@@ -644,7 +688,10 @@ export default function ChamCongPage() {
                       </td>
                     </tr>
                   );
-                })}
+                      })}
+                    </>
+                  ));
+                })()}
               </tbody>
               {nhanViens.length > 0 && (
                 <tfoot className="bg-slate-100 border-t-2 border-slate-200 font-semibold text-xs">
