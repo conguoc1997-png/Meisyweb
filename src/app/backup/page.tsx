@@ -7,6 +7,7 @@ export default function BackupPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileMergeRef = useRef<HTMLInputElement>(null);
 
   // ── Export ──────────────────────────────────────────────
   async function handleExport() {
@@ -40,12 +41,14 @@ export default function BackupPage() {
   }
 
   // ── Import ──────────────────────────────────────────────
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>, mode: "overwrite" | "merge" = "overwrite") {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!confirm(`⚠️ Import sẽ GHI ĐÈ data hiện tại bằng file "${file.name}".\n\nBạn chắc chắn không?`)) {
-      e.target.value = "";
-      return;
+    if (mode === "overwrite") {
+      if (!confirm(`⚠️ Import sẽ GHI ĐÈ data hiện tại bằng file "${file.name}".\n\nBạn chắc chắn không?`)) {
+        e.target.value = "";
+        return;
+      }
     }
     setImporting(true);
     setResult(null);
@@ -55,7 +58,7 @@ export default function BackupPage() {
       const res = await fetch("/api/backup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, mode }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
@@ -109,29 +112,40 @@ export default function BackupPage() {
       </div>
 
       {/* Import */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-3">
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4">
         <h2 className="font-semibold text-slate-700 flex items-center gap-2">
           <Upload size={18} className="text-emerald-500" /> Khôi phục dữ liệu (Import)
         </h2>
-        <p className="text-sm text-slate-500">
-          Chọn file <code className="bg-slate-100 px-1 rounded">meisy-backup-*.json</code> đã xuất trước đó để restore.
-          Data hiện tại sẽ được <span className="text-amber-600 font-medium">ghi đè</span>.
-        </p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".json"
-          onChange={handleImport}
-          className="hidden"
-        />
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={importing}
-          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50"
-        >
-          {importing ? <RefreshCw size={15} className="animate-spin" /> : <Upload size={15} />}
-          {importing ? "Đang khôi phục..." : "Chọn file backup để restore"}
-        </button>
+
+        {/* Merge */}
+        <div className="border border-blue-100 bg-blue-50 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-medium text-blue-700">✅ Merge — Thêm mới (khuyên dùng)</p>
+          <p className="text-xs text-slate-500">Chỉ thêm record chưa có. Data cũ trên production <strong>giữ nguyên</strong>, không mất gì.</p>
+          <input ref={fileMergeRef} type="file" accept=".json" onChange={e => handleImport(e, "merge")} className="hidden" />
+          <button
+            onClick={() => fileMergeRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {importing ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+            {importing ? "Đang merge..." : "Merge vào production"}
+          </button>
+        </div>
+
+        {/* Ghi đè */}
+        <div className="border border-red-100 bg-red-50 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-medium text-red-700">⚠️ Ghi đè — Restore toàn bộ</p>
+          <p className="text-xs text-slate-500">Cập nhật tất cả record theo file. Dùng khi muốn khôi phục sau mất data.</p>
+          <input ref={fileRef} type="file" accept=".json" onChange={e => handleImport(e, "overwrite")} className="hidden" />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importing}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
+          >
+            {importing ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+            {importing ? "Đang khôi phục..." : "Ghi đè toàn bộ"}
+          </button>
+        </div>
       </div>
 
       {/* Kết quả */}

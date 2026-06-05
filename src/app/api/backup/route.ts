@@ -54,13 +54,12 @@ export async function POST(req: NextRequest) {
     const t = body.tables;
     if (!t) return NextResponse.json({ error: "File không hợp lệ" }, { status: 400 });
 
+    const mode = (body.mode as string) || "overwrite"; // "overwrite" | "merge"
     const results: Record<string, number> = {};
 
-    // Helper upsert từng bảng
+    // Helper upsert (ghi đè) — cập nhật nếu đã có, tạo mới nếu chưa có
     async function upsertMany<T extends Record<string, unknown>>(
-      model: string,
-      rows: T[],
-      key: string = "id"
+      model: string, rows: T[], key: string = "id"
     ) {
       if (!rows?.length) return 0;
       let count = 0;
@@ -68,50 +67,63 @@ export async function POST(req: NextRequest) {
       const m = (prisma as any)[model];
       for (const row of rows) {
         try {
-          await m.upsert({
-            where: { [key]: row[key] },
-            update: row,
-            create: row,
-          });
+          await m.upsert({ where: { [key]: row[key] }, update: row, create: row });
           count++;
         } catch { /* bỏ qua row lỗi */ }
       }
       return count;
     }
 
+    // Helper merge — chỉ thêm record chưa có, không đụng record cũ
+    async function mergeMany<T extends Record<string, unknown>>(
+      model: string, rows: T[]
+    ) {
+      if (!rows?.length) return 0;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = await (prisma as any)[model].createMany({ data: rows, skipDuplicates: true });
+        return res.count;
+      } catch { return 0; }
+    }
+
+    const save = mode === "merge" ? mergeMany : upsertMany;
+
     // Restore theo thứ tự (tránh lỗi foreign key)
-    results.vatTu       = await upsertMany("vatTu",       t.vatTu       || []);
-    results.nhaCungCap  = await upsertMany("nhaCungCap",  t.nhaCungCap  || []);
-    results.quyDoiDonVi = await upsertMany("quyDoiDonVi", t.quyDoiDonVi || []);
-    results.nhanVien    = await upsertMany("nhanVien",    t.nhanVien    || []);
-    results.chamCong    = await upsertMany("chamCong",    t.chamCong    || []);
-    results.doiTra      = await upsertMany("doiTra",      t.doiTra      || []);
-    results.feedback    = await upsertMany("feedback",    t.feedback    || []);
-    results.buTien      = await upsertMany("buTien",      t.buTien      || []);
-    results.ungTien     = await upsertMany("ungTien",     t.ungTien     || []);
-    results.loCat       = await upsertMany("loCat",       t.loCat       || []);
-    results.vaiTon      = await upsertMany("vaiTon",      t.vaiTon      || []);
-    results.koc         = await upsertMany("kOC",         t.koc         || []);
-    results.kocBooking  = await upsertMany("kOCBooking",  t.kocBooking  || []);
-    results.congNo      = await upsertMany("congNo",      t.congNo      || []);
-    results.donHoanTra  = await upsertMany("donHoanTra",  t.donHoanTra  || []);
+    results.vatTu       = await save("vatTu",       t.vatTu       || []);
+    results.nhaCungCap  = await save("nhaCungCap",  t.nhaCungCap  || []);
+    results.quyDoiDonVi = await save("quyDoiDonVi", t.quyDoiDonVi || []);
+    results.nhanVien    = await save("nhanVien",    t.nhanVien    || []);
+    results.chamCong    = await save("chamCong",    t.chamCong    || []);
+    results.doiTra      = await save("doiTra",      t.doiTra      || []);
+    results.feedback    = await save("feedback",    t.feedback    || []);
+    results.buTien      = await save("buTien",      t.buTien      || []);
+    results.ungTien     = await save("ungTien",     t.ungTien     || []);
+    results.loCat       = await save("loCat",       t.loCat       || []);
+    results.vaiTon      = await save("vaiTon",      t.vaiTon      || []);
+    results.koc         = await save("kOC",         t.koc         || []);
+    results.kocBooking  = await save("kOCBooking",  t.kocBooking  || []);
+    results.congNo      = await save("congNo",      t.congNo      || []);
+    results.donHoanTra  = await save("donHoanTra",  t.donHoanTra  || []);
 
     // PhieuNhapKho + chiTiet (nested)
     let phieuCount = 0;
     for (const phieu of (t.phieuNhapKho || [])) {
       try {
         const { chiTiet, ...phieuData } = phieu;
-        await prisma.phieuNhapKho.upsert({
-          where: { id: phieuData.id },
-          update: phieuData,
-          create: phieuData,
-        });
+        if (mode === "merge") {
+          // Merge: chỉ tạo nếu chưa có
+          const exists = await prisma.phieuNhapKho.findUnique({ where: { id: phieuData.id } });
+          if (exists) { phieuCount++; continue; }
+          await prisma.phieuNhapKho.create({ data: phieuData });
+        } else {
+          await prisma.phieuNhapKho.upsert({ where: { id: phieuData.id }, update: phieuData, create: phieuData });
+        }
         for (const ct of (chiTiet || [])) {
-          await prisma.chiTietNhapKho.upsert({
-            where: { id: ct.id },
-            update: ct,
-            create: ct,
-          });
+          if (mode === "merge") {
+            await prisma.chiTietNhapKho.createMany({ data: [ct], skipDuplicates: true });
+          } else {
+            await prisma.chiTietNhapKho.upsert({ where: { id: ct.id }, update: ct, create: ct });
+          }
         }
         phieuCount++;
       } catch { /* bỏ qua */ }
