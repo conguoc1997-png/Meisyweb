@@ -552,7 +552,7 @@ export default function NhapKhoPage() {
                             <td className="px-3 py-1.5 align-top">
                               <div className="relative">
                                 <input
-                                  value={vtSearch[i] !== undefined && vtSearch[i] !== null
+                                  value={vtSearch[i] && vtSearch[i].trim()
                                     ? vtSearch[i]
                                     : (selectedVT ? `${selectedVT.ma} – ${selectedVT.ten}` : "")}
                                   onChange={e => {
