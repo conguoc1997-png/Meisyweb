@@ -239,9 +239,15 @@ export default function NhapKhoPage() {
   }
 
   async function handleCreate() {
-    if (!form.soPhieu || !form.ngay || !form.nhaCC) return;
+    if (!form.soPhieu || !form.ngay || !form.nhaCC) {
+      alert("Vui lòng điền đầy đủ: Số phiếu, Ngày nhập, Nhà cung cấp");
+      return;
+    }
     const validRows = chiTiet.filter(r => r.vatTuId && r.soLuongMua > 0 && r.donGia > 0);
-    if (validRows.length === 0) return;
+    if (validRows.length === 0) {
+      alert("Chưa có dòng hàng hợp lệ.\n\n• Phải chọn vật tư từ danh sách (click vào tên)\n• Số lượng > 0\n• Đơn giá > 0");
+      return;
+    }
     setSaving(true);
 
     // Nếu chọn "khác" + nhập tên mới → tự tạo NhaCungCap
