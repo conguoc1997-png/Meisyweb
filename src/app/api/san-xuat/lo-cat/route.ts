@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         ngayNhanHang: b.ngayNhanHang ? new Date(b.ngayNhanHang) : null,
         soLuongThieu: ni(b.soLuongThieu),
         xuongNhanHang: b.xuongNhanHang || null,
+        loaiHang: b.loaiHang || "dai_thuong",
         trangThai: b.trangThai || "chua_xuat",
         xuong: b.xuong || "meisy",
         hdMay: ni(b.hdMay),

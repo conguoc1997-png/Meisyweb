@@ -185,6 +185,7 @@ model LoCat {
   tonTruocGiatMau    Float?
   hdGiatMauDa        Boolean   @default(false)
   xuatHoaDonDa       Boolean   @default(false) // đã xuất hoá đơn cho lô này
+  loaiHang           String?   @default("dai_thuong") // Dài thường | Dài kiểu | Short
   daCat              Boolean   @default(false) // đã hoàn thành cắt → xoá cây khỏi tồn kho
   ghiChuMay          String?   // ghi chú kiểu cách may
   mauGiat            String?   // màu giặt: NHẠT | ĐẬM | VI_SINH | KHÓI | CHÀM

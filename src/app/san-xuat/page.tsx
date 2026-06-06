@@ -14,6 +14,7 @@ type LoCat = {
   soMSoDo: number | null; soCay: number; cayData: string | null; soY: number | null; soM: number | null; tongSize: number | null;
   soLa: number | null; soLaThucTe: number | null; soSanPham: number | null;
   hangThucTe: number | null; ngayNhanHang: string | null; soLuongThieu: number | null; xuongNhanHang: string | null;
+  loaiHang: string | null;
   trangThai: string; xuong: string;
   daCat: boolean;
   hdMay: number | null; tonTruocMay: number | null; hdMayDa: boolean;
@@ -26,6 +27,16 @@ type LoCat = {
 };
 
 const DEFAULT_XUONG = [{ key: "meisy", label: "Meisy" }, { key: "dung_linh", label: "Dũng Linh" }];
+const LOAI_HANG_OPTIONS = [
+  { value: "dai_thuong", label: "Dài thường" },
+  { value: "dai_kieu",   label: "Dài kiểu" },
+  { value: "short",      label: "Short" },
+];
+const LOAI_HANG_LABEL: Record<string, string> = {
+  dai_thuong: "Dài thường",
+  dai_kieu:   "Dài kiểu",
+  short:      "Short",
+};
 const MAU_GIAT_OPTIONS = ["NHẠT", "ĐẬM", "VI SINH", "KHÓI", "CHÀM"];
 const MAU_GIAT_CLS: Record<string, string> = {
   "NHẠT":    "bg-sky-100 text-sky-700",
@@ -36,6 +47,7 @@ const MAU_GIAT_CLS: Record<string, string> = {
 };
 const emptyForm = {
   ngay: new Date().toISOString().slice(0, 10),
+  loaiHang: "dai_thuong",
   xuong: "meisy", hangCat: "", soSize: "", maVai: "",
   soMSoDo: "", soCay: "1", soY: "", soM: "", tongSize: "",
   soLaThucTe: "", hangThucTe: "", xuongNhanHang: "", trangThai: "chua_nhap",
@@ -362,7 +374,7 @@ export default function SanXuatPage() {
 
   const openEdit = (lo: LoCat) => {
     setForm({
-      ngay: lo.ngay.slice(0, 10), xuong: lo.xuong, hangCat: lo.hangCat,
+      ngay: lo.ngay.slice(0, 10), loaiHang: lo.loaiHang ?? "dai_thuong", xuong: lo.xuong, hangCat: lo.hangCat,
       soSize: lo.soSize ?? "", maVai: lo.maVai ?? "",
       soMSoDo: lo.soMSoDo != null ? String(lo.soMSoDo) : "",
       soCay: String(lo.soCay ?? 1),
@@ -1190,6 +1202,7 @@ export default function SanXuatPage() {
               <tr>
                 <th className="px-2 py-2.5 w-6"></th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ngày</th>
+                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Loại hàng</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
@@ -1210,7 +1223,7 @@ export default function SanXuatPage() {
             <tbody className="divide-y divide-slate-100">
               {losCat.length === 0 ? (
                 <tr>
-                  <td colSpan={19} className="text-center py-16 text-slate-400">
+                  <td colSpan={20} className="text-center py-16 text-slate-400">
                     <Scissors size={32} className="mx-auto mb-2 opacity-30" />
                     <p>Chưa có lô cắt nào</p>
                     <button onClick={openAdd} className="mt-3 text-rose-500 hover:underline text-sm">+ Thêm lô cắt đầu tiên</button>
@@ -1244,6 +1257,15 @@ export default function SanXuatPage() {
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-slate-600">{formatDate(lo.ngay)}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[12px] font-medium ${
+                        lo.loaiHang === "short"     ? "bg-sky-100 text-sky-700" :
+                        lo.loaiHang === "dai_kieu"  ? "bg-purple-100 text-purple-700" :
+                                                      "bg-slate-100 text-slate-600"
+                      }`}>
+                        {LOAI_HANG_LABEL[lo.loaiHang ?? "dai_thuong"] ?? lo.loaiHang ?? "Dài thường"}
+                      </span>
+                    </td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{lo.hangCat}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
@@ -1444,7 +1466,9 @@ export default function SanXuatPage() {
                         <td></td>
                         {/* col 2: Ngày — empty */}
                         <td></td>
-                        {/* col 3: Hàng cắt — label */}
+                        {/* col 3: Loại hàng — empty */}
+                        <td></td>
+                        {/* col 4: Hàng cắt — label */}
                         <td className="px-3 py-1.5 text-[14px] text-slate-400 font-semibold">└ Cây #{ci + 1}</td>
                         {/* col 4: Size — empty */}
                         <td></td>
@@ -2037,6 +2061,14 @@ export default function SanXuatPage() {
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Ngày *</label>
                       <input required type="date" value={form.ngay} onChange={sf("ngay")} className={inp} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Loại hàng</label>
+                      <select value={form.loaiHang} onChange={sf("loaiHang")} className={inp}>
+                        {LOAI_HANG_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="text-xs text-slate-600 mb-1 block">Xưởng cắt</label>
