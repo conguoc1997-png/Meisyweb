@@ -294,6 +294,15 @@ export default function ChamCongPage() {
 
   return (
     <div className="p-5">
+      {/* Print styles — chỉ in bảng lương, ẩn hết còn lại */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #bang-luong-in, #bang-luong-in * { visibility: visible !important; }
+          #bang-luong-in { position: fixed; top: 0; left: 0; width: 100%; }
+          @page { size: A4 landscape; margin: 10mm 8mm; }
+        }
+      `}</style>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -581,7 +590,7 @@ export default function ChamCongPage() {
 
       {/* ─── TAB BẢNG LƯƠNG ─── */}
       {activeTab === "luong" && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div id="bang-luong-in" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="font-bold text-slate-800">Bảng Lương — Tháng {month}/{year}</h2>
@@ -589,6 +598,11 @@ export default function ChamCongPage() {
                 {soNgayLamViec} ngày làm việc · Lương TC = (LCB ÷ {soNgayLamViec}ngày ÷ 8h) × 1.5 × giờ TC
               </p>
             </div>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition print:hidden">
+              <Printer size={14} /> In bảng lương
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
