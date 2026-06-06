@@ -86,6 +86,19 @@ export default function ChamCongPage() {
     setHolidayLabelsRaw(m); try { localStorage.setItem("meisy_holiday_labels", JSON.stringify(m)); } catch {};
   };
 
+  // Phiếu lương cá nhân
+  type PhieuLuong = {
+    nv: NhanVien;
+    lcb: number; soNgayLamViec: number;
+    congCoMat: number; congMuon: number; congNuaNgay: number;
+    congPhep: number; congLe: number; congVang: number; congTinhLuong: number;
+    tongTC: number; heSoTC: number;
+    luongCong: number; luongTC: number;
+    phuCapCC: number; phuCapAnNgay: number; ngayAnDuCong: number; tongPhuCap: number;
+    thucLinh: number;
+  };
+  const [phieuLuong, setPhieuLuong] = useState<PhieuLuong | null>(null);
+
   // Modal quản lý NV
   const [showNVModal, setShowNVModal] = useState(false);
   const [allNVs, setAllNVs] = useState<NhanVien[]>([]);
@@ -622,6 +635,7 @@ export default function ChamCongPage() {
                   <th className="px-3 py-2.5 text-right text-orange-600">Lương TC</th>
                   <th className="px-3 py-2.5 text-center text-teal-600 min-w-[130px]">Phụ cấp<div className="text-[10px] font-normal text-slate-400">CC + Ăn/ngày</div></th>
                   <th className="px-3 py-2.5 text-right font-bold text-indigo-700 bg-indigo-50 border-l border-indigo-100">Thực lĩnh</th>
+                  <th className="px-2 py-2.5 w-8"></th>
                 </tr>
               </thead>
               <tbody>
@@ -639,7 +653,7 @@ export default function ChamCongPage() {
                   return Array.from(groups.entries()).map(([phongBan, nvList]) => (
                     <React.Fragment key={`group-luong-${phongBan}`}>
                       <tr>
-                        <td colSpan={12} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
+                        <td colSpan={13} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
                           <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">🏢 {phongBan}</span>
                           <span className="ml-2 text-xs text-indigo-400">({nvList.length} NV)</span>
                         </td>
@@ -758,6 +772,14 @@ export default function ChamCongPage() {
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
                         {lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>}
+                      </td>
+                      <td className="px-1 py-2 text-center">
+                        <button
+                          title="In phiếu lương"
+                          onClick={() => setPhieuLuong({ nv, lcb, soNgayLamViec, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC, luongCong: Math.round(luongCong), luongTC: Math.round(luongTC), phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap: Math.round(tongPhuCap), thucLinh: Math.round(thucLinh) })}
+                          className="p-1.5 rounded-lg hover:bg-violet-100 text-slate-300 hover:text-violet-600 transition">
+                          <Printer size={13} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1016,6 +1038,143 @@ export default function ChamCongPage() {
           </div>
         </div>
       )}
+
+      {/* ═══ MODAL PHIẾU LƯƠNG CÁ NHÂN ═══ */}
+      {phieuLuong && (() => {
+        const { nv, lcb, soNgayLamViec: ngayLV, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang,
+          congTinhLuong, tongTC, heSoTC, luongCong, luongTC, phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap, thucLinh } = phieuLuong;
+        const fmtVND = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
+            {/* Print: chỉ hiện phiếu, ẩn overlay + nút */}
+            <style>{`
+              @media print {
+                body > * { display: none !important; }
+                #phieu-luong-modal { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+                .no-print { display: none !important; }
+                @page { size: A5; margin: 12mm; }
+              }
+            `}</style>
+            <div id="phieu-luong-modal" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm print:shadow-none print:rounded-none">
+              {/* Toolbar — ẩn khi in */}
+              <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-100">
+                <span className="font-semibold text-slate-700">Phiếu lương cá nhân</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => window.print()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition">
+                    <Printer size={12} /> In phiếu
+                  </button>
+                  <button onClick={() => setPhieuLuong(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} /></button>
+                </div>
+              </div>
+
+              {/* Nội dung phiếu */}
+              <div className="p-5">
+                {/* Header công ty */}
+                <div className="text-center mb-4 pb-3 border-b border-slate-200">
+                  <p className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">Meisy Inhouse</p>
+                  <p className="text-base font-bold text-slate-800 mt-0.5 uppercase tracking-wide">Phiếu Lương</p>
+                  <p className="text-sm font-semibold text-violet-700 mt-0.5">Tháng {month}/{year}</p>
+                </div>
+
+                {/* Thông tin NV */}
+                <div className="bg-slate-50 rounded-xl p-3 mb-4 space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Họ tên</span>
+                    <span className="font-bold text-slate-800">{nv.ten}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Mã NV</span>
+                    <span className="font-mono text-slate-600">{nv.maNV}</span>
+                  </div>
+                  {nv.chucVu && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Chức vụ</span>
+                      <span className="text-slate-700">{nv.chucVu}</span>
+                    </div>
+                  )}
+                  {nv.phongBan && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Phòng ban</span>
+                      <span className="text-slate-700">{nv.phongBan}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bảng chi tiết */}
+                <table className="w-full text-sm mb-4">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="text-left px-3 py-1.5 text-xs text-slate-500 font-medium rounded-l-lg">Khoản mục</th>
+                      <th className="text-right px-3 py-1.5 text-xs text-slate-500 font-medium">Số liệu</th>
+                      <th className="text-right px-3 py-1.5 text-xs text-slate-500 font-medium rounded-r-lg">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr>
+                      <td className="px-3 py-2 text-slate-600">Lương cơ bản</td>
+                      <td className="px-3 py-2 text-right text-slate-500 text-xs">{fmt(lcb)} ÷ {ngayLV} ngày</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtVND(lcb)}</td>
+                    </tr>
+                    <tr className="bg-emerald-50/50">
+                      <td className="px-3 py-2 text-emerald-700 font-medium">Ngày công ({congTinhLuong} ngày)</td>
+                      <td className="px-3 py-2 text-right text-[11px] text-slate-400 leading-4">
+                        {congCoMat > 0 && <div>Đi làm: {congCoMat}</div>}
+                        {congMuon > 0 && <div>Đi muộn: {congMuon}</div>}
+                        {congNuaNgay > 0 && <div>½ ngày: {congNuaNgay}</div>}
+                        {congPhep > 0 && <div>Nghỉ phép: {congPhep}</div>}
+                        {congLe > 0 && <div>Nghỉ lễ: {congLe}</div>}
+                        {congVang > 0 && <div className="text-red-500">Vắng: {congVang}</div>}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold text-emerald-700">{fmtVND(luongCong)}</td>
+                    </tr>
+                    {tongTC > 0 && (
+                      <tr>
+                        <td className="px-3 py-2 text-orange-600">Tăng ca</td>
+                        <td className="px-3 py-2 text-right text-xs text-slate-400">{tongTC}h × hệ số {heSoTC}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-orange-600">{fmtVND(luongTC)}</td>
+                      </tr>
+                    )}
+                    {phuCapCC > 0 && (
+                      <tr>
+                        <td className="px-3 py-2 text-teal-600">PC Chuyên cần</td>
+                        <td className="px-3 py-2 text-right text-xs text-slate-400">{congVang > 0 ? <span className="text-red-400">Không đủ điều kiện</span> : "Đủ điều kiện"}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-teal-600">{congVang > 0 ? "—" : fmtVND(phuCapCC)}</td>
+                      </tr>
+                    )}
+                    {phuCapAnNgay > 0 && (
+                      <tr>
+                        <td className="px-3 py-2 text-teal-600">PC Ăn</td>
+                        <td className="px-3 py-2 text-right text-xs text-slate-400">{fmt(phuCapAnNgay)} × {ngayAnDuCong} ngày</td>
+                        <td className="px-3 py-2 text-right font-semibold text-teal-600">{fmtVND(phuCapAnNgay * ngayAnDuCong)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-violet-300 bg-violet-50">
+                      <td colSpan={2} className="px-3 py-3 font-bold text-violet-800 text-base rounded-l-lg">THỰC LĨNH</td>
+                      <td className="px-3 py-3 text-right font-bold text-violet-800 text-base rounded-r-lg">{fmtVND(thucLinh)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                {/* Ký tên */}
+                <div className="grid grid-cols-2 gap-4 text-center text-[11px] text-slate-500 mt-5 pt-4 border-t border-slate-100">
+                  <div>
+                    <p className="font-semibold uppercase tracking-wide mb-10">Người nhận</p>
+                    <p className="border-t border-slate-300 pt-1">(Ký, ghi rõ họ tên)</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold uppercase tracking-wide mb-10">Kế toán</p>
+                    <p className="border-t border-slate-300 pt-1">(Ký, ghi rõ họ tên)</p>
+                  </div>
+                </div>
+                <p className="text-center text-[10px] text-slate-300 mt-3">Ngày in: {new Date().toLocaleDateString("vi-VN")}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
