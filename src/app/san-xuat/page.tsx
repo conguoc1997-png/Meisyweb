@@ -610,6 +610,16 @@ export default function SanXuatPage() {
     }).catch(() => fetchData());
   };
 
+  const saveLoaiHang = (lo: LoCat, val: string) => {
+    const loaiHang = val || "dai_thuong";
+    setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, loaiHang } : l));
+    setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, loaiHang } : l));
+    fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loaiHang }),
+    }).catch(() => fetchData());
+  };
+
   const saveNhanVe = async (lo: LoCat, val: string) => {
     setEditingNhanVe(null);
     const hangThucTe = val === "" ? null : Math.round(Number(val));
@@ -1202,7 +1212,6 @@ export default function SanXuatPage() {
               <tr>
                 <th className="px-2 py-2.5 w-6"></th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ngày</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Loại hàng</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
@@ -1215,6 +1224,7 @@ export default function SanXuatPage() {
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu giặt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50 hidden">Số SP</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Nhận về</th>
+                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Loại hàng</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Trạng thái</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Xưởng</th>
                 <th className="px-3 py-2.5"></th>
@@ -1257,15 +1267,6 @@ export default function SanXuatPage() {
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-slate-600">{formatDate(lo.ngay)}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[12px] font-medium ${
-                        lo.loaiHang === "short"     ? "bg-sky-100 text-sky-700" :
-                        lo.loaiHang === "dai_kieu"  ? "bg-purple-100 text-purple-700" :
-                                                      "bg-slate-100 text-slate-600"
-                      }`}>
-                        {LOAI_HANG_LABEL[lo.loaiHang ?? "dai_thuong"] ?? lo.loaiHang ?? "Dài thường"}
-                      </span>
-                    </td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{lo.hangCat}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
@@ -1428,6 +1429,23 @@ export default function SanXuatPage() {
                         </>
                       )}
                     </td>
+                    {/* Loại hàng — inline select */}
+                    <td className="px-1.5 py-1 text-center">
+                      <select
+                        value={lo.loaiHang ?? "dai_thuong"}
+                        onChange={e => saveLoaiHang(lo, e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className={`border rounded px-1.5 py-0.5 text-[12px] font-medium focus:outline-none focus:ring-1 cursor-pointer ${
+                          lo.loaiHang === "short"    ? "bg-sky-50 border-sky-200 text-sky-700 focus:ring-sky-300" :
+                          lo.loaiHang === "dai_kieu" ? "bg-purple-50 border-purple-200 text-purple-700 focus:ring-purple-300" :
+                                                       "bg-slate-100 border-slate-200 text-slate-600 focus:ring-slate-300"
+                        }`}
+                      >
+                        {LOAI_HANG_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </td>
                     <td className="px-3 py-2.5 text-center">
                       {hasCay ? (
                         <span className="text-[13px] text-slate-400">
@@ -1466,9 +1484,7 @@ export default function SanXuatPage() {
                         <td></td>
                         {/* col 2: Ngày — empty */}
                         <td></td>
-                        {/* col 3: Loại hàng — empty */}
-                        <td></td>
-                        {/* col 4: Hàng cắt — label */}
+                        {/* col 3: Hàng cắt — label */}
                         <td className="px-3 py-1.5 text-[14px] text-slate-400 font-semibold">└ Cây #{ci + 1}</td>
                         {/* col 4: Size — empty */}
                         <td></td>
@@ -1605,6 +1621,8 @@ export default function SanXuatPage() {
                             ) : <span className="text-[12px] text-green-500 block mt-0.5 text-right">✓</span>;
                           })()}
                         </td>
+                        {/* col: Loại hàng — empty for cây rows */}
+                        <td></td>
                         {/* col 14: Trạng thái per-cây toggle */}
                         <td className="px-2 py-1.5 text-center">
                           <button onClick={() => toggleCayTrangThai(lo, ci)}
