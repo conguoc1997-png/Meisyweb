@@ -16,8 +16,15 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.nhanVien.findUnique({ where: { maNV } });
   if (existing) return NextResponse.json({ error: "Mã NV đã tồn tại" }, { status: 400 });
 
+  const { ngaySinh } = data;
   const nv = await prisma.nhanVien.create({
-    data: { maNV, ten, chucVu: chucVu || null, phongBan: phongBan || null, luongCB: luongCB ? Number(luongCB) : null },
+    data: {
+      maNV, ten,
+      chucVu:   chucVu   || null,
+      phongBan: phongBan || null,
+      luongCB:  luongCB  ? Number(luongCB) : null,
+      ngaySinh: ngaySinh ? new Date(ngaySinh) : null,
+    },
   });
   return NextResponse.json(nv);
 }

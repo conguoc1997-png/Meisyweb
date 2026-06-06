@@ -416,6 +416,7 @@ model NhanVien {
   phuCapChuyenCan Float?  // phụ cấp chuyên cần cố định/tháng
   phuCapAn        Float?  // phụ cấp ăn mỗi ngày (chỉ tính ngày đi làm đủ)
   heSoTC          Float   @default(1.5) // hệ số tăng ca
+  ngaySinh        DateTime? // ngày sinh nhật
   active     Boolean    @default(true)
   createdAt  DateTime   @default(now())
   chamCongs  ChamCong[]

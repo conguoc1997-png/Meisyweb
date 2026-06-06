@@ -145,3 +145,8 @@ CREATE TABLE IF NOT EXISTS "CongNo" (
 -- Module Sản xuất — thêm cột loaiHang vào LoCat
 -- ============================================================
 ALTER TABLE "LoCat" ADD COLUMN IF NOT EXISTS "loaiHang" TEXT DEFAULT 'dai_thuong';
+
+-- ============================================================
+-- Module Nhân sự — thêm ngày sinh vào NhanVien
+-- ============================================================
+ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "ngaySinh" TIMESTAMPTZ;

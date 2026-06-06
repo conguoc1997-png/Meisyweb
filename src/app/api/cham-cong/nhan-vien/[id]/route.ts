@@ -14,6 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       phuCapChuyenCan: data.phuCapChuyenCan !== undefined ? (data.phuCapChuyenCan ? Number(data.phuCapChuyenCan) : null) : undefined,
       phuCapAn:        data.phuCapAn        !== undefined ? (data.phuCapAn        ? Number(data.phuCapAn)        : null) : undefined,
       heSoTC:   data.heSoTC   !== undefined ? Number(data.heSoTC) : undefined,
+      ngaySinh: data.ngaySinh !== undefined ? (data.ngaySinh ? new Date(data.ngaySinh) : null) : undefined,
       active:   data.active   !== undefined ? data.active : undefined,
     },
   });
