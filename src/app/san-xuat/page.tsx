@@ -863,9 +863,17 @@ export default function SanXuatPage() {
   // Stats
   // tongSP: tính theo tháng CẮT (losCat đã filter theo ngay)
   const tongSP = losCat.reduce((s, l) => s + (l.soSanPham ?? 0), 0);
+  const tongSP_byLoai = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const l of losCat) {
+      const key = l.loaiHang ?? "dai_thuong";
+      map[key] = (map[key] ?? 0) + (l.soSanPham ?? 0);
+    }
+    return map;
+  }, [losCat]);
 
   // tongNhan + tongThieu: tính theo tháng NHẬN (ngayNhanHang), filter từ allLoCat
-  const { tongNhan, tongThieu } = useMemo(() => {
+  const { tongNhan, tongThieu, tongNhan_byLoai } = useMemo(() => {
     let rows = allLoCat;
     if (filterXuong) rows = rows.filter(l => l.xuong === filterXuong);
     if (filterThang) {
@@ -879,9 +887,15 @@ export default function SanXuatPage() {
         return d.getFullYear() === y && d.getMonth() + 1 === m;
       });
     }
+    const byLoai: Record<string, number> = {};
+    for (const l of rows) {
+      const key = l.loaiHang ?? "dai_thuong";
+      byLoai[key] = (byLoai[key] ?? 0) + (l.hangThucTe ?? 0);
+    }
     return {
       tongNhan: rows.reduce((s, l) => s + (l.hangThucTe ?? 0), 0),
       tongThieu: rows.reduce((s, l) => s + (l.hangThucTe != null ? Math.max(0, l.soLuongThieu ?? 0) : 0), 0),
+      tongNhan_byLoai: byLoai,
     };
   }, [allLoCat, filterThang, filterXuong]);
   const daNhapCount = losCat.filter(l => l.trangThai === "da_nhap").length;
@@ -930,11 +944,33 @@ export default function SanXuatPage() {
           <p className="text-xs text-slate-500 mb-1">Tổng sản phẩm</p>
           <p className="text-2xl font-bold text-slate-800">{tongSP.toLocaleString()}</p>
           <p className="text-xs text-slate-400 mt-1">{losCat.length} lô · {filterThang ? <span className="text-rose-400">tháng cắt</span> : "tất cả"}</p>
+          <div className="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+            {[{ key: "dai_thuong", label: "Dài thường", cls: "text-slate-500" },
+              { key: "dai_kieu",   label: "Dài kiểu",   cls: "text-purple-600" },
+              { key: "short",      label: "Short",       cls: "text-sky-600"    }
+            ].map(({ key, label, cls }) => tongSP_byLoai[key] ? (
+              <div key={key} className="flex justify-between items-center text-[12px]">
+                <span className={`${cls} font-medium`}>{label}</span>
+                <span className="text-slate-600 font-semibold">{(tongSP_byLoai[key] ?? 0).toLocaleString()}</span>
+              </div>
+            ) : null)}
+          </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <p className="text-xs text-slate-500 mb-1">Đã nhận về</p>
           <p className="text-2xl font-bold text-green-600">{tongNhan.toLocaleString()}</p>
           <p className="text-xs text-slate-400 mt-1">{filterThang ? <span className="text-green-500">tháng nhận</span> : "tất cả"}</p>
+          <div className="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+            {[{ key: "dai_thuong", label: "Dài thường", cls: "text-slate-500" },
+              { key: "dai_kieu",   label: "Dài kiểu",   cls: "text-purple-600" },
+              { key: "short",      label: "Short",       cls: "text-sky-600"    }
+            ].map(({ key, label, cls }) => tongNhan_byLoai[key] ? (
+              <div key={key} className="flex justify-between items-center text-[12px]">
+                <span className={`${cls} font-medium`}>{label}</span>
+                <span className="text-green-700 font-semibold">{(tongNhan_byLoai[key] ?? 0).toLocaleString()}</span>
+              </div>
+            ) : null)}
+          </div>
         </div>
         <div className={`rounded-xl p-4 border ${tongThieu > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
           <p className="text-xs text-slate-500 mb-1">Tổng thiếu</p>
