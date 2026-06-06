@@ -1385,17 +1385,14 @@ export default function SanXuatPage() {
                           <input
                             type="number"
                             min="0"
-                            value={lo.hangThucTe != null ? String(lo.hangThucTe) : ""}
-                            onChange={e => {
-                              const val = e.target.value;
-                              const hangThucTe = val === "" ? null : Math.round(Number(val));
-                              const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
-                              setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
-                              setAllLoCat(prev => prev.map(l => l.id === lo.id ? { ...l, hangThucTe, soLuongThieu } : l));
-                            }}
+                            defaultValue={lo.hangThucTe != null ? String(lo.hangThucTe) : ""}
+                            key={`nv-${lo.id}-${lo.hangThucTe}`}
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={e => e.stopPropagation()}
                             onBlur={e => saveNhanVe(lo, e.target.value)}
                             onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                             placeholder="0"
+                            style={{ pointerEvents: "all", position: "relative", zIndex: 10 }}
                             className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
                           />
                           {lo.hangThucTe != null && lo.soSanPham != null && (() => {
@@ -1563,23 +1560,16 @@ export default function SanXuatPage() {
                           <input
                             type="number"
                             min="0"
-                            value={nhanVeCay != null ? String(nhanVeCay) : ""}
-                            onChange={e => {
-                              const val = e.target.value;
-                              // Optimistic update local state ngay khi gõ
-                              const htVal = val === "" ? null : Math.round(Number(val));
-                              try {
-                                const parsed = JSON.parse(lo.cayData!);
-                                parsed[ci] = { ...parsed[ci], hangThucTe: htVal };
-                                const newCayData = JSON.stringify(parsed);
-                                setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData } : l));
-                              } catch { /* ignore */ }
-                            }}
+                            defaultValue={nhanVeCay != null ? String(nhanVeCay) : ""}
+                            key={`nvcay-${lo.id}-${ci}-${nhanVeCay}`}
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={e => e.stopPropagation()}
                             onBlur={e => saveCayNhanVe(lo, ci, e.target.value)}
                             onKeyDown={e => {
                               if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
                             }}
                             placeholder="0"
+                            style={{ pointerEvents: "all", position: "relative", zIndex: 10 }}
                             className="w-16 text-right border border-green-300 rounded px-1 py-0.5 text-[14px] font-semibold text-green-700 focus:outline-none focus:ring-1 focus:ring-green-400 bg-green-50"
                           />
                           {nhanVeCay != null && spPerCay != null && (() => {

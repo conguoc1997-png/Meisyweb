@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2 } from "lucide-react";
 
 type NhanVien = {
@@ -373,9 +373,9 @@ export default function ChamCongPage() {
                   });
                   let globalIdx = 0;
                   return Array.from(groups.entries()).map(([phongBan, nvList]) => (
-                    <>
+                    <React.Fragment key={`group-${phongBan}`}>
                       {/* Header phòng ban */}
-                      <tr key={`pb-${phongBan}`}>
+                      <tr>
                         <td colSpan={50} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
                           <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
                             🏢 {phongBan}
@@ -390,9 +390,9 @@ export default function ChamCongPage() {
                   const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                   const rowBg = idx % 2 === 0 ? "bg-white" : "bg-slate-50/40";
                   return (
-                    <>
+                    <React.Fragment key={nv.id}>
                     {/* ── Dòng 1: chấm công ── */}
-                    <tr key={nv.id} className={`${rowBg} hover:bg-rose-50/20 transition`}>
+                    <tr className={`${rowBg} hover:bg-rose-50/20 transition`}>
                       {/* STT — rowSpan=2 */}
                       <td rowSpan={2} className={`sticky left-0 z-10 px-3 py-1.5 text-center text-slate-400 border-r border-slate-100 border-b-2 border-b-slate-200 ${rowBg}`}>
                         {idx + 1}
@@ -481,10 +481,10 @@ export default function ChamCongPage() {
                         );
                       })}
                     </tr>
-                    </>
+                    </React.Fragment>
                   );
                       })}
-                    </>
+                    </React.Fragment>
                   ));
                 })()}
               </tbody>
@@ -564,8 +564,8 @@ export default function ChamCongPage() {
                   });
                   let globalIdx = 0;
                   return Array.from(groups.entries()).map(([phongBan, nvList]) => (
-                    <>
-                      <tr key={`pb-luong-${phongBan}`}>
+                    <React.Fragment key={`group-luong-${phongBan}`}>
+                      <tr>
                         <td colSpan={12} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
                           <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">🏢 {phongBan}</span>
                           <span className="ml-2 text-xs text-indigo-400">({nvList.length} NV)</span>
@@ -689,7 +689,7 @@ export default function ChamCongPage() {
                     </tr>
                   );
                       })}
-                    </>
+                    </React.Fragment>
                   ));
                 })()}
               </tbody>
