@@ -195,6 +195,11 @@ export default function DinhMucPage() {
     const key = `${hangCat}:${col.key}`;
     setTicking(key);
     try {
+      // Đồng bộ loai + nhom của VatTu để matchesCol khớp với cột
+      await fetch(`/api/ke-toan/vat-tu/${vatTuId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loai: col.loai, nhom: col.nhom }),
+      });
       await fetch("/api/ke-toan/dinh-muc", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hangCat: targetCat, vatTuId, soLuong: 1, haoHui: 0 }),
