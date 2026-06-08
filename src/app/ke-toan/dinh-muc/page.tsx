@@ -37,10 +37,10 @@ const COLUMNS: ColDef[] = [
   // Hoàn thiện — tickOnly: click trực tiếp
   { key:"may",      label:"May",       loai:"hoan_thien", nhom:"may",       shared:true, tickOnly:true,
     hdr:"bg-slate-200 text-slate-800",   badge:"bg-slate-200 text-slate-700" },
-  // Giặt — riêng từng SP (2 cột ngoài cùng bên phải)
-  { key:"giat_mau", label:"Giặt Màu",  loai:"hoan_thien", nhom:"giat_mau",  shared:false, tickOnly:true, separatorLeft:true,
+  // Giặt — set từ CHUNG, áp cho tất cả SP
+  { key:"giat_mau", label:"Giặt Màu",  loai:"hoan_thien", nhom:"giat_mau",  shared:true, tickOnly:true, separatorLeft:true,
     hdr:"bg-blue-100 text-blue-800",     badge:"bg-blue-100 text-blue-700" },
-  { key:"giat_vs",  label:"Giặt VS",   loai:"hoan_thien", nhom:"giat_vi_sinh", shared:false, tickOnly:true,
+  { key:"giat_vs",  label:"Giặt VS",   loai:"hoan_thien", nhom:"giat_vi_sinh", shared:true, tickOnly:true,
     hdr:"bg-cyan-100 text-cyan-800",     badge:"bg-cyan-100 text-cyan-700" },
 ];
 
