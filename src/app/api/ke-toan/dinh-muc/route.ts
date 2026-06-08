@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const hangCat = searchParams.get("hangCat");
     const items = await prisma.dinhMucNPL.findMany({
       where: hangCat ? { hangCat } : undefined,
-      include: { vatTu: { include: { tonKho: true } } },
+      include: { vatTu: true }, // tonKho không cần ở đây, load riêng phase 2
       orderBy: [{ hangCat: "asc" }, { vatTu: { ten: "asc" } }],
     });
     return NextResponse.json(items);

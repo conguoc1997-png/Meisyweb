@@ -77,16 +77,16 @@ export default function DinhMucPage() {
   /* ── Fetch ─────────────────────────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    // Phase 1: load dữ liệu chính → hiển thị bảng ngay
+    // Load song song 3 API chính, hiển thị ngay khi xong
     const [sps, vts, dms] = await Promise.all([
-      fetch("/api/kho/san-pham").then(r => r.json()),
-      fetch("/api/ke-toan/vat-tu").then(r => r.json()),
-      fetch("/api/ke-toan/dinh-muc").then(r => r.json()),
+      fetch("/api/kho/san-pham").then(r => r.json()).catch(() => []),
+      fetch("/api/ke-toan/vat-tu").then(r => r.json()).catch(() => []),
+      fetch("/api/ke-toan/dinh-muc").then(r => r.json()).catch(() => []),
     ]);
     setSanPhams(Array.isArray(sps) ? sps : []);
     setVatTus(Array.isArray(vts) ? vts : []);
     setDinhMucs(Array.isArray(dms) ? dms : []);
-    setLoading(false);
+    setLoading(false); // hiển thị bảng ngay, không chờ tồn kho
     // Phase 2: load tồn kho trong nền
     fetch("/api/ke-toan/ton-kho")
       .then(r => r.json())
@@ -383,7 +383,12 @@ export default function DinhMucPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-slate-400 text-sm">Đang tải...</div>
+        <div className="space-y-2 animate-pulse">
+          <div className="h-10 bg-slate-100 rounded-xl w-full" />
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-14 bg-slate-50 rounded-xl w-full" />
+          ))}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
           <table className="text-sm border-collapse w-full" style={{ minWidth: `${200 + COLUMNS.length * 110}px` }}>
