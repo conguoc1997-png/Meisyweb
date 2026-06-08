@@ -137,11 +137,13 @@ export default function DinhMucPage() {
   }
 
   function getColVatTus(col: ColDef, q: string): VatTu[] {
+    const lq = q.toLowerCase();
     const matched = vatTus.filter(vt => {
+      // Khi có search query → hiện tất cả VatTu (không lọc theo loai/nhom)
+      if (q) return vt.ten.toLowerCase().includes(lq) || vt.ma.toLowerCase().includes(lq);
+      // Không có query → chỉ hiện VatTu cùng loai, nhom khớp hoặc null
       if (vt.loai !== col.loai) return false;
-      // Hiển thị cả nhom đúng + nhom null (chưa phân nhóm) để user có thể link
       if (col.nhom !== null && vt.nhom !== col.nhom && vt.nhom !== null) return false;
-      if (q) { const lq = q.toLowerCase(); return vt.ten.toLowerCase().includes(lq) || vt.ma.toLowerCase().includes(lq); }
       return true;
     });
     // Ưu tiên: nhom khớp → nhom null → hết kho; trong mỗi nhóm ưu tiên có stock (sau quy đổi)
@@ -538,15 +540,15 @@ export default function DinhMucPage() {
                     <div className="flex-1 relative">
                       <p className="text-[10px] text-slate-400 mb-1">Vật tư</p>
                       <input
-                        value={item.vtSearch || (vt ? vt.ten : "")}
+                        value={item.vtSearch !== undefined && item.vtSearch !== "" ? item.vtSearch : (vt ? vt.ten : "")}
                         onChange={e => {
                           setEditItems(prev => prev.map((it, i) =>
                             i === idx ? { ...it, vtSearch: e.target.value, changed: true } : it));
                           setVtDropOpen(idx);
                         }}
-                        onFocus={() => setVtDropOpen(idx)}
-                        placeholder="Tìm vật tư..."
-                        className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        onFocus={e => { e.target.select(); setVtDropOpen(idx); }}
+                        placeholder="Tìm vật tư bất kỳ..."
+                        className="w-full border border-indigo-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-text"
                       />
                       {vtDropOpen === idx && (
                         <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto mt-1">
