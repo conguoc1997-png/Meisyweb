@@ -140,6 +140,27 @@ export default function TonKhoPage() {
     soPhuLieu: filtered.filter(t => t.vatTu.loai === "phu_lieu").length,
   }), [filtered]);
 
+  // Tự bổ sung loại/nhóm từ DB vào dropdown (loại tùy chỉnh)
+  const allLoaiOptions = useMemo(() => {
+    const known = new Set(LOAI_OPTIONS.map(l => l.value));
+    const extras = [...new Set(items.map(t => t.vatTu.loai).filter(l => l && !known.has(l)))]
+      .map(l => ({ value: l, label: l }));
+    return [...LOAI_OPTIONS, ...extras];
+  }, [items]);
+
+  // Nhóm tùy chỉnh theo loại: merge danh sách cứng + giá trị từ DB
+  const allNhomByLoai = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const t of items) {
+      const loai = t.vatTu.loai;
+      const nhom = t.vatTu.nhom;
+      if (!nhom) continue;
+      if (!map[loai]) map[loai] = [...(NHOM_OPTIONS[loai] ?? [])];
+      if (!map[loai].includes(nhom)) map[loai].push(nhom);
+    }
+    return map;
+  }, [items]);
+
   const allNhom = useMemo(() => {
     const s = new Set(items.map(t => t.vatTu.nhom).filter(Boolean) as string[]);
     return [...s].sort();
@@ -200,7 +221,7 @@ export default function TonKhoPage() {
   }
 
   function openEdit(t: TonKho) {
-    const knownLoai = LOAI_OPTIONS.some(l => l.value === t.vatTu.loai);
+    const knownLoai = allLoaiOptions.some(l => l.value === t.vatTu.loai);
     const loaiFm    = knownLoai ? t.vatTu.loai : "__custom__";
     const cLoai     = knownLoai ? "" : (t.vatTu.loai || "");
 
@@ -304,7 +325,7 @@ export default function TonKhoPage() {
     } finally { setDeleting(false); }
   }
 
-  const nhomOptions = NHOM_OPTIONS[form.loai] || [];
+  const nhomOptions = allNhomByLoai[form.loai] ?? NHOM_OPTIONS[form.loai] ?? [];
 
   return (
     <div className="p-6 space-y-5">
@@ -370,7 +391,7 @@ export default function TonKhoPage() {
         <select value={filterLoai} onChange={e => { setFilterLoai(e.target.value); setFilterNhom(""); }}
           className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="">Tất cả loại</option>
-          {LOAI_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+          {allLoaiOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
         </select>
         {allNhom.length > 0 && (
           <select value={filterNhom} onChange={e => setFilterNhom(e.target.value)}
@@ -590,7 +611,7 @@ export default function TonKhoPage() {
                   ) : (
                     <select value={form.loai} onChange={e => setForm(f => ({ ...f, loai: e.target.value, nhom: "" }))}
                       className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                      {LOAI_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                      {allLoaiOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                       <option value="__custom__">➕ Thêm loại mới...</option>
                     </select>
                   )}

@@ -155,6 +155,21 @@ export default function NhapKhoPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Tự bổ sung loại từ DB vào dropdown
+  const allLoaiOptions = useMemo(() => {
+    const STATIC = [
+      { value: "vai",        label: "Vải" },
+      { value: "may",        label: "May" },
+      { value: "gia_cong",   label: "Gia công" },
+      { value: "hoan_thien", label: "Hoàn thiện" },
+      { value: "phu_lieu",   label: "Phụ liệu (cũ)" },
+    ];
+    const known = new Set(STATIC.map(l => l.value));
+    const extras = [...new Set(vatTus.map(v => v.loai).filter(l => l && !known.has(l)))]
+      .map(l => ({ value: l, label: l }));
+    return [...STATIC, ...extras];
+  }, [vatTus]);
+
   const filtered = useMemo(() => phieus.filter(p => {
     const s = search.toLowerCase();
     const matchSearch = !s || p.soPhieu.toLowerCase().includes(s) ||
@@ -923,11 +938,9 @@ export default function NhapKhoPage() {
                       setNewVtForm(f => ({ ...f, loai, nhom: "", donVi: defaultDonVi }));
                     }}
                       className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                      <option value="vai">Vải</option>
-                      <option value="may">May</option>
-                      <option value="gia_cong">Gia công</option>
-                      <option value="hoan_thien">Hoàn thiện</option>
-                      <option value="phu_lieu">Phụ liệu (cũ)</option>
+                      {allLoaiOptions.map(l => (
+                        <option key={l.value} value={l.value}>{l.label}</option>
+                      ))}
                       <option value="__custom__">➕ Thêm loại mới...</option>
                     </select>
                   )}
