@@ -72,7 +72,7 @@ export default function DinhMucPage() {
   const [vtDropOpen, setVtDropOpen] = useState<number|null>(null);
 
   // Tick picker: chọn vật tư trực tiếp từ tồn kho cho tickOnly cols
-  const [tickPicker, setTickPicker] = useState<{ hangCat: string; col: ColDef; search: string } | null>(null);
+  const [tickPicker, setTickPicker] = useState<{ hangCat: string; col: ColDef; search: string; showAll: boolean } | null>(null);
 
   /* ── Fetch ─────────────────────────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
@@ -179,7 +179,7 @@ export default function DinhMucPage() {
       } finally { setTicking(null); }
     } else {
       // Chưa có → mở picker chọn vật tư từ tồn kho
-      setTickPicker({ hangCat, col, search: "" });
+      setTickPicker({ hangCat, col, search: "", showAll: false });
     }
   }
 
@@ -615,7 +615,7 @@ export default function DinhMucPage() {
                 <X size={16} />
               </button>
             </div>
-            <div className="px-4 pt-3 pb-2">
+            <div className="px-4 pt-3 pb-2 space-y-2">
               <input
                 autoFocus
                 value={tickPicker.search}
@@ -623,15 +623,36 @@ export default function DinhMucPage() {
                 placeholder="Tìm tên vật tư..."
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={tickPicker.showAll}
+                  onChange={e => setTickPicker(p => p ? { ...p, showAll: e.target.checked } : p)}
+                  className="accent-indigo-600 w-3.5 h-3.5" />
+                <span className="text-xs text-slate-400">Hiện cả hàng chưa nhập kho</span>
+              </label>
             </div>
             <div className="max-h-64 overflow-y-auto px-2 pb-3">
-              {vatTus
-                .filter(v => {
-                  const q = tickPicker.search.toLowerCase();
-                  return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
-                })
-                .sort((a, b) => a.ten.localeCompare(b.ten))
-                .map(v => {
+              {(() => {
+                const q = tickPicker.search.toLowerCase();
+                const list = vatTus
+                  .filter(v => {
+                    const tk = tonKhoMap.get(v.id);
+                    const hasStock = (tk?.soLuongQD ?? 0) > 0;
+                    if (!tickPicker.showAll && !hasStock) return false;
+                    return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
+                  })
+                  .sort((a, b) => {
+                    // Ưu tiên có tồn kho lên đầu
+                    const aStock = (tonKhoMap.get(a.id)?.soLuongQD ?? 0) > 0;
+                    const bStock = (tonKhoMap.get(b.id)?.soLuongQD ?? 0) > 0;
+                    if (aStock !== bStock) return aStock ? -1 : 1;
+                    return a.ten.localeCompare(b.ten);
+                  });
+                if (list.length === 0) return (
+                  <p className="text-center text-xs text-slate-400 py-6">
+                    {tickPicker.showAll ? "Không tìm thấy vật tư" : "Không có vật tư nào trong kho — bật \"Hiện cả hàng chưa nhập\" để xem tất cả"}
+                  </p>
+                );
+                return list.map(v => {
                   const tk = tonKhoMap.get(v.id);
                   const stock = tk?.soLuongQD ?? 0;
                   return (
@@ -651,13 +672,8 @@ export default function DinhMucPage() {
                       )}
                     </button>
                   );
-                })}
-              {vatTus.filter(v => {
-                const q = tickPicker.search.toLowerCase();
-                return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
-              }).length === 0 && (
-                <p className="text-center text-xs text-slate-400 py-6">Không tìm thấy vật tư</p>
-              )}
+                });
+              })()}
             </div>
           </div>
         </div>
