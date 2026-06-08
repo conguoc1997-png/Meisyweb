@@ -35,7 +35,7 @@ const LOAI_OPTIONS = [
 
 const NHOM_OPTIONS: Record<string, string[]> = {
   vai:        ["vai"],
-  may:        ["lot", "chi", "khoa_keo", "mac", "khac"],
+  may:        ["lot", "chi", "khoa_keo", "mac", "cong_may", "khac"],
   gia_cong:   ["cuc", "dinh_tan", "mac_da", "khac"],
   hoan_thien: ["mac_lung", "khac"],
   phu_lieu:   ["chi", "cuc", "khoa_keo", "lot", "dinh_tan", "giat_mau", "giat_vi_sinh", "may", "khac"],
@@ -54,6 +54,7 @@ const NHOM_LABEL: Record<string, string> = {
   giat_mau:     "Giặt màu",
   giat_vi_sinh: "Giặt vi sinh",
   may:          "May",
+  cong_may:     "Công may",
   khac:         "Khác",
   // legacy
   vai_cotton: "Vải cotton", vai_thun: "Vải thun", vai_lua: "Vải lụa",
@@ -434,7 +435,7 @@ export default function TonKhoPage() {
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${loaiColor(g.loai)}`}>
-                    {LOAI_OPTIONS.find(l => l.value === g.loai)?.label}
+                    {LOAI_OPTIONS.find(l => l.value === g.loai)?.label ?? g.loai}
                   </span>
                   {g.nhom && <span className="ml-1.5 text-xs text-slate-400">{NHOM_LABEL[g.nhom] ?? g.nhom}</span>}
                 </td>
@@ -497,7 +498,7 @@ export default function TonKhoPage() {
                 <td className="px-4 py-3 font-medium text-slate-800">{t.vatTu.ten}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${loaiColor(t.vatTu.loai)}`}>
-                    {LOAI_OPTIONS.find(l => l.value === t.vatTu.loai)?.label}
+                    {LOAI_OPTIONS.find(l => l.value === t.vatTu.loai)?.label ?? t.vatTu.loai}
                   </span>
                   {t.vatTu.nhom && <span className="ml-1.5 text-xs text-slate-400">{NHOM_LABEL[t.vatTu.nhom] ?? t.vatTu.nhom}</span>}
                 </td>
