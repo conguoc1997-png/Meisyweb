@@ -37,10 +37,10 @@ const COLUMNS: ColDef[] = [
   // Hoàn thiện — tickOnly: click trực tiếp
   { key:"may",      label:"May",       loai:"hoan_thien", nhom:"may",       shared:true, tickOnly:true,
     hdr:"bg-slate-200 text-slate-800",   badge:"bg-slate-200 text-slate-700" },
-  // Giặt — set từ CHUNG, áp cho tất cả SP
-  { key:"giat_mau", label:"Giặt Màu",  loai:"hoan_thien", nhom:"giat_mau",  shared:true, tickOnly:true, separatorLeft:true,
+  // Giặt — tick riêng từng SP, CHUNG chỉ định VatTu nguồn
+  { key:"giat_mau", label:"Giặt Màu",  loai:"hoan_thien", nhom:"giat_mau",  shared:false, tickOnly:true, separatorLeft:true,
     hdr:"bg-blue-100 text-blue-800",     badge:"bg-blue-100 text-blue-700" },
-  { key:"giat_vs",  label:"Giặt VS",   loai:"hoan_thien", nhom:"giat_vi_sinh", shared:true, tickOnly:true,
+  { key:"giat_vs",  label:"Giặt VS",   loai:"hoan_thien", nhom:"giat_vi_sinh", shared:false, tickOnly:true,
     hdr:"bg-cyan-100 text-cyan-800",     badge:"bg-cyan-100 text-cyan-700" },
 ];
 
@@ -182,7 +182,23 @@ export default function DinhMucPage() {
         await fetchAll();
       } finally { setTicking(null); }
     } else {
-      // Chưa có → mở picker chọn vật tư từ tồn kho
+      // Chưa có → nếu col không shared (Giặt), dùng VatTu từ CHUNG row
+      if (!col.shared) {
+        const chungItems = getChungItems(col);
+        if (chungItems.length > 0) {
+          // Tự động tick bằng VatTu của CHUNG
+          setTicking(key);
+          try {
+            await fetch("/api/ke-toan/dinh-muc", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ hangCat, vatTuId: chungItems[0].vatTuId, soLuong: 1, haoHui: 0 }),
+            });
+            await fetchAll();
+          } finally { setTicking(null); }
+          return;
+        }
+      }
+      // Không có CHUNG ref → mở picker
       setTickPicker({ hangCat, col, search: "", showAll: false });
     }
   }
@@ -213,8 +229,11 @@ export default function DinhMucPage() {
     const col = COLUMNS.find(c => c.key === colKey)!;
     // Shared col on product row → chỉ xem (không edit)
     if (col.shared && hangCat !== CHUNG_KEY) return;
-    // !shared tickOnly + CHUNG row → không làm gì
-    if (!col.shared && col.tickOnly && hangCat === CHUNG_KEY) return;
+    // !shared tickOnly + CHUNG row → mở picker để chọn VatTu nguồn
+    if (!col.shared && col.tickOnly && hangCat === CHUNG_KEY) {
+      setTickPicker({ hangCat: CHUNG_KEY, col, search: "", showAll: false });
+      return;
+    }
     // tickOnly → dùng toggleTick thay vì modal
     if (col.tickOnly) { toggleTick(hangCat, col); return; }
     const items = getOwnItems(hangCat, col);
