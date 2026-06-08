@@ -87,12 +87,16 @@ export default function DinhMucPage() {
     setVatTus(Array.isArray(vts) ? vts : []);
     setDinhMucs(Array.isArray(dms) ? dms : []);
     setLoading(false);
-    // Phase 2: load tồn kho trong nền (chỉ dùng cho dropdown đơn vị)
+    // Phase 2: load tồn kho trong nền
     fetch("/api/ke-toan/ton-kho")
       .then(r => r.json())
       .then(tonKhos => {
         if (Array.isArray(tonKhos)) {
-          setTonKhoMap(new Map(tonKhos.map((t: TonKhoRow) => [t.vatTuId, t])));
+          // API trả về { vatTuId, soLuong, vatTu } — map soLuong → soLuongQD
+          setTonKhoMap(new Map(tonKhos.map((t: { vatTuId: string; soLuong: number; vatTu?: { donVi?: string } }) => [
+            t.vatTuId,
+            { vatTuId: t.vatTuId, soLuongQD: t.soLuong, donViQuyDoi: t.vatTu?.donVi ?? "", quyDoi: 1 } as TonKhoRow,
+          ])));
         }
       })
       .catch(() => {}); // non-fatal
