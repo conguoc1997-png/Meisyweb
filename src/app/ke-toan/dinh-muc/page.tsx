@@ -15,7 +15,8 @@ type DinhMuc = { id: string; hangCat: string; vatTuId: string; soLuong: number;
 type ColDef = {
   key: string; label: string; loai: string; nhom: string|null;
   hdr: string; badge: string; shared: boolean;
-  tickOnly?: boolean; // true → click trực tiếp toggle 0/1, không cần modal nhập số
+  tickOnly?: boolean;      // true → click trực tiếp toggle 0/1
+  separatorLeft?: boolean; // true → đường kẻ phân cách bên trái
 };
 
 const COLUMNS: ColDef[] = [
@@ -34,12 +35,13 @@ const COLUMNS: ColDef[] = [
   { key:"dinh_tan", label:"Đinh tán",  loai:"gia_cong",   nhom:"dinh_tan",  shared:true,
     hdr:"bg-rose-100 text-rose-800",     badge:"bg-rose-100 text-rose-700" },
   // Hoàn thiện — tickOnly: click trực tiếp
-  { key:"giat_mau", label:"Giặt Màu",  loai:"hoan_thien", nhom:"giat_mau",  shared:true, tickOnly:true,
-    hdr:"bg-blue-100 text-blue-800",     badge:"bg-blue-100 text-blue-700" },
-  { key:"giat_vs",  label:"Giặt VS",   loai:"hoan_thien", nhom:"giat_vi_sinh", shared:true, tickOnly:true,
-    hdr:"bg-cyan-100 text-cyan-800",     badge:"bg-cyan-100 text-cyan-700" },
   { key:"may",      label:"May",       loai:"hoan_thien", nhom:"may",       shared:true, tickOnly:true,
     hdr:"bg-slate-200 text-slate-800",   badge:"bg-slate-200 text-slate-700" },
+  // Giặt — riêng từng SP (2 cột ngoài cùng bên phải)
+  { key:"giat_mau", label:"Giặt Màu",  loai:"hoan_thien", nhom:"giat_mau",  shared:false, tickOnly:true, separatorLeft:true,
+    hdr:"bg-blue-100 text-blue-800",     badge:"bg-blue-100 text-blue-700" },
+  { key:"giat_vs",  label:"Giặt VS",   loai:"hoan_thien", nhom:"giat_vi_sinh", shared:false, tickOnly:true,
+    hdr:"bg-cyan-100 text-cyan-800",     badge:"bg-cyan-100 text-cyan-700" },
 ];
 
 const CHUNG_KEY = "__CHUNG__"; // hangCat cho hàng mặc định chung
@@ -162,13 +164,13 @@ export default function DinhMucPage() {
     const key = `${hangCat}:${col.key}`;
     if (ticking === key) return;
     setTicking(key);
+    // Nếu shared → luôn dùng CHUNG_KEY; nếu !shared → dùng hangCat riêng
+    const targetCat = col.shared ? CHUNG_KEY : hangCat;
     try {
-      const existing = getChungItems(col); // tickOnly cols always read from CHUNG
-      const targetHangCat = hangCat === CHUNG_KEY ? CHUNG_KEY : CHUNG_KEY; // always CHUNG
-      const chungItems = getOwnItems(CHUNG_KEY, col);
-      if (chungItems.length > 0) {
+      const ownItems = getOwnItems(targetCat, col);
+      if (ownItems.length > 0) {
         // Đã có → xoá (untick)
-        await Promise.all(chungItems.map(dm =>
+        await Promise.all(ownItems.map(dm =>
           fetch(`/api/ke-toan/dinh-muc/${dm.id}`, { method: "DELETE" })
         ));
       } else {
@@ -187,7 +189,7 @@ export default function DinhMucPage() {
         }
         await fetch("/api/ke-toan/dinh-muc", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hangCat: CHUNG_KEY, vatTuId: vt.id, soLuong: 1, haoHui: 0 }),
+          body: JSON.stringify({ hangCat: targetCat, vatTuId: vt.id, soLuong: 1, haoHui: 0 }),
         });
       }
       await fetchAll();
@@ -199,6 +201,8 @@ export default function DinhMucPage() {
     const col = COLUMNS.find(c => c.key === colKey)!;
     // Shared col on product row → chỉ xem (không edit)
     if (col.shared && hangCat !== CHUNG_KEY) return;
+    // !shared tickOnly + CHUNG row → không làm gì
+    if (!col.shared && col.tickOnly && hangCat === CHUNG_KEY) return;
     // tickOnly → dùng toggleTick thay vì modal
     if (col.tickOnly) { toggleTick(hangCat, col); return; }
     const items = getOwnItems(hangCat, col);
@@ -279,13 +283,17 @@ export default function DinhMucPage() {
     // ── tickOnly render ──────────────────────────────────────────────────
     if (col.tickOnly) {
       const checked = items.length > 0;
-      // Product row: chỉ hiển thị trạng thái từ CHUNG (read-only)
-      if (hangCat !== CHUNG_KEY) {
+      // Shared + product row: hiển thị trạng thái kế thừa từ CHUNG (read-only)
+      if (col.shared && hangCat !== CHUNG_KEY) {
         return checked
           ? <span className="text-lg">✓</span>
           : <span className="text-slate-200 text-base">—</span>;
       }
-      // CHUNG row: click để toggle
+      // !shared + CHUNG row: không áp dụng
+      if (!col.shared && hangCat === CHUNG_KEY) {
+        return <span className="text-slate-200 text-base select-none">—</span>;
+      }
+      // CHUNG row (shared) hoặc product row (!shared): nút toggle
       return (
         <div className={`flex items-center justify-center w-8 h-8 rounded-xl mx-auto transition-all
           ${isLoading ? "opacity-40" : ""}
@@ -373,9 +381,10 @@ export default function DinhMucPage() {
                   Sản phẩm
                 </th>
                 {COLUMNS.map(col => (
-                  <th key={col.key} className={`px-2 py-3 text-center text-xs font-bold w-28 ${col.hdr}`}>
+                  <th key={col.key} className={`px-2 py-3 text-center text-xs font-bold w-28 ${col.hdr} ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}`}>
                     <div>{col.label}</div>
                     {col.shared && <div className="text-[10px] font-normal opacity-60 mt-0.5">↓ từ CHUNG</div>}
+                    {!col.shared && !col.tickOnly && <div className="text-[10px] font-normal opacity-60 mt-0.5">riêng SP</div>}
                   </th>
                 ))}
               </tr>
@@ -397,6 +406,7 @@ export default function DinhMucPage() {
                 {COLUMNS.map(col => (
                   <td key={col.key}
                     className={`px-2 py-3 text-center align-middle border-r border-indigo-100
+                      ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}
                       ${col.shared ? "cursor-pointer hover:bg-indigo-100/50 transition-colors" : "bg-indigo-50/30"}`}
                     onClick={() => col.shared && openCell(CHUNG_KEY, col.key)}>
                     {col.shared ? (
@@ -431,12 +441,14 @@ export default function DinhMucPage() {
 
                     {/* Cells */}
                     {COLUMNS.map(col => {
-                      const canEdit = !col.shared;
+                      const canEdit = !col.shared || (col.tickOnly && col.shared === false);
+                      const canClick = !col.shared; // product rows: click khi !shared
                       return (
                         <td key={col.key}
                           className={`px-2 py-2 text-center align-middle border-r border-slate-50
-                            ${canEdit ? "cursor-pointer hover:bg-teal-50/60 transition-colors" : ""}`}
-                          onClick={() => canEdit && openCell(sp.sku, col.key)}>
+                            ${col.separatorLeft ? "border-l-2 border-slate-200" : ""}
+                            ${canClick ? "cursor-pointer hover:bg-teal-50/60 transition-colors" : ""}`}
+                          onClick={() => canClick && openCell(sp.sku, col.key)}>
                           <CellContent hangCat={sp.sku} col={col} />
                         </td>
                       );
