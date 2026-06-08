@@ -199,8 +199,16 @@ export default function TonKhoPage() {
   }
 
   function openEdit(t: TonKho) {
-    setForm({ ma: t.vatTu.ma, ten: t.vatTu.ten, loai: t.vatTu.loai, nhom: t.vatTu.nhom || "", donVi: t.vatTu.donVi, ghiChu: t.vatTu.ghiChu || "" });
-    setCustomLoai(""); setCustomNhom(""); setSaveError("");
+    const knownLoai = LOAI_OPTIONS.some(l => l.value === t.vatTu.loai);
+    const loaiFm    = knownLoai ? t.vatTu.loai : "__custom__";
+    const cLoai     = knownLoai ? "" : (t.vatTu.loai || "");
+
+    const knownNhom = !t.vatTu.nhom || (NHOM_OPTIONS[t.vatTu.loai] ?? []).includes(t.vatTu.nhom);
+    const nhomFm    = knownNhom ? (t.vatTu.nhom || "") : "__custom__";
+    const cNhom     = knownNhom ? "" : (t.vatTu.nhom || "");
+
+    setForm({ ma: t.vatTu.ma, ten: t.vatTu.ten, loai: loaiFm, nhom: nhomFm, donVi: t.vatTu.donVi, ghiChu: t.vatTu.ghiChu || "" });
+    setCustomLoai(cLoai); setCustomNhom(cNhom); setSaveError("");
     setEditTarget(t);
     setModal("edit");
   }
