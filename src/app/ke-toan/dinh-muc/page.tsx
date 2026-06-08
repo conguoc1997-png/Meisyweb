@@ -173,9 +173,18 @@ export default function DinhMucPage() {
         ));
       } else {
         // Chưa có → tạo mới với soLuong=1 (tick)
-        // Cần 1 vatTu thuộc nhom này — lấy cái đầu tiên trong tồn kho
-        const vt = vatTus.find(v => v.loai === col.loai && (col.nhom === null || v.nhom === col.nhom));
+        // Cần 1 vatTu thuộc nhom này — tìm theo loai+nhom, fallback theo nhom rồi theo tên
+        const vt = vatTus.find(v => v.loai === col.loai && (col.nhom === null || v.nhom === col.nhom))
+          ?? (col.nhom ? vatTus.find(v => v.nhom === col.nhom) : undefined)
+          ?? vatTus.find(v => v.ten.toLowerCase().replace(/\s/g,"") === col.label.toLowerCase().replace(/\s/g,""));
         if (!vt) { alert(`Chưa có vật tư nhóm "${col.label}" trong tồn kho`); return; }
+        // Tự động cập nhật loai/nhom của vật tư nếu chưa khớp với cột
+        if (vt.loai !== col.loai || (col.nhom && vt.nhom !== col.nhom)) {
+          await fetch(`/api/ke-toan/vat-tu/${vt.id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ loai: col.loai, nhom: col.nhom ?? vt.nhom }),
+          });
+        }
         await fetch("/api/ke-toan/dinh-muc", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ hangCat: CHUNG_KEY, vatTuId: vt.id, soLuong: 1, haoHui: 0 }),
