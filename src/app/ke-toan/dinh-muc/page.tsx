@@ -71,6 +71,9 @@ export default function DinhMucPage() {
   const [saving, setSaving] = useState(false);
   const [vtDropOpen, setVtDropOpen] = useState<number|null>(null);
 
+  // Tick picker: chọn vật tư trực tiếp từ tồn kho cho tickOnly cols
+  const [tickPicker, setTickPicker] = useState<{ hangCat: string; col: ColDef; search: string } | null>(null);
+
   /* ── Fetch ─────────────────────────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -163,35 +166,35 @@ export default function DinhMucPage() {
   async function toggleTick(hangCat: string, col: ColDef) {
     const key = `${hangCat}:${col.key}`;
     if (ticking === key) return;
-    setTicking(key);
-    // Nếu shared → luôn dùng CHUNG_KEY; nếu !shared → dùng hangCat riêng
     const targetCat = col.shared ? CHUNG_KEY : hangCat;
-    try {
-      const ownItems = getOwnItems(targetCat, col);
-      if (ownItems.length > 0) {
-        // Đã có → xoá (untick)
+    const ownItems = getOwnItems(targetCat, col);
+    if (ownItems.length > 0) {
+      // Đã có → xoá (untick)
+      setTicking(key);
+      try {
         await Promise.all(ownItems.map(dm =>
           fetch(`/api/ke-toan/dinh-muc/${dm.id}`, { method: "DELETE" })
         ));
-      } else {
-        // Chưa có → tạo mới với soLuong=1 (tick)
-        // Cần 1 vatTu thuộc nhom này — tìm theo loai+nhom, fallback theo nhom rồi theo tên
-        const vt = vatTus.find(v => v.loai === col.loai && (col.nhom === null || v.nhom === col.nhom))
-          ?? (col.nhom ? vatTus.find(v => v.nhom === col.nhom) : undefined)
-          ?? vatTus.find(v => v.ten.toLowerCase().replace(/\s/g,"") === col.label.toLowerCase().replace(/\s/g,""));
-        if (!vt) { alert(`Chưa có vật tư nhóm "${col.label}" trong tồn kho`); return; }
-        // Tự động cập nhật loai/nhom của vật tư nếu chưa khớp với cột
-        if (vt.loai !== col.loai || (col.nhom && vt.nhom !== col.nhom)) {
-          await fetch(`/api/ke-toan/vat-tu/${vt.id}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ loai: col.loai, nhom: col.nhom ?? vt.nhom }),
-          });
-        }
-        await fetch("/api/ke-toan/dinh-muc", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hangCat: targetCat, vatTuId: vt.id, soLuong: 1, haoHui: 0 }),
-        });
-      }
+        await fetchAll();
+      } finally { setTicking(null); }
+    } else {
+      // Chưa có → mở picker chọn vật tư từ tồn kho
+      setTickPicker({ hangCat, col, search: "" });
+    }
+  }
+
+  async function confirmTickPick(vatTuId: string) {
+    if (!tickPicker) return;
+    const { hangCat, col } = tickPicker;
+    const targetCat = col.shared ? CHUNG_KEY : hangCat;
+    setTickPicker(null);
+    const key = `${hangCat}:${col.key}`;
+    setTicking(key);
+    try {
+      await fetch("/api/ke-toan/dinh-muc", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hangCat: targetCat, vatTuId, soLuong: 1, haoHui: 0 }),
+      });
       await fetchAll();
     } finally { setTicking(null); }
   }
@@ -594,6 +597,67 @@ export default function DinhMucPage() {
                 className="px-4 py-1.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Tick Picker Modal ──────────────────────────────────────────────── */}
+      {tickPicker && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4"
+          onClick={e => e.target === e.currentTarget && setTickPicker(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Chọn vật tư — {tickPicker.col.label}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Chọn từ danh sách tồn kho</p>
+              </div>
+              <button onClick={() => setTickPicker(null)} className="p-1.5 rounded-lg hover:bg-slate-100">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-4 pt-3 pb-2">
+              <input
+                autoFocus
+                value={tickPicker.search}
+                onChange={e => setTickPicker(p => p ? { ...p, search: e.target.value } : p)}
+                placeholder="Tìm tên vật tư..."
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto px-2 pb-3">
+              {vatTus
+                .filter(v => {
+                  const q = tickPicker.search.toLowerCase();
+                  return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
+                })
+                .sort((a, b) => a.ten.localeCompare(b.ten))
+                .map(v => {
+                  const tk = tonKhoMap.get(v.id);
+                  const stock = tk?.soLuongQD ?? 0;
+                  return (
+                    <button key={v.id}
+                      onClick={() => confirmTickPick(v.id)}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-indigo-50 flex items-center gap-3 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-800 truncate">{v.ten}</p>
+                        <p className="text-xs text-slate-400">{v.loai}{v.nhom ? ` · ${v.nhom}` : ""}</p>
+                      </div>
+                      {tk ? (
+                        <span className={`text-xs font-medium shrink-0 ${stock > 0 ? "text-emerald-600" : "text-slate-300"}`}>
+                          {stock.toLocaleString("vi-VN")} {tk.donViQuyDoi ?? v.donVi}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300 shrink-0">chưa nhập</span>
+                      )}
+                    </button>
+                  );
+                })}
+              {vatTus.filter(v => {
+                const q = tickPicker.search.toLowerCase();
+                return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
+              }).length === 0 && (
+                <p className="text-center text-xs text-slate-400 py-6">Không tìm thấy vật tư</p>
+              )}
             </div>
           </div>
         </div>
