@@ -99,6 +99,7 @@ export default function TonKhoPage() {
   const [customLoai, setCustomLoai] = useState("");
   const [customNhom, setCustomNhom] = useState("");
   const [saving, setSaving]       = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [recalcing, setRecalcing] = useState(false);
   const [groupByName, setGroupByName] = useState(false);
 
@@ -192,40 +193,53 @@ export default function TonKhoPage() {
 
   function openCreate() {
     setForm({ ma: "", ten: "", loai: "may", nhom: "", donVi: "cai", ghiChu: "" });
-    setCustomLoai(""); setCustomNhom("");
+    setCustomLoai(""); setCustomNhom(""); setSaveError("");
     setEditTarget(null);
     setModal("create");
   }
 
   function openEdit(t: TonKho) {
     setForm({ ma: t.vatTu.ma, ten: t.vatTu.ten, loai: t.vatTu.loai, nhom: t.vatTu.nhom || "", donVi: t.vatTu.donVi, ghiChu: t.vatTu.ghiChu || "" });
-    setCustomLoai(""); setCustomNhom("");
+    setCustomLoai(""); setCustomNhom(""); setSaveError("");
     setEditTarget(t);
     setModal("edit");
   }
 
   async function handleSave() {
-    if (!form.ma || !form.ten) return;
+    setSaveError("");
+    if (!form.ten.trim()) { setSaveError("Vui lòng nhập tên vật tư."); return; }
+    if (!form.ma.trim()) { setSaveError("Vui lòng nhập mã vật tư."); return; }
     setSaving(true);
-    const loaiFinal = form.loai === "__custom__" ? customLoai.trim() || "khac" : form.loai;
-    const nhomFinal = form.nhom === "__custom__" ? customNhom.trim() || null : (form.nhom || null);
-    const payload = { ...form, loai: loaiFinal, nhom: nhomFinal, ghiChu: form.ghiChu || null };
-    if (modal === "create") {
-      await fetch("/api/ke-toan/vat-tu", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } else if (modal === "edit" && editTarget) {
-      await fetch(`/api/ke-toan/vat-tu/${editTarget.vatTuId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    try {
+      const loaiFinal = form.loai === "__custom__" ? customLoai.trim() || "khac" : form.loai;
+      const nhomFinal = form.nhom === "__custom__" ? customNhom.trim() || null : (form.nhom || null);
+      const payload = { ...form, loai: loaiFinal, nhom: nhomFinal, ghiChu: form.ghiChu || null };
+      let res: Response;
+      if (modal === "create") {
+        res = await fetch("/api/ke-toan/vat-tu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else if (modal === "edit" && editTarget) {
+        res = await fetch(`/api/ke-toan/vat-tu/${editTarget.vatTuId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else return;
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setSaveError(d.error?.includes("Unique") || d.error?.includes("unique")
+          ? `Mã "${form.ma}" đã tồn tại, vui lòng dùng mã khác.`
+          : (d.error || "Lỗi không xác định."));
+        return;
+      }
+      setModal(null);
+      fetchAll();
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setModal(null);
-    fetchAll();
   }
 
   async function handleRecalc() {
@@ -599,8 +613,13 @@ export default function TonKhoPage() {
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               </div>
             </div>
+            {saveError && (
+              <div className="mx-6 mb-2 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">
+                {saveError}
+              </div>
+            )}
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={() => setModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Huỷ</button>
+              <button onClick={() => { setModal(null); setSaveError(""); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Huỷ</button>
               <button onClick={handleSave} disabled={saving}
                 className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50">
                 {saving ? "Đang lưu..." : "Lưu"}
