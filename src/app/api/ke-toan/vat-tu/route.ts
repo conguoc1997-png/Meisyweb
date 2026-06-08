@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         ...(nhom && { nhom }),
         ...(active !== null && { active: active !== "false" }),
       },
-      include: { tonKho: true },
+      include: { tonKho: { select: { soLuong: true, giaTrungBinh: true } } },
       orderBy: [{ loai: "asc" }, { nhom: "asc" }, { ten: "asc" }],
     });
     return NextResponse.json(items);

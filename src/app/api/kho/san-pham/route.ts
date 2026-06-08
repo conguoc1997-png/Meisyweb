@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 30; // cache 30s trên Vercel Edge
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
