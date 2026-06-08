@@ -320,9 +320,23 @@ export default function DinhMucPage() {
           ? <span className="text-lg">✓</span>
           : <span className="text-slate-200 text-base">—</span>;
       }
-      // !shared + CHUNG row: không áp dụng
+      // !shared + CHUNG row: hiển thị VatTu nguồn đã chọn (hoặc nút chọn)
       if (!col.shared && hangCat === CHUNG_KEY) {
-        return <span className="text-slate-200 text-base select-none">—</span>;
+        const chungItems = getChungItems(col);
+        if (chungItems.length > 0) {
+          const vt = vatTus.find(v => v.id === chungItems[0].vatTuId);
+          return (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]">{vt?.ten ?? "—"}</span>
+              <span className="text-[9px] text-slate-300">nguồn</span>
+            </div>
+          );
+        }
+        return (
+          <div className="w-8 h-8 rounded-xl mx-auto border-2 border-dashed border-slate-300 hover:border-blue-400 flex items-center justify-center text-slate-300 hover:text-blue-400 transition-all cursor-pointer">
+            <span className="text-base">+</span>
+          </div>
+        );
       }
       // CHUNG row (shared) hoặc product row (!shared): nút toggle
       return (
@@ -443,17 +457,9 @@ export default function DinhMucPage() {
                   <td key={col.key}
                     className={`px-2 py-3 text-center align-middle border-r border-indigo-100
                       ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}
-                      ${col.shared ? "cursor-pointer hover:bg-indigo-100/50 transition-colors" : "bg-indigo-50/30"}`}
-                    onClick={() => col.shared && openCell(CHUNG_KEY, col.key)}>
-                    {col.shared ? (
-                      <CellContent hangCat={CHUNG_KEY} col={col} />
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        <span className="text-xs text-indigo-300 flex items-center gap-1">
-                          <Lock size={10} /> riêng SP
-                        </span>
-                      </div>
-                    )}
+                      cursor-pointer hover:bg-indigo-100/50 transition-colors`}
+                    onClick={() => openCell(CHUNG_KEY, col.key)}>
+                    <CellContent hangCat={CHUNG_KEY} col={col} />
                   </td>
                 ))}
               </tr>
