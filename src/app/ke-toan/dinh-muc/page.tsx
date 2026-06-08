@@ -136,21 +136,15 @@ export default function DinhMucPage() {
     return { items: getOwnItems(hangCat, col), isChung: false };
   }
 
-  function getColVatTus(col: ColDef, q: string): VatTu[] {
+  function getColVatTus(_col: ColDef, q: string): VatTu[] {
     const lq = q.toLowerCase();
+    // Luôn hiện tất cả VatTu, filter theo search nếu có
     const matched = vatTus.filter(vt => {
-      // Khi có search query → hiện tất cả VatTu (không lọc theo loai/nhom)
-      if (q) return vt.ten.toLowerCase().includes(lq) || vt.ma.toLowerCase().includes(lq);
-      // Không có query → chỉ hiện VatTu cùng loai, nhom khớp hoặc null
-      if (vt.loai !== col.loai) return false;
-      if (col.nhom !== null && vt.nhom !== col.nhom && vt.nhom !== null) return false;
-      return true;
+      if (!q) return true;
+      return vt.ten.toLowerCase().includes(lq) || vt.ma.toLowerCase().includes(lq);
     });
-    // Ưu tiên: nhom khớp → nhom null → hết kho; trong mỗi nhóm ưu tiên có stock (sau quy đổi)
+    // Ưu tiên: có tồn kho trước, sau đó theo tên
     matched.sort((a, b) => {
-      const aMatch = a.nhom === col.nhom ? 0 : 1;
-      const bMatch = b.nhom === col.nhom ? 0 : 1;
-      if (aMatch !== bMatch) return aMatch - bMatch;
       const aStock = tonKhoMap.get(a.id)?.soLuongQD ?? 0;
       const bStock = tonKhoMap.get(b.id)?.soLuongQD ?? 0;
       if (aStock > 0 && bStock <= 0) return -1;
