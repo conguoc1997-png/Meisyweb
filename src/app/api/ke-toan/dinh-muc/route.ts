@@ -2,7 +2,20 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// One-time migration: thêm cột haoHui nếu chưa có
+let migrated = false;
+async function ensureHaoHui() {
+  if (migrated) return;
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "DinhMucNPL" ADD COLUMN IF NOT EXISTS "haoHui" FLOAT NOT NULL DEFAULT 0`
+    );
+    migrated = true;
+  } catch { migrated = true; }
+}
+
 export async function GET(req: NextRequest) {
+  await ensureHaoHui();
   try {
     const { searchParams } = new URL(req.url);
     const hangCat = searchParams.get("hangCat");
@@ -29,6 +42,7 @@ export async function POST(req: NextRequest) {
         hangCat:  body.hangCat,
         vatTuId:  body.vatTuId,
         soLuong:  body.soLuong,
+        haoHui:   body.haoHui   ?? 0,
         donViMua: body.donViMua ?? "m",
         quyDoi:   body.quyDoi   ?? 1,
         ghiChu:   body.ghiChu   || null,

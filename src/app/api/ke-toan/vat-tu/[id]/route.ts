@@ -34,7 +34,14 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    await prisma.vatTu.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      // Xoá các bản ghi liên quan trước
+      await tx.tonKhoVatTu.deleteMany({ where: { vatTuId: id } });
+      await tx.dinhMucNPL.deleteMany({ where: { vatTuId: id } });
+      await tx.chiTietNhapKho.deleteMany({ where: { vatTuId: id } });
+      await tx.phieuXuatChiTiet.deleteMany({ where: { vatTuId: id } });
+      await tx.vatTu.delete({ where: { id } });
+    });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });

@@ -30,12 +30,15 @@ export async function PATCH(
         soLuongMua: number;
         donViMua: string;
         quyDoi: number;
+        donViQuyDoi?: string; // đơn vị sau quy đổi (m, chiếc...)
         soLuong: number;
         donGia: number;
+        vat?: number;   // thuế VAT % (0 | 5 | 8 | 10 ...)
         ghiChu?: string;
       };
       const rows: RowInput[] = body.chiTiet;
-      const tongTien = rows.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
+      // tongTien bao gồm cả VAT
+      const tongTien = rows.reduce((s, r) => s + r.soLuongMua * r.donGia * (1 + (r.vat || 0) / 100), 0);
 
       // ── Phase 1: transaction tồn kho (không có CongNo để tránh timeout) ──
       let soPhieuCu = "";
@@ -47,16 +50,18 @@ export async function PATCH(
         if (!old) throw new Error("Không tìm thấy phiếu");
         soPhieuCu = old.soPhieu;
 
-        // Đảo tồn kho cũ
+        // Đảo tồn kho cũ (trừ soLuongMua ra khỏi tonKho, dùng giá đã có VAT)
         for (const row of old.chiTiet) {
           const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
           if (ton) {
-            const newSL = Math.max(0, ton.soLuong - row.soLuong);
-            const newGiaTri = Math.max(0, ton.soLuong * ton.giaTrungBinh - row.soLuong * row.donGia);
-            const newGia = newSL > 0 ? newGiaTri / newSL : ton.giaTrungBinh;
+            const slMuaCu = row.soLuongMua;
+            const giaVonCu = row.donGia * (1 + (row.vat || 0) / 100);
+            const newSL = Math.max(0, ton.soLuong - slMuaCu);
+            const newGT = Math.max(0, ton.giaTriTon - slMuaCu * giaVonCu);
+            const newGia = newSL > 0 ? newGT / newSL : ton.giaTrungBinh;
             await tx.tonKhoVatTu.update({
               where: { vatTuId: row.vatTuId },
-              data: { soLuong: newSL, giaTrungBinh: newGia, giaTriTon: newSL * newGia },
+              data: { soLuong: newSL, giaTrungBinh: newGia, giaTriTon: newGT },
             });
           }
         }
@@ -68,6 +73,7 @@ export async function PATCH(
         await tx.phieuNhapKho.update({
           where: { id },
           data: {
+            soPhieu:    body.soPhieu    || undefined,
             ngay:       body.ngay       ? new Date(body.ngay) : undefined,
             nhaCC:      body.nhaCC      ?? undefined,
             tenNhaCC:   body.tenNhaCC   ?? undefined,
@@ -80,32 +86,36 @@ export async function PATCH(
           },
         });
 
-        // Tạo chi tiết mới + cập nhật tồn kho
+        // Tạo chi tiết mới + cập nhật tồn kho (dùng soLuongMua nhất quán với donGia)
         for (const row of rows) {
           await tx.chiTietNhapKho.create({
             data: {
-              phieuId:    id,
-              vatTuId:    row.vatTuId,
-              soLuongMua: row.soLuongMua,
-              donViMua:   row.donViMua,
-              quyDoi:     row.quyDoi,
-              soLuong:    row.soLuong,
-              donGia:     row.donGia,
-              thanhTien:  row.soLuongMua * row.donGia,
-              ghiChu:     row.ghiChu || null,
+              phieuId:     id,
+              vatTuId:     row.vatTuId,
+              soLuongMua:  row.soLuongMua,
+              donViMua:    row.donViMua,
+              quyDoi:      row.quyDoi,
+              donViQuyDoi: row.donViQuyDoi || "",
+              soLuong:     row.soLuong,
+              donGia:      row.donGia,
+              vat:         row.vat || 0,
+              thanhTien:   row.soLuongMua * row.donGia * (1 + (row.vat || 0) / 100),
+              ghiChu:      row.ghiChu || null,
             },
           });
+          const slMua  = row.soLuongMua;
+          const giaVon = row.donGia * (1 + (row.vat || 0) / 100);
           const existing = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
           if (existing) {
-            const newSL = existing.soLuong + row.soLuong;
-            const newGT = existing.giaTriTon + row.soLuong * row.donGia;
+            const newSL = existing.soLuong + slMua;
+            const newGT = existing.giaTriTon + slMua * giaVon;
             await tx.tonKhoVatTu.update({
               where: { vatTuId: row.vatTuId },
-              data: { soLuong: newSL, giaTrungBinh: newSL > 0 ? newGT / newSL : row.donGia, giaTriTon: newGT },
+              data: { soLuong: newSL, giaTrungBinh: newSL > 0 ? newGT / newSL : giaVon, giaTriTon: newGT },
             });
           } else {
             await tx.tonKhoVatTu.create({
-              data: { vatTuId: row.vatTuId, soLuong: row.soLuong, giaTrungBinh: row.donGia, giaTriTon: row.soLuong * row.donGia },
+              data: { vatTuId: row.vatTuId, soLuong: slMua, giaTrungBinh: giaVon, giaTriTon: slMua * giaVon },
             });
           }
         }
@@ -114,12 +124,13 @@ export async function PATCH(
       // ── Phase 2: CongNo ngoài transaction (best-effort, không rollback phiếu nếu lỗi) ──
       try {
         const nccInfo = await prisma.nhaCungCap.findFirst({ where: { OR: [{ id: body.nhaCC }, { ma: body.nhaCC }] } });
+        const soPhieuMoi = body.soPhieu || soPhieuCu;
         await prisma.congNo.deleteMany({ where: { soChungTu: soPhieuCu, loai: "mua_hang" } });
         await prisma.congNo.create({
           data: {
             nhaCC:     body.nhaCC,
             ngay:      body.ngay ? new Date(body.ngay) : new Date(),
-            soChungTu: soPhieuCu,
+            soChungTu: soPhieuMoi,
             dienGiai:  `Nhập hàng ${nccInfo?.ten || body.nhaCC}`,
             loai:      "mua_hang",
             soTien:    tongTien,
@@ -170,10 +181,14 @@ export async function DELETE(
       for (const row of phieu.chiTiet) {
         const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: row.vatTuId } });
         if (ton) {
-          const newSoLuong = Math.max(0, ton.soLuong - row.soLuong);
+          const slMuaCu  = row.soLuongMua;
+          const giaVonCu = row.donGia * (1 + (row.vat || 0) / 100);
+          const newSL    = Math.max(0, ton.soLuong - slMuaCu);
+          const newGT    = Math.max(0, ton.giaTriTon - slMuaCu * giaVonCu);
+          const newGia   = newSL > 0 ? newGT / newSL : ton.giaTrungBinh;
           await tx.tonKhoVatTu.update({
             where: { vatTuId: row.vatTuId },
-            data: { soLuong: newSoLuong, giaTriTon: newSoLuong * ton.giaTrungBinh },
+            data: { soLuong: newSL, giaTrungBinh: newGia, giaTriTon: newGT },
           });
         }
       }

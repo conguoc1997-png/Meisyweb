@@ -2,11 +2,74 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
-  const loCatId = req.nextUrl.searchParams.get("loCatId");
-  if (!loCatId) return NextResponse.json({ error: "Missing loCatId" }, { status: 400 });
+type SuggestRow = {
+  type: "vai" | "phu_lieu";
+  vatTuId: string | null;
+  vatTu: { id: string; ma: string; ten: string; loai: string; donVi: string; nhom: string | null; tonKho: { soLuong: number; giaTrungBinh: number; giaTriTon: number } | null } | null;
+  maVai?: string;
+  soLuong: number;
+  donGia: number;
+  ghiChu: string;
+  source: "lo_cat" | "dinh_muc";
+};
 
-  const [lo, dinhMucs, vatTus] = await Promise.all([
+export async function GET(req: NextRequest) {
+  const loCatId   = req.nextUrl.searchParams.get("loCatId");
+  const hangCatQS = req.nextUrl.searchParams.get("hangCat");
+  const soSPQS    = req.nextUrl.searchParams.get("soSanPham");
+
+  // ── Chế độ 2: chỉ hangCat + soSanPham (không cần lô cắt) ──────────────
+  if (!loCatId && hangCatQS && soSPQS) {
+    const soSanPham = parseFloat(soSPQS) || 0;
+    const CHUNG_KEY = "__CHUNG__";
+
+    const [dinhMucsProduct, dinhMucsChung] = await Promise.all([
+      prisma.dinhMucNPL.findMany({
+        where: { hangCat: hangCatQS },
+        include: { vatTu: { include: { tonKho: true } } },
+      }),
+      prisma.dinhMucNPL.findMany({
+        where: { hangCat: CHUNG_KEY },
+        include: { vatTu: { include: { tonKho: true } } },
+      }),
+    ]);
+
+    // Merge: product-specific takes priority; CHUNG fills gaps (phu_lieu only, not vai)
+    const productVatTuIds = new Set(dinhMucsProduct.map(d => d.vatTuId));
+    const merged = [
+      ...dinhMucsProduct,
+      ...dinhMucsChung.filter(d => d.vatTu.loai !== "vai" && !productVatTuIds.has(d.vatTuId)),
+    ];
+
+    const rows: SuggestRow[] = merged.map(dm => {
+      const haoHui = (dm as { haoHui?: number }).haoHui ?? 0;
+      const heSoHao = 1 + haoHui / 100;
+      const soLuong = Math.round(dm.soLuong * soSanPham * heSoHao * 100) / 100;
+      const haoNote = haoHui > 0 ? ` +${haoHui}% hao` : "";
+      return {
+        type: dm.vatTu.loai === "vai" ? "vai" : "phu_lieu",
+        vatTuId: dm.vatTu.id,
+        vatTu: dm.vatTu,
+        soLuong,
+        donGia: dm.vatTu.tonKho?.giaTrungBinh ?? 0,
+        ghiChu: `Định mức ${dm.soLuong}/sp × ${soSanPham}sp${haoNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
+        source: "dinh_muc",
+      };
+    });
+
+    return NextResponse.json({
+      lo: null,
+      hangCat: hangCatQS,
+      soSanPham,
+      rows,
+    });
+  }
+
+  // ── Chế độ 1: theo lô cắt ─────────────────────────────────────────────
+  if (!loCatId) return NextResponse.json({ error: "Missing loCatId or (hangCat + soSanPham)" }, { status: 400 });
+
+  const CHUNG_KEY = "__CHUNG__";
+  const [lo, allDinhMucs, vatTus] = await Promise.all([
     prisma.loCat.findUnique({ where: { id: loCatId } }),
     prisma.dinhMucNPL.findMany({ include: { vatTu: { include: { tonKho: true } } } }),
     prisma.vatTu.findMany({ include: { tonKho: true } }),
@@ -15,21 +78,11 @@ export async function GET(req: NextRequest) {
   if (!lo) return NextResponse.json({ error: "Không tìm thấy lô" }, { status: 404 });
 
   const soSanPham = lo.hangThucTe ?? lo.soSanPham ?? 0;
-  const rows: {
-    type: "vai" | "phu_lieu";
-    vatTuId: string | null;
-    vatTu: (typeof vatTus)[0] | null;
-    maVai?: string;
-    soLuong: number;
-    donGia: number;
-    ghiChu: string;
-    source: "lo_cat" | "dinh_muc";
-  }[] = [];
+  const rows: SuggestRow[] = [];
 
   // ── 1. Hàng VẢI: lấy từ số liệu thực tế của lô cắt ──────────────────
   const soMet = lo.soM ?? 0;
   if (soMet > 0) {
-    // Tìm VatTu khớp với maVai (match mềm: theo ma hoặc ten)
     const maVaiLower = (lo.maVai || "").toLowerCase().trim();
     const vatTuVai = maVaiLower
       ? vatTus.find(v =>
@@ -56,18 +109,30 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // ── 2. PHỤ LIỆU: tính từ định mức × số SP ────────────────────────────
+  // ── 2. PHỤ LIỆU: tính từ định mức × số SP (product-specific + CHUNG fallback) ──
   if (lo.hangCat && soSanPham > 0) {
-    const dmHang = dinhMucs.filter(d => d.hangCat === lo.hangCat);
-    for (const dm of dmHang) {
-      const soLuong = Math.round(dm.soLuong * soSanPham / 100 * 100) / 100;
+    const dmProduct = allDinhMucs.filter(d => d.hangCat === lo.hangCat && d.vatTu.loai !== "vai");
+    const dmChung   = allDinhMucs.filter(d => d.hangCat === CHUNG_KEY  && d.vatTu.loai !== "vai");
+
+    // Product-specific takes priority; CHUNG fills gaps
+    const productVatTuIds = new Set(dmProduct.map(d => d.vatTuId));
+    const dmMerged = [
+      ...dmProduct,
+      ...dmChung.filter(d => !productVatTuIds.has(d.vatTuId)),
+    ];
+
+    for (const dm of dmMerged) {
+      const haoHui = (dm as { haoHui?: number }).haoHui ?? 0;
+      const heSoHao = 1 + haoHui / 100;
+      const soLuong = Math.round(dm.soLuong * soSanPham * heSoHao * 100) / 100;
+      const haoNote = haoHui > 0 ? ` +${haoHui}% hao` : "";
       rows.push({
         type: "phu_lieu",
         vatTuId: dm.vatTu.id,
         vatTu: dm.vatTu,
         soLuong,
         donGia: dm.vatTu.tonKho?.giaTrungBinh ?? 0,
-        ghiChu: `Định mức ${dm.soLuong}/${100}sp × ${soSanPham}sp`,
+        ghiChu: `Định mức ${dm.soLuong}/sp × ${soSanPham}sp${haoNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
         source: "dinh_muc",
       });
     }

@@ -65,6 +65,20 @@ const DON_VI_DEFAULT: Record<string, string> = {
 
 const DEFAULT_QUY_DOI: Record<string, number> = { m: 1, cay: 50, kg: 1.5 };
 
+// Map giá trị đơn vị raw → hiển thị có dấu
+const DON_VI_LABEL: Record<string, string> = {
+  m: "m", met: "m",
+  cay: "cây", kg: "kg",
+  cai: "cái", chiec: "chiếc",
+  cuon: "cuộn",
+  goi: "gói",
+  hop: "hộp",
+  bo: "bộ",
+  thuong: "thương",
+  set: "set",
+};
+const fmtDV = (dv: string) => DON_VI_LABEL[dv?.toLowerCase()] ?? dv;
+
 const TRANG_THAI_MAP: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   chua_thanh_toan:    { label: "Chưa TT",    color: "bg-yellow-100 text-yellow-700", icon: <Clock size={12} /> },
   thanh_toan_1_phan:  { label: "TT 1 phần",  color: "bg-blue-100 text-blue-700",    icon: <AlertCircle size={12} /> },
@@ -105,7 +119,9 @@ export default function NhapKhoPage() {
 
   // Mini-form thêm vật tư mới
   const [newVtModal, setNewVtModal] = useState<{ rowIdx: number } | null>(null);
-  const [newVtForm, setNewVtForm] = useState({ ten: "", loai: "phu_lieu", donVi: "cai", nhom: "" });
+  const [newVtForm, setNewVtForm] = useState({ ten: "", loai: "may", donVi: "cai", nhom: "" });
+  const [customLoai, setCustomLoai] = useState(""); // nhập tự do khi chọn "+ thêm"
+  const [customNhom, setCustomNhom] = useState(""); // nhập tự do khi chọn "+ thêm"
   const [savingVt, setSavingVt] = useState(false);
 
   const [form, setForm] = useState({
@@ -217,20 +233,27 @@ export default function NhapKhoPage() {
       ghiChu: p.ghiChu || "",
       nguoiTao: p.nguoiTao || "",
     });
-    setChiTiet(p.chiTiet.map(r => ({
-      id: r.id,
-      vatTuId: r.vatTuId,
-      vatTu: r.vatTu,
-      soLuongMua: r.soLuongMua,
-      donViMua: r.donViMua,
-      quyDoi: r.quyDoi,
-      soLuong: r.soLuong,
-      donViQuyDoi: "",
-      donGia: r.donGia,
-      thanhTien: r.thanhTien,
-      vat: 0,
-      ghiChu: r.ghiChu,
-    })));
+    setChiTiet(p.chiTiet.map(r => {
+      // Lấy donViQuyDoi: ưu tiên giá trị đã lưu trong DB, fallback từ QuyDoiDonVi hoặc donVi vật tư
+      const dvqd = (r as ChiTiet).donViQuyDoi
+        || autoFillQuyDoi(r.donViMua ?? "m", r.vatTu?.loai === "vai").donViQuyDoi
+        || r.vatTu?.donVi
+        || "";
+      return {
+        id: r.id,
+        vatTuId: r.vatTuId,
+        vatTu: r.vatTu,
+        soLuongMua: r.soLuongMua ?? 0,
+        donViMua: r.donViMua ?? "m",
+        quyDoi: r.quyDoi ?? 1,
+        soLuong: r.soLuong ?? 0,
+        donViQuyDoi: dvqd,
+        donGia: r.donGia ?? 0,
+        thanhTien: r.thanhTien ?? 0,
+        vat: r.vat ?? 0,
+        ghiChu: r.ghiChu ?? "",   // null → "" để tránh uncontrolled input
+      };
+    }));
     setVtSearch(p.chiTiet.map(() => ""));
     setModal("create");
   }
@@ -247,10 +270,12 @@ export default function NhapKhoPage() {
     if (!newVtForm.ten.trim() || !newVtModal) return;
     setSavingVt(true);
     const ma = "VT" + Date.now().toString().slice(-6);
+    const loaiFinal = newVtForm.loai === "__custom__" ? customLoai.trim() : newVtForm.loai;
+    const nhomFinal = newVtForm.nhom === "__custom__" ? customNhom.trim() : (newVtForm.nhom || null);
     const res = await fetch("/api/ke-toan/vat-tu", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ma, ten: newVtForm.ten.trim(), loai: newVtForm.loai, donVi: newVtForm.donVi, nhom: newVtForm.nhom || null }),
+      body: JSON.stringify({ ma, ten: newVtForm.ten.trim(), loai: loaiFinal, donVi: newVtForm.donVi, nhom: nhomFinal }),
     });
     setSavingVt(false);
     if (res.ok) {
@@ -258,7 +283,8 @@ export default function NhapKhoPage() {
       setVatTus(prev => [...prev, newVt]);
       updateRow(newVtModal.rowIdx, { vatTuId: newVt.id });
       setNewVtModal(null);
-      setNewVtForm({ ten: "", loai: "phu_lieu", donVi: "cai", nhom: "" });
+      setNewVtForm({ ten: "", loai: "may", donVi: "cai", nhom: "" });
+      setCustomLoai(""); setCustomNhom("");
     }
   }
 
@@ -311,6 +337,9 @@ export default function NhapKhoPage() {
     if (res.ok) {
       closeModal();
       fetchAll();
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      alert("❌ Lỗi khi lưu phiếu:\n" + (errData.error || `HTTP ${res.status}`));
     }
   }
 
@@ -402,7 +431,7 @@ export default function NhapKhoPage() {
               const tt = TRANG_THAI_MAP[p.trangThai] || TRANG_THAI_MAP.chua_thanh_toan;
               return (
                 <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-indigo-700 font-medium">{p.soPhieu}</td>
+                  <td className="px-4 py-3 text-indigo-700 font-medium">{p.soPhieu}</td>
                   <td className="px-4 py-3 text-slate-600">{fmtDate(p.ngay)}</td>
                   <td className="px-4 py-3 text-slate-700">
                     {nhaCCs.find(n => n.id === p.nhaCC)?.ten
@@ -456,7 +485,7 @@ export default function NhapKhoPage() {
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Số phiếu *</label>
                   <input value={form.soPhieu} onChange={e => setForm(f => ({ ...f, soPhieu: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Ngày nhập *</label>
@@ -518,8 +547,9 @@ export default function NhapKhoPage() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-56">Vật tư</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-24">ĐV mua</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-20">Số lượng</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 w-24">Quy đổi <span className="text-[10px]">(vải)</span></th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-20">≈ Tổng m <span className="text-[10px] text-teal-400">(vải)</span></th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 w-24">Quy đổi</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-700 w-24">ĐV sau QĐ</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-28">≈ Tổng QĐ</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-28">Đơn giá</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-28">Thành tiền</th>
                         <th className="px-3 py-2 text-center text-xs font-medium text-orange-500 w-16">VAT %</th>
@@ -529,22 +559,27 @@ export default function NhapKhoPage() {
                     </thead>
                     <tbody>
                       {chiTiet.map((row, i) => {
-                        const selectedVT = vatTus.find(v => v.id === row.vatTuId);
+                        const selectedVT = vatTus.find(v => v.id === row.vatTuId) ?? row.vatTu;
                         const isVai = selectedVT?.loai === "vai";
                         const filteredVTs = vatTus.filter(v => {
                           const q = (vtSearch[i] || "").trim().toLowerCase();
                           return !q || v.ten.toLowerCase().includes(q) || v.ma.toLowerCase().includes(q);
                         });
                         const dvInfo = isVai ? DON_VI_VAI.find(d => d.value === row.donViMua) : null;
-                        // Quy đổi vải: khi không phải mét; phụ liệu: khi có hệ số trong DB hoặc user đã nhập
                         const dbQD = !isVai ? quyDois.find(q => q.tuDonVi === row.donViMua) : null;
+                        // Vải: luôn hiện (kể cả mét — quyDoi=1); phụ liệu: hiện khi không phải "cai"
                         const showQD = isVai
-                          ? (dvInfo?.showQuyDoi ?? false)
-                          : (row.donViMua !== "cai" && row.donViMua !== "m"); // luôn cho phép nhập hệ số cho phụ liệu có đơn vị phức
+                          ? true
+                          : (row.donViMua !== "cai");
+                        const tongDonVi = isVai ? "m" : (row.donViQuyDoi || dbQD?.veDonVi || row.donViMua || "đv");
                         const quyDoiLabel = isVai
-                          ? (dvInfo?.placeholder || "m/ĐVT")
-                          : (dbQD ? `${dbQD.veDonVi}/${row.donViMua}` : (row.donViQuyDoi ? `${row.donViQuyDoi}/${row.donViMua}` : "đv nhỏ"));
-                        const tongLabel = isVai ? "m" : (row.donViQuyDoi || dbQD?.veDonVi || "đv");
+                          ? (dvInfo?.placeholder || `${tongDonVi}/${row.donViMua}`)
+                          : (dbQD
+                              ? `${dbQD.veDonVi}/${row.donViMua}`
+                              : row.donViQuyDoi
+                                ? `${row.donViQuyDoi}/${row.donViMua}`
+                                : row.donViMua === "m" ? "1:1" : `?/${row.donViMua}`);
+                        const tongLabel = tongDonVi;
 
                         return (
                           <tr key={i} className="border-t border-slate-100">
@@ -554,7 +589,7 @@ export default function NhapKhoPage() {
                                 <input
                                   value={vtSearch[i] && vtSearch[i].trim()
                                     ? vtSearch[i]
-                                    : (selectedVT ? `${selectedVT.ma} – ${selectedVT.ten}` : "")}
+                                    : (selectedVT ? selectedVT.ten : "")}
                                   onChange={e => {
                                     const ns = [...vtSearch]; ns[i] = e.target.value; setVtSearch(ns);
                                     if (!e.target.value) updateRow(i, { vatTuId: "" });
@@ -583,7 +618,6 @@ export default function NhapKhoPage() {
                                           updateRow(i, { vatTuId: v.id });
                                           const ns = [...vtSearch]; ns[i] = ""; setVtSearch(ns);
                                         }}>
-                                        <span className="font-mono text-slate-400 shrink-0">{v.ma}</span>
                                         <span className="text-slate-700">{v.ten}</span>
                                         <span className="text-slate-400 ml-auto shrink-0">{v.donVi}</span>
                                       </button>
@@ -593,7 +627,7 @@ export default function NhapKhoPage() {
                                       onClick={() => {
                                         const ns = [...vtSearch]; ns[i] = ""; setVtSearch(ns);
                                         setNewVtModal({ rowIdx: i });
-                                        setNewVtForm({ ten: vtSearch[i]?.trim() || "", loai: "phu_lieu", donVi: "cai", nhom: "" });
+                                        setNewVtForm({ ten: vtSearch[i]?.trim() || "", loai: "may", donVi: "cai", nhom: "" });
                                       }}
                                       className="w-full text-left px-3 py-2 text-xs text-indigo-600 hover:bg-indigo-50 font-medium border-t border-slate-100 flex items-center gap-1">
                                       <Plus size={11} /> Thêm vật tư mới...
@@ -624,21 +658,32 @@ export default function NhapKhoPage() {
                                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300" />
                             </td>
 
-                            {/* Quy đổi */}
+                            {/* Quy đổi (hệ số) */}
                             <td className="px-3 py-1.5 align-top">
                               {showQD ? (
-                                <div>
-                                  <input type="number" min={0} step="0.01" value={row.quyDoi || ""}
-                                    onChange={e => updateRow(i, { quyDoi: parseFloat(e.target.value) || 1 })}
-                                    className="w-full border border-indigo-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-indigo-50" />
-                                  <p className="text-[10px] text-slate-400 mt-0.5">{quyDoiLabel}</p>
-                                </div>
+                                <input type="number" min={0} step="0.01"
+                                  value={row.quyDoi || ""}
+                                  onChange={e => updateRow(i, { quyDoi: parseFloat(e.target.value) || 1 })}
+                                  className="w-full border border-indigo-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-indigo-50" />
                               ) : (
                                 <span className="text-xs text-slate-300 px-2">—</span>
                               )}
                             </td>
 
-                            {/* Tổng (quy đổi) — editable */}
+                            {/* ĐV sau quy đổi — luôn hiển thị, luôn editable */}
+                            <td className="px-3 py-1.5 align-top">
+                              <div className="flex items-center gap-0.5">
+                                <input
+                                  value={row.donViQuyDoi || tongDonVi}
+                                  onChange={e => updateRow(i, { donViQuyDoi: e.target.value })}
+                                  placeholder="đvị"
+                                  className="w-full border border-teal-200 rounded-lg px-2 py-1.5 text-xs text-center font-medium text-teal-700 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50"
+                                />
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5 text-center">/{fmtDV(row.donViMua)}</p>
+                            </td>
+
+                            {/* Tổng quy đổi */}
                             <td className="px-3 py-1.5 align-top">
                               {showQD ? (
                                 <div>
@@ -648,24 +693,25 @@ export default function NhapKhoPage() {
                                     onChange={e => updateRow(i, { soLuong: parseFloat(e.target.value) || 0 })}
                                     className="w-full border border-teal-200 rounded-lg px-2 py-1.5 text-xs text-right font-semibold text-teal-700 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50"
                                   />
-                                  <p className="text-[10px] text-slate-400 mt-0.5">{tongLabel}</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                                    {row.donViQuyDoi || tongLabel}
+                                  </p>
                                 </div>
                               ) : (
                                 <span className="text-xs text-slate-300">—</span>
                               )}
                             </td>
 
-                            {/* Đơn giá */}
+                            {/* Đơn giá — luôn tính theo ĐV mua */}
                             <td className="px-3 py-1.5 align-top">
                               <div>
                                 <input type="number" min={0} value={row.donGia || ""}
                                   onChange={e => updateRow(i, { donGia: parseFloat(e.target.value) || 0 })}
                                   className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300" />
-                                {row.donViMua !== "m" && row.donViMua !== "cai" && row.soLuong > 0 && row.donGia > 0 && (
-                                  <p className="text-[10px] text-slate-400 mt-0.5">
-                                    ≈ {fmt(Math.round(row.soLuongMua * row.donGia / row.soLuong))}₫/{tongLabel}
-                                  </p>
-                                )}
+                                {/* Nhãn đơn vị giá: đ/cây, đ/kg, đ/m... */}
+                                <p className="text-[10px] text-slate-400 mt-0.5 text-right">
+                                  đ/{fmtDV(row.donViMua) || "đv"}
+                                </p>
                               </div>
                             </td>
 
@@ -751,7 +797,7 @@ export default function NhapKhoPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
-                <h2 className="text-lg font-bold text-slate-800 font-mono">{selected.soPhieu}</h2>
+                <h2 className="text-lg font-bold text-slate-800">{selected.soPhieu}</h2>
                 <p className="text-xs text-slate-400">
                   {nhaCCs.find(n => n.id === selected.nhaCC)?.ten
                     || (selected.nhaCC === "khac" && selected.tenNhaCC ? selected.tenNhaCC : null)
@@ -801,19 +847,25 @@ export default function NhapKhoPage() {
                       <tr key={i} className="border-t border-slate-50">
                         <td className="px-3 py-2">
                           <p className="font-medium text-slate-700">{r.vatTu?.ten || r.vatTuId}</p>
-                          {r.vatTu && <p className="text-[10px] text-slate-400">{r.vatTu.ma} · {r.vatTu.nhom || r.vatTu.loai}</p>}
+                          {r.vatTu && <p className="text-[10px] text-slate-400">{r.vatTu.nhom || r.vatTu.loai}</p>}
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-600">
-                          {r.soLuongMua} {r.donViMua}
+                          {r.soLuongMua} {fmtDV(r.donViMua)}
                           {isVaiRow && r.donViMua !== "m" && r.quyDoi !== 1 && (
-                            <span className="text-slate-400"> × {r.quyDoi} m/{r.donViMua}</span>
+                            <span className="text-slate-400"> × {r.quyDoi} m/{fmtDV(r.donViMua)}</span>
                           )}
                         </td>
                         <td className="px-3 py-2 text-xs font-semibold">
-                          {isVaiRow
-                            ? <span className="text-teal-600">{fmt(r.soLuong)} m</span>
-                            : <span className="text-slate-500">{fmt(r.soLuongMua)} {r.donViMua}</span>
-                          }
+                          {isVaiRow ? (
+                            <span className="text-teal-600">{fmt(r.soLuong)} m</span>
+                          ) : (r as ChiTiet).donViQuyDoi && (r as ChiTiet).donViQuyDoi !== r.donViMua && (r.quyDoi ?? 1) !== 1 ? (
+                            <span className="text-teal-600">
+                              {fmt(r.soLuongMua * (r.quyDoi ?? 1))} {fmtDV((r as ChiTiet).donViQuyDoi)}
+                              <span className="text-slate-400 font-normal ml-1">({r.soLuongMua} {fmtDV(r.donViMua)})</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">{fmt(r.soLuongMua)} {fmtDV(r.donViMua)}</span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right text-xs">{fmt(r.donGia)}₫</td>
                         <td className="px-3 py-2 text-right font-semibold">{fmt(r.thanhTien)}₫</td>
@@ -856,28 +908,86 @@ export default function NhapKhoPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Loại</label>
-                  <select value={newVtForm.loai} onChange={e => setNewVtForm(f => ({ ...f, loai: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    <option value="vai">Vải</option>
-                    <option value="phu_lieu">Phụ liệu</option>
-                    <option value="dong_goi">Đóng gói</option>
-                  </select>
+                  {newVtForm.loai === "__custom__" ? (
+                    <div className="flex gap-1">
+                      <input autoFocus value={customLoai} onChange={e => setCustomLoai(e.target.value)}
+                        placeholder="Nhập tên loại mới..."
+                        className="flex-1 border border-indigo-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                      <button onClick={() => setNewVtForm(f => ({ ...f, loai: "may" }))}
+                        className="px-2 py-1 text-slate-400 hover:text-slate-600 text-lg">✕</button>
+                    </div>
+                  ) : (
+                    <select value={newVtForm.loai} onChange={e => {
+                      const loai = e.target.value;
+                      const defaultDonVi = loai === "vai" ? "cay" : "cai";
+                      setNewVtForm(f => ({ ...f, loai, nhom: "", donVi: defaultDonVi }));
+                    }}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                      <option value="vai">Vải</option>
+                      <option value="may">May</option>
+                      <option value="gia_cong">Gia công</option>
+                      <option value="hoan_thien">Hoàn thiện</option>
+                      <option value="phu_lieu">Phụ liệu (cũ)</option>
+                      <option value="__custom__">➕ Thêm loại mới...</option>
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Đơn vị</label>
                   <select value={newVtForm.donVi} onChange={e => setNewVtForm(f => ({ ...f, donVi: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    <option value="cai">Cái</option>
-                    <option value="goi">Gói</option>
-                    <option value="cuon">Cuộn</option>
-                    <option value="m">Mét (m)</option>
-                    <option value="kg">KG</option>
-                    <option value="hop">Hộp</option>
-                    <option value="bo">Bộ</option>
-                    <option value="cay">Cây</option>
+                    {newVtForm.loai === "vai" ? (
+                      <>
+                        <option value="cay">Cây</option>
+                        <option value="m">Mét (m)</option>
+                        <option value="kg">KG</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="cai">Cái</option>
+                        <option value="chiec">Chiếc</option>
+                        <option value="goi">Gói</option>
+                        <option value="cuon">Cuộn</option>
+                        <option value="hop">Hộp</option>
+                        <option value="bo">Bộ</option>
+                        <option value="kg">KG</option>
+                        <option value="m">Mét (m)</option>
+                        <option value="thuong">Thương</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
+              {newVtForm.loai !== "vai" && (() => {
+                const NHOM_OPTS: Record<string, { value: string; label: string }[]> = {
+                  may:        [{ value:"lot", label:"Lót" }, { value:"chi", label:"Chỉ" }, { value:"khoa_keo", label:"Khoá kéo" }, { value:"mac", label:"Mác" }, { value:"khac", label:"Khác" }],
+                  gia_cong:   [{ value:"cuc", label:"Cúc" }, { value:"dinh_tan", label:"Đinh tán" }, { value:"mac_da", label:"Mác da" }, { value:"khac", label:"Khác" }],
+                  hoan_thien: [{ value:"giat_mau", label:"Giặt màu" }, { value:"giat_vi_sinh", label:"Giặt vi sinh" }, { value:"may", label:"May" }, { value:"mac_lung", label:"Mác lưng" }, { value:"khac", label:"Khác" }],
+                  phu_lieu:   [{ value:"khoa_keo", label:"Khoá kéo" }, { value:"cuc", label:"Cúc" }, { value:"dinh_tan", label:"Đinh tán" }, { value:"lot", label:"Lót" }, { value:"chi", label:"Chỉ" }, { value:"khac", label:"Khác" }],
+                };
+                const opts = NHOM_OPTS[newVtForm.loai] ?? [];
+                return (
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">Nhóm</label>
+                    {newVtForm.nhom === "__custom__" ? (
+                      <div className="flex gap-1">
+                        <input autoFocus value={customNhom} onChange={e => setCustomNhom(e.target.value)}
+                          placeholder="Nhập tên nhóm mới..."
+                          className="flex-1 border border-indigo-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        <button onClick={() => setNewVtForm(f => ({ ...f, nhom: "" }))}
+                          className="px-2 py-1 text-slate-400 hover:text-slate-600 text-lg">✕</button>
+                      </div>
+                    ) : (
+                      <select value={newVtForm.nhom} onChange={e => setNewVtForm(f => ({ ...f, nhom: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">— Chọn nhóm —</option>
+                        {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        <option value="__custom__">➕ Thêm nhóm mới...</option>
+                      </select>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
               <button onClick={() => setNewVtModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>

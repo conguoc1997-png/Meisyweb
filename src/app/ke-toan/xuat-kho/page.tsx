@@ -5,6 +5,7 @@ import { Plus, Search, X, Trash2, Eye, AlertCircle, CheckCircle, Layers, Package
 
 type VatTu = { id: string; ma: string; ten: string; donVi: string; nhom: string | null; loai: string };
 type TonKho = { soLuong: number; giaTrungBinh: number };
+type SanPham = { id: string; ten: string; sku: string; mauSac: string | null; size: string | null; tonKho: number };
 
 type SuggestRow = {
   type: "vai" | "phu_lieu";
@@ -56,12 +57,16 @@ export default function XuatKhoPage() {
   const [phieus, setPhieus]   = useState<PhieuXuat[]>([]);
   const [vatTus, setVatTus]   = useState<(VatTu & { tonKho?: TonKho })[]>([]);
   const [loCats, setLoCats]   = useState<LoCat[]>([]);
+  const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
   const [modal, setModal]     = useState<"create" | "view" | null>(null);
   const [selected, setSelected] = useState<PhieuXuat | null>(null);
 
   // Form
+  const [xuatMode, setXuatMode] = useState<"lo_cat" | "san_pham">("lo_cat");
+  const [spSearch, setSpSearch] = useState("");
+  const [selectedSP, setSelectedSP] = useState<{ ten: string; totalTon: number } | null>(null);
   const [form, setForm] = useState({
     soPhieu: genSoPhieu(),
     ngay: new Date().toISOString().slice(0, 10),
@@ -84,15 +89,17 @@ export default function XuatKhoPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, v, l] = await Promise.all([
+      const [p, v, l, sp] = await Promise.all([
         fetch("/api/ke-toan/xuat-kho").then(r => r.json()),
         fetch("/api/ke-toan/vat-tu").then(r => r.json()),
         fetch("/api/san-xuat/lo-cat?limit=300").then(r => r.json()).catch(() => []),
+        fetch("/api/kho/san-pham").then(r => r.json()).catch(() => []),
       ]);
       setPhieus(Array.isArray(p) ? p : []);
       setVatTus(Array.isArray(v) ? v : []);
       const loData = Array.isArray(l) ? l : (Array.isArray(l?.data) ? l.data : []);
       setLoCats(loData);
+      setSanPhams(Array.isArray(sp) ? sp : []);
     } catch (e) {
       console.error("fetchAll xuat-kho:", e);
     } finally {
@@ -124,6 +131,33 @@ export default function XuatKhoPage() {
       soSanPham: String(data.soSanPham || ""),
     }));
 
+    const newRows: XuatRow[] = (data.rows as SuggestRow[]).map(r => ({
+      type: r.type,
+      vatTuId: r.vatTuId || "__UNMAPPED__",
+      vatTu: r.vatTu || undefined,
+      soLuong: r.soLuong,
+      donGia: r.donGia,
+      ghiChu: r.ghiChu,
+      source: r.source,
+      warned: !r.vatTuId,
+    }));
+    setRows(newRows);
+    setVtSearch(newRows.map(() => ""));
+  }
+
+  // Khi số sản phẩm thay đổi trong chế độ sản phẩm → tải lại suggest
+  async function onSoSanPhamSP(soSP: string) {
+    setForm(f => ({ ...f, soSanPham: soSP }));
+    const hangCat = form.hangCat;
+    const spNum = parseFloat(soSP) || 0;
+    if (!hangCat || spNum <= 0) return;
+
+    setSuggestLoad(true);
+    const res = await fetch(`/api/ke-toan/xuat-kho/suggest?hangCat=${encodeURIComponent(hangCat)}&soSanPham=${spNum}`);
+    setSuggestLoad(false);
+    if (!res.ok) return;
+
+    const data = await res.json();
     const newRows: XuatRow[] = (data.rows as SuggestRow[]).map(r => ({
       type: r.type,
       vatTuId: r.vatTuId || "__UNMAPPED__",
@@ -324,24 +358,96 @@ export default function XuatKhoPage() {
                   <input value={form.nguoiTao} onChange={e => setForm(f => ({ ...f, nguoiTao: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
-                <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-500 block mb-1">
-                    Chọn lô cắt
-                    <span className="ml-1.5 text-indigo-400 font-normal">— tự điền vải từ lô + phụ liệu từ định mức</span>
-                  </label>
-                  <select value={form.loCatId} onChange={e => onSelectLo(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    <option value="">— Chọn lô cắt —</option>
-                    {loCats.map(l => (
-                      <option key={l.id} value={l.id}>
-                        {fmtDate(l.ngay)} · {l.hangCat}
-                        {l.maVai ? ` · ${l.maVai}` : ""}
-                        {` · ${l.hangThucTe ?? l.soSanPham ?? "?"} sp`}
-                        {l.soM ? ` · ${l.soM}m` : ""}
-                      </option>
-                    ))}
-                  </select>
+
+                {/* ── Chế độ xuất ── */}
+                <div className="col-span-3">
+                  <div className="flex rounded-xl border border-slate-200 overflow-hidden w-fit">
+                    <button onClick={() => { setXuatMode("lo_cat"); setRows([]); setVtSearch([]); setSelectedSP(null); setSpSearch(""); setForm(f => ({ ...f, loCatId: "", hangCat: "", soSanPham: "" })); }}
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${xuatMode === "lo_cat" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+                      📋 Theo lô cắt
+                    </button>
+                    <button onClick={() => { setXuatMode("san_pham"); setRows([]); setVtSearch([]); setForm(f => ({ ...f, loCatId: "", hangCat: "", soSanPham: "" })); }}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-l border-slate-200 ${xuatMode === "san_pham" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+                      📦 Theo sản phẩm
+                    </button>
+                  </div>
                 </div>
+
+                {xuatMode === "lo_cat" ? (
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-slate-500 block mb-1">
+                      Chọn lô cắt
+                      <span className="ml-1.5 text-indigo-400 font-normal">— tự điền vải từ lô + phụ liệu từ định mức</span>
+                    </label>
+                    <select value={form.loCatId} onChange={e => onSelectLo(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                      <option value="">— Chọn lô cắt —</option>
+                      {loCats.map(l => (
+                        <option key={l.id} value={l.id}>
+                          {fmtDate(l.ngay)} · {l.hangCat}
+                          {l.maVai ? ` · ${l.maVai}` : ""}
+                          {` · ${l.hangThucTe ?? l.soSanPham ?? "?"} sp`}
+                          {l.soM ? ` · ${l.soM}m` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <>
+                    <div className="col-span-2 relative">
+                      <label className="text-xs font-medium text-slate-500 block mb-1">
+                        Chọn sản phẩm từ kho
+                        <span className="ml-1.5 text-indigo-400 font-normal">— tự tính NPL từ định mức</span>
+                      </label>
+                      <input value={selectedSP ? selectedSP.ten : spSearch}
+                        onChange={e => { setSpSearch(e.target.value); setSelectedSP(null); setForm(f => ({ ...f, hangCat: "", soSanPham: "" })); setRows([]); }}
+                        placeholder="Tìm tên sản phẩm..."
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                      {!selectedSP && spSearch && (() => {
+                        const q = spSearch.toLowerCase();
+                        const uniqueNames = [...new Set(sanPhams.map(s => s.ten))].filter(n => n.toLowerCase().includes(q));
+                        if (!uniqueNames.length) return null;
+                        return (
+                          <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto mt-1">
+                            {uniqueNames.slice(0, 12).map(name => {
+                              const spItems = sanPhams.filter(s => s.ten === name);
+                              const totalTon = spItems.reduce((s, sp) => s + sp.tonKho, 0);
+                              return (
+                                <button key={name} onClick={() => {
+                                  setSelectedSP({ ten: name, totalTon });
+                                  setSpSearch("");
+                                  setForm(f => ({ ...f, hangCat: name }));
+                                }} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-50 last:border-0">
+                                  <p className="text-sm font-medium text-slate-800">{name}</p>
+                                  <p className="text-xs text-slate-400">{spItems.length} màu/size · tồn {totalTon} sp</p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                      {selectedSP && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className="text-xs text-slate-500">Tồn kho: <strong>{selectedSP.totalTon} sp</strong></span>
+                          <button onClick={() => { setSelectedSP(null); setSpSearch(""); setForm(f => ({ ...f, hangCat: "", soSanPham: "" })); setRows([]); }}
+                            className="text-xs text-red-400 hover:text-red-600">✕ Đổi</button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Số sản phẩm xuất *</label>
+                      <input type="number" min={1} value={form.soSanPham}
+                        onChange={e => onSoSanPhamSP(e.target.value)}
+                        disabled={!form.hangCat}
+                        placeholder={form.hangCat ? "Nhập số lượng..." : "Chọn SP trước"}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-40" />
+                      {form.hangCat && !rows.length && !suggestLoad && parseFloat(form.soSanPham) > 0 && (
+                        <p className="text-xs text-amber-500 mt-1">⚠ Chưa có định mức cho &quot;{form.hangCat}&quot;</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Ghi chú</label>
                   <input value={form.ghiChu} onChange={e => setForm(f => ({ ...f, ghiChu: e.target.value }))}

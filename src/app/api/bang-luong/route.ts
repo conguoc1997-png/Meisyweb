@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       const luongChinh = luongNgay * ngayCong;
       const pcAn       = phuCapAn * ngayDiLam;
       const pcChuyenCan = ngayVang === 0 ? phuCapCC : 0; // mất chuyên cần nếu có ngày vắng
-      const luongTC    = tongTC > 0 ? (luongCB / NGAY_CHUAN / 8) * heSoTC * tongTC : 0;
+      const luongTC    = tongTC > 0 ? heSoTC * tongTC : 0; // heSoTC = VND/giờ (flat rate)
       const tongLuong  = luongChinh + pcAn + pcChuyenCan + luongTC;
 
       return {

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ===================== MODULE AUTH =====================
@@ -279,7 +280,8 @@ model DinhMucNPL {
   id        String   @id @default(cuid())
   hangCat   String   // mã/tên loại hàng, e.g. "Áo sơ mi", "Quần short"
   vatTuId   String
-  soLuong   Float    // định mức / 100 sản phẩm (theo đơn vị cơ bản)
+  soLuong   Float    // định mức / 1 sản phẩm (theo đơn vị cơ bản)
+  haoHui    Float    @default(0)   // % hao hụt (VD: 3 = 3%), tự động cộng vào khi xuất
   donViMua  String   @default("m") // đơn vị mua (có thể khác đơn vị cơ bản)
   quyDoi    Float    @default(1)   // hệ số quy đổi sang đơn vị cơ bản
   ghiChu    String?
@@ -379,8 +381,10 @@ model ChiTietNhapKho {
   soLuongMua  Float   @default(0) // số lượng theo đơn vị mua (cây, kg, m...)
   donViMua    String  @default("m") // đơn vị mua: m | cay | kg
   quyDoi      Float   @default(1)   // hệ số: soLuong = soLuongMua × quyDoi
+  donViQuyDoi String? @default("")  // đơn vị sau quy đổi (m, chiếc...) — lưu từ form nhập
   soLuong     Float   // tổng theo đơn vị tồn kho (m)
   donGia      Float   // giá / donViMua
+  vat         Float   @default(0)   // thuế VAT %
   thanhTien   Float
   ghiChu      String?
 
