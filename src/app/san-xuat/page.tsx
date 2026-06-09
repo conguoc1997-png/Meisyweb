@@ -165,6 +165,7 @@ export default function SanXuatPage() {
   };
 
   const [xuatKhoLoading, setXuatKhoLoading] = useState<Set<string>>(new Set());
+  const [hoanTacLoading, setHoanTacLoading] = useState<Set<string>>(new Set());
   const [losCat, setLosCat] = useState<LoCat[]>([]);
   const [allLoCat, setAllLoCat] = useState<LoCat[]>([]);
   const [filterThang, setFilterThang] = useState(() => {
@@ -764,6 +765,27 @@ export default function SanXuatPage() {
       body: JSON.stringify({ [field]: newVal }),
     }).catch(() => fetchData());
 
+  };
+
+  const handleHoanTac = async (lo: LoCat) => {
+    if (!confirm(`Hoàn tác xuất kho cho lô "${lo.hangCat}"?\nTồn kho NPL sẽ được hoàn trả lại.`)) return;
+    setHoanTacLoading(prev => new Set(prev).add(lo.id));
+    try {
+      const res = await fetch("/api/ke-toan/xuat-kho/hoan-tac", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loCatId: lo.id }),
+      }).then(r => r.json());
+      if (res.ok) {
+        const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: false } : l);
+        setLosCat(update); setAllLoCat(update);
+      } else {
+        alert(`⚠️ Hoàn tác: ${res.error ?? "Lỗi không xác định"}`);
+      }
+    } catch {
+      alert("⚠️ Lỗi kết nối khi hoàn tác");
+    } finally {
+      setHoanTacLoading(prev => { const s = new Set(prev); s.delete(lo.id); return s; });
+    }
   };
 
   const handleXuatKho = async (lo: LoCat) => {
@@ -1783,10 +1805,24 @@ export default function SanXuatPage() {
                           <td className="px-4 py-3 text-slate-600">{lo.xuong ? (XUONG_LABEL[lo.xuong] ?? lo.xuong) : "—"}</td>
                           <td className="px-4 py-3 text-center">
                             {lo.xuatHoaDonDa ? (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Đã xuất
-                              </span>
+                              <div className="inline-flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Đã xuất
+                                </span>
+                                <button
+                                  onClick={() => handleHoanTac(lo)}
+                                  disabled={hoanTacLoading.has(lo.id)}
+                                  title="Hoàn tác xuất kho"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-400 hover:text-rose-500 text-xs transition disabled:opacity-40">
+                                  {hoanTacLoading.has(lo.id) ? (
+                                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40" strokeDashoffset="10"/></svg>
+                                  ) : (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
+                                  )}
+                                  Hoàn tác
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 onClick={() => handleXuatKho(lo)}
