@@ -78,6 +78,16 @@ const DON_VI_OPTIONS = [
 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
 
+const DON_VI_LABEL: Record<string, string> = {
+  m: "m", met: "m", yard: "yard", kg: "kg",
+  cay: "cây", cai: "cái", chiec: "chiếc", cuon: "cuộn",
+  goi: "gói", hop: "hộp", bo: "bộ", thuong: "thương", set: "set",
+};
+const fmtDV = (dv?: string | null) => {
+  if (!dv) return "";
+  return DON_VI_LABEL[dv.toLowerCase()] ?? dv;
+};
+
 const LOAI_COLOR: Record<string, string> = {
   vai:        "bg-teal-100 text-teal-700",
   may:        "bg-blue-100 text-blue-700",
@@ -417,17 +427,18 @@ export default function TonKhoPage() {
               <th className="px-4 py-3 font-semibold text-slate-600">Tên vật tư</th>
               <th className="px-4 py-3 font-semibold text-slate-600">Loại / Nhóm</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-right">Tồn kho</th>
-              <th className="px-4 py-3 font-semibold text-slate-600 text-right">Đơn vị</th>
-              <th className="px-4 py-3 font-semibold text-teal-600 text-right">Quy đổi</th>
+              <th className="px-4 py-3 font-semibold text-slate-600 text-center">Đơn vị</th>
+              <th className="px-4 py-3 font-semibold text-teal-600 text-right">SL quy đổi</th>
+              <th className="px-4 py-3 font-semibold text-teal-600 text-center">Đơn vị QĐ</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-right">Giá TB</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-right">Giá trị tồn</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={groupByName ? 9 : 10} className="text-center py-12 text-slate-400">Đang tải...</td></tr>}
+            {loading && <tr><td colSpan={10} className="text-center py-12 text-slate-400">Đang tải...</td></tr>}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={groupByName ? 9 : 10} className="text-center py-12 text-slate-400 space-y-2">
+              <tr><td colSpan={10} className="text-center py-12 text-slate-400 space-y-2">
                 <PackageCheck size={32} className="mx-auto text-slate-300" />
                 <p>Chưa có dữ liệu tồn kho</p>
               </td></tr>
@@ -466,24 +477,19 @@ export default function TonKhoPage() {
                     <span className="ml-1.5 text-[10px] text-indigo-400">({g.items.length} mã)</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-500">{g.donVi}</td>
-                {/* Quy đổi (grouped: sum soLuongQD) */}
+                <td className="px-4 py-3 text-center text-slate-500">{fmtDV(g.donVi)}</td>
+                {/* SL quy đổi */}
                 <td className="px-4 py-3 text-right">
                   {(() => {
                     const totalQD = g.items.reduce((s, t) => s + (t.soLuongQD ?? t.soLuong), 0);
-                    const dvQD = g.items.find(t => t.donViQuyDoi && t.donViQuyDoi !== t.donViMua)?.donViQuyDoi ?? null;
-                    const hasConv = dvQD != null && g.items.some(t => (t.quyDoi ?? 1) !== 1);
-                    return hasConv ? (
-                      <div className="space-y-0.5">
-                        <div>
-                          <span className="font-semibold text-teal-700">{fmt(Math.round(totalQD * 100) / 100)}</span>
-                          <span className="text-xs text-teal-500 ml-1">{dvQD}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          ({fmt(Math.round(g.soLuong * 100) / 100)} {g.donVi})
-                        </div>
-                      </div>
-                    ) : <span className="text-xs text-slate-300">—</span>;
+                    return <span className="font-semibold text-teal-700">{fmt(Math.round(totalQD * 100) / 100)}</span>;
+                  })()}
+                </td>
+                {/* Đơn vị QĐ */}
+                <td className="px-4 py-3 text-center">
+                  {(() => {
+                    const dvQD = g.items.find(t => t.donViQuyDoi)?.donViQuyDoi ?? g.donVi;
+                    return <span className="text-xs text-teal-600 font-medium">{fmtDV(dvQD)}</span>;
                   })()}
                 </td>
                 <td className="px-4 py-3 text-right text-slate-600">{fmt(Math.round(g.giaTrungBinh))}₫</td>
@@ -524,22 +530,18 @@ export default function TonKhoPage() {
                   {t.vatTu.nhom && <span className="ml-1.5 text-xs text-slate-400">{NHOM_LABEL[t.vatTu.nhom] ?? t.vatTu.nhom}</span>}
                 </td>
                 <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(t.soLuong)}</td>
-                <td className="px-4 py-3 text-right text-slate-500">{t.donViMua ?? t.vatTu.donVi}</td>
-                {/* Quy đổi — hiện cả sau và trước quy đổi */}
+                <td className="px-4 py-3 text-center text-slate-500">{fmtDV(t.donViMua ?? t.vatTu.donVi)}</td>
+                {/* SL quy đổi — luôn hiện, nếu không quy đổi = soLuong */}
                 <td className="px-4 py-3 text-right">
-                  {(t.quyDoi ?? 1) !== 1 && t.donViQuyDoi && t.donViQuyDoi !== t.donViMua ? (
-                    <div className="space-y-0.5">
-                      <div>
-                        <span className="font-semibold text-teal-700">{fmt(Math.round(t.soLuongQD * 100) / 100)}</span>
-                        <span className="text-xs text-teal-500 ml-1">{t.donViQuyDoi}</span>
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        ({fmt(Math.round(t.soLuong * 100) / 100)} {t.donViMua ?? t.vatTu.donVi})
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-300">—</span>
-                  )}
+                  <span className={`font-semibold ${(t.quyDoi ?? 1) !== 1 ? "text-teal-700" : "text-slate-500"}`}>
+                    {fmt(Math.round((t.soLuongQD ?? t.soLuong) * 100) / 100)}
+                  </span>
+                </td>
+                {/* Đơn vị QĐ — luôn hiện */}
+                <td className="px-4 py-3 text-center">
+                  <span className={`text-xs font-medium ${(t.quyDoi ?? 1) !== 1 ? "text-teal-600" : "text-slate-400"}`}>
+                    {fmtDV(t.donViQuyDoi ?? t.vatTu.donVi)}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-right text-slate-600">{fmt(Math.round(t.giaTrungBinh))}₫</td>
                 <td className="px-4 py-3 text-right font-bold text-indigo-700">{fmt(Math.round(t.giaTriTon))}₫</td>
@@ -557,7 +559,7 @@ export default function TonKhoPage() {
           {filtered.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-slate-200 bg-slate-50">
-                <td colSpan={groupByName ? 6 : 7} className="px-4 py-3 font-semibold text-slate-700 text-right">Tổng giá trị tồn kho:</td>
+                <td colSpan={groupByName ? 7 : 8} className="px-4 py-3 font-semibold text-slate-700 text-right">Tổng giá trị tồn kho:</td>
                 <td className="px-4 py-3 text-right font-bold text-indigo-700 text-base">
                   {fmt(Math.round(groupByName ? groupedStats.giaTriTon : stats.giaTriTon))}₫
                 </td>
