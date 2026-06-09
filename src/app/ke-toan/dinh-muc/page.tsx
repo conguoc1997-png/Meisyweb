@@ -163,34 +163,56 @@ export default function DinhMucPage() {
 
   /* ── Toggle tick (tickOnly cols) ───────────────────────────────────────── */
   const [ticking, setTicking] = useState<string|null>(null); // "hangCat:colKey"
+
+  /** Optimistic: cập nhật dinhMucs ngay, API chạy nền */
+  function optimisticRemove(ids: string[]) {
+    setDinhMucs(prev => prev.filter(dm => !ids.includes(dm.id)));
+  }
+  function optimisticAdd(tempDm: DinhMuc) {
+    setDinhMucs(prev => [...prev, tempDm]);
+  }
+  function optimisticReplace(tempId: string, realDm: DinhMuc) {
+    setDinhMucs(prev => prev.map(dm => dm.id === tempId ? realDm : dm));
+  }
+
   async function toggleTick(hangCat: string, col: ColDef) {
     const key = `${hangCat}:${col.key}`;
     if (ticking === key) return;
     const targetCat = col.shared ? CHUNG_KEY : hangCat;
     const ownItems = getOwnItems(targetCat, col);
     if (ownItems.length > 0) {
-      // Đã có → xoá (untick)
+      // Đã có → xoá (untick) — optimistic
+      const ids = ownItems.map(dm => dm.id);
+      optimisticRemove(ids);
       setTicking(key);
       try {
-        await Promise.all(ownItems.map(dm =>
-          fetch(`/api/ke-toan/dinh-muc/${dm.id}`, { method: "DELETE" })
+        await Promise.all(ids.map(id =>
+          fetch(`/api/ke-toan/dinh-muc/${id}`, { method: "DELETE" })
         ));
-        await fetchAll();
-      } finally { setTicking(null); }
+      } catch { await fetchAll(); } // revert on error
+      finally { setTicking(null); }
     } else {
       // Chưa có → nếu col không shared (Giặt), dùng VatTu từ CHUNG row
       if (!col.shared) {
         const chungItems = getChungItems(col);
         if (chungItems.length > 0) {
-          // Tự động tick bằng VatTu của CHUNG
+          const vatTuId = chungItems[0].vatTuId;
+          const vt = vatTus.find(v => v.id === vatTuId);
+          const tempId = `__temp__${Date.now()}`;
+          const tempDm: DinhMuc = { id: tempId, hangCat, vatTuId, soLuong: 1, haoHui: 0, vatTu: vt };
+          optimisticAdd(tempDm);
           setTicking(key);
           try {
-            await fetch("/api/ke-toan/dinh-muc", {
+            const res = await fetch("/api/ke-toan/dinh-muc", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ hangCat, vatTuId: chungItems[0].vatTuId, soLuong: 1, haoHui: 0 }),
+              body: JSON.stringify({ hangCat, vatTuId, soLuong: 1, haoHui: 0 }),
             });
-            await fetchAll();
-          } finally { setTicking(null); }
+            if (res.ok) {
+              const real: DinhMuc = await res.json();
+              optimisticReplace(tempId, { ...real, vatTu: vt });
+            } else { await fetchAll(); }
+          } catch { await fetchAll(); }
+          finally { setTicking(null); }
           return;
         }
       }
@@ -205,6 +227,16 @@ export default function DinhMucPage() {
     const targetCat = col.shared ? CHUNG_KEY : hangCat;
     setTickPicker(null);
     const key = `${hangCat}:${col.key}`;
+    // Optimistic add
+    const vt = vatTus.find(v => v.id === vatTuId);
+    const vtOptimistic: VatTu = vt ? { ...vt, loai: col.loai, nhom: col.nhom } : { id: vatTuId, ma: "", ten: vatTuId, loai: col.loai, nhom: col.nhom, donVi: "" };
+    const tempId = `__temp__${Date.now()}`;
+    const tempDm: DinhMuc = { id: tempId, hangCat: targetCat, vatTuId, soLuong: 1, haoHui: 0, vatTu: vtOptimistic };
+    optimisticAdd(tempDm);
+    // Cập nhật vatTus local để matchesCol khớp
+    if (vt && (vt.loai !== col.loai || vt.nhom !== col.nhom)) {
+      setVatTus(prev => prev.map(v => v.id === vatTuId ? { ...v, loai: col.loai, nhom: col.nhom } : v));
+    }
     setTicking(key);
     try {
       // Đồng bộ loai + nhom của VatTu để matchesCol khớp với cột
@@ -212,12 +244,16 @@ export default function DinhMucPage() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ loai: col.loai, nhom: col.nhom }),
       });
-      await fetch("/api/ke-toan/dinh-muc", {
+      const res = await fetch("/api/ke-toan/dinh-muc", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hangCat: targetCat, vatTuId, soLuong: 1, haoHui: 0 }),
       });
-      await fetchAll();
-    } finally { setTicking(null); }
+      if (res.ok) {
+        const real: DinhMuc = await res.json();
+        optimisticReplace(tempId, { ...real, vatTu: vtOptimistic });
+      } else { await fetchAll(); }
+    } catch { await fetchAll(); }
+    finally { setTicking(null); }
   }
 
   /* ── Cell open/close ────────────────────────────────────────────────────── */
