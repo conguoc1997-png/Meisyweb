@@ -616,12 +616,33 @@ export default function DinhMucPage() {
                               })}
                         </div>
                       )}
-                      {vt && !item.vtSearch && <p className="text-[10px] text-slate-400 mt-0.5">{fmtDV(vt.donVi)}</p>}
+                      {vt && !item.vtSearch && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[10px] text-slate-400">{fmtDV(vt.donVi)}</span>
+                          <button
+                            onClick={async () => {
+                              const newDv = prompt(`Sửa đơn vị cho "${vt.ten}" (hiện: ${vt.donVi}):`, vt.donVi);
+                              if (!newDv || newDv === vt.donVi) return;
+                              await fetch(`/api/ke-toan/vat-tu/${vt.id}`, {
+                                method: "PATCH", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ donVi: newDv.trim() }),
+                              });
+                              await fetchAll();
+                            }}
+                            className="text-[9px] text-indigo-400 hover:text-indigo-600 underline"
+                          >sửa</button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Quantity + Unit */}
                     <div className="w-24 shrink-0">
-                      <p className="text-[10px] text-slate-400 mb-1">SL / sp</p>
+                      <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
+                        SL / sp
+                        {vt && <span className="px-1 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-medium">
+                          {fmtDV(vt.donVi)}
+                        </span>}
+                      </p>
                       <input type="number" min={0} step="0.01"
                         value={item.soLuong || ""}
                         onChange={e => setEditItems(prev => prev.map((it, i) =>
