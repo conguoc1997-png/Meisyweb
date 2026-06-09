@@ -21,7 +21,11 @@ type TonKho = {
 };
 
 type VatTuForm = {
-  ma: string; ten: string; loai: string; nhom: string; donVi: string; ghiChu: string;
+  ma: string; ten: string; loai: string; nhom: string;
+  donVi: string;     // đơn vị sau quy đổi (m, cái, chiếc...)
+  donViMua: string;  // đơn vị mua (gói, cuộn, hộp...)
+  quyDoi: number;    // 1 donViMua = quyDoi × donVi
+  ghiChu: string;
 };
 
 const LOAI_OPTIONS = [
@@ -224,7 +228,7 @@ export default function TonKhoPage() {
   }), [groupedRows]);
 
   function openCreate() {
-    setForm({ ma: "", ten: "", loai: "may", nhom: "", donVi: "cai", ghiChu: "" });
+    setForm({ ma: "", ten: "", loai: "may", nhom: "", donVi: "cai", donViMua: "cai", quyDoi: 1, ghiChu: "" });
     setCustomLoai(""); setCustomNhom(""); setSaveError("");
     setEditTarget(null);
     setModal("create");
@@ -239,7 +243,7 @@ export default function TonKhoPage() {
     const nhomFm    = knownNhom ? (t.vatTu.nhom || "") : "__custom__";
     const cNhom     = knownNhom ? "" : (t.vatTu.nhom || "");
 
-    setForm({ ma: t.vatTu.ma, ten: t.vatTu.ten, loai: loaiFm, nhom: nhomFm, donVi: t.vatTu.donVi, ghiChu: t.vatTu.ghiChu || "" });
+    setForm({ ma: t.vatTu.ma, ten: t.vatTu.ten, loai: loaiFm, nhom: nhomFm, donVi: t.vatTu.donVi, donViMua: t.donViMua ?? t.vatTu.donVi, quyDoi: t.quyDoi ?? 1, ghiChu: t.vatTu.ghiChu || "" });
     setCustomLoai(cLoai); setCustomNhom(cNhom); setSaveError("");
     setEditTarget(t);
     setModal("edit");
@@ -253,7 +257,7 @@ export default function TonKhoPage() {
     try {
       const loaiFinal = form.loai === "__custom__" ? customLoai.trim() || "khac" : form.loai;
       const nhomFinal = form.nhom === "__custom__" ? customNhom.trim() || null : (form.nhom || null);
-      const payload = { ...form, loai: loaiFinal, nhom: nhomFinal, ghiChu: form.ghiChu || null };
+      const payload = { ...form, loai: loaiFinal, nhom: nhomFinal, ghiChu: form.ghiChu || null, donViMua: form.donViMua || form.donVi, quyDoi: Number(form.quyDoi) || 1 };
       let res: Response;
       if (modal === "create") {
         res = await fetch("/api/ke-toan/vat-tu", {
@@ -586,12 +590,40 @@ export default function TonKhoPage() {
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Đơn vị</label>
-                  <select value={form.donVi} onChange={e => setForm(f => ({ ...f, donVi: e.target.value }))}
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Đơn vị mua</label>
+                  <select value={form.donViMua} onChange={e => setForm(f => ({ ...f, donViMua: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
                     {DON_VI_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                   </select>
                 </div>
+              </div>
+              {/* Quy đổi */}
+              <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-medium text-teal-700">Quy đổi: 1 <span className="font-bold">{fmtDV(form.donViMua)}</span> = ? đơn vị nhỏ hơn</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-teal-600 block mb-1">Hệ số (1 đơn vị mua = X)</label>
+                    <input type="number" min={1} step={1}
+                      value={form.quyDoi}
+                      onChange={e => setForm(f => ({ ...f, quyDoi: Number(e.target.value) || 1 }))}
+                      className="w-full border border-teal-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-teal-600 block mb-1">Đơn vị sau quy đổi</label>
+                    <select value={form.donVi} onChange={e => setForm(f => ({ ...f, donVi: e.target.value }))}
+                      className="w-full border border-teal-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
+                      {DON_VI_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {form.quyDoi > 1 && (
+                  <p className="text-[11px] text-teal-600">
+                    → 1 {fmtDV(form.donViMua)} = {form.quyDoi.toLocaleString("vi-VN")} {fmtDV(form.donVi)}
+                  </p>
+                )}
+                {form.quyDoi === 1 && (
+                  <p className="text-[11px] text-slate-400">Không quy đổi — để 1 nếu mua và dùng cùng đơn vị</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 block mb-1">Tên vật tư *</label>
