@@ -66,7 +66,7 @@ export default function DinhMucPage() {
   // Cell editing
   const [editCell,  setEditCell]  = useState<{ hangCat: string; colKey: string }|null>(null);
   const [editItems, setEditItems] = useState<
-    { id?: string; vatTuId: string; soLuong: number; haoHui: number; vtSearch: string; changed: boolean }[]
+    { id?: string; vatTuId: string; soLuong: number; haoHui: number; donViMua?: string; vtSearch: string; changed: boolean }[]
   >([]);
   const [saving, setSaving] = useState(false);
   const [vtDropOpen, setVtDropOpen] = useState<number|null>(null);
@@ -270,7 +270,7 @@ export default function DinhMucPage() {
     if (col.tickOnly) { toggleTick(hangCat, col); return; }
     const items = getOwnItems(hangCat, col);
     setEditCell({ hangCat, colKey });
-    setEditItems(items.map(dm => ({ id: dm.id, vatTuId: dm.vatTuId, soLuong: dm.soLuong, haoHui: dm.haoHui ?? 0, vtSearch: "", changed: false })));
+    setEditItems(items.map(dm => ({ id: dm.id, vatTuId: dm.vatTuId, soLuong: dm.soLuong, haoHui: dm.haoHui ?? 0, donViMua: dm.donViMua, vtSearch: "", changed: false })));
     setVtDropOpen(null);
   }
   function closeCell() { setEditCell(null); setEditItems([]); setVtDropOpen(null); }
@@ -285,13 +285,13 @@ export default function DinhMucPage() {
       if (item.id) {
         await fetch(`/api/ke-toan/dinh-muc/${item.id}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ soLuong: item.soLuong, haoHui: item.haoHui }),
+          body: JSON.stringify({ soLuong: item.soLuong, haoHui: item.haoHui, donViMua: item.donViMua }),
         });
         setEditItems(prev => prev.map((it, i) => i === idx ? { ...it, changed: false } : it));
       } else {
         const res = await fetch("/api/ke-toan/dinh-muc", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hangCat: editCell.hangCat, vatTuId: item.vatTuId, soLuong: item.soLuong, haoHui: item.haoHui }),
+          body: JSON.stringify({ hangCat: editCell.hangCat, vatTuId: item.vatTuId, soLuong: item.soLuong, haoHui: item.haoHui, donViMua: item.donViMua }),
         });
         if (res.ok) {
           const newDm: DinhMuc = await res.json();
@@ -407,7 +407,7 @@ export default function DinhMucPage() {
               ${isChung ? "opacity-60 border border-dashed border-slate-300 bg-slate-50 text-slate-500" : col.badge}`}>
               <span className="font-bold text-sm leading-none">{fmt(dm.soLuong)}</span>
               <span className="opacity-70 text-[10px]">
-                {vt ? fmtDV(dm.donViMua ?? vt.donVi) : ""}
+                {vt ? fmtDV(dm.donViMua ?? vt.donVi ?? "") : ""}
               </span>
               {(dm.haoHui ?? 0) > 0 && (
                 <span className="text-[9px] text-amber-600 font-medium mt-0.5">+{dm.haoHui}%</span>
@@ -613,20 +613,34 @@ export default function DinhMucPage() {
                       {vt && !item.vtSearch && <p className="text-[10px] text-slate-400 mt-0.5">{fmtDV(vt.donVi)}</p>}
                     </div>
 
-                    {/* Quantity */}
-                    <div className="w-20 shrink-0">
-                      <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
-                        SL / sp
-                        {vt && <span className="px-1 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-medium">
-                          {fmtDV(vt.donVi)}
-                        </span>}
-                      </p>
+                    {/* Quantity + Unit */}
+                    <div className="w-24 shrink-0">
+                      <p className="text-[10px] text-slate-400 mb-1">SL / sp</p>
                       <input type="number" min={0} step="0.01"
                         value={item.soLuong || ""}
                         onChange={e => setEditItems(prev => prev.map((it, i) =>
                           i === idx ? { ...it, soLuong: parseFloat(e.target.value) || 0, changed: true } : it))}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       />
+                      {/* Chọn đơn vị: donVi (nhỏ, sau quy đổi) hoặc donViMua (gói, cuộn...) */}
+                      {vt && vt.donViMua && vt.donViMua !== vt.donVi ? (
+                        <div className="flex gap-1 mt-1">
+                          {[vt.donVi, vt.donViMua].map(dv => (
+                            <button key={dv}
+                              type="button"
+                              onClick={() => setEditItems(prev => prev.map((it, i) =>
+                                i === idx ? { ...it, donViMua: dv, changed: true } : it))}
+                              className={`flex-1 text-[9px] px-1 py-0.5 rounded border transition-colors
+                                ${(item.donViMua ?? vt.donVi) === dv
+                                  ? "bg-indigo-600 text-white border-indigo-600 font-bold"
+                                  : "bg-white text-slate-400 border-slate-200 hover:border-indigo-300"}`}>
+                              {fmtDV(dv)}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[9px] text-slate-400 mt-0.5 text-center">{vt ? fmtDV(vt.donVi) : ""}</p>
+                      )}
                     </div>
 
                     {/* Hao hụt % */}
