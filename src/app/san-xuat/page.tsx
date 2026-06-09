@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
+type SanPham = { id: string; sku: string; ten: string };
+
 type VaiTon = {
   id: string; maVai: string; soMet: number; soCay: number; cayData: string | null;
   donVi: string; mauSac: string | null; xuong: string | null; ghiChu: string | null; updatedAt: string;
@@ -93,6 +95,7 @@ export default function SanXuatPage() {
   const XUONG_LABEL: Record<string, string> = Object.fromEntries(xuongList.map(x => [x.key, x.label]));
 
   // ── Vải tồn ──
+  const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [vaiTons, setVaiTons] = useState<VaiTon[]>([]);
   const [showVaiTon, setShowVaiTon] = useState(false);
   const [modalVai, setModalVai] = useState<VaiTon | "new" | null>(null);
@@ -336,6 +339,9 @@ export default function SanXuatPage() {
 
   useEffect(() => { fetchData(); fetchHoaDonTon(); fetchAllForBalance(); }, [filterThang, filterXuong, filterTrangThai]);
   useEffect(() => { fetchVaiTon(); }, []);
+  useEffect(() => {
+    fetch("/api/kho/san-pham").then(r => r.json()).then(d => setSanPhams(Array.isArray(d) ? d : []));
+  }, []);
   // Close action menu when clicking outside
   useEffect(() => {
     if (!openActionMenu) return;
@@ -2136,8 +2142,8 @@ export default function SanXuatPage() {
                       <input required value={form.hangCat} onChange={sf("hangCat")} className={inp}
                         list="hang-cat-list" placeholder="Nhập hoặc chọn mã hàng..." />
                       <datalist id="hang-cat-list">
-                        {[...new Set(allLoCat.map(l => l.hangCat))].sort().map(h => (
-                          <option key={h} value={h} />
+                        {sanPhams.map(sp => (
+                          <option key={sp.id} value={sp.sku}>{sp.ten}</option>
                         ))}
                       </datalist>
                     </div>
