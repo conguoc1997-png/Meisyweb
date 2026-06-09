@@ -424,7 +424,6 @@ export default function DinhMucPage() {
           );
         })}
         {items.length > 2 && <div className="text-[10px] text-slate-400">+{items.length - 2}</div>}
-        {isChung && <div className="text-[10px] text-slate-400 mt-0.5">chung</div>}
       </div>
     );
   }
