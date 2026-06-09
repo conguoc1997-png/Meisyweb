@@ -13,58 +13,47 @@ import { prisma } from "@/lib/prisma";
  */
 export async function POST() {
   try {
-    // 1. Tổng hợp toàn bộ nhập kho theo vatTuId
-    const nhapRows = await prisma.chiTietNhapKho.groupBy({
-      by: ["vatTuId"],
-      _sum: { soLuongMua: true },
-    });
-
-    // Cần giaTriNhap = Σ(soLuongMua × donGia × (1 + vat/100)) — groupBy không làm được, query thủ công
+    // 1. Nhập kho: soLuongMua theo ĐV MUA, quyDoi = số đv cơ bản / 1 đv mua
     const allNhap = await prisma.chiTietNhapKho.findMany({
-      select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
+      select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true, quyDoi: true },
     });
 
-    // 2. Tổng hợp toàn bộ xuất kho theo vatTuId
-    const xuatRows = await prisma.phieuXuatChiTiet.groupBy({
-      by: ["vatTuId"],
-      _sum: { soLuong: true },
+    // 2. Xuất kho: soLuong theo ĐV CƠ BẢN (chiếc, m, bộ...)
+    const allXuat = await prisma.phieuXuatChiTiet.findMany({
+      select: { vatTuId: true, soLuong: true },
     });
 
-    // --- Build maps ---
-    type TonMap = {
-      soLuongNhap: number;
-      giaTriNhap:  number;
-      soLuongXuat: number;
-    };
-    const map = new Map<string, TonMap>();
+    // 3. quyDoi mới nhất per vatTuId (lấy từ nhập mới nhất)
+    const quyDoiMap = new Map<string, number>();
+    // allNhap đã order by phieu.ngay desc qua distinct — lấy first per vatTuId
+    for (const r of allNhap) {
+      if (!quyDoiMap.has(r.vatTuId)) quyDoiMap.set(r.vatTuId, r.quyDoi ?? 1);
+    }
+
+    type TonInfo = { soLuongNhap: number; giaTriNhap: number; soLuongXuatBase: number };
+    const map = new Map<string, TonInfo>();
 
     for (const r of allNhap) {
-      const cur = map.get(r.vatTuId) ?? { soLuongNhap: 0, giaTriNhap: 0, soLuongXuat: 0 };
+      const cur = map.get(r.vatTuId) ?? { soLuongNhap: 0, giaTriNhap: 0, soLuongXuatBase: 0 };
       cur.soLuongNhap += r.soLuongMua;
-      // Giá trị nhập = giá × (1 + VAT%) để khớp với thành tiền thực tế
       cur.giaTriNhap  += r.soLuongMua * r.donGia * (1 + (r.vat || 0) / 100);
       map.set(r.vatTuId, cur);
     }
-
-    for (const r of xuatRows) {
-      const cur = map.get(r.vatTuId) ?? { soLuongNhap: 0, giaTriNhap: 0, soLuongXuat: 0 };
-      cur.soLuongXuat += r._sum.soLuong ?? 0;
+    for (const r of allXuat) {
+      const cur = map.get(r.vatTuId) ?? { soLuongNhap: 0, giaTriNhap: 0, soLuongXuatBase: 0 };
+      cur.soLuongXuatBase += r.soLuong;
       map.set(r.vatTuId, cur);
     }
 
-    // Ensure nhapRows vatTuIds are seeded (even if no xuất)
-    for (const r of nhapRows) {
-      if (!map.has(r.vatTuId)) {
-        map.set(r.vatTuId, { soLuongNhap: r._sum.soLuongMua ?? 0, giaTriNhap: 0, soLuongXuat: 0 });
-      }
-    }
-
-    // 3. Upsert TonKhoVatTu cho mỗi vatTuId
+    // 4. Upsert TonKhoVatTu
+    // ton (đv mua) = nhap (đv mua) − xuat_base / quyDoi
     let updated = 0;
     for (const [vatTuId, d] of map.entries()) {
-      const soLuong       = Math.max(0, d.soLuongNhap - d.soLuongXuat);
-      const giaTrungBinh  = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
-      const giaTriTon     = soLuong * giaTrungBinh;
+      const quyDoi       = quyDoiMap.get(vatTuId) ?? 1;
+      const xuatDvMua    = d.soLuongXuatBase / quyDoi;
+      const soLuong      = Math.max(0, d.soLuongNhap - xuatDvMua);
+      const giaTrungBinh = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
+      const giaTriTon    = soLuong * giaTrungBinh;
 
       await prisma.tonKhoVatTu.upsert({
         where:  { vatTuId },
