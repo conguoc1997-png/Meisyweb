@@ -272,7 +272,8 @@ export default function DinhMucPage() {
     setEditCell({ hangCat, colKey });
     setEditItems(items.map(dm => {
       const tk = tonKhoMap.get(dm.vatTuId);
-      const dvQD = tk?.donViQuyDoi ?? dm.vatTu?.donVi ?? dm.donViMua;
+      // Ưu tiên donViMua đã lưu trong DB, fallback về donVi của vatTu
+      const dvQD = dm.donViMua ?? dm.vatTu?.donVi ?? tk?.donViQuyDoi ?? "";
       return { id: dm.id, vatTuId: dm.vatTuId, soLuong: dm.soLuong, haoHui: dm.haoHui ?? 0, donViMua: dvQD, vtSearch: "", changed: false };
     }));
     setVtDropOpen(null);
@@ -322,7 +323,8 @@ export default function DinhMucPage() {
 
   async function selectVatTu(idx: number, vt: VatTu) {
     const tk = tonKhoMap.get(vt.id);
-    const dvQD = tk?.donViQuyDoi ?? vt.donVi; // luôn dùng đơn vị sau quy đổi
+    // Dùng donVi của vatTu làm mặc định, không dùng donViQuyDoi từ tồn kho
+    const dvQD = vt.donVi ?? tk?.donViQuyDoi ?? "";
     setEditItems(prev => prev.map((it, i) =>
       i === idx ? { ...it, vatTuId: vt.id, vtSearch: vt.ten, donViMua: dvQD, changed: true } : it));
     setVtDropOpen(null);

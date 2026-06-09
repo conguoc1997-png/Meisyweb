@@ -16,6 +16,7 @@ export async function PATCH(
         ...(body.vatTuId  !== undefined && { vatTuId: body.vatTuId }),
         ...(body.soLuong  !== undefined && { soLuong: body.soLuong }),
         ...(body.haoHui   !== undefined && { haoHui: body.haoHui ?? 0 }),
+        ...(body.donViMua !== undefined && { donViMua: body.donViMua }),
         ...(body.ghiChu   !== undefined && { ghiChu: body.ghiChu || null }),
       },
       include: { vatTu: true },
