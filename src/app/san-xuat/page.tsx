@@ -762,6 +762,16 @@ export default function SanXuatPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: newVal }),
     }).catch(() => fetchData());
+
+    // Khi xuất hoá đơn → tự động tạo phiếu xuất kho theo định mức
+    if (field === "xuatHoaDonDa" && newVal === true) {
+      fetch("/api/ke-toan/xuat-kho/tu-dinh-muc", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loCatId: lo.id }),
+      }).then(r => r.json()).then(res => {
+        if (!res.ok) alert(`⚠️ Xuất kho: ${res.error ?? "Lỗi không xác định"}`);
+      }).catch(() => {});
+    }
   };
 
   // Dùng cho tab Xuất HĐ: tick lô multi-cây sẽ toggle toàn bộ cây cùng lúc
