@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 type SuggestRow = {
   type: "vai" | "phu_lieu";
   vatTuId: string | null;
-  vatTu: { id: string; ma: string; ten: string; loai: string; donVi: string; nhom: string | null; tonKho: { soLuong: number; giaTrungBinh: number; giaTriTon: number } | null } | null;
+  vatTu: { id: string; ma: string; ten: string; loai: string; donVi: string; donViMua?: string; quyDoi?: number; nhom: string | null; tonKho: { soLuong: number; giaTrungBinh: number; giaTriTon: number } | null } | null;
   maVai?: string;
   soLuong: number;
   donGia: number;
@@ -44,15 +44,22 @@ export async function GET(req: NextRequest) {
     const rows: SuggestRow[] = merged.map(dm => {
       const haoHui = (dm as { haoHui?: number }).haoHui ?? 0;
       const heSoHao = 1 + haoHui / 100;
-      const soLuong = Math.round(dm.soLuong * soSanPham * heSoHao * 100) / 100;
+      // Nếu định mức lưu theo đơn vị QĐ (donViMua = donVi), cần chia ngược quyDoi → ra đơn vị mua
+      const dmDonVi = (dm as { donViMua?: string }).donViMua ?? dm.vatTu.donVi;
+      const vatTuQuyDoi = (dm.vatTu as { quyDoi?: number }).quyDoi ?? 1;
+      const isDonViQD = dmDonVi === dm.vatTu.donVi && vatTuQuyDoi > 1;
+      const soLuongMua = isDonViQD
+        ? Math.round(dm.soLuong * soSanPham * heSoHao / vatTuQuyDoi * 10000) / 10000
+        : Math.round(dm.soLuong * soSanPham * heSoHao * 100) / 100;
       const haoNote = haoHui > 0 ? ` +${haoHui}% hao` : "";
+      const quyDoiNote = isDonViQD ? ` ÷${vatTuQuyDoi}` : "";
       return {
         type: dm.vatTu.loai === "vai" ? "vai" : "phu_lieu",
         vatTuId: dm.vatTu.id,
         vatTu: dm.vatTu,
-        soLuong,
+        soLuong: soLuongMua,
         donGia: dm.vatTu.tonKho?.giaTrungBinh ?? 0,
-        ghiChu: `Định mức ${dm.soLuong}/sp × ${soSanPham}sp${haoNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
+        ghiChu: `Định mức ${dm.soLuong}${dmDonVi}/sp × ${soSanPham}sp${haoNote}${quyDoiNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
         source: "dinh_muc",
       };
     });
@@ -124,15 +131,21 @@ export async function GET(req: NextRequest) {
     for (const dm of dmMerged) {
       const haoHui = (dm as { haoHui?: number }).haoHui ?? 0;
       const heSoHao = 1 + haoHui / 100;
-      const soLuong = Math.round(dm.soLuong * soSanPham * heSoHao * 100) / 100;
+      const dmDonVi = (dm as { donViMua?: string }).donViMua ?? dm.vatTu.donVi;
+      const vatTuQuyDoi = (dm.vatTu as { quyDoi?: number }).quyDoi ?? 1;
+      const isDonViQD = dmDonVi === dm.vatTu.donVi && vatTuQuyDoi > 1;
+      const soLuongMua = isDonViQD
+        ? Math.round(dm.soLuong * soSanPham * heSoHao / vatTuQuyDoi * 10000) / 10000
+        : Math.round(dm.soLuong * soSanPham * heSoHao * 100) / 100;
       const haoNote = haoHui > 0 ? ` +${haoHui}% hao` : "";
+      const quyDoiNote = isDonViQD ? ` ÷${vatTuQuyDoi}` : "";
       rows.push({
         type: "phu_lieu",
         vatTuId: dm.vatTu.id,
         vatTu: dm.vatTu,
-        soLuong,
+        soLuong: soLuongMua,
         donGia: dm.vatTu.tonKho?.giaTrungBinh ?? 0,
-        ghiChu: `Định mức ${dm.soLuong}/sp × ${soSanPham}sp${haoNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
+        ghiChu: `Định mức ${dm.soLuong}${dmDonVi}/sp × ${soSanPham}sp${haoNote}${quyDoiNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
         source: "dinh_muc",
       });
     }

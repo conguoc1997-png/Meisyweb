@@ -270,7 +270,11 @@ export default function DinhMucPage() {
     if (col.tickOnly) { toggleTick(hangCat, col); return; }
     const items = getOwnItems(hangCat, col);
     setEditCell({ hangCat, colKey });
-    setEditItems(items.map(dm => ({ id: dm.id, vatTuId: dm.vatTuId, soLuong: dm.soLuong, haoHui: dm.haoHui ?? 0, donViMua: dm.donViMua, vtSearch: "", changed: false })));
+    setEditItems(items.map(dm => {
+      const tk = tonKhoMap.get(dm.vatTuId);
+      const dvQD = tk?.donViQuyDoi ?? dm.vatTu?.donVi ?? dm.donViMua;
+      return { id: dm.id, vatTuId: dm.vatTuId, soLuong: dm.soLuong, haoHui: dm.haoHui ?? 0, donViMua: dvQD, vtSearch: "", changed: false };
+    }));
     setVtDropOpen(null);
   }
   function closeCell() { setEditCell(null); setEditItems([]); setVtDropOpen(null); }
@@ -317,8 +321,10 @@ export default function DinhMucPage() {
   }
 
   async function selectVatTu(idx: number, vt: VatTu) {
+    const tk = tonKhoMap.get(vt.id);
+    const dvQD = tk?.donViQuyDoi ?? vt.donVi; // luôn dùng đơn vị sau quy đổi
     setEditItems(prev => prev.map((it, i) =>
-      i === idx ? { ...it, vatTuId: vt.id, vtSearch: vt.ten, changed: true } : it));
+      i === idx ? { ...it, vatTuId: vt.id, vtSearch: vt.ten, donViMua: dvQD, changed: true } : it));
     setVtDropOpen(null);
     // Nếu vật tư chưa có nhom → tự động gán nhom theo cột đang edit
     if (!vt.nhom && editCell) {
@@ -622,25 +628,31 @@ export default function DinhMucPage() {
                           i === idx ? { ...it, soLuong: parseFloat(e.target.value) || 0, changed: true } : it))}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       />
-                      {/* Chọn đơn vị: donVi (nhỏ, sau quy đổi) hoặc donViMua (gói, cuộn...) */}
-                      {vt && vt.donViMua && vt.donViMua !== vt.donVi ? (
-                        <div className="flex gap-1 mt-1">
-                          {[vt.donVi, vt.donViMua].map(dv => (
-                            <button key={dv}
-                              type="button"
-                              onClick={() => setEditItems(prev => prev.map((it, i) =>
-                                i === idx ? { ...it, donViMua: dv, changed: true } : it))}
-                              className={`flex-1 text-[9px] px-1 py-0.5 rounded border transition-colors
-                                ${(item.donViMua ?? vt.donVi) === dv
-                                  ? "bg-indigo-600 text-white border-indigo-600 font-bold"
-                                  : "bg-white text-slate-400 border-slate-200 hover:border-indigo-300"}`}>
-                              {fmtDV(dv)}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[9px] text-slate-400 mt-0.5 text-center">{vt ? fmtDV(vt.donVi) : ""}</p>
-                      )}
+                      {/* Chọn đơn vị: QD unit (mặc định) hoặc donViMua (gói, cuộn...) */}
+                      {(() => {
+                        const tk = tonKhoMap.get(vt?.id ?? "");
+                        const dvQD = tk?.donViQuyDoi ?? vt?.donVi ?? "";
+                        const dvMua = vt?.donViMua;
+                        const hasTwoUnits = dvMua && dvMua !== dvQD;
+                        const selected = item.donViMua ?? dvQD;
+                        return hasTwoUnits ? (
+                          <div className="flex gap-1 mt-1">
+                            {[dvQD, dvMua!].map(dv => (
+                              <button key={dv} type="button"
+                                onClick={() => setEditItems(prev => prev.map((it, i) =>
+                                  i === idx ? { ...it, donViMua: dv, changed: true } : it))}
+                                className={`flex-1 text-[9px] px-1 py-0.5 rounded border transition-colors
+                                  ${selected === dv
+                                    ? "bg-indigo-600 text-white border-indigo-600 font-bold"
+                                    : "bg-white text-slate-400 border-slate-200 hover:border-indigo-300"}`}>
+                                {fmtDV(dv)}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[9px] text-slate-400 mt-0.5 text-center">{fmtDV(dvQD)}</p>
+                        );
+                      })()}
                     </div>
 
                     {/* Hao hụt % */}
