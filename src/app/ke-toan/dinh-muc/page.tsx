@@ -407,7 +407,7 @@ export default function DinhMucPage() {
               ${isChung ? "opacity-60 border border-dashed border-slate-300 bg-slate-50 text-slate-500" : col.badge}`}>
               <span className="font-bold text-sm leading-none">{fmt(dm.soLuong)}</span>
               <span className="opacity-70 text-[10px]">
-                {vt ? fmtDV(tonKhoMap.get(vt.id)?.donViQuyDoi ?? vt.donVi) : ""}
+                {vt ? fmtDV(dm.donViMua ?? vt.donVi) : ""}
               </span>
               {(dm.haoHui ?? 0) > 0 && (
                 <span className="text-[9px] text-amber-600 font-medium mt-0.5">+{dm.haoHui}%</span>
