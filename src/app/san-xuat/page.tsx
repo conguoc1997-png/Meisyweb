@@ -1760,16 +1760,13 @@ export default function SanXuatPage() {
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Size</th>
                       <th className="text-right px-4 py-2.5 text-slate-500 font-medium">Số lượng</th>
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Xưởng</th>
-                      <th className="text-center px-3 py-2.5 text-purple-500 font-medium text-xs">HĐ May</th>
-                      <th className="text-center px-3 py-2.5 text-teal-500 font-medium text-xs">HĐ Vi sinh</th>
-                      <th className="text-center px-3 py-2.5 text-blue-500 font-medium text-xs">HĐ Màu</th>
                       <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">ĐX HĐ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {hoaDonRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="text-center py-16 text-slate-400">
+                        <td colSpan={6} className="text-center py-16 text-slate-400">
                           <p className="text-2xl mb-2">📄</p>
                           <p>Chưa có lô nào được đánh dấu "Đã nhận"</p>
                         </td>
@@ -1800,9 +1797,6 @@ export default function SanXuatPage() {
                             {soLuong > 0 ? soLuong.toLocaleString() : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-4 py-3 text-slate-600">{lo.xuong ? (XUONG_LABEL[lo.xuong] ?? lo.xuong) : "—"}</td>
-                          <td className="px-3 py-3">{mkCb(mayState,    "bg-purple-500", () => handleHDTabToggle(lo, "hdMayDa"))}</td>
-                          <td className="px-3 py-3">{mkCb(viSinhState, "bg-teal-500",   () => handleHDTabToggle(lo, "hdGiatViSinhDa"))}</td>
-                          <td className="px-3 py-3">{mkCb(mauState,    "bg-blue-500",   () => handleHDTabToggle(lo, "hdGiatMauDa"))}</td>
                           <td className="px-3 py-3">
                             <button onClick={() => handleHDTabToggle(lo, "xuatHoaDonDa")}
                               className={`w-6 h-6 rounded border-2 flex items-center justify-center transition mx-auto ${lo.xuatHoaDonDa ? "bg-slate-600 border-transparent" : "bg-white border-slate-300 hover:border-slate-400"}`}>
