@@ -164,6 +164,7 @@ export default function SanXuatPage() {
     fetchVaiTon();
   };
 
+  const [xuatKhoLoading, setXuatKhoLoading] = useState<Set<string>>(new Set());
   const [losCat, setLosCat] = useState<LoCat[]>([]);
   const [allLoCat, setAllLoCat] = useState<LoCat[]>([]);
   const [filterThang, setFilterThang] = useState(() => {
@@ -763,14 +764,28 @@ export default function SanXuatPage() {
       body: JSON.stringify({ [field]: newVal }),
     }).catch(() => fetchData());
 
-    // Khi xuất hoá đơn → tự động tạo phiếu xuất kho theo định mức
-    if (field === "xuatHoaDonDa" && newVal === true) {
-      fetch("/api/ke-toan/xuat-kho/tu-dinh-muc", {
+  };
+
+  const handleXuatKho = async (lo: LoCat) => {
+    setXuatKhoLoading(prev => new Set(prev).add(lo.id));
+    try {
+      // 1. Đánh dấu xuatHoaDonDa = true
+      const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: true } : l);
+      setLosCat(update); setAllLoCat(update);
+      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ xuatHoaDonDa: true }),
+      });
+      // 2. Tạo phiếu xuất kho từ định mức
+      const res = await fetch("/api/ke-toan/xuat-kho/tu-dinh-muc", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ loCatId: lo.id }),
-      }).then(r => r.json()).then(res => {
-        if (!res.ok) alert(`⚠️ Xuất kho: ${res.error ?? "Lỗi không xác định"}`);
-      }).catch(() => {});
+      }).then(r => r.json());
+      if (!res.ok) alert(`⚠️ Xuất kho: ${res.error ?? "Lỗi không xác định"}`);
+    } catch {
+      alert("⚠️ Lỗi kết nối khi xuất kho");
+    } finally {
+      setXuatKhoLoading(prev => { const s = new Set(prev); s.delete(lo.id); return s; });
     }
   };
 
@@ -1729,7 +1744,7 @@ export default function SanXuatPage() {
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Size</th>
                       <th className="text-right px-4 py-2.5 text-slate-500 font-medium">Số lượng</th>
                       <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Xưởng</th>
-                      <th className="text-center px-3 py-2.5 text-slate-500 font-medium text-xs">ĐX HĐ</th>
+                      <th className="text-center px-4 py-2.5 text-slate-500 font-medium text-xs">Xuất Kho</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1766,11 +1781,25 @@ export default function SanXuatPage() {
                             {soLuong > 0 ? soLuong.toLocaleString() : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-4 py-3 text-slate-600">{lo.xuong ? (XUONG_LABEL[lo.xuong] ?? lo.xuong) : "—"}</td>
-                          <td className="px-3 py-3">
-                            <button onClick={() => handleHDTabToggle(lo, "xuatHoaDonDa")}
-                              className={`w-6 h-6 rounded border-2 flex items-center justify-center transition mx-auto ${lo.xuatHoaDonDa ? "bg-slate-600 border-transparent" : "bg-white border-slate-300 hover:border-slate-400"}`}>
-                              {lo.xuatHoaDonDa && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                            </button>
+                          <td className="px-4 py-3 text-center">
+                            {lo.xuatHoaDonDa ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Đã xuất
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleXuatKho(lo)}
+                                disabled={xuatKhoLoading.has(lo.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition">
+                                {xuatKhoLoading.has(lo.id) ? (
+                                  <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="40" strokeDashoffset="10"/></svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                )}
+                                Xuất kho
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
