@@ -618,7 +618,7 @@ export default function DinhMucPage() {
                       <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
                         SL / sp
                         {vt && <span className="px-1 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-medium">
-                          {fmtDV(vt.donViMua ?? vt.donVi)}
+                          {fmtDV(vt.donVi)}
                         </span>}
                       </p>
                       <input type="number" min={0} step="0.01"
