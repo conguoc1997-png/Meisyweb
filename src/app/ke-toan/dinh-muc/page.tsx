@@ -74,6 +74,25 @@ export default function DinhMucPage() {
   // Tick picker: chọn vật tư trực tiếp từ tồn kho cho tickOnly cols
   const [tickPicker, setTickPicker] = useState<{ hangCat: string; col: ColDef; search: string; showAll: boolean } | null>(null);
 
+  // Chỉnh sửa tên cột
+  const [colLabels, setColLabels] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("dinh-muc-col-labels") || "{}"); } catch { return {}; }
+  });
+  const [editingColKey, setEditingColKey] = useState<string | null>(null);
+  const [editingColVal, setEditingColVal] = useState("");
+  function startEditCol(col: ColDef) {
+    setEditingColKey(col.key);
+    setEditingColVal(colLabels[col.key] ?? col.label);
+  }
+  function saveColLabel(key: string) {
+    const val = editingColVal.trim();
+    const next = { ...colLabels, [key]: val || COLUMNS.find(c => c.key === key)!.label };
+    setColLabels(next);
+    localStorage.setItem("dinh-muc-col-labels", JSON.stringify(next));
+    setEditingColKey(null);
+  }
+  function getColLabel(col: ColDef) { return colLabels[col.key] ?? col.label; }
+
   /* ── Fetch ─────────────────────────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -471,7 +490,24 @@ export default function DinhMucPage() {
                 </th>
                 {COLUMNS.map(col => (
                   <th key={col.key} className={`px-2 py-3 text-center text-xs font-bold w-28 ${col.hdr} ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}`}>
-                    <div>{col.label}</div>
+                    {editingColKey === col.key ? (
+                      <input
+                        autoFocus
+                        value={editingColVal}
+                        onChange={e => setEditingColVal(e.target.value)}
+                        onBlur={() => saveColLabel(col.key)}
+                        onKeyDown={e => { if (e.key === "Enter") saveColLabel(col.key); if (e.key === "Escape") setEditingColKey(null); }}
+                        className="w-full text-center text-xs font-bold bg-white/80 border border-white rounded px-1 py-0.5 focus:outline-none"
+                        style={{ minWidth: 60 }}
+                      />
+                    ) : (
+                      <div
+                        className="cursor-pointer hover:underline decoration-dotted"
+                        title="Click để đổi tên cột"
+                        onClick={() => startEditCol(col)}>
+                        {getColLabel(col)}
+                      </div>
+                    )}
                     {col.shared && <div className="text-[10px] font-normal opacity-60 mt-0.5">↓ từ CHUNG</div>}
                     {!col.shared && !col.tickOnly && <div className="text-[10px] font-normal opacity-60 mt-0.5">riêng SP</div>}
                   </th>
