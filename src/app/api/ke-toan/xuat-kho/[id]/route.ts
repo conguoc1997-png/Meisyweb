@@ -2,6 +2,49 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const body = await req.json();
+
+    // Hủy phiếu: đánh dấu da_huy + hoàn tồn kho
+    if (body.trangThai === "da_huy") {
+      const phieu = await prisma.phieuXuatKho.findUnique({
+        where: { id },
+        include: { chiTiet: true },
+      });
+      if (!phieu) return NextResponse.json({ error: "Không tìm thấy" }, { status: 404 });
+      if ((phieu as { trangThai?: string }).trangThai === "da_huy")
+        return NextResponse.json({ error: "Phiếu đã hủy trước đó" }, { status: 400 });
+
+      const vatTuIds = [...new Set(phieu.chiTiet.map(c => c.vatTuId))];
+
+      // Đánh dấu hủy
+      await prisma.phieuXuatKho.update({
+        where: { id },
+        data: {
+          trangThai: "da_huy",
+          lyHuy: body.lyHuy || "Hủy phiếu",
+          ngayHuy: new Date(),
+          nguoiHuy: body.nguoiHuy || null,
+        } as Record<string, unknown>,
+      });
+
+      // Recalc lại tồn kho (hoàn ngược xuất)
+      if (vatTuIds.length > 0) await recalcVatTuIds(vatTuIds);
+
+      return NextResponse.json({ ok: true, message: "Đã hủy phiếu và hoàn tồn kho" });
+    }
+
+    return NextResponse.json({ error: "Không hỗ trợ thao tác này" }, { status: 400 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
+  }
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -57,7 +100,10 @@ async function recalcVatTuIds(vatTuIds: string[]) {
     select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true, quyDoi: true },
   });
   const xuatInfos = await prisma.phieuXuatChiTiet.findMany({
-    where:  { vatTuId: { in: vatTuIds } },
+    where:  {
+      vatTuId: { in: vatTuIds },
+      phieu: { trangThai: { not: "da_huy" } }, // bỏ qua phiếu đã hủy
+    },
     select: { vatTuId: true, soLuong: true },
   });
 

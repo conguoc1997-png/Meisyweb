@@ -231,6 +231,17 @@ export default function XuatKhoPage() {
     fetchAll();
   }
 
+  async function handleHuy(id: string, soPhieu: string) {
+    const lyHuy = prompt(`Hủy phiếu ${soPhieu}\nLý do hủy (bỏ trống = "Hủy phiếu"):`);
+    if (lyHuy === null) return; // user bấm Cancel
+    await fetch(`/api/ke-toan/xuat-kho/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trangThai: "da_huy", lyHuy: lyHuy || "Hủy phiếu" }),
+    });
+    fetchAll();
+  }
+
   const tongTien = rows.filter(r => r.vatTuId !== "__UNMAPPED__").reduce((s, r) => s + r.soLuong * r.donGia, 0);
   const vaiRows  = rows.filter(r => r.type === "vai");
   const phuRows  = rows.filter(r => r.type === "phu_lieu");
@@ -303,30 +314,50 @@ export default function XuatKhoPage() {
             {!loading && filtered.length === 0 && (
               <tr><td colSpan={7} className="text-center py-12 text-slate-400">Chưa có phiếu xuất nào</td></tr>
             )}
-            {filtered.map(p => (
-              <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3 font-mono text-indigo-700 font-medium">{p.soPhieu}</td>
+            {filtered.map(p => {
+              const daHuy = (p as { trangThai?: string }).trangThai === "da_huy";
+              return (
+              <tr key={p.id} className={`border-b border-slate-50 hover:bg-slate-50 ${daHuy ? "opacity-50" : ""}`}>
+                <td className="px-4 py-3">
+                  <div className="font-mono text-indigo-700 font-medium">{p.soPhieu}</div>
+                  {daHuy && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full font-medium">Đã hủy</span>}
+                </td>
                 <td className="px-4 py-3 text-slate-600">{fmtDate(p.ngay)}</td>
                 <td className="px-4 py-3">
                   {p.hangCat && <span className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-xs font-medium">{p.hangCat}</span>}
                 </td>
                 <td className="px-4 py-3 text-right">{p.soSanPham > 0 ? fmt(p.soSanPham) : "—"}</td>
-                <td className="px-4 py-3 text-right font-semibold">{fmt(p.chiTiet.reduce((s, c) => s + c.thanhTien, 0))}₫</td>
-                <td className="px-4 py-3 text-slate-400 text-xs">{p.ghiChu || "—"}</td>
+                <td className={`px-4 py-3 text-right font-semibold ${daHuy ? "line-through text-slate-400" : ""}`}>
+                  {fmt(p.chiTiet.reduce((s, c) => s + c.thanhTien, 0))}₫
+                </td>
+                <td className="px-4 py-3 text-slate-400 text-xs">
+                  {daHuy
+                    ? <span className="text-red-400">{(p as { lyHuy?: string }).lyHuy || "Đã hủy"}</span>
+                    : (p.ghiChu || "—")}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
                     <button onClick={() => { setSelected(p); setModal("view"); }}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
                       <Eye size={14} />
                     </button>
+                    {!daHuy && (
+                      <button onClick={() => handleHuy(p.id, p.soPhieu)}
+                        title="Hủy phiếu (giữ lịch sử, hoàn tồn kho)"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50">
+                        <X size={14} />
+                      </button>
+                    )}
                     <button onClick={() => handleDelete(p.id)}
+                      title="Xóa hẳn phiếu"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
