@@ -69,11 +69,10 @@ export async function PATCH(
         // Xoá chi tiết cũ
         await tx.chiTietNhapKho.deleteMany({ where: { phieuId: id } });
 
-        // Cập nhật header
+        // Cập nhật header (không đổi soPhieu để tránh unique conflict)
         await tx.phieuNhapKho.update({
           where: { id },
           data: {
-            soPhieu:    body.soPhieu    || undefined,
             ngay:       body.ngay       ? new Date(body.ngay) : undefined,
             nhaCC:      body.nhaCC      ?? undefined,
             tenNhaCC:   body.tenNhaCC   ?? undefined,
