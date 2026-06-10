@@ -6,10 +6,19 @@ import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2 } fr
 type NhanVien = {
   id: string; maNV: string; ten: string;
   chucVu: string | null; phongBan: string | null;
+  loaiLuong: string | null;
   luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; heSoTC: number;
   ngaySinh: string | null;
   active: boolean;
 };
+
+type LocatStats = { dai_thuong: number; dai_kieu: number; short: number };
+const LOAI_HANG_LABEL: Record<string, string> = {
+  dai_thuong: "Dài thường",
+  dai_kieu:   "Dài kiểu",
+  short:      "Short",
+};
+const LOAI_HANG_KEYS = ["dai_thuong", "dai_kieu", "short"] as const;
 
 type ChamCong = {
   id: string; nhanVienId: string; ngay: string; trangThai: string;
@@ -107,6 +116,10 @@ export default function ChamCongPage() {
   const [savingNV, setSavingNV] = useState(false);
   const [nvError, setNvError] = useState("");
 
+  // Khoán May
+  const [locatStats, setLocatStats] = useState<LocatStats>({ dai_thuong: 0, dai_kieu: 0, short: 0 });
+  const [khoanPrices, setKhoanPrices] = useState<Record<string, string>>({ dai_thuong: "", dai_kieu: "", short: "" });
+
   // Parse tháng
   const [year, month] = thang.split("-").map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -140,6 +153,23 @@ export default function ChamCongPage() {
   }, [thang]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load khoán prices từ localStorage khi đổi tháng
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`khoan-prices-${thang}`) || "{}");
+      setKhoanPrices({ dai_thuong: saved.dai_thuong ?? "", dai_kieu: saved.dai_kieu ?? "", short: saved.short ?? "" });
+    } catch { setKhoanPrices({ dai_thuong: "", dai_kieu: "", short: "" }); }
+  }, [thang]);
+
+  // Load LoCat stats khi tab = luong
+  useEffect(() => {
+    if (activeTab !== "luong") return;
+    fetch(`/api/san-xuat/lo-cat/stats?thang=${thang}`)
+      .then(r => r.json())
+      .then(d => { if (d.stats) setLocatStats(d.stats); })
+      .catch(() => {});
+  }, [thang, activeTab]);
 
   // Map nhanh: "nvId_ngayISO" → trangThai
   const ccMap = useMemo(() => {
@@ -650,14 +680,102 @@ export default function ChamCongPage() {
                     groups.get(pb)!.push(nv);
                   });
                   let globalIdx = 0;
-                  return Array.from(groups.entries()).map(([phongBan, nvList]) => (
+                  // ── Tính khoán May ──────────────────────────────────────
+                  const isMayGroup = (pb: string) => pb.trim().toLowerCase() === "may";
+
+                  const getHoursNV = (nvId: string) => {
+                    const sum = getSummary(nvId);
+                    const cong = (sum["di_lam"] ?? 0) + (sum["di_muon"] ?? 0) + (sum["nua_ngay"] ?? 0) * 0.5 + (sum["nghi_phep"] ?? 0) + (sum["nghi_le"] ?? 0);
+                    const tc   = days.reduce((s, d) => s + (tcMap[getKey(nvId, d)] ?? 0), 0);
+                    return cong * 8 + tc;
+                  };
+
+                  const khoanPool = LOAI_HANG_KEYS.reduce((s, k) => {
+                    const price = parseFloat(khoanPrices[k] || "0") || 0;
+                    return s + (locatStats[k] ?? 0) * price;
+                  }, 0);
+
+                  return Array.from(groups.entries()).map(([phongBan, nvList]) => {
+                    // Tổng giờ khoán của nhóm May (chỉ NV loaiLuong = khoan)
+                    const tongGioKhoanNhom = isMayGroup(phongBan)
+                      ? nvList.filter(n => n.loaiLuong === "khoan").reduce((s, n) => s + getHoursNV(n.id), 0)
+                      : 0;
+                    const donGiaGioKhoan = tongGioKhoanNhom > 0 ? khoanPool / tongGioKhoanNhom : 0;
+
+                    return (
                     <React.Fragment key={`group-luong-${phongBan}`}>
                       <tr>
-                        <td colSpan={13} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
+                        <td colSpan={15} className="bg-indigo-50 border-y border-indigo-200 px-4 py-1.5">
                           <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">🏢 {phongBan}</span>
                           <span className="ml-2 text-xs text-indigo-400">({nvList.length} NV)</span>
                         </td>
                       </tr>
+
+                      {/* ── Panel khoán May ────────────────────────── */}
+                      {isMayGroup(phongBan) && (
+                        <tr>
+                          <td colSpan={15} className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+                            <div className="flex items-start gap-6 flex-wrap">
+                              <div>
+                                <p className="text-xs font-bold text-amber-700 mb-2">🧩 Bảng khoán tháng {month}/{year}</p>
+                                <table className="text-xs border-collapse">
+                                  <thead>
+                                    <tr className="text-amber-600">
+                                      <th className="pr-4 pb-1 text-left font-semibold">Loại hàng</th>
+                                      <th className="px-3 pb-1 text-right font-semibold">SL (cái)</th>
+                                      <th className="px-3 pb-1 text-right font-semibold">Đơn giá (₫)</th>
+                                      <th className="px-3 pb-1 text-right font-semibold">Thành tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {LOAI_HANG_KEYS.map(k => {
+                                      const sl    = locatStats[k] ?? 0;
+                                      const price = parseFloat(khoanPrices[k] || "0") || 0;
+                                      return (
+                                        <tr key={k} className="border-t border-amber-100">
+                                          <td className="pr-4 py-1 font-medium text-slate-700">{LOAI_HANG_LABEL[k]}</td>
+                                          <td className="px-3 py-1 text-right text-slate-600">{sl > 0 ? fmt(sl) : <span className="text-slate-300">0</span>}</td>
+                                          <td className="px-3 py-1">
+                                            <input
+                                              type="number" min="0" step="1000"
+                                              value={khoanPrices[k]}
+                                              placeholder="0"
+                                              onChange={e => {
+                                                const next = { ...khoanPrices, [k]: e.target.value };
+                                                setKhoanPrices(next);
+                                                try { localStorage.setItem(`khoan-prices-${thang}`, JSON.stringify(next)); } catch {}
+                                              }}
+                                              className="w-24 text-right text-xs font-semibold text-amber-700 border border-amber-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                            />
+                                          </td>
+                                          <td className="px-3 py-1 text-right font-semibold text-amber-700">
+                                            {sl > 0 && price > 0 ? fmt(Math.round(sl * price)) + "₫" : <span className="text-slate-300">—</span>}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div className="flex flex-col gap-1 text-xs pt-5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-500 w-32">Tổng tiền khoán:</span>
+                                  <span className="font-bold text-amber-700 text-sm">{fmt(Math.round(khoanPool))}₫</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-500 w-32">Tổng giờ (NV khoán):</span>
+                                  <span className="font-semibold text-slate-700">{Math.round(tongGioKhoanNhom)} giờ</span>
+                                </div>
+                                <div className="flex items-center gap-2 border-t border-amber-200 pt-1 mt-1">
+                                  <span className="text-slate-500 w-32">Đơn giá / giờ:</span>
+                                  <span className="font-bold text-rose-600">{donGiaGioKhoan > 0 ? fmt(Math.round(donGiaGioKhoan)) + "₫/h" : "—"}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
                       {nvList.map((nv) => {
                   const idx = globalIdx++;
                   const summary = getSummary(nv.id);
@@ -684,6 +802,12 @@ export default function ChamCongPage() {
                   const luongTC       = heSoTC * tongTC; // đơn giá/giờ × số giờ TC
                   const thucLinh      = luongCong + luongTC + tongPhuCap;
 
+                  // Khoán
+                  const isKhoan       = nv.loaiLuong === "khoan" && isMayGroup(phongBan);
+                  const gioNV         = isKhoan ? congTinhLuong * 8 + tongTC : 0;
+                  const luongKhoan    = isKhoan ? donGiaGioKhoan * gioNV : 0;
+                  const thucLinhKhoan = isKhoan ? luongKhoan + tongPhuCap : thucLinh;
+
                   return (
                     <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
                       <td className="px-3 py-2 text-center text-slate-400 text-xs">{idx + 1}</td>
@@ -692,7 +816,9 @@ export default function ChamCongPage() {
                         {nv.chucVu && <p className="text-xs text-slate-400">{nv.chucVu}</p>}
                       </td>
                       <td className="px-3 py-2 text-right text-slate-600">
-                        {lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
+                        {isKhoan
+                          ? <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-semibold">Khoán</span>
+                          : lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
                       </td>
                       <td className="px-3 py-2 text-center font-semibold text-emerald-700">{congTinhLuong || "—"}</td>
                       <td className="px-3 py-2 text-center text-blue-600">{congPhep || ""}</td>
@@ -718,10 +844,15 @@ export default function ChamCongPage() {
                         />
                       </td>
                       <td className="px-3 py-2 text-right text-slate-700">
-                        {lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>}
+                        {isKhoan
+                          ? (donGiaGioKhoan > 0 && gioNV > 0
+                            ? <span className="text-amber-600 font-semibold">{fmt(Math.round(luongKhoan))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(Math.round(donGiaGioKhoan))}₫/h</span></span>
+                            : <span className="text-slate-300 text-xs">—</span>)
+                          : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
+                        }
                       </td>
                       <td className="px-3 py-2 text-right text-orange-600">
-                        {lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : ""}
+                        {isKhoan ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
                       </td>
                       {/* Phụ cấp — 2 ô: Chuyên cần + Ăn/ngày */}
                       <td className="px-2 py-1">
@@ -771,7 +902,10 @@ export default function ChamCongPage() {
                         </div>
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
-                        {lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>}
+                        {isKhoan
+                          ? (thucLinhKhoan > 0 ? fmt(Math.round(thucLinhKhoan)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
+                          : (lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
+                        }
                       </td>
                       <td className="px-1 py-2 text-center">
                         <button
@@ -785,7 +919,8 @@ export default function ChamCongPage() {
                   );
                       })}
                     </React.Fragment>
-                  ));
+                  );
+                  });
                 })()}
               </tbody>
               {nhanViens.length > 0 && (
