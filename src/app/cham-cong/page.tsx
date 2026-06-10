@@ -335,8 +335,16 @@ export default function ChamCongPage() {
 
   return (
     <div className="p-5">
-      {/* Print styles — chỉ in bảng lương, ẩn hết còn lại */}
-      <style>{`
+      {/* Print styles — chuyển đổi giữa in phiếu cá nhân và bảng lương */}
+      <style>{phieuLuong ? `
+        @media print {
+          body * { visibility: hidden !important; }
+          #phieu-luong-modal, #phieu-luong-modal * { visibility: visible !important; }
+          #phieu-luong-modal { position: fixed; top: 0; left: 0; width: 100%; background: white; }
+          .no-print { display: none !important; }
+          @page { size: A5; margin: 12mm; }
+        }
+      ` : `
         @media print {
           body * { visibility: hidden !important; }
           #bang-luong-in, #bang-luong-in * { visibility: visible !important; }
@@ -1257,15 +1265,6 @@ export default function ChamCongPage() {
         const fmtVND = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
-            {/* Print: chỉ hiện phiếu, ẩn overlay + nút */}
-            <style>{`
-              @media print {
-                body > * { display: none !important; }
-                #phieu-luong-modal { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
-                .no-print { display: none !important; }
-                @page { size: A5; margin: 12mm; }
-              }
-            `}</style>
             <div id="phieu-luong-modal" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm print:shadow-none print:rounded-none">
               {/* Toolbar — ẩn khi in */}
               <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-100">
