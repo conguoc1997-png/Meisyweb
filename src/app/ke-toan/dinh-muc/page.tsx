@@ -80,6 +80,41 @@ export default function DinhMucPage() {
   });
   const [editingColKey, setEditingColKey] = useState<string | null>(null);
   const [editingColVal, setEditingColVal] = useState("");
+
+  // Cột tùy chỉnh (thêm mới)
+  const [extraCols, setExtraCols] = useState<ColDef[]>(() => {
+    try { return JSON.parse(localStorage.getItem("dinh-muc-extra-cols") || "[]"); } catch { return []; }
+  });
+  const [addColModal, setAddColModal] = useState(false);
+  const [addColForm, setAddColForm] = useState({ label: "", loai: "hoan_thien", nhom: "", shared: false, tickOnly: true });
+
+  const allColumns = useMemo(() => [...COLUMNS, ...extraCols], [extraCols]);
+
+  function saveExtraCols(cols: ColDef[]) {
+    setExtraCols(cols);
+    localStorage.setItem("dinh-muc-extra-cols", JSON.stringify(cols));
+  }
+  function addNewCol() {
+    const label = addColForm.label.trim();
+    if (!label) return;
+    const key = `custom_${Date.now()}`;
+    const newCol: ColDef = {
+      key, label,
+      loai: addColForm.loai,
+      nhom: addColForm.nhom.trim() || null,
+      shared: addColForm.shared,
+      tickOnly: addColForm.tickOnly,
+      hdr: "bg-violet-100 text-violet-800",
+      badge: "bg-violet-100 text-violet-700",
+      separatorLeft: extraCols.length === 0, // đường kẻ trước cột đầu tiên
+    };
+    saveExtraCols([...extraCols, newCol]);
+    setAddColModal(false);
+    setAddColForm({ label: "", loai: "hoan_thien", nhom: "", shared: false, tickOnly: true });
+  }
+  function removeExtraCol(key: string) {
+    saveExtraCols(extraCols.filter(c => c.key !== key));
+  }
   function startEditCol(col: ColDef) {
     setEditingColKey(col.key);
     setEditingColVal(colLabels[col.key] ?? col.label);
@@ -482,13 +517,13 @@ export default function DinhMucPage() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
-          <table className="text-sm border-collapse w-full" style={{ minWidth: `${200 + COLUMNS.length * 110}px` }}>
+          <table className="text-sm border-collapse w-full" style={{ minWidth: `${200 + allColumns.length * 110}px` }}>
             <thead>
               <tr className="bg-slate-50 border-b-2 border-slate-200">
                 <th className="px-4 py-3 text-left font-semibold text-slate-600 w-48 sticky left-0 bg-slate-50 z-10 border-r border-slate-200">
                   Sản phẩm
                 </th>
-                {COLUMNS.map(col => (
+                {allColumns.map(col => (
                   <th key={col.key} className={`px-2 py-3 text-center text-xs font-bold w-28 ${col.hdr} ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}`}>
                     {editingColKey === col.key ? (
                       <input
@@ -510,8 +545,20 @@ export default function DinhMucPage() {
                     )}
                     {col.shared && <div className="text-[10px] font-normal opacity-60 mt-0.5">↓ từ CHUNG</div>}
                     {!col.shared && !col.tickOnly && <div className="text-[10px] font-normal opacity-60 mt-0.5">riêng SP</div>}
+                    {extraCols.some(c => c.key === col.key) && (
+                      <button onClick={e => { e.stopPropagation(); removeExtraCol(col.key); }}
+                        className="mt-0.5 text-[9px] text-red-300 hover:text-red-500 block mx-auto">✕ xóa</button>
+                    )}
                   </th>
                 ))}
+                {/* Nút thêm cột mới */}
+                <th className="px-2 py-3 text-center w-12 border-l-2 border-dashed border-slate-300">
+                  <button onClick={() => setAddColModal(true)}
+                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-indigo-100 text-slate-400 hover:text-indigo-600 flex items-center justify-center mx-auto text-lg font-bold transition-colors"
+                    title="Thêm cột mới">
+                    +
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -528,7 +575,7 @@ export default function DinhMucPage() {
                     </div>
                   </div>
                 </td>
-                {COLUMNS.map(col => (
+                {allColumns.map(col => (
                   <td key={col.key}
                     className={`px-2 py-3 text-center align-middle border-r border-indigo-100
                       ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}
@@ -537,6 +584,7 @@ export default function DinhMucPage() {
                     <CellContent hangCat={CHUNG_KEY} col={col} />
                   </td>
                 ))}
+                <td />
               </tr>
 
               {/* ── PRODUCT ROWS ───────────────────────────────────────── */}
@@ -557,9 +605,8 @@ export default function DinhMucPage() {
                     </td>
 
                     {/* Cells */}
-                    {COLUMNS.map(col => {
-                      const canEdit = !col.shared || (col.tickOnly && col.shared === false);
-                      const canClick = !col.shared; // product rows: click khi !shared
+                    {allColumns.map(col => {
+                      const canClick = !col.shared;
                       return (
                         <td key={col.key}
                           className={`px-2 py-2 text-center align-middle border-r border-slate-50
@@ -570,6 +617,7 @@ export default function DinhMucPage() {
                         </td>
                       );
                     })}
+                    <td />
                   </tr>
                 ))
               )}
@@ -829,6 +877,69 @@ export default function DinhMucPage() {
                   );
                 });
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modal thêm cột mới ─────────────────────────────────────────────── */}
+      {addColModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4"
+          onClick={e => e.target === e.currentTarget && setAddColModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Thêm cột mới</h3>
+              <button onClick={() => setAddColModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Tên cột *</label>
+                <input autoFocus value={addColForm.label}
+                  onChange={e => setAddColForm(f => ({ ...f, label: e.target.value }))}
+                  placeholder="VD: Giặt Nhanh, In lụa..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Loại vật tư</label>
+                  <select value={addColForm.loai}
+                    onChange={e => setAddColForm(f => ({ ...f, loai: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="hoan_thien">Hoàn thiện</option>
+                    <option value="may">May</option>
+                    <option value="gia_cong">Gia công</option>
+                    <option value="vai">Vải</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Nhóm (nhom)</label>
+                  <input value={addColForm.nhom}
+                    onChange={e => setAddColForm(f => ({ ...f, nhom: e.target.value }))}
+                    placeholder="VD: giat_nhanh"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={addColForm.shared}
+                    onChange={e => setAddColForm(f => ({ ...f, shared: e.target.checked }))}
+                    className="accent-indigo-600 w-4 h-4" />
+                  <span className="text-xs text-slate-600">Dùng chung (CHUNG)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={addColForm.tickOnly}
+                    onChange={e => setAddColForm(f => ({ ...f, tickOnly: e.target.checked }))}
+                    className="accent-indigo-600 w-4 h-4" />
+                  <span className="text-xs text-slate-600">Chỉ tick (không nhập SL)</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-5 py-4 border-t border-slate-100">
+              <button onClick={() => setAddColModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Hủy</button>
+              <button onClick={addNewCol} disabled={!addColForm.label.trim()}
+                className="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-40">
+                Thêm cột
+              </button>
             </div>
           </div>
         </div>
