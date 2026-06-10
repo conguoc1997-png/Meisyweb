@@ -292,16 +292,22 @@ model DinhMucNPL {
 
 // Phiếu xuất kho NPL (liên kết lô cắt)
 model PhieuXuatKho {
-  id        String   @id @default(cuid())
-  soPhieu   String   @unique
-  loCatId   String?  // lô cắt tương ứng
-  hangCat   String?  // loại hàng cắt
-  soSanPham Int      @default(0) // số SP thực tế của lô
+  id        String    @id @default(cuid())
+  soPhieu   String    @unique
+  loCatId   String?   // lô cắt tương ứng
+  hangCat   String?   // loại hàng cắt
+  soSanPham Int       @default(0) // số SP thực tế của lô
   ngay      DateTime
-  lyDo      String   @default("san_xuat") // san_xuat | dieu_chinh | khac
+  lyDo      String    @default("san_xuat") // san_xuat | dieu_chinh | khac
   ghiChu    String?
   nguoiTao  String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+
+  // Trạng thái hủy
+  trangThai  String    @default("active")  // active | da_huy
+  lyHuy      String?   // lý do hủy (vd: "Hoàn hóa đơn #123")
+  ngayHuy    DateTime?
+  nguoiHuy   String?
 
   chiTiet PhieuXuatChiTiet[]
 }
