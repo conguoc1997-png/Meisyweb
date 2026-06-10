@@ -154,22 +154,17 @@ export default function ChamCongPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Load khoán prices từ localStorage khi đổi tháng
+  // Load khoán prices + SL từ localStorage khi đổi tháng
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(`khoan-prices-${thang}`) || "{}");
       setKhoanPrices({ dai_thuong: saved.dai_thuong ?? "", dai_kieu: saved.dai_kieu ?? "", short: saved.short ?? "" });
     } catch { setKhoanPrices({ dai_thuong: "", dai_kieu: "", short: "" }); }
+    try {
+      const savedSL = JSON.parse(localStorage.getItem(`khoan-sl-${thang}`) || "{}");
+      setLocatStats({ dai_thuong: savedSL.dai_thuong ?? 0, dai_kieu: savedSL.dai_kieu ?? 0, short: savedSL.short ?? 0 });
+    } catch { setLocatStats({ dai_thuong: 0, dai_kieu: 0, short: 0 }); }
   }, [thang]);
-
-  // Load LoCat stats khi tab = luong
-  useEffect(() => {
-    if (activeTab !== "luong") return;
-    fetch(`/api/san-xuat/lo-cat/stats?thang=${thang}`)
-      .then(r => r.json())
-      .then(d => { if (d.stats) setLocatStats(d.stats); })
-      .catch(() => {});
-  }, [thang, activeTab]);
 
   // Map nhanh: "nvId_ngayISO" → trangThai
   const ccMap = useMemo(() => {
@@ -745,7 +740,19 @@ export default function ChamCongPage() {
                                       return (
                                         <tr key={k} className="border-t border-amber-100">
                                           <td className="pr-4 py-1 font-medium text-slate-700">{LOAI_HANG_LABEL[k]}</td>
-                                          <td className="px-3 py-1 text-right text-slate-600">{sl > 0 ? fmt(sl) : <span className="text-slate-300">0</span>}</td>
+                                          <td className="px-3 py-1">
+                                            <input
+                                              type="number" min="0" step="1"
+                                              value={sl || ""}
+                                              placeholder="0"
+                                              onChange={e => {
+                                                const next = { ...locatStats, [k]: parseFloat(e.target.value) || 0 };
+                                                setLocatStats(next);
+                                                try { localStorage.setItem(`khoan-sl-${thang}`, JSON.stringify(next)); } catch {}
+                                              }}
+                                              className="w-20 text-right text-xs font-semibold text-slate-700 border border-slate-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                            />
+                                          </td>
                                           <td className="px-3 py-1">
                                             <input
                                               type="number" min="0" step="1000"
