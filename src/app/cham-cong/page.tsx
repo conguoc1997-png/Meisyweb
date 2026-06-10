@@ -1355,7 +1355,7 @@ export default function ChamCongPage() {
               <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-100">
                 <span className="font-semibold text-slate-700">Phiếu lương cá nhân</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={printPhieuLuong}
+                  <button onClick={() => window.print()}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition">
                     <Printer size={12} /> In phiếu
                   </button>
