@@ -516,9 +516,9 @@ export default function DinhMucPage() {
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm" style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
           <table className="text-sm border-collapse w-full" style={{ minWidth: `${200 + allColumns.length * 110}px` }}>
-            <thead>
+            <thead className="sticky top-0 z-20">
               <tr className="bg-slate-50 border-b-2 border-slate-200">
                 <th className="px-4 py-3 text-left font-semibold text-slate-600 w-48 sticky left-0 bg-slate-50 z-10 border-r border-slate-200">
                   Sản phẩm
@@ -563,7 +563,7 @@ export default function DinhMucPage() {
             </thead>
             <tbody>
               {/* ── CHUNG ROW (pinned) ─────────────────────────────────── */}
-              <tr className="border-b-2 border-indigo-200 bg-indigo-50/60">
+              <tr className="border-b-2 border-indigo-200 bg-indigo-50/60 sticky z-10" style={{ top: "49px" }}>
                 <td className="px-4 py-3 sticky left-0 bg-indigo-50 z-10 border-r border-indigo-200">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
@@ -577,14 +577,14 @@ export default function DinhMucPage() {
                 </td>
                 {allColumns.map(col => (
                   <td key={col.key}
-                    className={`px-2 py-3 text-center align-middle border-r border-indigo-100
+                    className={`px-2 py-3 text-center align-middle border-r border-indigo-100 bg-indigo-50
                       ${col.separatorLeft ? "border-l-2 border-slate-300" : ""}
                       cursor-pointer hover:bg-indigo-100/50 transition-colors`}
                     onClick={() => openCell(CHUNG_KEY, col.key)}>
                     <CellContent hangCat={CHUNG_KEY} col={col} />
                   </td>
                 ))}
-                <td />
+                <td className="bg-indigo-50" />
               </tr>
 
               {/* ── PRODUCT ROWS ───────────────────────────────────────── */}
