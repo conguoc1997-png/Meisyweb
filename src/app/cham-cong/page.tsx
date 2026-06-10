@@ -701,11 +701,11 @@ export default function ChamCongPage() {
                       ? nvList.filter(n => n.loaiLuong === "khoan").reduce((s, n) => s + getHoursNV(n.id), 0)
                       : 0;
 
-                    // Phần co_ban nhận từ pool = Σ(tăng ca × hệ số) của NV co_ban
+                    // Phần co_ban nhận từ pool = Σ(tổng giờ đi làm × heSoTC) của NV co_ban
                     const totalCoBanTC = isMayGroup(phongBan)
                       ? nvList.filter(n => n.loaiLuong !== "khoan").reduce((s, n) => {
-                          const tc = days.reduce((d, day) => d + (tcMap[getKey(n.id, day)] ?? 0), 0);
-                          return s + tc * (n.heSoTC ?? 1.5);
+                          const gioCoBan = getHoursNV(n.id);
+                          return s + gioCoBan * (n.heSoTC ?? 1.5);
                         }, 0)
                       : 0;
 
@@ -823,11 +823,14 @@ export default function ChamCongPage() {
                   const luongTC       = heSoTC * tongTC; // đơn giá/giờ × số giờ TC
                   const thucLinh      = luongCong + luongTC + tongPhuCap;
 
-                  // Khoán
+                  // Khoán / co_ban May
                   const isKhoan       = nv.loaiLuong === "khoan" && isMayGroup(phongBan);
-                  const gioNV         = isKhoan ? congTinhLuong * 8 + tongTC : 0;
-                  const luongKhoan    = isKhoan ? donGiaGioKhoan * gioNV : 0;
-                  const thucLinhKhoan = isKhoan ? luongKhoan + tongPhuCap : thucLinh;
+                  const isCoBanMay    = nv.loaiLuong !== "khoan"  && isMayGroup(phongBan);
+                  const gioNV         = (isKhoan || isCoBanMay) ? congTinhLuong * 8 + tongTC : 0;
+                  const luongKhoan    = isKhoan    ? donGiaGioKhoan * gioNV : 0;
+                  const luongCoBanMay = isCoBanMay ? gioNV * (nv.heSoTC ?? 1.5) : 0;
+                  const thucLinhKhoan    = isKhoan    ? luongKhoan    + tongPhuCap : thucLinh;
+                  const thucLinhCoBanMay = isCoBanMay ? luongCoBanMay + tongPhuCap : thucLinh;
 
                   return (
                     <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
@@ -839,7 +842,9 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right text-slate-600">
                         {isKhoan
                           ? <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-semibold">Khoán</span>
-                          : lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
+                          : isCoBanMay
+                            ? <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">Tiếng</span>
+                            : lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
                       </td>
                       <td className="px-3 py-2 text-center font-semibold text-emerald-700">{congTinhLuong || "—"}</td>
                       <td className="px-3 py-2 text-center text-blue-600">{congPhep || ""}</td>
@@ -869,11 +874,15 @@ export default function ChamCongPage() {
                           ? (donGiaGioKhoan > 0 && gioNV > 0
                             ? <span className="text-amber-600 font-semibold">{fmt(Math.round(luongKhoan))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(Math.round(donGiaGioKhoan))}₫/h</span></span>
                             : <span className="text-slate-300 text-xs">—</span>)
-                          : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
+                          : isCoBanMay
+                            ? (gioNV > 0
+                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
+                              : <span className="text-slate-300 text-xs">—</span>)
+                            : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
                         }
                       </td>
                       <td className="px-3 py-2 text-right text-orange-600">
-                        {isKhoan ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
+                        {(isKhoan || isCoBanMay) ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
                       </td>
                       {/* Phụ cấp — 2 ô: Chuyên cần + Ăn/ngày */}
                       <td className="px-2 py-1">
@@ -925,7 +934,9 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right font-bold text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
                         {isKhoan
                           ? (thucLinhKhoan > 0 ? fmt(Math.round(thucLinhKhoan)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
-                          : (lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
+                          : isCoBanMay
+                            ? (thucLinhCoBanMay > 0 ? fmt(Math.round(thucLinhCoBanMay)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
+                            : (lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
                         }
                       </td>
                       <td className="px-1 py-2 text-center">
