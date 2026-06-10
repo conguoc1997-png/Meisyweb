@@ -633,7 +633,7 @@ export default function ChamCongPage() {
             <div>
               <h2 className="font-bold text-slate-800">Bảng Lương — Tháng {month}/{year}</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {soNgayLamViec} ngày làm việc · Lương TC = (LCB ÷ {soNgayLamViec}ngày ÷ 8h) × 1.5 × giờ TC
+                {soNgayLamViec} ngày làm việc · Lương TC (lương CB) = giờ TC × hệ số · Đội May: cơ chế khoán riêng
               </p>
             </div>
             <button
@@ -994,7 +994,7 @@ export default function ChamCongPage() {
             </table>
           </div>
           <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-400">
-            💡 Lương TC = (LCB ÷ ngày ÷ 8h) × <b>Hệ số TC</b> × giờ TC &nbsp;|&nbsp; Thực lĩnh = Lương công + Lương TC + Phụ cấp &nbsp;|&nbsp; Vắng không tính lương
+            💡 Lương CB: Lương TC = giờ TC × <b>Hệ số TC</b> &nbsp;|&nbsp; Đội May: Lương theo khoán sản phẩm (không tính TC riêng) &nbsp;|&nbsp; Thực lĩnh = Lương + Phụ cấp &nbsp;|&nbsp; Vắng không tính lương
           </div>
         </div>
       )}
