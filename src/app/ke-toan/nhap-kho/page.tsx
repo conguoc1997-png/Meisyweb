@@ -433,15 +433,16 @@ export default function NhapKhoPage() {
               <th className="px-4 py-3 font-semibold text-slate-600">Ngày</th>
               <th className="px-4 py-3 font-semibold text-slate-600">Nhà CC</th>
               <th className="px-4 py-3 font-semibold text-slate-600">Số HĐ</th>
+              <th className="px-4 py-3 font-semibold text-slate-600">Nguyên phụ liệu</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-right">Tổng tiền</th>
               <th className="px-4 py-3 font-semibold text-slate-600">Trạng thái</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={7} className="text-center py-12 text-slate-400">Đang tải...</td></tr>}
+            {loading && <tr><td colSpan={8} className="text-center py-12 text-slate-400">Đang tải...</td></tr>}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-slate-400">Chưa có phiếu nhập nào</td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-slate-400">Chưa có phiếu nhập nào</td></tr>
             )}
             {filtered.map(p => {
               const tt = TRANG_THAI_MAP[p.trangThai] || TRANG_THAI_MAP.chua_thanh_toan;
@@ -457,6 +458,18 @@ export default function NhapKhoPage() {
                       || p.nhaCC}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{p.soHoaDon || "—"}</td>
+                  <td className="px-4 py-3 max-w-[220px]">
+                    <div className="flex flex-wrap gap-1">
+                      {p.chiTiet.slice(0, 3).map((c, i) => (
+                        <span key={i} className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full truncate max-w-[100px]">
+                          {c.vatTu?.ten ?? "—"}
+                        </span>
+                      ))}
+                      {p.chiTiet.length > 3 && (
+                        <span className="text-xs text-slate-400">+{p.chiTiet.length - 3}</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(p.tongTien)}₫</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${tt.color}`}>
