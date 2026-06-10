@@ -111,6 +111,91 @@ export default function ChamCongPage() {
   };
   const [phieuLuong, setPhieuLuong] = useState<PhieuLuong | null>(null);
 
+  const printPhieuLuong = () => {
+    if (!phieuLuong) return;
+    const p = phieuLuong;
+    const fv = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
+    const f  = (n: number) => n.toLocaleString("vi-VN");
+
+    const rows = p.isKhoan || p.isCoBanMay ? `
+      <tr style="background:#fffbeb">
+        <td style="padding:6px 10px;font-weight:600;color:#b45309">${p.isKhoan ? "Lương khoán" : "Lương theo giờ"}</td>
+        <td style="padding:6px 10px;text-align:right;font-size:11px;color:#888">${p.gioNV}h × ${f(p.donGiaGio ?? 0)}₫/h</td>
+        <td style="padding:6px 10px;text-align:right;font-weight:600;color:#b45309">${fv(p.luongMay ?? 0)}</td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding:5px 10px;font-size:11px;color:#888">Chấm công (${p.congTinhLuong} ngày)
+          ${p.congCoMat ? ` · Đi làm: ${p.congCoMat}` : ""}${p.congMuon ? ` · Muộn: ${p.congMuon}` : ""}${p.congVang ? `<span style="color:red"> · Vắng: ${p.congVang}</span>` : ""}
+        </td><td></td>
+      </tr>
+    ` : `
+      <tr>
+        <td style="padding:6px 10px;color:#555">Lương cơ bản</td>
+        <td style="padding:6px 10px;text-align:right;font-size:11px;color:#888">${f(p.lcb)} ÷ ${p.soNgayLamViec} ngày</td>
+        <td style="padding:6px 10px;text-align:right">${fv(p.lcb)}</td>
+      </tr>
+      <tr style="background:#f0fdf4">
+        <td style="padding:6px 10px;color:#16a34a;font-weight:600">Ngày công (${p.congTinhLuong} ngày)</td>
+        <td style="padding:6px 10px;text-align:right;font-size:11px;color:#888;line-height:1.5">
+          ${p.congCoMat > 0 ? `Đi làm: ${p.congCoMat}<br>` : ""}${p.congMuon > 0 ? `Đi muộn: ${p.congMuon}<br>` : ""}${p.congNuaNgay > 0 ? `½ ngày: ${p.congNuaNgay}<br>` : ""}${p.congPhep > 0 ? `Nghỉ phép: ${p.congPhep}<br>` : ""}${p.congVang > 0 ? `<span style="color:red">Vắng: ${p.congVang}</span>` : ""}
+        </td>
+        <td style="padding:6px 10px;text-align:right;font-weight:600;color:#16a34a">${fv(p.luongCong)}</td>
+      </tr>
+      ${p.tongTC > 0 ? `<tr><td style="padding:6px 10px;color:#ea580c">Tăng ca</td><td style="padding:6px 10px;text-align:right;font-size:11px;color:#888">${p.tongTC}h × ${f(p.heSoTC)}₫/h</td><td style="padding:6px 10px;text-align:right;color:#ea580c;font-weight:600">${fv(p.luongTC)}</td></tr>` : ""}
+    `;
+
+    const pcRows = `
+      ${p.phuCapCC > 0 ? `<tr><td style="padding:6px 10px;color:#0d9488">PC Chuyên cần</td><td style="padding:6px 10px;text-align:right;font-size:11px;color:#888">${p.congVang > 0 ? "Không đủ điều kiện" : "Đủ điều kiện"}</td><td style="padding:6px 10px;text-align:right;color:#0d9488;font-weight:600">${p.congVang > 0 ? "—" : fv(p.phuCapCC)}</td></tr>` : ""}
+      ${p.phuCapAnNgay > 0 ? `<tr><td style="padding:6px 10px;color:#0d9488">PC Ăn ca</td><td style="padding:6px 10px;text-align:right;font-size:11px;color:#888">${f(p.phuCapAnNgay)} × ${p.ngayAnDuCong} ngày</td><td style="padding:6px 10px;text-align:right;color:#0d9488;font-weight:600">${fv(p.phuCapAnNgay * p.ngayAnDuCong)}</td></tr>` : ""}
+    `;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>Phiếu Lương — ${p.nv.ten}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
+        .info-box { background: #f8fafc; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        th { background: #f1f5f9; padding: 7px 10px; text-align: left; font-size: 11px; color: #64748b; }
+        th:last-child, td:last-child { text-align: right; }
+        tr { border-bottom: 1px solid #f1f5f9; }
+        .tfoot-row td { border-top: 2px solid #8b5cf6; background: #f5f3ff; padding: 10px; font-weight: 700; font-size: 15px; color: #5b21b6; }
+        .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #666; }
+        .sign-name { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 40px; }
+        .sign-line { border-top: 1px solid #aaa; padding-top: 4px; }
+        @media print { body { padding: 0; } @page { size: A5; margin: 12mm; } }
+      </style>
+    </head><body>
+      <div class="header">
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:2px;text-transform:uppercase">Meisy Inhouse</div>
+        <div style="font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin:4px 0">Phiếu Lương</div>
+        <div style="font-size:13px;font-weight:600;color:#7c3aed">Tháng ${month}/${year}</div>
+      </div>
+      <div class="info-box">
+        <div class="info-row"><span style="color:#64748b">Họ và tên:</span><strong>${p.nv.ten}</strong></div>
+        <div class="info-row"><span style="color:#64748b">Mã NV:</span><span>${p.nv.maNV}</span></div>
+        ${p.nv.chucVu ? `<div class="info-row"><span style="color:#64748b">Chức vụ:</span><span>${p.nv.chucVu}</span></div>` : ""}
+        ${p.nv.phongBan ? `<div class="info-row"><span style="color:#64748b">Bộ phận:</span><span>${p.nv.phongBan}</span></div>` : ""}
+      </div>
+      <table>
+        <thead><tr><th>Khoản mục</th><th style="text-align:right">Số liệu</th><th style="text-align:right">Thành tiền</th></tr></thead>
+        <tbody>${rows}${pcRows}</tbody>
+        <tfoot><tr class="tfoot-row"><td colspan="2">THỰC LĨNH</td><td>${fv(p.thucLinh)}</td></tr></tfoot>
+      </table>
+      <div class="sign">
+        <div><div class="sign-name">Người nhận</div><div class="sign-line">(Ký, ghi rõ họ tên)</div></div>
+        <div><div class="sign-name">Kế toán</div><div class="sign-line">(Ký, ghi rõ họ tên)</div></div>
+      </div>
+      <div style="text-align:center;font-size:10px;color:#ccc;margin-top:12px">Ngày in: ${new Date().toLocaleDateString("vi-VN")}</div>
+      <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script>
+    </body></html>`;
+
+    const win = window.open("", "_blank", "width=480,height=750");
+    win?.document.write(html);
+    win?.document.close();
+  };
+
   // Modal quản lý NV
   const [showNVModal, setShowNVModal] = useState(false);
   const [allNVs, setAllNVs] = useState<NhanVien[]>([]);
@@ -1270,7 +1355,7 @@ export default function ChamCongPage() {
               <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-100">
                 <span className="font-semibold text-slate-700">Phiếu lương cá nhân</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => window.print()}
+                  <button onClick={printPhieuLuong}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition">
                     <Printer size={12} /> In phiếu
                   </button>
