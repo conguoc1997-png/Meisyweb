@@ -105,6 +105,9 @@ export default function ChamCongPage() {
     luongCong: number; luongTC: number;
     phuCapCC: number; phuCapAnNgay: number; ngayAnDuCong: number; tongPhuCap: number;
     thucLinh: number;
+    // May special
+    isKhoan?: boolean; isCoBanMay?: boolean;
+    gioNV?: number; donGiaGio?: number; luongMay?: number;
   };
   const [phieuLuong, setPhieuLuong] = useState<PhieuLuong | null>(null);
 
@@ -949,7 +952,17 @@ export default function ChamCongPage() {
                       <td className="px-1 py-2 text-center">
                         <button
                           title="In phiếu lương"
-                          onClick={() => setPhieuLuong({ nv, lcb, soNgayLamViec, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC, luongCong: Math.round(luongCong), luongTC: Math.round(luongTC), phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap: Math.round(tongPhuCap), thucLinh: Math.round(thucLinh) })}
+                          onClick={() => setPhieuLuong({
+                            nv, lcb, soNgayLamViec, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC,
+                            luongCong: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : Math.round(luongCong),
+                            luongTC: (isKhoan || isCoBanMay) ? 0 : Math.round(luongTC),
+                            phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap: Math.round(tongPhuCap),
+                            thucLinh: isKhoan ? Math.round(thucLinhKhoan) : isCoBanMay ? Math.round(thucLinhCoBanMay) : Math.round(thucLinh),
+                            isKhoan, isCoBanMay,
+                            gioNV: (isKhoan || isCoBanMay) ? Math.round(gioNV) : undefined,
+                            donGiaGio: isKhoan ? Math.round(donGiaGioKhoan) : isCoBanMay ? (nv.heSoTC ?? 1.5) : undefined,
+                            luongMay: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : undefined,
+                          })}
                           className="p-1.5 rounded-lg hover:bg-violet-100 text-slate-300 hover:text-violet-600 transition">
                           <Printer size={13} />
                         </button>
@@ -1239,7 +1252,8 @@ export default function ChamCongPage() {
       {/* ═══ MODAL PHIẾU LƯƠNG CÁ NHÂN ═══ */}
       {phieuLuong && (() => {
         const { nv, lcb, soNgayLamViec: ngayLV, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang,
-          congTinhLuong, tongTC, heSoTC, luongCong, luongTC, phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap, thucLinh } = phieuLuong;
+          congTinhLuong, tongTC, heSoTC, luongCong, luongTC, phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap, thucLinh,
+          isKhoan, isCoBanMay, gioNV, donGiaGio, luongMay } = phieuLuong;
         const fmtVND = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
@@ -1308,29 +1322,51 @@ export default function ChamCongPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="px-3 py-2 text-slate-600">Lương cơ bản</td>
-                      <td className="px-3 py-2 text-right text-slate-500 text-xs">{fmt(lcb)} ÷ {ngayLV} ngày</td>
-                      <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtVND(lcb)}</td>
-                    </tr>
-                    <tr className="bg-emerald-50/50">
-                      <td className="px-3 py-2 text-emerald-700 font-medium">Ngày công ({congTinhLuong} ngày)</td>
-                      <td className="px-3 py-2 text-right text-[11px] text-slate-400 leading-4">
-                        {congCoMat > 0 && <div>Đi làm: {congCoMat}</div>}
-                        {congMuon > 0 && <div>Đi muộn: {congMuon}</div>}
-                        {congNuaNgay > 0 && <div>½ ngày: {congNuaNgay}</div>}
-                        {congPhep > 0 && <div>Nghỉ phép: {congPhep}</div>}
-                        {congLe > 0 && <div>Nghỉ lễ: {congLe}</div>}
-                        {congVang > 0 && <div className="text-red-500">Vắng: {congVang}</div>}
-                      </td>
-                      <td className="px-3 py-2 text-right font-semibold text-emerald-700">{fmtVND(luongCong)}</td>
-                    </tr>
-                    {tongTC > 0 && (
-                      <tr>
-                        <td className="px-3 py-2 text-orange-600">Tăng ca</td>
-                        <td className="px-3 py-2 text-right text-xs text-slate-400">{tongTC}h × hệ số {heSoTC}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-orange-600">{fmtVND(luongTC)}</td>
-                      </tr>
+                    {/* ── May khoán / tiếng ─────────────────────── */}
+                    {(isKhoan || isCoBanMay) ? (
+                      <>
+                        <tr className="bg-amber-50/50">
+                          <td className="px-3 py-2 font-medium text-amber-700">{isKhoan ? "Lương khoán" : "Lương theo giờ"}</td>
+                          <td className="px-3 py-2 text-right text-xs text-slate-400">{gioNV}h × {fmt(donGiaGio ?? 0)}₫/h</td>
+                          <td className="px-3 py-2 text-right font-semibold text-amber-700">{fmtVND(luongMay ?? 0)}</td>
+                        </tr>
+                        <tr className="bg-slate-50/50">
+                          <td className="px-3 py-2 text-slate-500 text-xs" colSpan={2}>Chấm công ({congTinhLuong} ngày)</td>
+                          <td className="px-3 py-2 text-right text-[11px] text-slate-400 leading-4">
+                            {congCoMat > 0 && <div>Đi làm: {congCoMat}</div>}
+                            {congMuon > 0 && <div>Đi muộn: {congMuon}</div>}
+                            {congNuaNgay > 0 && <div>½ ngày: {congNuaNgay}</div>}
+                            {congVang > 0 && <div className="text-red-500">Vắng: {congVang}</div>}
+                          </td>
+                        </tr>
+                      </>
+                    ) : (
+                      <>
+                        <tr>
+                          <td className="px-3 py-2 text-slate-600">Lương cơ bản</td>
+                          <td className="px-3 py-2 text-right text-slate-500 text-xs">{fmt(lcb)} ÷ {ngayLV} ngày</td>
+                          <td className="px-3 py-2 text-right font-medium text-slate-700">{fmtVND(lcb)}</td>
+                        </tr>
+                        <tr className="bg-emerald-50/50">
+                          <td className="px-3 py-2 text-emerald-700 font-medium">Ngày công ({congTinhLuong} ngày)</td>
+                          <td className="px-3 py-2 text-right text-[11px] text-slate-400 leading-4">
+                            {congCoMat > 0 && <div>Đi làm: {congCoMat}</div>}
+                            {congMuon > 0 && <div>Đi muộn: {congMuon}</div>}
+                            {congNuaNgay > 0 && <div>½ ngày: {congNuaNgay}</div>}
+                            {congPhep > 0 && <div>Nghỉ phép: {congPhep}</div>}
+                            {congLe > 0 && <div>Nghỉ lễ: {congLe}</div>}
+                            {congVang > 0 && <div className="text-red-500">Vắng: {congVang}</div>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-emerald-700">{fmtVND(luongCong)}</td>
+                        </tr>
+                        {tongTC > 0 && (
+                          <tr>
+                            <td className="px-3 py-2 text-orange-600">Tăng ca</td>
+                            <td className="px-3 py-2 text-right text-xs text-slate-400">{tongTC}h × hệ số {heSoTC}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-orange-600">{fmtVND(luongTC)}</td>
+                          </tr>
+                        )}
+                      </>
                     )}
                     {phuCapCC > 0 && (
                       <tr>
