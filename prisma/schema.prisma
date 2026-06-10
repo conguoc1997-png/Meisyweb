@@ -422,6 +422,7 @@ model NhanVien {
   ten        String
   chucVu     String?
   phongBan   String?
+  loaiLuong       String  @default("co_ban") // co_ban | khoan
   luongCB         Float?
   phuCapChuyenCan Float?  // phụ cấp chuyên cần cố định/tháng
   phuCapAn        Float?  // phụ cấp ăn mỗi ngày (chỉ tính ngày đi làm đủ)

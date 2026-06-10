@@ -102,7 +102,7 @@ export default function ChamCongPage() {
   // Modal quản lý NV
   const [showNVModal, setShowNVModal] = useState(false);
   const [allNVs, setAllNVs] = useState<NhanVien[]>([]);
-  const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "", ngaySinh: "" });
+  const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "" });
   const [editingNV, setEditingNV] = useState<NhanVien | null>(null);
   const [savingNV, setSavingNV] = useState(false);
   const [nvError, setNvError] = useState("");
@@ -274,7 +274,7 @@ export default function ChamCongPage() {
       if (editingNV) {
         const res = await fetch(`/api/cham-cong/nhan-vien/${editingNV.id}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ten: nvForm.ten, chucVu: nvForm.chucVu, phongBan: nvForm.phongBan, luongCB: nvForm.luongCB, ngaySinh: nvForm.ngaySinh || null }),
+          body: JSON.stringify({ ten: nvForm.ten, chucVu: nvForm.chucVu, phongBan: nvForm.phongBan, loaiLuong: nvForm.loaiLuong, luongCB: nvForm.luongCB, ngaySinh: nvForm.ngaySinh || null }),
         });
         if (!res.ok) { const e = await res.json(); setNvError(e.error ?? "Lỗi cập nhật"); return; }
       } else {
@@ -287,7 +287,7 @@ export default function ChamCongPage() {
       const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
       const list = Array.isArray(data) ? data : [];
       setAllNVs(list);
-      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", luongCB: "" });
+      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "" });
       setEditingNV(null);
       fetchData();
     } finally {
@@ -922,7 +922,7 @@ export default function ChamCongPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-800">Quản lý Nhân viên</h2>
-              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "", ngaySinh: "" }); }}
+              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "" }); }}
                 className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-5">
@@ -988,10 +988,33 @@ export default function ChamCongPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 block mb-1">Lương cơ bản</label>
+                    <label className="text-xs text-slate-500 block mb-1">Hình thức lương</label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: "co_ban", label: "Lương cơ bản", icon: "💼" },
+                        { value: "khoan",  label: "Khoán",         icon: "🧩" },
+                      ].map(opt => (
+                        <button key={opt.value} type="button"
+                          onClick={() => setNvForm(f => ({ ...f, loaiLuong: opt.value }))}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm font-medium transition-all
+                            ${nvForm.loaiLuong === opt.value
+                              ? "border-rose-400 bg-rose-50 text-rose-700 shadow-sm"
+                              : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"}`}>
+                          <span>{opt.icon}</span>{opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-1">
+                      {nvForm.loaiLuong === "khoan" ? "Đơn giá khoán / sản phẩm" : "Lương cơ bản"}
+                    </label>
                     <input type="number" value={nvForm.luongCB} onChange={e => setNvForm(f => ({ ...f, luongCB: e.target.value }))}
-                      placeholder="VD: 5000000"
+                      placeholder={nvForm.loaiLuong === "khoan" ? "VD: 50000" : "VD: 5000000"}
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                    {nvForm.loaiLuong === "khoan" && (
+                      <p className="text-[11px] text-slate-400 mt-1">Lương sẽ tính theo số sản phẩm hoàn thành trong tháng</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 block mb-1">🎂 Ngày sinh</label>
@@ -1001,7 +1024,7 @@ export default function ChamCongPage() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   {editingNV && (
-                    <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", luongCB: "", ngaySinh: "" }); }}
+                    <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "" }); }}
                       className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-100 transition">Huỷ</button>
                   )}
                   <button onClick={saveNV} disabled={savingNV}
@@ -1024,7 +1047,7 @@ export default function ChamCongPage() {
                       {nv.ngaySinh && <span className="text-xs text-pink-500 ml-2">🎂 {new Date(nv.ngaySinh).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit" })}</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", luongCB: nv.luongCB ? String(nv.luongCB) : "", ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "" }); }}
+                      <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", loaiLuong: (nv as {loaiLuong?: string}).loaiLuong ?? "co_ban", luongCB: nv.luongCB ? String(nv.luongCB) : "", ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "" }); }}
                         className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50 transition">Sửa</button>
                       <button onClick={() => toggleActiveNV(nv)}
                         className={`text-xs px-2 py-1 rounded transition ${nv.active ? "text-slate-400 hover:bg-red-50 hover:text-red-500" : "text-green-600 hover:bg-green-50"}`}>
