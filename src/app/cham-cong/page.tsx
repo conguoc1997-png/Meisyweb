@@ -696,11 +696,22 @@ export default function ChamCongPage() {
                   }, 0);
 
                   return Array.from(groups.entries()).map(([phongBan, nvList]) => {
-                    // Tổng giờ khoán của nhóm May (chỉ NV loaiLuong = khoan)
+                    // ── Khoán May: tổng giờ & khấu trừ co_ban ──────────────
                     const tongGioKhoanNhom = isMayGroup(phongBan)
                       ? nvList.filter(n => n.loaiLuong === "khoan").reduce((s, n) => s + getHoursNV(n.id), 0)
                       : 0;
-                    const donGiaGioKhoan = tongGioKhoanNhom > 0 ? khoanPool / tongGioKhoanNhom : 0;
+
+                    // Phần co_ban nhận từ pool = Σ(tăng ca × hệ số) của NV co_ban
+                    const totalCoBanTC = isMayGroup(phongBan)
+                      ? nvList.filter(n => n.loaiLuong !== "khoan").reduce((s, n) => {
+                          const tc = days.reduce((d, day) => d + (tcMap[getKey(n.id, day)] ?? 0), 0);
+                          return s + tc * (n.heSoTC ?? 1.5);
+                        }, 0)
+                      : 0;
+
+                    // Pool còn lại sau khi trừ phần co_ban TC
+                    const khoanRemainder  = Math.max(0, khoanPool - totalCoBanTC);
+                    const donGiaGioKhoan  = tongGioKhoanNhom > 0 ? khoanRemainder / tongGioKhoanNhom : 0;
 
                     return (
                     <React.Fragment key={`group-luong-${phongBan}`}>
@@ -759,15 +770,25 @@ export default function ChamCongPage() {
                               </div>
                               <div className="flex flex-col gap-1 text-xs pt-5">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-slate-500 w-32">Tổng tiền khoán:</span>
+                                  <span className="text-slate-500 w-40">Pool cả đội:</span>
                                   <span className="font-bold text-amber-700 text-sm">{fmt(Math.round(khoanPool))}₫</span>
                                 </div>
+                                {totalCoBanTC > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-500 w-40">Trừ TC (lương CB):</span>
+                                    <span className="font-semibold text-red-500">−{fmt(Math.round(totalCoBanTC))}₫</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 border-t border-amber-200 pt-1 mt-0.5">
+                                  <span className="text-slate-500 w-40">Pool chia khoán:</span>
+                                  <span className="font-bold text-emerald-700 text-sm">{fmt(Math.round(khoanRemainder))}₫</span>
+                                </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-slate-500 w-32">Tổng giờ (NV khoán):</span>
+                                  <span className="text-slate-500 w-40">Tổng giờ (NV khoán):</span>
                                   <span className="font-semibold text-slate-700">{Math.round(tongGioKhoanNhom)} giờ</span>
                                 </div>
                                 <div className="flex items-center gap-2 border-t border-amber-200 pt-1 mt-1">
-                                  <span className="text-slate-500 w-32">Đơn giá / giờ:</span>
+                                  <span className="text-slate-500 w-40">Đơn giá / giờ khoán:</span>
                                   <span className="font-bold text-rose-600">{donGiaGioKhoan > 0 ? fmt(Math.round(donGiaGioKhoan)) + "₫/h" : "—"}</span>
                                 </div>
                               </div>
