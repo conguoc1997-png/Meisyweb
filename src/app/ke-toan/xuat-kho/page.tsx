@@ -50,7 +50,7 @@ function genSoPhieu() {
   const y = now.getFullYear().toString().slice(-2);
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
-  return `XK${y}${m}${d}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")}`;
+  return `XK${y}${m}${d}-${Date.now().toString().slice(-6)}`;
 }
 
 export default function XuatKhoPage() {

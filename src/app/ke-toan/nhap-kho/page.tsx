@@ -100,8 +100,9 @@ function genSoPhieu(): string {
   const y = now.getFullYear().toString().slice(-2);
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
-  const r = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0");
-  return `NK${y}${m}${d}-${r}`;
+  // Dùng timestamp ms để tránh trùng
+  const t = Date.now().toString().slice(-6);
+  return `NK${y}${m}${d}-${t}`;
 }
 
 export default function NhapKhoPage() {
