@@ -346,8 +346,8 @@ export default function BangLuongPage() {
     <style>{phieuLuong ? `
       @media print {
         body * { visibility: hidden !important; }
-        #phieu-luong-in, #phieu-luong-in * { visibility: visible !important; }
-        #phieu-luong-in { position: fixed; top: 0; left: 0; width: 100%; }
+        #phieu-luong-in, #phieu-luong-in * { visibility: visible !important; overflow: visible !important; }
+        #phieu-luong-in { position: fixed; top: 0; left: 0; width: 100%; background: white; }
         @page { size: A5; margin: 12mm 14mm; }
       }
     ` : `
