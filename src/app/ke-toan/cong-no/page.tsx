@@ -3,11 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Plus, Pencil, Trash2, X, BookOpen, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 
-const NHA_CC = [
-  { key: "hac_long", label: "Hắc Long" },
-  { key: "an_huy",   label: "An Huy" },
-  { key: "viet_hoa", label: "Việt Hoa" },
-];
+type NhaCungCap = { id: string; ma: string; ten: string };
 
 const LOAI_GD = [
   { key: "mua_hang",       label: "Mua hàng",       sign: +1, color: "text-red-600",   bg: "bg-red-50 text-red-700 border-red-200" },
@@ -31,7 +27,8 @@ const emptyForm = {
 };
 
 export default function CongNoPage() {
-  const [nhaCC, setNhaCC] = useState("hac_long");
+  const [nhaCCList, setNhaCCList] = useState<NhaCungCap[]>([]);
+  const [nhaCC, setNhaCC] = useState("");
   const [records, setRecords] = useState<CongNo[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editRecord, setEditRecord] = useState<CongNo | null>(null);
@@ -39,7 +36,20 @@ export default function CongNoPage() {
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CongNo | null>(null);
 
+  // Fetch danh sách nhà cung cấp động
+  useEffect(() => {
+    fetch("/api/ke-toan/nha-cung-cap")
+      .then(r => r.json())
+      .then((data: NhaCungCap[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setNhaCCList(data);
+          setNhaCC(data[0].id);
+        }
+      });
+  }, []);
+
   const fetchData = async () => {
+    if (!nhaCC) return;
     const data = await fetch(`/api/ke-toan/cong-no?nhaCC=${nhaCC}`).then(r => r.json());
     setRecords(Array.isArray(data) ? data : []);
   };
@@ -117,15 +127,17 @@ export default function CongNoPage() {
       </div>
 
       {/* Tabs nhà cung cấp */}
-      <div className="flex gap-2 mb-6">
-        {NHA_CC.map(nc => (
-          <button key={nc.key} onClick={() => setNhaCC(nc.key)}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {nhaCCList.length === 0 ? (
+          <p className="text-sm text-slate-400">Chưa có nhà cung cấp. Thêm tại trang <b>Nhập kho</b>.</p>
+        ) : nhaCCList.map(nc => (
+          <button key={nc.id} onClick={() => setNhaCC(nc.id)}
             className={`px-5 py-2 rounded-xl text-sm font-semibold border transition ${
-              nhaCC === nc.key
+              nhaCC === nc.id
                 ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                 : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
             }`}>
-            {nc.label}
+            {nc.ten}
           </button>
         ))}
       </div>
@@ -158,7 +170,7 @@ export default function CongNoPage() {
       {/* Actions */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-slate-700">
-          Sổ cái — {NHA_CC.find(n => n.key === nhaCC)?.label}
+          Sổ cái — {nhaCCList.find(n => n.id === nhaCC)?.ten ?? ""}
         </span>
         <button onClick={openAdd}
           className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 transition shadow-sm">
@@ -187,7 +199,7 @@ export default function CongNoPage() {
                 <tr>
                   <td colSpan={8} className="text-center py-16 text-slate-400">
                     <BookOpen size={32} className="mx-auto mb-2 opacity-30" />
-                    <p>Chưa có giao dịch nào với {NHA_CC.find(n => n.key === nhaCC)?.label}</p>
+                    <p>Chưa có giao dịch nào với {nhaCCList.find(n => n.id === nhaCC)?.ten ?? ""}</p>
                   </td>
                 </tr>
               ) : rows.map(r => {
