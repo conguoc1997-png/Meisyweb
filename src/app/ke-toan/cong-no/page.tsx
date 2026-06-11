@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Pencil, Trash2, X, BookOpen, TrendingDown, TrendingUp, Wallet, RefreshCw, UserPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, X, BookOpen, TrendingDown, TrendingUp, Wallet, RefreshCw, UserPlus, ArrowDownToLine } from "lucide-react";
 
 type NhaCungCap = { id: string; ma: string; ten: string };
 
@@ -79,6 +79,29 @@ export default function CongNoPage() {
       await fetchNCC(newNCC.id);
     } catch (err) { alert(err instanceof Error ? err.message : "Lỗi"); }
     finally { setNccLoading(false); }
+  };
+
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    const current = nhaCCList.find(n => n.id === nhaCC);
+    if (!current) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/ke-toan/cong-no/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhaCCId: current.id, nhaCCTen: current.ten }),
+      });
+      const result = await res.json();
+      if (result.created > 0) {
+        alert(`Đã đồng bộ ${result.created} phiếu nhập kho vào công nợ.`);
+        fetchData();
+      } else {
+        alert(result.message || "Không có phiếu mới cần đồng bộ.");
+      }
+    } catch { alert("Lỗi đồng bộ"); }
+    finally { setSyncing(false); }
   };
 
   const fetchData = async () => {
@@ -214,10 +237,18 @@ export default function CongNoPage() {
         <span className="text-sm font-semibold text-slate-700">
           Sổ cái — {nhaCCList.find(n => n.id === nhaCC)?.ten ?? ""}
         </span>
-        <button onClick={openAdd}
-          className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 transition shadow-sm">
-          <Plus size={16} /> Thêm giao dịch
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleSync} disabled={syncing}
+            title="Kéo phiếu nhập kho cũ vào công nợ theo tên NCC"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition">
+            <ArrowDownToLine size={14} className={syncing ? "animate-bounce" : ""} />
+            {syncing ? "Đang đồng bộ..." : "Đồng bộ từ nhập kho"}
+          </button>
+          <button onClick={openAdd}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 transition shadow-sm">
+            <Plus size={16} /> Thêm giao dịch
+          </button>
+        </div>
       </div>
 
       {/* Bảng sổ cái */}
