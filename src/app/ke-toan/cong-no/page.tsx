@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Pencil, Trash2, X, BookOpen, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { Plus, Pencil, Trash2, X, BookOpen, TrendingDown, TrendingUp, Wallet, RefreshCw, UserPlus } from "lucide-react";
 
 type NhaCungCap = { id: string; ma: string; ten: string };
 
@@ -35,18 +35,51 @@ export default function CongNoPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CongNo | null>(null);
+  const [showAddNCC, setShowAddNCC] = useState(false);
+  const [nccForm, setNccForm] = useState({ ten: "", sdt: "", diaChi: "" });
+  const [nccLoading, setNccLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchNCC = async (keepSelected?: string) => {
+    const data: NhaCungCap[] = await fetch("/api/ke-toan/nha-cung-cap").then(r => r.json());
+    if (Array.isArray(data)) {
+      setNhaCCList(data);
+      if (keepSelected && data.find(n => n.id === keepSelected)) {
+        setNhaCC(keepSelected);
+      } else if (data.length > 0) {
+        setNhaCC(prev => prev || data[0].id);
+      }
+    }
+  };
 
   // Fetch danh sách nhà cung cấp động
-  useEffect(() => {
-    fetch("/api/ke-toan/nha-cung-cap")
-      .then(r => r.json())
-      .then((data: NhaCungCap[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setNhaCCList(data);
-          setNhaCC(data[0].id);
-        }
+  useEffect(() => { fetchNCC(); }, []);
+
+  const handleRefreshNCC = async () => {
+    setRefreshing(true);
+    await fetchNCC(nhaCC);
+    setRefreshing(false);
+  };
+
+  const handleAddNCC = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nccForm.ten.trim()) return;
+    setNccLoading(true);
+    try {
+      const maAuto = "NCC" + Date.now().toString().slice(-6);
+      const res = await fetch("/api/ke-toan/nha-cung-cap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ma: maAuto, ten: nccForm.ten.trim(), sdt: nccForm.sdt || null, diaChi: nccForm.diaChi || null }),
       });
-  }, []);
+      if (!res.ok) throw new Error((await res.json()).error);
+      const newNCC: NhaCungCap = await res.json();
+      setShowAddNCC(false);
+      setNccForm({ ten: "", sdt: "", diaChi: "" });
+      await fetchNCC(newNCC.id);
+    } catch (err) { alert(err instanceof Error ? err.message : "Lỗi"); }
+    finally { setNccLoading(false); }
+  };
 
   const fetchData = async () => {
     if (!nhaCC) return;
@@ -127,10 +160,8 @@ export default function CongNoPage() {
       </div>
 
       {/* Tabs nhà cung cấp */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {nhaCCList.length === 0 ? (
-          <p className="text-sm text-slate-400">Chưa có nhà cung cấp. Thêm tại trang <b>Nhập kho</b>.</p>
-        ) : nhaCCList.map(nc => (
+      <div className="flex gap-2 mb-6 flex-wrap items-center">
+        {nhaCCList.map(nc => (
           <button key={nc.id} onClick={() => setNhaCC(nc.id)}
             className={`px-5 py-2 rounded-xl text-sm font-semibold border transition ${
               nhaCC === nc.id
@@ -140,6 +171,17 @@ export default function CongNoPage() {
             {nc.ten}
           </button>
         ))}
+        {/* Nút thêm NCC + làm mới */}
+        <button onClick={() => { setNccForm({ ten: "", sdt: "", diaChi: "" }); setShowAddNCC(true); }}
+          title="Thêm nhà cung cấp mới"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition">
+          <UserPlus size={14} /> Thêm NCC
+        </button>
+        <button onClick={handleRefreshNCC} disabled={refreshing}
+          title="Cập nhật danh sách từ nhập kho"
+          className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition">
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+        </button>
       </div>
 
       {/* Stats */}
@@ -305,6 +347,43 @@ export default function CongNoPage() {
                 <button type="submit" disabled={loading}
                   className="flex-1 px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50">
                   {loading ? "Đang lưu..." : editRecord ? "Lưu" : "Thêm"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal thêm NCC */}
+      {showAddNCC && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2"><UserPlus size={16} className="text-indigo-500" /> Thêm nhà cung cấp</h2>
+              <button onClick={() => setShowAddNCC(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddNCC} className="p-5 space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Tên nhà cung cấp *</label>
+                <input required value={nccForm.ten} placeholder="VD: Hắc Long"
+                  onChange={e => setNccForm(f => ({ ...f, ten: e.target.value }))} className={inp} />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Số điện thoại</label>
+                <input value={nccForm.sdt} placeholder="0901..."
+                  onChange={e => setNccForm(f => ({ ...f, sdt: e.target.value }))} className={inp} />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Địa chỉ</label>
+                <input value={nccForm.diaChi}
+                  onChange={e => setNccForm(f => ({ ...f, diaChi: e.target.value }))} className={inp} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => setShowAddNCC(false)}
+                  className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-xl hover:bg-slate-50">Huỷ</button>
+                <button type="submit" disabled={nccLoading}
+                  className="flex-1 px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50">
+                  {nccLoading ? "Đang thêm..." : "Thêm"}
                 </button>
               </div>
             </form>
