@@ -7,7 +7,7 @@ type NhanVien = {
   id: string; maNV: string; ten: string;
   chucVu: string | null; phongBan: string | null;
   loaiLuong: string | null;
-  luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; heSoTC: number;
+  luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; phuCapDacBiet: number | null; heSoTC: number;
   ngaySinh: string | null;
   active: boolean;
 };
@@ -103,7 +103,7 @@ export default function ChamCongPage() {
     congPhep: number; congLe: number; congVang: number; congTinhLuong: number;
     tongTC: number; heSoTC: number;
     luongCong: number; luongTC: number;
-    phuCapCC: number; phuCapAnNgay: number; ngayAnDuCong: number; tongPhuCap: number;
+    phuCapCC: number; phuCapAnNgay: number; ngayAnDuCong: number; phuCapDB: number; tongPhuCap: number;
     thucLinh: number;
     // May special
     isKhoan?: boolean; isCoBanMay?: boolean;
@@ -918,9 +918,10 @@ export default function ChamCongPage() {
                   const heSoTC        = nv.heSoTC ?? 1.5;
                   const phuCapCC      = nv.phuCapChuyenCan ?? 0;
                   const phuCapAnNgay  = nv.phuCapAn ?? 0;
+                  const phuCapDB      = nv.phuCapDacBiet ?? 0;
                   // Ngày đủ công cho PC ăn = chỉ di_lam + di_muon (đủ 1 ngày)
                   const ngayAnDuCong  = congCoMat + congMuon;
-                  const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong;
+                  const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong + phuCapDB;
                   const luongNgay     = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
                   const luongCong     = luongNgay * congTinhLuong;
                   const luongTC       = heSoTC * tongTC; // đơn giá/giờ × số giờ TC
@@ -1027,6 +1028,24 @@ export default function ChamCongPage() {
                             />
                             {phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
                           </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-400 w-7 shrink-0">ĐB</span>
+                            <input
+                              type="number" step="50000" min="0"
+                              defaultValue={phuCapDB || ""}
+                              placeholder="0"
+                              onBlur={async e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                                  method: "PATCH", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ phuCapDacBiet: val || null }),
+                                });
+                                fetchData();
+                              }}
+                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </div>
                           {tongPhuCap > 0 && (
                             <div className="text-[11px] font-bold text-teal-700 text-right pr-1">
                               = {fmt(Math.round(tongPhuCap))}₫
@@ -1049,7 +1068,7 @@ export default function ChamCongPage() {
                             nv, lcb, soNgayLamViec, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC,
                             luongCong: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : Math.round(luongCong),
                             luongTC: (isKhoan || isCoBanMay) ? 0 : Math.round(luongTC),
-                            phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap: Math.round(tongPhuCap),
+                            phuCapCC, phuCapAnNgay, ngayAnDuCong, phuCapDB, tongPhuCap: Math.round(tongPhuCap),
                             thucLinh: isKhoan ? Math.round(thucLinhKhoan) : isCoBanMay ? Math.round(thucLinhCoBanMay) : Math.round(thucLinh),
                             isKhoan, isCoBanMay,
                             gioNV: (isKhoan || isCoBanMay) ? Math.round(gioNV) : undefined,
@@ -1345,7 +1364,7 @@ export default function ChamCongPage() {
       {/* ═══ MODAL PHIẾU LƯƠNG CÁ NHÂN ═══ */}
       {phieuLuong && (() => {
         const { nv, lcb, soNgayLamViec: ngayLV, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang,
-          congTinhLuong, tongTC, heSoTC, luongCong, luongTC, phuCapCC, phuCapAnNgay, ngayAnDuCong, tongPhuCap, thucLinh,
+          congTinhLuong, tongTC, heSoTC, luongCong, luongTC, phuCapCC, phuCapAnNgay, ngayAnDuCong, phuCapDB, tongPhuCap, thucLinh,
           isKhoan, isCoBanMay, gioNV, donGiaGio, luongMay } = phieuLuong;
         const fmtVND = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
         return (
@@ -1464,6 +1483,13 @@ export default function ChamCongPage() {
                         <td className="px-3 py-2 text-teal-600">PC Ăn</td>
                         <td className="px-3 py-2 text-right text-xs text-slate-400">{fmt(phuCapAnNgay)} × {ngayAnDuCong} ngày</td>
                         <td className="px-3 py-2 text-right font-semibold text-teal-600">{fmtVND(phuCapAnNgay * ngayAnDuCong)}</td>
+                      </tr>
+                    )}
+                    {phuCapDB > 0 && (
+                      <tr>
+                        <td className="px-3 py-2 text-teal-600">PC Đặc biệt</td>
+                        <td className="px-3 py-2 text-right text-xs text-slate-400"></td>
+                        <td className="px-3 py-2 text-right font-semibold text-teal-600">{fmtVND(phuCapDB)}</td>
                       </tr>
                     )}
                   </tbody>
