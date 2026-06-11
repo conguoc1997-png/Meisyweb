@@ -185,14 +185,29 @@ export default function CongNoPage() {
       {/* Tabs nhà cung cấp */}
       <div className="flex gap-2 mb-6 flex-wrap items-center">
         {nhaCCList.map(nc => (
-          <button key={nc.id} onClick={() => setNhaCC(nc.id)}
-            className={`px-5 py-2 rounded-xl text-sm font-semibold border transition ${
-              nhaCC === nc.id
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
-            }`}>
-            {nc.ten}
-          </button>
+          <div key={nc.id} className="relative group">
+            <button onClick={() => setNhaCC(nc.id)}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold border transition pr-7 ${
+                nhaCC === nc.id
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+              }`}>
+              {nc.ten}
+            </button>
+            <button
+              onClick={async e => {
+                e.stopPropagation();
+                if (!confirm(`Xoá nhà cung cấp "${nc.ten}"?`)) return;
+                await fetch(`/api/ke-toan/nha-cung-cap/${nc.id}`, { method: "DELETE" });
+                await fetchNCC();
+              }}
+              className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 transition ${
+                nhaCC === nc.id ? "text-white/70 hover:text-white" : "text-slate-300 hover:text-red-500"
+              }`}
+              title="Xoá NCC">
+              <X size={12} />
+            </button>
+          </div>
         ))}
         {/* Nút thêm NCC + làm mới */}
         <button onClick={() => { setNccForm({ ten: "", sdt: "", diaChi: "" }); setShowAddNCC(true); }}
