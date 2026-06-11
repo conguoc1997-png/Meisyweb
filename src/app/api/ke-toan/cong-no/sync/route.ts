@@ -52,30 +52,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Thiếu nhaCCId hoặc nhaCCTen" }, { status: 400 });
     }
 
-    const slug = toSlug(nhaCCTen); // vd "Hắc Long" → "hac_long"
+    const slug = toSlug(nhaCCTen);
+    const searchKey = oldKey || slug;
 
-    const orConditions: object[] = [
-      { tenNhaCC: { equals: nhaCCTen, mode: "insensitive" } },
-      { tenNhaCC: { contains: nhaCCTen, mode: "insensitive" } },
-      { nhaCC: { equals: nhaCCId } },
-      { nhaCC: { equals: slug } },           // auto slug
-      { nhaCC: { contains: slug } },         // partial match
-    ];
-    if (oldKey) {
-      orConditions.push({ nhaCC: { equals: oldKey } });
-    }
-
-    const phieus = await prisma.phieuNhapKho.findMany({
-      where: { OR: orConditions },
-      orderBy: { ngay: "asc" },
-    });
+    // Dùng raw SQL để tránh mọi vấn đề với Prisma query builder
+    const phieus = await prisma.$queryRaw<{
+      id: string; soPhieu: string; ngay: Date; tongTien: number;
+      soHoaDon: string | null; nguoiTao: string | null;
+    }[]>`
+      SELECT id, "soPhieu", ngay, "tongTien", "soHoaDon", "nguoiTao"
+      FROM "PhieuNhapKho"
+      WHERE "nhaCC" = ${nhaCCId}
+         OR "nhaCC" = ${searchKey}
+         OR LOWER("tenNhaCC") = LOWER(${nhaCCTen})
+         OR LOWER("tenNhaCC") LIKE LOWER(${'%' + nhaCCTen + '%'})
+      ORDER BY ngay ASC
+    `;
 
     if (phieus.length === 0) {
-      const sample = await prisma.phieuNhapKho.findMany({
-        take: 5, orderBy: { ngay: "desc" },
-        select: { nhaCC: true, tenNhaCC: true },
-      });
-      return NextResponse.json({ created: 0, message: "Không tìm thấy phiếu nhập kho phù hợp", debug: { nhaCCTen, slug, oldKey, sample } });
+      return NextResponse.json({ created: 0, message: "Không tìm thấy phiếu nhập kho phù hợp", debug: { nhaCCTen, slug, searchKey } });
     }
 
     // Lấy tất cả soPhieu của phiếu tìm được
