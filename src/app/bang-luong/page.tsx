@@ -236,8 +236,77 @@ function PhieuLuongContent({ phieu }: { phieu: PhieuLuong }) {
   );
 }
 
+/* ─── Login screen ─── */
+function LoginScreen({ onLogin }: { onLogin: (maNV: string | null) => void }) {
+  const [input, setInput] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = input.trim().toUpperCase();
+    if (!val) return;
+    if (val === "ADMIN") {
+      sessionStorage.setItem("bl_auth", "ADMIN");
+      onLogin(null);
+    } else {
+      sessionStorage.setItem("bl_auth", val);
+      onLogin(val);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <span className="text-2xl">💰</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-800">Bảng lương</h1>
+          <p className="text-sm text-slate-400 mt-1">Nhập mã nhân viên để xem lương</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Mã nhân viên</label>
+            <input
+              autoFocus
+              value={input}
+              onChange={e => { setInput(e.target.value); setError(""); }}
+              placeholder="VD: NV001"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono"
+            />
+            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+          </div>
+          <button type="submit"
+            className="w-full bg-violet-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700 transition">
+            Xem lương
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main page ─── */
 export default function BangLuongPage() {
+  const [auth, setAuth] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("bl_auth");
+    setAuth(saved ?? "");
+  }, []);
+
+  const handleLogin = (maNV: string | null) => {
+    setAuth(maNV === null ? "ADMIN" : maNV);
+  };
+
+  if (auth === undefined) return null; // chờ load session
+  if (!auth) return <LoginScreen onLogin={handleLogin} />;
+
+  return <BangLuongContent auth={auth} onLogout={() => { sessionStorage.removeItem("bl_auth"); setAuth(""); }} />;
+}
+
+function BangLuongContent({ auth, onLogout }: { auth: string; onLogout: () => void }) {
+  const isAdmin = auth === "ADMIN";
   const now = new Date();
   const defaultThang = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [thang, setThang] = useState(defaultThang);
@@ -326,9 +395,11 @@ export default function BangLuongPage() {
   const rows = useMemo(() => {
     if (!khoanAdjustedRows.length && !data) return [];
     const source = khoanAdjustedRows.length ? khoanAdjustedRows : (data?.rows ?? []);
-    if (!filterPhongBan) return source;
-    return source.filter(r => r.phongBan === filterPhongBan);
-  }, [khoanAdjustedRows, data, filterPhongBan]);
+    let filtered = source;
+    if (!isAdmin) filtered = filtered.filter(r => r.maNV.toUpperCase() === auth.toUpperCase());
+    if (filterPhongBan) filtered = filtered.filter(r => r.phongBan === filterPhongBan);
+    return filtered;
+  }, [khoanAdjustedRows, data, filterPhongBan, isAdmin, auth]);
 
   const tongFiltered = useMemo(() => ({
     luongChinh:  rows.reduce((s, r) => s + r.luongChinh, 0),
@@ -373,7 +444,10 @@ export default function BangLuongPage() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Bảng lương</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Tổng hợp lương từ dữ liệu chấm công</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {isAdmin ? "Xem toàn bộ nhân viên" : `Đang xem: ${auth}`}
+            <button onClick={onLogout} className="ml-2 text-xs text-violet-500 hover:underline">Đăng xuất</button>
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month nav */}
@@ -391,19 +465,21 @@ export default function BangLuongPage() {
               <ChevronRight size={15} />
             </button>
           </div>
-          {/* Filter phòng ban */}
-          {phongBans.length > 0 && (
+          {/* Filter phòng ban — chỉ admin */}
+          {isAdmin && phongBans.length > 0 && (
             <select value={filterPhongBan} onChange={e => setFilterPhongBan(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200">
               <option value="">Tất cả bộ phận</option>
               {phongBans.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           )}
-          {/* Print */}
-          <button onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition print:hidden">
-            <Printer size={14} /> In bảng lương
-          </button>
+          {/* Print — chỉ admin */}
+          {isAdmin && (
+            <button onClick={handlePrint}
+              className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition print:hidden">
+              <Printer size={14} /> In bảng lương
+            </button>
+          )}
         </div>
       </div>
 
