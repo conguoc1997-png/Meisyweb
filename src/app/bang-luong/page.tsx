@@ -245,13 +245,7 @@ function LoginScreen({ onLogin }: { onLogin: (maNV: string | null) => void }) {
     e.preventDefault();
     const val = input.trim().toUpperCase();
     if (!val) return;
-    if (val === "ADMIN") {
-      sessionStorage.setItem("bl_auth", "ADMIN");
-      onLogin(null);
-    } else {
-      sessionStorage.setItem("bl_auth", val);
-      onLogin(val);
-    }
+    onLogin(val === "ADMIN" ? null : val);
   };
 
   return (
@@ -288,18 +282,22 @@ function LoginScreen({ onLogin }: { onLogin: (maNV: string | null) => void }) {
 
 /* ─── Main page ─── */
 export default function BangLuongPage() {
-  const [auth, setAuth] = useState<string | null | undefined>(undefined);
+  const [auth, setAuth] = useState<string>("");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("bl_auth");
-    setAuth(saved ?? "");
+    const saved = sessionStorage.getItem("bl_auth") ?? "";
+    setAuth(saved);
+    setReady(true);
   }, []);
 
   const handleLogin = (maNV: string | null) => {
-    setAuth(maNV === null ? "ADMIN" : maNV);
+    const val = maNV === null ? "ADMIN" : maNV;
+    sessionStorage.setItem("bl_auth", val);
+    setAuth(val);
   };
 
-  if (auth === undefined) return null; // chờ load session
+  if (!ready) return null;
   if (!auth) return <LoginScreen onLogin={handleLogin} />;
 
   return <BangLuongContent auth={auth} onLogout={() => { sessionStorage.removeItem("bl_auth"); setAuth(""); }} />;
