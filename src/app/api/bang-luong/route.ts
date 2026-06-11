@@ -104,6 +104,7 @@ export async function GET(req: NextRequest) {
         ten:          nv.ten,
         chucVu:       nv.chucVu,
         phongBan:     nv.phongBan,
+        loaiLuong:    nv.loaiLuong ?? "co_ban",
         luongCB,
         heSoTC,
         // Ngày

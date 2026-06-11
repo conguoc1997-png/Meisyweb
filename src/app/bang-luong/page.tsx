@@ -3,12 +3,22 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Printer, ChevronLeft, ChevronRight, Info, X } from "lucide-react";
 
+const LOAI_HANG_KEYS = ["dai_thuong", "dai_kieu", "short"] as const;
+type LocatKey = typeof LOAI_HANG_KEYS[number];
+type LocatStats = Record<LocatKey, number>;
+const LOAI_HANG_LABEL: Record<LocatKey, string> = {
+  dai_thuong: "Dài thường", dai_kieu: "Dài kiểu", short: "Short",
+};
+
+const isMayGroup = (pb: string | null) => (pb ?? "").trim().toLowerCase() === "may";
+
 type LuongRow = {
   nhanVienId:   string;
   maNV:         string;
   ten:          string;
   chucVu:       string | null;
   phongBan:     string | null;
+  loaiLuong:    string;
   luongCB:      number;
   heSoTC:       number;
   soNgayLvThang: number;
@@ -44,6 +54,10 @@ type BangLuongData = {
 type PhieuLuong = {
   row: LuongRow;
   thangLabel: string;
+  isKhoan?: boolean;
+  isCoBanMay?: boolean;
+  gioNV?: number;
+  donGiaGio?: number;
 };
 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
@@ -79,57 +93,53 @@ function formatThangLabel(thang: string) {
 
 /* ─── Phiếu lương modal ─── */
 function PhieuLuongModal({ phieu, onClose }: { phieu: PhieuLuong; onClose: () => void }) {
-  const { row, thangLabel } = phieu;
   const handlePrint = () => window.print();
 
   return (
-    <>
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #phieu-luong-in, #phieu-luong-in * { visibility: visible !important; }
-          #phieu-luong-in { position: fixed; top: 0; left: 0; width: 100%; }
-          @page { size: A5; margin: 12mm 14mm; }
-        }
-      `}</style>
-
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden"
-        onClick={onClose}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
-          onClick={e => e.stopPropagation()}>
-          {/* Modal header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800 text-sm">Phiếu lương cá nhân</h3>
-            <div className="flex items-center gap-2">
-              <button onClick={handlePrint}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition">
-                <Printer size={12} /> In phiếu
-              </button>
-              <button onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition">
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-          {/* Preview content */}
-          <div className="p-5 overflow-y-auto max-h-[80vh]">
-            <PhieuLuongContent phieu={phieu} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 print:bg-transparent print:block print:inset-auto"
+      onClick={onClose}>
+      <div id="phieu-luong-modal"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden print:shadow-none print:rounded-none print:mx-0 print:max-w-none print:overflow-visible"
+        onClick={e => e.stopPropagation()}>
+        {/* Modal header — ẩn khi in */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 print:hidden">
+          <h3 className="font-bold text-slate-800 text-sm">Phiếu lương cá nhân</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition">
+              <Printer size={12} /> In phiếu
+            </button>
+            <button onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition">
+              <X size={16} />
+            </button>
           </div>
         </div>
+        {/* Nội dung phiếu */}
+        <div className="p-5 overflow-y-auto max-h-[80vh] print:overflow-visible print:max-h-none print:p-0">
+          <PhieuLuongContent phieu={phieu} />
+        </div>
       </div>
-
-      {/* Print target — always in DOM when modal open */}
-      <div id="phieu-luong-in" className="hidden print:block">
-        <PhieuLuongContent phieu={phieu} />
-      </div>
-    </>
+    </div>
   );
 }
 
 function PhieuLuongContent({ phieu }: { phieu: PhieuLuong }) {
-  const { row, thangLabel } = phieu;
-  const items = [
+  const { row, thangLabel, isKhoan, isCoBanMay, gioNV, donGiaGio } = phieu;
+
+  const isMayNV = isKhoan || isCoBanMay;
+
+  const items = isMayNV ? [
+    { label: "Ngày công",        val: null,             note: `${row.ngayCong} ngày`, isNote: true },
+    { label: "Giờ tăng ca",      val: null,             note: `${row.tongTC} giờ`, isNote: true },
+    { label: "Tổng giờ làm",     val: null,             note: `${gioNV} giờ`, isNote: true },
+    { label: isKhoan ? "Đơn giá/giờ khoán" : "Hệ số TC (đ/giờ)", val: null,
+      note: donGiaGio !== undefined ? `${fmt(donGiaGio)} đ/giờ` : "—", isNote: true },
+    { label: isKhoan ? "Lương khoán" : "Lương bộ phận May",
+      val: row.luongChinh, note: "" },
+    { label: "PC ăn ca",         val: row.pcAn,         note: "" },
+    { label: "PC chuyên cần",    val: row.pcChuyenCan,  note: "" },
+  ] : [
     { label: "Lương cơ bản",     val: row.luongCB,      note: "" },
     { label: "Ngày công chuẩn",  val: null,             note: "26 ngày/tháng", isNote: true },
     { label: "Ngày công thực tế",val: null,             note: `${row.ngayCong} ngày`, isNote: true },
@@ -238,6 +248,8 @@ export default function BangLuongPage() {
   const [loading, setLoading] = useState(false);
   const [filterPhongBan, setFilterPhongBan] = useState("");
   const [phieuLuong, setPhieuLuong] = useState<PhieuLuong | null>(null);
+  const [locatStats, setLocatStats] = useState<LocatStats>({ dai_thuong: 0, dai_kieu: 0, short: 0 });
+  const [khoanPrices, setKhoanPrices] = useState<Record<LocatKey, string>>({ dai_thuong: "", dai_kieu: "", short: "" });
   const thangOptions = useMemo(() => getThangOptions(), []);
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -250,16 +262,76 @@ export default function BangLuongPage() {
       .finally(() => setLoading(false));
   }, [thang]);
 
+  // Load khoán data từ localStorage (sync với trang Chấm công)
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`khoan-prices-${thang}`) || "{}");
+      setKhoanPrices({
+        dai_thuong: saved.dai_thuong ?? "",
+        dai_kieu:   saved.dai_kieu   ?? "",
+        short:      saved.short      ?? "",
+      });
+    } catch { setKhoanPrices({ dai_thuong: "", dai_kieu: "", short: "" }); }
+    try {
+      const savedSL = JSON.parse(localStorage.getItem(`khoan-sl-${thang}`) || "{}");
+      setLocatStats({
+        dai_thuong: savedSL.dai_thuong ?? 0,
+        dai_kieu:   savedSL.dai_kieu   ?? 0,
+        short:      savedSL.short      ?? 0,
+      });
+    } catch { setLocatStats({ dai_thuong: 0, dai_kieu: 0, short: 0 }); }
+  }, [thang]);
+
   const phongBans = useMemo(() => {
     if (!data) return [];
     return [...new Set(data.rows.map(r => r.phongBan ?? "").filter(Boolean))].sort();
   }, [data]);
 
-  const rows = useMemo(() => {
+  // Khoán calculation overlay cho May NV
+  const khoanAdjustedRows = useMemo(() => {
     if (!data) return [];
-    if (!filterPhongBan) return data.rows;
-    return data.rows.filter(r => r.phongBan === filterPhongBan);
-  }, [data, filterPhongBan]);
+
+    const getHoursNV = (r: LuongRow) => r.ngayCong * 8 + r.tongTC;
+
+    const khoanPool = LOAI_HANG_KEYS.reduce((s, k) => {
+      const price = parseFloat(khoanPrices[k] || "0") || 0;
+      return s + (locatStats[k] ?? 0) * price;
+    }, 0);
+
+    const mayRows = data.rows.filter(r => isMayGroup(r.phongBan));
+    const totalCoBanTC = mayRows
+      .filter(r => r.loaiLuong !== "khoan")
+      .reduce((s, r) => s + getHoursNV(r) * r.heSoTC, 0);
+    const khoanRemainder = Math.max(0, khoanPool - totalCoBanTC);
+    const tongGioKhoan = mayRows
+      .filter(r => r.loaiLuong === "khoan")
+      .reduce((s, r) => s + getHoursNV(r), 0);
+    const donGiaGioKhoan = tongGioKhoan > 0 ? khoanRemainder / tongGioKhoan : 0;
+
+    return data.rows.map(r => {
+      if (!isMayGroup(r.phongBan)) return r;
+
+      const gioNV = getHoursNV(r);
+      const pcAn = r.pcAn;
+      const pcCC = r.pcChuyenCan;
+
+      if (r.loaiLuong === "khoan") {
+        const luongChinh = Math.round(donGiaGioKhoan * gioNV);
+        return { ...r, luongChinh, luongTC: 0, tongLuong: luongChinh + pcAn + pcCC };
+      } else {
+        // co_ban May: lương = số giờ × heSoTC
+        const luongChinh = Math.round(gioNV * r.heSoTC);
+        return { ...r, luongChinh, luongTC: 0, tongLuong: luongChinh + pcAn + pcCC };
+      }
+    });
+  }, [data, locatStats, khoanPrices]);
+
+  const rows = useMemo(() => {
+    if (!khoanAdjustedRows.length && !data) return [];
+    const source = khoanAdjustedRows.length ? khoanAdjustedRows : (data?.rows ?? []);
+    if (!filterPhongBan) return source;
+    return source.filter(r => r.phongBan === filterPhongBan);
+  }, [khoanAdjustedRows, data, filterPhongBan]);
 
   const tongFiltered = useMemo(() => ({
     luongChinh:  rows.reduce((s, r) => s + r.luongChinh, 0),
@@ -273,8 +345,15 @@ export default function BangLuongPage() {
 
   return (
     <>
-    {/* ── Print styles (bảng lương tổng) ── */}
-    <style>{`
+    {/* ── Print styles — switches based on whether phiếu cá nhân is open ── */}
+    <style>{phieuLuong ? `
+      @media print {
+        body * { visibility: hidden !important; }
+        #phieu-luong-in, #phieu-luong-in * { visibility: visible !important; }
+        #phieu-luong-in { position: fixed; top: 0; left: 0; width: 100%; }
+        @page { size: A5; margin: 12mm 14mm; }
+      }
+    ` : `
       @media print {
         body * { visibility: hidden !important; }
         #bang-luong-print, #bang-luong-print * { visibility: visible !important; }
@@ -331,10 +410,72 @@ export default function BangLuongPage() {
       </div>
 
       {/* Note */}
-      <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-5 text-[13px] text-blue-700 print:hidden">
+      <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-3 text-[13px] text-blue-700 print:hidden">
         <Info size={14} className="flex-shrink-0 mt-0.5" />
         <span>Lương chính = <b>Lương CB ÷ 26 × Ngày công</b> &nbsp;·&nbsp; PC ăn tính theo ngày đi làm thực tế &nbsp;·&nbsp;
         PC chuyên cần mất khi có ngày vắng &nbsp;·&nbsp; Tăng ca = <b>Hệ số TC (đ/giờ) × Giờ tăng ca</b></span>
+      </div>
+
+      {/* Khoán May panel */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5 print:hidden">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[12px] font-bold text-amber-800 uppercase tracking-wide">Khoán May</span>
+          <span className="text-[11px] text-amber-600">— Nhập SL & đơn giá để tính lương bộ phận May</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {LOAI_HANG_KEYS.map(k => {
+            const pool = (locatStats[k] ?? 0) * (parseFloat(khoanPrices[k] || "0") || 0);
+            return (
+              <div key={k} className="bg-white rounded-lg border border-amber-100 p-3">
+                <p className="text-[11px] font-semibold text-amber-700 mb-2">{LOAI_HANG_LABEL[k]}</p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-slate-400">SL</label>
+                    <input
+                      type="number" min={0}
+                      value={locatStats[k] === 0 ? "" : locatStats[k]}
+                      placeholder="0"
+                      onChange={e => {
+                        const next = { ...locatStats, [k]: Number(e.target.value) || 0 };
+                        setLocatStats(next);
+                        localStorage.setItem(`khoan-sl-${thang}`, JSON.stringify(next));
+                      }}
+                      className="w-full border border-slate-200 rounded px-2 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-amber-300"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-slate-400">Đơn giá</label>
+                    <input
+                      type="number" min={0}
+                      value={khoanPrices[k]}
+                      placeholder="0"
+                      onChange={e => {
+                        const next = { ...khoanPrices, [k]: e.target.value };
+                        setKhoanPrices(next);
+                        localStorage.setItem(`khoan-prices-${thang}`, JSON.stringify(next));
+                      }}
+                      className="w-full border border-slate-200 rounded px-2 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-amber-300"
+                    />
+                  </div>
+                </div>
+                {pool > 0 && (
+                  <p className="text-[10px] text-amber-600 mt-1">= {pool.toLocaleString("vi-VN")} đ</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {(() => {
+          const khoanPool = LOAI_HANG_KEYS.reduce((s, k) => {
+            return s + (locatStats[k] ?? 0) * (parseFloat(khoanPrices[k] || "0") || 0);
+          }, 0);
+          if (khoanPool === 0) return null;
+          return (
+            <p className="text-[12px] text-amber-800 font-semibold mt-2">
+              Tổng pool: {khoanPool.toLocaleString("vi-VN")} đ
+            </p>
+          );
+        })()}
       </div>
 
       {/* Summary cards */}
@@ -464,7 +605,22 @@ export default function BangLuongPage() {
                       {/* In phiếu cá nhân */}
                       <td className="px-2 py-2.5 text-center print:hidden">
                         <button
-                          onClick={() => setPhieuLuong({ row: r, thangLabel: formatThangLabel(thang) })}
+                          onClick={() => {
+                            const isK = r.loaiLuong === "khoan" && isMayGroup(r.phongBan);
+                            const isCM = r.loaiLuong !== "khoan" && isMayGroup(r.phongBan);
+                            const gNV = (isK || isCM) ? r.ngayCong * 8 + r.tongTC : undefined;
+                            // Re-compute donGiaGio from current khoan state
+                            let dGio: number | undefined;
+                            if (isK || isCM) {
+                              const pool = LOAI_HANG_KEYS.reduce((s, k) => s + (locatStats[k] ?? 0) * (parseFloat(khoanPrices[k] || "0") || 0), 0);
+                              const allMayRows = khoanAdjustedRows.filter(x => isMayGroup(x.phongBan));
+                              const totCoBan = allMayRows.filter(x => x.loaiLuong !== "khoan").reduce((s, x) => s + (x.ngayCong * 8 + x.tongTC) * x.heSoTC, 0);
+                              const rem = Math.max(0, pool - totCoBan);
+                              const totKhoan = allMayRows.filter(x => x.loaiLuong === "khoan").reduce((s, x) => s + x.ngayCong * 8 + x.tongTC, 0);
+                              dGio = isK ? (totKhoan > 0 ? Math.round(rem / totKhoan) : 0) : r.heSoTC;
+                            }
+                            setPhieuLuong({ row: r, thangLabel: formatThangLabel(thang), isKhoan: isK, isCoBanMay: isCM, gioNV: gNV, donGiaGio: dGio });
+                          }}
                           title="In phiếu lương cá nhân"
                           className="p-1.5 rounded-lg hover:bg-violet-100 text-slate-300 hover:text-violet-600 transition">
                           <Printer size={13} />
