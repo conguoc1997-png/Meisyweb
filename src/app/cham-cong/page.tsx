@@ -73,6 +73,9 @@ export default function ChamCongPage() {
     try { localStorage.setItem(`meisy_holidays_${year}`, JSON.stringify(list)); } catch {}
   };
   const [activeTab, setActiveTab] = useState<"chamcong" | "luong">("chamcong");
+  const [blAuth, setBlAuth] = useState<string>("");
+  const [blInput, setBlInput] = useState("");
+  const [blError, setBlError] = useState("");
   // Danh sách phòng ban — lưu localStorage
   const DEFAULT_PHONG_BAN = ["Kho", "May", "CSKH", "Livestream"];
   const [phongBanList, setPhongBanListRaw] = useState<string[]>(() => {
@@ -723,20 +726,48 @@ export default function ChamCongPage() {
       ))}
 
       {/* ─── TAB BẢNG LƯƠNG ─── */}
-      {activeTab === "luong" && (
+      {activeTab === "luong" && !blAuth && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm mx-auto mt-8">
+          <div className="text-center mb-5">
+            <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">💰</div>
+            <h2 className="font-bold text-slate-800">Xem bảng lương</h2>
+            <p className="text-xs text-slate-400 mt-1">Nhập mã nhân viên để xem lương của bạn</p>
+          </div>
+          <form onSubmit={e => {
+            e.preventDefault();
+            const val = blInput.trim().toUpperCase();
+            if (!val) return;
+            setBlAuth(val);
+            setBlError("");
+          }} className="space-y-3">
+            <input autoFocus value={blInput}
+              onChange={e => { setBlInput(e.target.value); setBlError(""); }}
+              placeholder="VD: NV001 hoặc ADMIN"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono" />
+            {blError && <p className="text-xs text-red-500">{blError}</p>}
+            <button type="submit" className="w-full bg-violet-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700">
+              Xem lương
+            </button>
+          </form>
+        </div>
+      )}
+
+      {activeTab === "luong" && blAuth && (
         <div id="bang-luong-in" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="font-bold text-slate-800">Bảng Lương — Tháng {month}/{year}</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {soNgayLamViec} ngày làm việc · Lương TC (lương CB) = giờ TC × hệ số · Đội May: cơ chế khoán riêng
+                {blAuth === "ADMIN" ? "Xem toàn bộ" : `Đang xem: ${blAuth}`}
+                <button onClick={() => { setBlAuth(""); setBlInput(""); }} className="ml-2 text-violet-500 hover:underline">Đăng xuất</button>
               </p>
             </div>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition print:hidden">
-              <Printer size={14} /> In bảng lương
-            </button>
+            {blAuth === "ADMIN" && (
+              <button onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition print:hidden">
+                <Printer size={14} /> In bảng lương
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -764,8 +795,12 @@ export default function ChamCongPage() {
                   <tr><td colSpan={12} className="text-center py-10 text-slate-400">Chưa có nhân viên</td></tr>
                 )}
                 {(() => {
+                  const isAdmin = blAuth === "ADMIN";
+                  const visibleNV = isAdmin
+                    ? nhanViens
+                    : nhanViens.filter(nv => nv.maNV?.toUpperCase() === blAuth.toUpperCase());
                   const groups = new Map<string, typeof nhanViens>();
-                  nhanViens.forEach(nv => {
+                  visibleNV.forEach(nv => {
                     const pb = nv.phongBan?.trim() || "Chưa phân phòng";
                     if (!groups.has(pb)) groups.set(pb, []);
                     groups.get(pb)!.push(nv);
