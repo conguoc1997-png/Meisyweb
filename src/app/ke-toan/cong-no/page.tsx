@@ -82,6 +82,16 @@ export default function CongNoPage() {
   };
 
   const [syncing, setSyncing] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [oldKeys, setOldKeys] = useState<string[]>([]);
+  const [selectedOldKey, setSelectedOldKey] = useState("");
+
+  const openSyncModal = async () => {
+    const data = await fetch("/api/ke-toan/cong-no/sync").then(r => r.json());
+    setOldKeys(data.oldKeys ?? []);
+    setSelectedOldKey("");
+    setShowSyncModal(true);
+  };
 
   const handleSync = async () => {
     const current = nhaCCList.find(n => n.id === nhaCC);
@@ -91,14 +101,15 @@ export default function CongNoPage() {
       const res = await fetch("/api/ke-toan/cong-no/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nhaCCId: current.id, nhaCCTen: current.ten }),
+        body: JSON.stringify({ nhaCCId: current.id, nhaCCTen: current.ten, oldKey: selectedOldKey || undefined }),
       });
       const result = await res.json();
-      if (result.created > 0) {
-        alert(`Đã đồng bộ ${result.created} phiếu nhập kho vào công nợ.`);
+      setShowSyncModal(false);
+      if ((result.created ?? 0) > 0 || (result.migrated ?? 0) > 0) {
+        alert(`Đã tạo mới ${result.created} phiếu, cập nhật ${result.migrated} phiếu cũ.`);
         fetchData();
       } else {
-        alert(result.message || "Không có phiếu mới cần đồng bộ.");
+        alert(result.message || "Không có phiếu nào cần đồng bộ.");
       }
     } catch { alert("Lỗi đồng bộ"); }
     finally { setSyncing(false); }
@@ -253,7 +264,7 @@ export default function CongNoPage() {
           Sổ cái — {nhaCCList.find(n => n.id === nhaCC)?.ten ?? ""}
         </span>
         <div className="flex items-center gap-2">
-          <button onClick={handleSync} disabled={syncing}
+          <button onClick={openSyncModal} disabled={syncing}
             title="Kéo phiếu nhập kho cũ vào công nợ theo tên NCC"
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-sm rounded-xl hover:border-indigo-300 hover:text-indigo-600 transition">
             <ArrowDownToLine size={14} className={syncing ? "animate-bounce" : ""} />
@@ -433,6 +444,49 @@ export default function CongNoPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal đồng bộ từ nhập kho */}
+      {showSyncModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <ArrowDownToLine size={16} className="text-indigo-500" />
+                Đồng bộ từ nhập kho
+              </h2>
+              <button onClick={() => setShowSyncModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-600">
+                NCC: <strong>{nhaCCList.find(n => n.id === nhaCC)?.ten}</strong>
+              </p>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Ghép với key cũ trong nhập kho (nếu có)</label>
+                <select
+                  value={selectedOldKey}
+                  onChange={e => setSelectedOldKey(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                  <option value="">(Không dùng key cũ)</option>
+                  {oldKeys.map(k => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">
+                  Chọn key nếu phiếu nhập kho cũ lưu theo dạng không dấu như &quot;hac_long&quot;
+                </p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowSyncModal(false)}
+                  className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-xl hover:bg-slate-50">Huỷ</button>
+                <button onClick={handleSync} disabled={syncing}
+                  className="flex-1 px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50">
+                  {syncing ? "Đang đồng bộ..." : "Đồng bộ"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
