@@ -353,8 +353,9 @@ export default function BangLuongPage() {
     ` : `
       @media print {
         body * { visibility: hidden !important; }
-        #bang-luong-print, #bang-luong-print * { visibility: visible !important; }
-        #bang-luong-print { position: fixed; top: 0; left: 0; width: 100%; }
+        #bang-luong-print, #bang-luong-print * { visibility: visible !important; overflow: visible !important; }
+        #bang-luong-print { position: fixed; top: 0; left: 0; width: 100%; background: white; }
+        .no-print { display: none !important; }
         @page { size: A4 landscape; margin: 12mm 10mm; }
       }
     `}</style>
