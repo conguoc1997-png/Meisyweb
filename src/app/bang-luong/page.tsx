@@ -6,9 +6,6 @@ import { Printer, ChevronLeft, ChevronRight, Info, X } from "lucide-react";
 const LOAI_HANG_KEYS = ["dai_thuong", "dai_kieu", "short"] as const;
 type LocatKey = typeof LOAI_HANG_KEYS[number];
 type LocatStats = Record<LocatKey, number>;
-const LOAI_HANG_LABEL: Record<LocatKey, string> = {
-  dai_thuong: "Dài thường", dai_kieu: "Dài kiểu", short: "Short",
-};
 
 const isMayGroup = (pb: string | null) => (pb ?? "").trim().toLowerCase() === "may";
 
@@ -414,68 +411,6 @@ export default function BangLuongPage() {
         <Info size={14} className="flex-shrink-0 mt-0.5" />
         <span>Lương chính = <b>Lương CB ÷ 26 × Ngày công</b> &nbsp;·&nbsp; PC ăn tính theo ngày đi làm thực tế &nbsp;·&nbsp;
         PC chuyên cần mất khi có ngày vắng &nbsp;·&nbsp; Tăng ca = <b>Hệ số TC (đ/giờ) × Giờ tăng ca</b></span>
-      </div>
-
-      {/* Khoán May panel */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5 print:hidden">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[12px] font-bold text-amber-800 uppercase tracking-wide">Khoán May</span>
-          <span className="text-[11px] text-amber-600">— Nhập SL & đơn giá để tính lương bộ phận May</span>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {LOAI_HANG_KEYS.map(k => {
-            const pool = (locatStats[k] ?? 0) * (parseFloat(khoanPrices[k] || "0") || 0);
-            return (
-              <div key={k} className="bg-white rounded-lg border border-amber-100 p-3">
-                <p className="text-[11px] font-semibold text-amber-700 mb-2">{LOAI_HANG_LABEL[k]}</p>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="text-[10px] text-slate-400">SL</label>
-                    <input
-                      type="number" min={0}
-                      value={locatStats[k] === 0 ? "" : locatStats[k]}
-                      placeholder="0"
-                      onChange={e => {
-                        const next = { ...locatStats, [k]: Number(e.target.value) || 0 };
-                        setLocatStats(next);
-                        localStorage.setItem(`khoan-sl-${thang}`, JSON.stringify(next));
-                      }}
-                      className="w-full border border-slate-200 rounded px-2 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-amber-300"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[10px] text-slate-400">Đơn giá</label>
-                    <input
-                      type="number" min={0}
-                      value={khoanPrices[k]}
-                      placeholder="0"
-                      onChange={e => {
-                        const next = { ...khoanPrices, [k]: e.target.value };
-                        setKhoanPrices(next);
-                        localStorage.setItem(`khoan-prices-${thang}`, JSON.stringify(next));
-                      }}
-                      className="w-full border border-slate-200 rounded px-2 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-amber-300"
-                    />
-                  </div>
-                </div>
-                {pool > 0 && (
-                  <p className="text-[10px] text-amber-600 mt-1">= {pool.toLocaleString("vi-VN")} đ</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {(() => {
-          const khoanPool = LOAI_HANG_KEYS.reduce((s, k) => {
-            return s + (locatStats[k] ?? 0) * (parseFloat(khoanPrices[k] || "0") || 0);
-          }, 0);
-          if (khoanPool === 0) return null;
-          return (
-            <p className="text-[12px] text-amber-800 font-semibold mt-2">
-              Tổng pool: {khoanPool.toLocaleString("vi-VN")} đ
-            </p>
-          );
-        })()}
       </div>
 
       {/* Summary cards */}
