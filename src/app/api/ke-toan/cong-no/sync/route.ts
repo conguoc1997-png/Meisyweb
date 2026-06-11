@@ -2,6 +2,21 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// GET /api/ke-toan/cong-no/sync?ten=xxx — debug: xem phiếu nhập kho theo tên
+export async function GET(req: NextRequest) {
+  const ten = req.nextUrl.searchParams.get("ten") || "";
+  const sample = await prisma.phieuNhapKho.findMany({
+    take: 20,
+    orderBy: { ngay: "desc" },
+    select: { soPhieu: true, nhaCC: true, tenNhaCC: true, tongTien: true },
+  });
+  const matched = sample.filter(p =>
+    p.tenNhaCC?.toLowerCase().includes(ten.toLowerCase()) ||
+    p.nhaCC?.toLowerCase().includes(ten.toLowerCase())
+  );
+  return NextResponse.json({ ten, matched, sample });
+}
+
 // POST /api/ke-toan/cong-no/sync
 // Tạo CongNo từ PhieuNhapKho theo tên NCC (đồng bộ dữ liệu cũ)
 export async function POST(req: NextRequest) {
@@ -11,16 +26,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Thiếu nhaCCId hoặc nhaCCTen" }, { status: 400 });
     }
 
-    // Tìm tất cả phiếu nhập kho có tenNhaCC trùng tên (không phân biệt hoa thường)
+    // Tìm theo tenNhaCC (case-insensitive) HOẶC nhaCC chứa tên
     const phieus = await prisma.phieuNhapKho.findMany({
       where: {
-        tenNhaCC: { equals: nhaCCTen, mode: "insensitive" },
+        OR: [
+          { tenNhaCC: { equals: nhaCCTen, mode: "insensitive" } },
+          { tenNhaCC: { contains: nhaCCTen, mode: "insensitive" } },
+          { nhaCC: { equals: nhaCCTen, mode: "insensitive" } },
+          { nhaCC: { contains: nhaCCTen, mode: "insensitive" } },
+        ],
       },
       orderBy: { ngay: "asc" },
     });
 
     if (phieus.length === 0) {
-      return NextResponse.json({ created: 0, message: "Không tìm thấy phiếu nhập kho phù hợp" });
+      // Trả về sample để debug
+      const sample = await prisma.phieuNhapKho.findMany({
+        take: 5, orderBy: { ngay: "desc" },
+        select: { nhaCC: true, tenNhaCC: true },
+      });
+      return NextResponse.json({ created: 0, message: "Không tìm thấy phiếu nhập kho phù hợp", debug: { searchedFor: nhaCCTen, sample } });
     }
 
     // Lấy CongNo đã có theo nhaCCId (tránh duplicate theo soChungTu)
