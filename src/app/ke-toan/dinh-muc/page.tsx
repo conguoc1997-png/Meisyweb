@@ -169,6 +169,10 @@ export default function DinhMucPage() {
   const spMap = useMemo(() => new Map(sanPhams.map(s => [s.sku, s])), [sanPhams]);
 
   function matchesCol(dm: DinhMuc, col: ColDef): boolean {
+    // Custom cols: dùng ghiChu = col.key làm identifier riêng biệt
+    if (col.key.startsWith("custom_")) {
+      return dm.ghiChu === col.key;
+    }
     const vt = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
     if (!vt) return false;
     if (vt.loai !== col.loai) return false;
@@ -266,7 +270,7 @@ export default function DinhMucPage() {
           try {
             const res = await fetch("/api/ke-toan/dinh-muc", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ hangCat, vatTuId, soLuong: 1, haoHui: 0 }),
+              body: JSON.stringify({ hangCat, vatTuId, soLuong: 1, haoHui: 0, ghiChu: col.key.startsWith("custom_") ? col.key : undefined }),
             });
             if (res.ok) {
               const real: DinhMuc = await res.json();
@@ -307,7 +311,7 @@ export default function DinhMucPage() {
       });
       const res = await fetch("/api/ke-toan/dinh-muc", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hangCat: targetCat, vatTuId, soLuong: 1, haoHui: 0 }),
+        body: JSON.stringify({ hangCat: targetCat, vatTuId, soLuong: 1, haoHui: 0, ghiChu: col.key.startsWith("custom_") ? col.key : undefined }),
       });
       if (res.ok) {
         const real: DinhMuc = await res.json();
@@ -377,7 +381,7 @@ export default function DinhMucPage() {
       } else {
         const res = await fetch("/api/ke-toan/dinh-muc", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hangCat: editCell.hangCat, vatTuId: item.vatTuId, soLuong: item.soLuong, haoHui: item.haoHui, donViMua: item.donViMua }),
+          body: JSON.stringify({ hangCat: editCell.hangCat, vatTuId: item.vatTuId, soLuong: item.soLuong, haoHui: item.haoHui, donViMua: item.donViMua, ghiChu: editCell.colKey.startsWith("custom_") ? editCell.colKey : undefined }),
         });
         if (res.ok) {
           const newDm: DinhMuc = await res.json();
@@ -929,28 +933,8 @@ export default function DinhMucPage() {
                 <label className="text-xs text-slate-500 block mb-1">Tên cột *</label>
                 <input autoFocus value={addColForm.label}
                   onChange={e => setAddColForm(f => ({ ...f, label: e.target.value }))}
-                  placeholder="VD: Giặt Nhanh, In lụa..."
+                  placeholder="VD: Mác size, In lụa, Ép keo..."
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Loại vật tư</label>
-                  <select value={addColForm.loai}
-                    onChange={e => setAddColForm(f => ({ ...f, loai: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                    <option value="hoan_thien">Hoàn thiện</option>
-                    <option value="may">May</option>
-                    <option value="gia_cong">Gia công</option>
-                    <option value="vai">Vải</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 block mb-1">Nhóm (nhom)</label>
-                  <input value={addColForm.nhom}
-                    onChange={e => setAddColForm(f => ({ ...f, nhom: e.target.value }))}
-                    placeholder="VD: giat_nhanh"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
               </div>
               <div>
                 <label className="text-xs text-slate-500 block mb-2">Loại cột *</label>
