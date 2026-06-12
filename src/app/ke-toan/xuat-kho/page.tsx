@@ -99,7 +99,6 @@ export default function XuatKhoPage() {
         fetch("/api/san-xuat/lo-cat?limit=300").then(r => r.json()).catch(() => []),
         fetch("/api/kho/san-pham").then(r => r.json()).catch(() => []),
       ]);
-      if (!Array.isArray(p)) alert("Lỗi tải phiếu xuất: " + JSON.stringify(p));
       setPhieus(Array.isArray(p) ? p : []);
       setVatTus(Array.isArray(v) ? v : []);
       const loData = Array.isArray(l) ? l : (Array.isArray(l?.data) ? l.data : []);

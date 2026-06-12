@@ -39,6 +39,21 @@ export async function POST(req: NextRequest) {
     //         chiTiet: [{vatTuId, soLuong, donGia, ghiChu?}] }
 
     type RowIn = { vatTuId: string; soLuong: number; donGia: number; ghiChu?: string };
+    const chiTiet = body.chiTiet as RowIn[];
+    const vatTuIds = [...new Set(chiTiet.map(r => r.vatTuId))];
+
+    // Pre-fetch tồn kho và quyDoi TRƯỚC transaction để tránh timeout
+    const [tonRows, nhapRows] = await Promise.all([
+      prisma.tonKhoVatTu.findMany({ where: { vatTuId: { in: vatTuIds } } }),
+      prisma.chiTietNhapKho.findMany({
+        where: { vatTuId: { in: vatTuIds } },
+        orderBy: { id: "desc" },
+        distinct: ["vatTuId"],
+        select: { vatTuId: true, quyDoi: true },
+      }),
+    ]);
+    const tonMap    = new Map(tonRows.map(t => [t.vatTuId, t]));
+    const quyDoiMap = new Map(nhapRows.map(n => [n.vatTuId, n.quyDoi ?? 1]));
 
     const phieu = await prisma.$transaction(async (tx) => {
       // 1. Tạo phiếu xuất
@@ -53,7 +68,7 @@ export async function POST(req: NextRequest) {
           ghiChu: body.ghiChu || null,
           nguoiTao: body.nguoiTao || null,
           chiTiet: {
-            create: (body.chiTiet as RowIn[]).map(r => ({
+            create: chiTiet.map(r => ({
               vatTuId: r.vatTuId,
               soLuong: r.soLuong,
               donGia: r.donGia,
@@ -65,18 +80,11 @@ export async function POST(req: NextRequest) {
         include: { chiTiet: { include: { vatTu: true } } },
       });
 
-      // 2. Trừ tồn kho — soLuong lưu theo đơn vị cơ bản, quyDoi để convert ra đvMua
-      for (const r of body.chiTiet as RowIn[]) {
-        const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: r.vatTuId } });
+      // 2. Trừ tồn kho — dùng data đã pre-fetch, chỉ update bên trong transaction
+      for (const r of chiTiet) {
+        const ton    = tonMap.get(r.vatTuId);
+        const quyDoi = quyDoiMap.get(r.vatTuId) ?? 1;
         if (ton) {
-          // Lấy quyDoi từ lần nhập gần nhất
-          const nhap = await tx.chiTietNhapKho.findFirst({
-            where: { vatTuId: r.vatTuId },
-            orderBy: { id: "desc" },
-            select: { quyDoi: true },
-          });
-          const quyDoi = nhap?.quyDoi ?? 1;
-          // soLuong (đvCơBản) / quyDoi = đvMua để trừ tồn
           const newSL = Math.max(0, ton.soLuong - r.soLuong / quyDoi);
           await tx.tonKhoVatTu.update({
             where: { vatTuId: r.vatTuId },
@@ -86,7 +94,7 @@ export async function POST(req: NextRequest) {
       }
 
       return p;
-    });
+    }, { timeout: 20000 });
 
     return NextResponse.json(phieu, { status: 201 });
   } catch (e: unknown) {
