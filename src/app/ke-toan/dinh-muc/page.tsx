@@ -86,7 +86,7 @@ export default function DinhMucPage() {
     try { return JSON.parse(localStorage.getItem("dinh-muc-extra-cols") || "[]"); } catch { return []; }
   });
   const [addColModal, setAddColModal] = useState(false);
-  const [addColForm, setAddColForm] = useState({ label: "", loai: "hoan_thien", nhom: "", shared: false, tickOnly: true });
+  const [addColForm, setAddColForm] = useState({ label: "", loai: "hoan_thien", nhom: "", shared: false, tickOnly: false });
 
   const allColumns = useMemo(() => [...COLUMNS, ...extraCols], [extraCols]);
 
@@ -110,7 +110,7 @@ export default function DinhMucPage() {
     };
     saveExtraCols([...extraCols, newCol]);
     setAddColModal(false);
-    setAddColForm({ label: "", loai: "hoan_thien", nhom: "", shared: false, tickOnly: true });
+    setAddColForm({ label: "", loai: "hoan_thien", nhom: "", shared: false, tickOnly: false });
   }
   function removeExtraCol(key: string) {
     saveExtraCols(extraCols.filter(c => c.key !== key));
@@ -573,8 +573,17 @@ export default function DinhMucPage() {
                     {col.shared && <div className="text-[10px] font-normal opacity-60 mt-0.5">↓ từ CHUNG</div>}
                     {!col.shared && !col.tickOnly && <div className="text-[10px] font-normal opacity-60 mt-0.5">riêng SP</div>}
                     {extraCols.some(c => c.key === col.key) && (
-                      <button onClick={e => { e.stopPropagation(); removeExtraCol(col.key); }}
-                        className="mt-0.5 text-[9px] text-red-300 hover:text-red-500 block mx-auto">✕ xóa</button>
+                      <div className="flex items-center justify-center gap-1 mt-0.5">
+                        <button onClick={e => {
+                          e.stopPropagation();
+                          saveExtraCols(extraCols.map(c => c.key === col.key ? { ...c, shared: !c.shared } : c));
+                        }} className="text-[9px] text-indigo-300 hover:text-indigo-600">
+                          {col.shared ? "→ phát sinh" : "→ chung"}
+                        </button>
+                        <span className="text-slate-200">·</span>
+                        <button onClick={e => { e.stopPropagation(); removeExtraCol(col.key); }}
+                          className="text-[9px] text-red-300 hover:text-red-500">✕ xóa</button>
+                      </div>
                     )}
                   </th>
                 ))}
@@ -946,19 +955,27 @@ export default function DinhMucPage() {
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
               </div>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={addColForm.shared}
-                    onChange={e => setAddColForm(f => ({ ...f, shared: e.target.checked }))}
-                    className="accent-indigo-600 w-4 h-4" />
-                  <span className="text-xs text-slate-600">Dùng chung (CHUNG)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={addColForm.tickOnly}
-                    onChange={e => setAddColForm(f => ({ ...f, tickOnly: e.target.checked }))}
-                    className="accent-indigo-600 w-4 h-4" />
-                  <span className="text-xs text-slate-600">Chỉ tick (không nhập SL)</span>
-                </label>
+              <div>
+                <label className="text-xs text-slate-500 block mb-2">Loại cột *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "Dùng chung", desc: "Tất cả SP dùng cùng 1 định mức", shared: true,  tickOnly: false },
+                    { label: "Theo phát sinh", desc: "Mỗi SP nhập định mức riêng",       shared: false, tickOnly: false },
+                    { label: "Tick chung",   desc: "Tick on/off dùng chung (vd: May)",  shared: true,  tickOnly: true  },
+                    { label: "Tick phát sinh", desc: "Tick on/off từng SP riêng",        shared: false, tickOnly: true  },
+                  ].map(opt => {
+                    const active = addColForm.shared === opt.shared && addColForm.tickOnly === opt.tickOnly;
+                    return (
+                      <button key={opt.label} type="button"
+                        onClick={() => setAddColForm(f => ({ ...f, shared: opt.shared, tickOnly: opt.tickOnly }))}
+                        className={`text-left px-3 py-2 rounded-xl border-2 transition-all text-xs
+                          ${active ? "border-indigo-500 bg-indigo-50" : "border-slate-200 hover:border-slate-300"}`}>
+                        <p className={`font-semibold ${active ? "text-indigo-700" : "text-slate-700"}`}>{opt.label}</p>
+                        <p className="text-slate-400 mt-0.5">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 px-5 py-4 border-t border-slate-100">
