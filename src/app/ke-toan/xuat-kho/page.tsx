@@ -224,6 +224,9 @@ export default function XuatKhoPage() {
       setModal(null);
       resetForm();
       fetchAll();
+    } else {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      alert(`Lỗi xuất kho: ${err.error ?? JSON.stringify(err)}`);
     }
   }
 
