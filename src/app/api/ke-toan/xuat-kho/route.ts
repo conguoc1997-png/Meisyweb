@@ -65,11 +65,19 @@ export async function POST(req: NextRequest) {
         include: { chiTiet: { include: { vatTu: true } } },
       });
 
-      // 2. Trừ tồn kho
+      // 2. Trừ tồn kho — soLuong lưu theo đơn vị cơ bản, quyDoi để convert ra đvMua
       for (const r of body.chiTiet as RowIn[]) {
         const ton = await tx.tonKhoVatTu.findUnique({ where: { vatTuId: r.vatTuId } });
         if (ton) {
-          const newSL = Math.max(0, ton.soLuong - r.soLuong);
+          // Lấy quyDoi từ lần nhập gần nhất
+          const nhap = await tx.chiTietNhapKho.findFirst({
+            where: { vatTuId: r.vatTuId },
+            orderBy: { id: "desc" },
+            select: { quyDoi: true },
+          });
+          const quyDoi = nhap?.quyDoi ?? 1;
+          // soLuong (đvCơBản) / quyDoi = đvMua để trừ tồn
+          const newSL = Math.max(0, ton.soLuong - r.soLuong / quyDoi);
           await tx.tonKhoVatTu.update({
             where: { vatTuId: r.vatTuId },
             data: { soLuong: newSL, giaTriTon: newSL * ton.giaTrungBinh },
