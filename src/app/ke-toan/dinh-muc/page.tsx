@@ -243,7 +243,7 @@ export default function DinhMucPage() {
         await Promise.all(ids.map(id =>
           fetch(`/api/ke-toan/dinh-muc/${id}`, { method: "DELETE" })
         ));
-      } catch { await fetchAll(); } // revert on error
+      } catch { await refreshDinhMuc(); } // revert on error
       finally { setTicking(null); }
     } else {
       // Chưa có → nếu col không shared (Giặt), dùng VatTu từ CHUNG row
@@ -264,8 +264,8 @@ export default function DinhMucPage() {
             if (res.ok) {
               const real: DinhMuc = await res.json();
               optimisticReplace(tempId, { ...real, vatTu: vt });
-            } else { await fetchAll(); }
-          } catch { await fetchAll(); }
+            } else { await refreshDinhMuc(); }
+          } catch { await refreshDinhMuc(); }
           finally { setTicking(null); }
           return;
         }
@@ -305,8 +305,8 @@ export default function DinhMucPage() {
       if (res.ok) {
         const real: DinhMuc = await res.json();
         optimisticReplace(tempId, { ...real, vatTu: vtOptimistic });
-      } else { await fetchAll(); }
-    } catch { await fetchAll(); }
+      } else { await refreshDinhMuc(); }
+    } catch { await refreshDinhMuc(); }
     finally { setTicking(null); }
   }
 
@@ -334,6 +334,12 @@ export default function DinhMucPage() {
   }
   function closeCell() { setEditCell(null); setEditItems([]); setVtDropOpen(null); }
 
+  // Chỉ refresh định mức (không load lại san-pham, vat-tu, ton-kho)
+  const refreshDinhMuc = useCallback(async () => {
+    const dms = await fetch("/api/ke-toan/dinh-muc").then(r => r.json()).catch(() => []);
+    if (Array.isArray(dms)) setDinhMucs(dms);
+  }, []);
+
   /* ── Save / delete edit item ────────────────────────────────────────────── */
   async function saveItem(idx: number) {
     if (!editCell) return;
@@ -357,7 +363,7 @@ export default function DinhMucPage() {
           setEditItems(prev => prev.map((it, i) => i === idx ? { ...it, id: newDm.id, changed: false } : it));
         }
       }
-      await fetchAll();
+      await refreshDinhMuc();
     } finally { setSaving(false); }
   }
 
@@ -365,7 +371,7 @@ export default function DinhMucPage() {
     const item = editItems[idx];
     if (item.id) {
       await fetch(`/api/ke-toan/dinh-muc/${item.id}`, { method: "DELETE" });
-      await fetchAll();
+      await refreshDinhMuc();
     }
     setEditItems(prev => prev.filter((_, i) => i !== idx));
   }
@@ -712,7 +718,8 @@ export default function DinhMucPage() {
                                 method: "PATCH", headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ donVi: newDv.trim() }),
                               });
-                              await fetchAll();
+                              // Cập nhật local state, không cần re-fetch toàn bộ
+                              setVatTus(prev => prev.map(v => v.id === vt.id ? { ...v, donVi: newDv.trim() } : v));
                             }}
                             className="text-[9px] text-indigo-400 hover:text-indigo-600 underline"
                           >sửa</button>
