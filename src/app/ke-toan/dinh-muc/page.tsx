@@ -319,7 +319,7 @@ export default function DinhMucPage() {
 
   /* ── Cell open/close ────────────────────────────────────────────────────── */
   function openCell(hangCat: string, colKey: string) {
-    const col = COLUMNS.find(c => c.key === colKey)!;
+    const col = allColumns.find(c => c.key === colKey)!;
     // Shared col on product row → chỉ xem (không edit)
     if (col.shared && hangCat !== CHUNG_KEY) return;
     // !shared tickOnly + CHUNG row → mở picker để chọn VatTu nguồn
