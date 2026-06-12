@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Plus, Search, X, Trash2, Eye, AlertCircle, CheckCircle, Layers, Package } from "lucide-react";
 
 type VatTu = { id: string; ma: string; ten: string; donVi: string; nhom: string | null; loai: string };
@@ -79,6 +79,7 @@ export default function XuatKhoPage() {
   });
   const [rows, setRows]         = useState<XuatRow[]>([]);
   const [suggestLoad, setSuggestLoad] = useState(false);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saving, setSaving]     = useState(false);
   // per-row vat-tu search state
   const [vtSearch, setVtSearch] = useState<string[]>([]);
@@ -145,13 +146,15 @@ export default function XuatKhoPage() {
     setVtSearch(newRows.map(() => ""));
   }
 
-  // Khi số sản phẩm thay đổi trong chế độ sản phẩm → tải lại suggest
+  // Khi số sản phẩm thay đổi trong chế độ sản phẩm → tải lại suggest (debounce 400ms)
   async function onSoSanPhamSP(soSP: string) {
     setForm(f => ({ ...f, soSanPham: soSP }));
     const hangCat = form.hangCat;
     const spNum = parseFloat(soSP) || 0;
     if (!hangCat || spNum <= 0) return;
 
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    suggestTimer.current = setTimeout(async () => {
     setSuggestLoad(true);
     const res = await fetch(`/api/ke-toan/xuat-kho/suggest?hangCat=${encodeURIComponent(hangCat)}&soSanPham=${spNum}`);
     setSuggestLoad(false);
@@ -170,6 +173,7 @@ export default function XuatKhoPage() {
     }));
     setRows(newRows);
     setVtSearch(newRows.map(() => ""));
+    }, 400);
   }
 
   function updateRow(i: number, patch: Partial<XuatRow>) {
