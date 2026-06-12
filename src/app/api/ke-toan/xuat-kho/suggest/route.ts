@@ -120,13 +120,16 @@ export async function GET(req: NextRequest) {
         ) ?? null
       : null;
 
+    const vaiQuyDoi = vatTuVai ? (quyDoiMap2.get(vatTuVai.id) ?? 1) : 1;
+    const vaiGiaMua = vatTuVai?.tonKho?.giaTrungBinh ?? 0;
+    const vaiDonGia = vaiQuyDoi > 1 ? Math.round(vaiGiaMua / vaiQuyDoi * 100) / 100 : vaiGiaMua;
     rows.push({
       type: "vai",
       vatTuId: vatTuVai?.id ?? null,
       vatTu: vatTuVai,
       maVai: lo.maVai ?? undefined,
       soLuong: soMet,
-      donGia: vatTuVai?.tonKho?.giaTrungBinh ?? 0,
+      donGia: vaiDonGia,
       ghiChu: `Vải lô: ${lo.maVai || "chưa ghi"}${lo.soCay > 1 ? ` (${lo.soCay} cây)` : ""}`,
       source: "lo_cat",
     });
