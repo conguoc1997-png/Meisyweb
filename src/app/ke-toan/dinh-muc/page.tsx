@@ -424,7 +424,7 @@ export default function DinhMucPage() {
       // Shared + product row: hiển thị trạng thái kế thừa từ CHUNG (read-only)
       if (col.shared && hangCat !== CHUNG_KEY) {
         return checked
-          ? <span className="text-lg">✓</span>
+          ? <span className="text-sm font-semibold text-emerald-600">1</span>
           : <span className="text-slate-200 text-base">—</span>;
       }
       // !shared + CHUNG row: hiển thị VatTu nguồn đã chọn (hoặc nút chọn)
@@ -456,7 +456,7 @@ export default function DinhMucPage() {
           {isLoading
             ? <span className="text-xs animate-spin">⟳</span>
             : checked
-              ? <span className="text-base font-bold">✓</span>
+              ? <span className="text-sm font-bold">1</span>
               : <span className="text-slate-400 text-base">+</span>
           }
         </div>
