@@ -327,8 +327,22 @@ export default function DinhMucPage() {
       setTickPicker({ hangCat: CHUNG_KEY, col, search: "", showAll: false });
       return;
     }
-    // tickOnly → dùng toggleTick thay vì modal
-    if (col.tickOnly) { toggleTick(hangCat, col); return; }
+    // tickOnly: nếu đã có → mở modal nhập số; nếu chưa có → toggle (tạo mới sl=1)
+    if (col.tickOnly) {
+      const existing = getOwnItems(hangCat, col);
+      if (existing.length > 0) {
+        // Mở modal để chỉnh soLuong
+        setEditCell({ hangCat, colKey });
+        setEditItems(existing.map(dm => ({
+          id: dm.id, vatTuId: dm.vatTuId, soLuong: dm.soLuong,
+          haoHui: dm.haoHui ?? 0, donViMua: dm.donViMua ?? dm.vatTu?.donVi ?? "",
+          vtSearch: "", changed: false,
+        })));
+        return;
+      }
+      toggleTick(hangCat, col);
+      return;
+    }
     const items = getOwnItems(hangCat, col);
     setEditCell({ hangCat, colKey });
     setEditItems(items.map(dm => {
@@ -424,7 +438,7 @@ export default function DinhMucPage() {
       // Shared + product row: hiển thị trạng thái kế thừa từ CHUNG (read-only)
       if (col.shared && hangCat !== CHUNG_KEY) {
         return checked
-          ? <span className="text-sm font-semibold text-emerald-600">1</span>
+          ? <span className="text-sm font-semibold text-emerald-600">{items[0].soLuong}</span>
           : <span className="text-slate-200 text-base">—</span>;
       }
       // !shared + CHUNG row: hiển thị VatTu nguồn đã chọn (hoặc nút chọn)
@@ -456,7 +470,7 @@ export default function DinhMucPage() {
           {isLoading
             ? <span className="text-xs animate-spin">⟳</span>
             : checked
-              ? <span className="text-sm font-bold">1</span>
+              ? <span className="text-sm font-bold">{items[0]?.soLuong ?? 1}</span>
               : <span className="text-slate-400 text-base">+</span>
           }
         </div>
