@@ -494,6 +494,9 @@ export default function DinhMucPage() {
           return (
             <div key={i} className={`inline-flex flex-col items-center px-2 py-1 rounded-lg text-xs font-medium
               ${isChung ? "opacity-60 border border-dashed border-slate-300 bg-slate-50 text-slate-500" : col.badge}`}>
+              {vt && (
+                <span className="opacity-60 text-[9px] leading-none mb-0.5 max-w-[72px] truncate">{vt.ten}</span>
+              )}
               <span className="font-bold text-sm leading-none">{fmt(dm.soLuong)}</span>
               {vt && (
                 <span className="opacity-70 text-[10px]">{fmtDV(dm.donViMua ?? vt.donVi ?? "")}</span>
