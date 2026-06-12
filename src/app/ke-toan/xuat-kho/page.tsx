@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Search, X, Trash2, Eye, AlertCircle, CheckCircle, Layers, Package } from "lucide-react";
+import { Plus, Search, X, Trash2, Eye, AlertCircle, CheckCircle, Layers, Package, BarChart2, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 type VatTu = { id: string; ma: string; ten: string; donVi: string; nhom: string | null; loai: string };
 type TonKho = { soLuong: number; giaTrungBinh: number };
@@ -112,6 +113,46 @@ export default function XuatKhoPage() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Tab thống kê ──
+  const [tab, setTab] = useState<"list" | "stats">("list");
+  const [statMonth, setStatMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [statHangCat, setStatHangCat] = useState("");
+
+  const statData = useMemo(() => {
+    const [y, m] = statMonth.split("-").map(Number);
+    const inMonth = phieus.filter(p => {
+      const d = new Date(p.ngay);
+      return d.getFullYear() === y && d.getMonth() + 1 === m &&
+        (!statHangCat || p.hangCat === statHangCat);
+    });
+    type Row = { vatTuId: string; ten: string; ma: string; donVi: string; soLuong: number; thanhTien: number };
+    const map = new Map<string, Row>();
+    for (const p of inMonth) {
+      for (const c of p.chiTiet) {
+        const cur = map.get(c.vatTuId) ?? { vatTuId: c.vatTuId, ten: c.vatTu?.ten ?? c.vatTuId, ma: c.vatTu?.ma ?? "", donVi: c.vatTu?.donVi ?? "", soLuong: 0, thanhTien: 0 };
+        cur.soLuong += c.soLuong;
+        cur.thanhTien += c.thanhTien;
+        map.set(c.vatTuId, cur);
+      }
+    }
+    return [...map.values()].sort((a, b) => b.thanhTien - a.thanhTien);
+  }, [phieus, statMonth, statHangCat]);
+
+  const allHangCats = useMemo(() => [...new Set(phieus.map(p => p.hangCat).filter(Boolean))] as string[], [phieus]);
+
+  function exportExcel() {
+    const [y, m] = statMonth.split("-");
+    const title = `Thống kê xuất kho NPL tháng ${m}/${y}${statHangCat ? " — " + statHangCat : ""}`;
+    const header = ["STT", "Mã VT", "Tên vật tư", "ĐV", "Tổng số lượng", "Thành tiền (đ)"];
+    const dataRows = statData.map((r, i) => [i + 1, r.ma, r.ten, r.donVi, r.soLuong, r.thanhTien]);
+    const totalRow = ["", "", "TỔNG", "", statData.reduce((s, r) => s + r.soLuong, 0), statData.reduce((s, r) => s + r.thanhTien, 0)];
+    const ws = XLSX.utils.aoa_to_sheet([[title], [], header, ...dataRows, [], totalRow]);
+    ws["!cols"] = [{ wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 8 }, { wch: 16 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Thong ke");
+    XLSX.writeFile(wb, `xuat-kho-${statMonth}${statHangCat ? "-" + statHangCat : ""}.xlsx`);
+  }
 
   const filtered = useMemo(() => phieus.filter(p => {
     const s = search.toLowerCase();
@@ -312,6 +353,82 @@ export default function XuatKhoPage() {
         </div>
       </div>
 
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setTab("list")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === "list" ? "bg-white shadow text-slate-800" : "text-slate-500 hover:text-slate-700"}`}>
+          <Layers size={14} /> Danh sách
+        </button>
+        <button onClick={() => setTab("stats")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === "stats" ? "bg-white shadow text-slate-800" : "text-slate-500 hover:text-slate-700"}`}>
+          <BarChart2 size={14} /> Thống kê
+        </button>
+      </div>
+
+      {tab === "stats" && (
+        <div className="space-y-4">
+          {/* Bộ lọc thống kê */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Tháng</label>
+              <input type="month" value={statMonth} onChange={e => setStatMonth(e.target.value)}
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Loại hàng</label>
+              <select value={statHangCat} onChange={e => setStatHangCat(e.target.value)}
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+                <option value="">Tất cả</option>
+                {allHangCats.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div className="flex-1" />
+            <button onClick={exportExcel} disabled={statData.length === 0}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed self-end">
+              <Download size={15} /> Xuất Excel
+            </button>
+          </div>
+
+          {/* Bảng thống kê */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left">
+                  <th className="px-4 py-3 font-semibold text-slate-500 w-10">#</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Vật tư</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">ĐV</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 text-right">Tổng số lượng</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 text-right">Thành tiền</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statData.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-12 text-slate-400">Không có dữ liệu trong tháng này</td></tr>
+                )}
+                {statData.map((r, i) => (
+                  <tr key={r.vatTuId} className="border-b border-slate-50 hover:bg-slate-50">
+                    <td className="px-4 py-2.5 text-slate-400">{i + 1}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium text-slate-800">{r.ten}</div>
+                      <div className="text-xs text-slate-400">{r.ma}</div>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500">{r.donVi}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-700">{fmt(r.soLuong)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-indigo-700">{fmt(r.thanhTien)}₫</td>
+                  </tr>
+                ))}
+                {statData.length > 0 && (
+                  <tr className="bg-slate-50 font-semibold border-t border-slate-200">
+                    <td colSpan={3} className="px-4 py-3 text-slate-700">TỔNG ({statData.length} loại)</td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-700">—</td>
+                    <td className="px-4 py-3 text-right text-indigo-700">{fmt(statData.reduce((s, r) => s + r.thanhTien, 0))}₫</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "list" && <>
       {/* Filter */}
       <div className="relative w-56">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -386,6 +503,7 @@ export default function XuatKhoPage() {
           </tbody>
         </table>
       </div>
+      </> }
 
       {/* ── CREATE MODAL ── */}
       {modal === "create" && (
