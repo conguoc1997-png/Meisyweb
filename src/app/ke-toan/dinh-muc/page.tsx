@@ -630,7 +630,7 @@ export default function DinhMucPage() {
       {editCell && editCol && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4"
           onClick={e => e.target === e.currentTarget && closeCell()}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
                 <p className="text-xs text-slate-400 mb-0.5">Định mức / 1 sản phẩm</p>
@@ -686,7 +686,7 @@ export default function DinhMucPage() {
                                       ${hasStock ? "hover:bg-emerald-50" : "hover:bg-slate-50 opacity-60"}`}
                                     onMouseDown={e => e.preventDefault()}
                                     onClick={() => selectVatTu(idx, v)}>
-                                    <span className={`truncate flex-1 ${hasStock ? "text-slate-800" : "text-slate-400"}`}>{v.ten}</span>
+                                    <span className={`flex-1 ${hasStock ? "text-slate-800" : "text-slate-400"}`}>{v.ten}</span>
                                     {!v.nhom && (
                                       <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 font-medium">→ tự link</span>
                                     )}
