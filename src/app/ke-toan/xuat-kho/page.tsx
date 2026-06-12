@@ -209,7 +209,6 @@ export default function XuatKhoPage() {
   async function doCreate() {
     const validRows = rows.filter(r => r.vatTuId && r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0);
     if (!form.soPhieu || !form.ngay || validRows.length === 0) return;
-    setThieuModal(null);
     setSaving(true);
     const res = await fetch("/api/ke-toan/xuat-kho", {
       method: "POST",
