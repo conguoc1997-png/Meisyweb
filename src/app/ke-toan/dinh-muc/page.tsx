@@ -709,7 +709,7 @@ export default function DinhMucPage() {
                       )}
                       {vt && !item.vtSearch && (
                         <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-[10px] text-slate-400">{fmtDV(vt.donVi)}</span>
+                          <span className="text-[10px] text-slate-400">{fmtDV(item.donViMua ?? vt.donVi)}</span>
                           <button
                             onClick={async () => {
                               const newDv = prompt(`Sửa đơn vị cho "${vt.ten}" (hiện: ${vt.donVi}):`, vt.donVi);
@@ -732,7 +732,7 @@ export default function DinhMucPage() {
                       <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
                         SL / sp
                         {vt && <span className="px-1 py-0.5 rounded bg-slate-200 text-slate-600 text-[9px] font-medium">
-                          {fmtDV(vt.donVi)}
+                          {fmtDV(item.donViMua ?? vt.donVi)}
                         </span>}
                       </p>
                       <input type="number" min={0} step="0.01"
@@ -763,7 +763,7 @@ export default function DinhMucPage() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-[9px] text-slate-400 mt-0.5 text-center">{fmtDV(dvQD)}</p>
+                          <p className="text-[9px] text-slate-400 mt-0.5 text-center">{fmtDV(item.donViMua ?? dvQD)}</p>
                         );
                       })()}
                     </div>
