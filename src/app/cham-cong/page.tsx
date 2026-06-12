@@ -655,33 +655,30 @@ export default function ChamCongPage() {
                         const sun = isSunday(d);
                         return (
                           <td key={d} className={`p-px border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/40"}`}>
-                            {!sun ? (
-                              <input
-                                type="number"
-                                min="0"
-                                max="24"
-                                step="0.5"
-                                value={tc ?? ""}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  const tcVal = val === "" ? null : Math.min(24, parseFloat(val));
-                                  setChamCongs(prev => {
-                                    const ngay = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-                                    const existing = prev.find(c => c.nhanVienId === nv.id && c.ngay.slice(0,10) === ngay);
-                                    if (existing) return prev.map(c => c.nhanVienId === nv.id && c.ngay.slice(0,10) === ngay ? { ...c, tangCa: tcVal } : c);
-                                    if (!tcVal) return prev;
-                                    return [...prev, { id: "tmp3", nhanVienId: nv.id, ngay: ngay + "T00:00:00.000Z", trangThai: "", tangCa: tcVal, ghiChu: null }];
-                                  });
-                                }}
-                                onBlur={e => handleTCChange(nv.id, d, e.target.value)}
-                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                placeholder=""
-                                className="w-full h-7 text-center text-xs font-bold text-orange-700 bg-transparent border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                title="Số giờ tăng ca"
-                              />
-                            ) : (
-                              <div className="h-6" />
-                            )}
+                            <input
+                              type="number"
+                              min="0"
+                              max="24"
+                              step="0.5"
+                              value={tc ?? ""}
+                              onChange={e => {
+                                const val = e.target.value;
+                                const tcVal = val === "" ? null : Math.min(24, parseFloat(val));
+                                setChamCongs(prev => {
+                                  const ngay = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                                  const existing = prev.find(c => c.nhanVienId === nv.id && c.ngay.slice(0,10) === ngay);
+                                  if (existing) return prev.map(c => c.nhanVienId === nv.id && c.ngay.slice(0,10) === ngay ? { ...c, tangCa: tcVal } : c);
+                                  if (!tcVal) return prev;
+                                  return [...prev, { id: "tmp3", nhanVienId: nv.id, ngay: ngay + "T00:00:00.000Z", trangThai: "", tangCa: tcVal, ghiChu: null }];
+                                });
+                              }}
+                              onBlur={e => handleTCChange(nv.id, d, e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                              placeholder=""
+                              className={`w-full h-7 text-center text-xs font-bold bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                ${sun ? "text-slate-500 border-slate-300" : "text-orange-700 border-orange-300"}`}
+                              title="Số giờ tăng ca"
+                            />
                           </td>
                         );
                       })}
