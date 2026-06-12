@@ -683,8 +683,8 @@ export default function DinhMucPage() {
                             ? <p className="text-xs text-slate-400 px-3 py-2">Không tìm thấy vật tư nhóm &ldquo;{editCol.label}&rdquo;</p>
                             : colVts.map(v => {
                                 const tk = tonKhoMap.get(v.id);
-                                const stock = tk?.soLuongQD ?? 0; // sau quy đổi từ lịch sử nhập
-                                const donViHien = fmtDV(tk?.donViQuyDoi ?? v.donVi);
+                                const stock = tk?.soLuongQD ?? 0;
+                                const donViHien = fmtDV(v.donViMua ?? v.donVi);
                                 const hasStock = stock > 0;
                                 return (
                                   <button key={v.id}
