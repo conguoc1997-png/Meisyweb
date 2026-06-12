@@ -40,11 +40,17 @@ export async function GET(req: NextRequest) {
     ]);
     const quyDoiMap = new Map(quyDoiRows.map(r => [r.vatTuId, r.quyDoi ?? 1]));
 
+    // non-shared tickOnly cols: CHUNG row chỉ là "nguồn VatTu", không phải định mức thật
+    const NON_SHARED_TICK_NHOMS = new Set(["giat_mau", "giat_vi_sinh"]);
     // Merge: product-specific takes priority; CHUNG fills gaps (phu_lieu only, not vai)
     const productVatTuIds = new Set(dinhMucsProduct.map(d => d.vatTuId));
     const merged = [
       ...dinhMucsProduct,
-      ...dinhMucsChung.filter(d => d.vatTu.loai !== "vai" && !productVatTuIds.has(d.vatTuId)),
+      ...dinhMucsChung.filter(d =>
+        d.vatTu.loai !== "vai" &&
+        !productVatTuIds.has(d.vatTuId) &&
+        !NON_SHARED_TICK_NHOMS.has(d.vatTu.nhom ?? "")
+      ),
     ];
 
     const rows: SuggestRow[] = merged.map(dm => {
@@ -131,11 +137,15 @@ export async function GET(req: NextRequest) {
     const dmProduct = allDinhMucs.filter(d => d.hangCat === lo.hangCat && d.vatTu.loai !== "vai");
     const dmChung   = allDinhMucs.filter(d => d.hangCat === CHUNG_KEY  && d.vatTu.loai !== "vai");
 
-    // Product-specific takes priority; CHUNG fills gaps
+    // Product-specific takes priority; CHUNG fills gaps (exclude non-shared tickOnly sources)
+    const NON_SHARED_TICK_NHOMS2 = new Set(["giat_mau", "giat_vi_sinh"]);
     const productVatTuIds = new Set(dmProduct.map(d => d.vatTuId));
     const dmMerged = [
       ...dmProduct,
-      ...dmChung.filter(d => !productVatTuIds.has(d.vatTuId)),
+      ...dmChung.filter(d =>
+        !productVatTuIds.has(d.vatTuId) &&
+        !NON_SHARED_TICK_NHOMS2.has(d.vatTu.nhom ?? "")
+      ),
     ];
 
     for (const dm of dmMerged) {
