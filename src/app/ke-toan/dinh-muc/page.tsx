@@ -146,10 +146,17 @@ export default function DinhMucPage() {
       .then(r => r.json())
       .then(tonKhos => {
         if (Array.isArray(tonKhos)) {
-          // API trả về { vatTuId, soLuong, vatTu } — map soLuong → soLuongQD
-          setTonKhoMap(new Map(tonKhos.map((t: { vatTuId: string; soLuong: number; vatTu?: { donVi?: string } }) => [
+          setTonKhoMap(new Map(tonKhos.map((t: {
+            vatTuId: string; soLuong: number; soLuongQD?: number;
+            donViQuyDoi?: string; quyDoi?: number; vatTu?: { donVi?: string }
+          }) => [
             t.vatTuId,
-            { vatTuId: t.vatTuId, soLuongQD: t.soLuong, donViQuyDoi: t.vatTu?.donVi ?? "", quyDoi: 1 } as TonKhoRow,
+            {
+              vatTuId:     t.vatTuId,
+              soLuongQD:   t.soLuongQD ?? t.soLuong,   // đã quy đổi (ví dụ m)
+              donViQuyDoi: t.donViQuyDoi ?? t.vatTu?.donVi ?? "",
+              quyDoi:      t.quyDoi ?? 1,
+            } as TonKhoRow,
           ])));
         }
       })
@@ -684,7 +691,7 @@ export default function DinhMucPage() {
                             : colVts.map(v => {
                                 const tk = tonKhoMap.get(v.id);
                                 const stock = tk?.soLuongQD ?? 0;
-                                const donViHien = fmtDV(v.donViMua ?? v.donVi);
+                                const donViHien = fmtDV(tk?.donViQuyDoi ?? v.donVi);
                                 const hasStock = stock > 0;
                                 return (
                                   <button key={v.id}
