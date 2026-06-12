@@ -498,12 +498,6 @@ export default function DinhMucPage() {
                 <span className="opacity-60 text-[9px] leading-none mb-0.5 max-w-[72px] truncate">{vt.ten}</span>
               )}
               <span className="font-bold text-sm leading-none">{fmt(dm.soLuong)}</span>
-              {vt && (
-                <span className="opacity-70 text-[10px]">{fmtDV(dm.donViMua ?? vt.donVi ?? "")}</span>
-              )}
-              {(dm.haoHui ?? 0) > 0 && (
-                <span className="text-[9px] text-amber-600 font-medium mt-0.5">+{dm.haoHui}%</span>
-              )}
             </div>
           );
         })}
