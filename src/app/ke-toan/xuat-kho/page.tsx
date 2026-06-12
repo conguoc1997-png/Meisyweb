@@ -86,6 +86,9 @@ export default function XuatKhoPage() {
   const [addingRow, setAddingRow] = useState(false);
   const [addVTSearch, setAddVTSearch] = useState("");
   const [addRow, setAddRow]     = useState<Partial<XuatRow>>({ type: "phu_lieu", soLuong: 0, donGia: 0, ghiChu: "" });
+  // Cảnh báo thiếu nguyên liệu
+  type ThieuRow = { ten: string; canXuat: number; tonKho: number; donVi: string };
+  const [thieuModal, setThieuModal] = useState<ThieuRow[] | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -203,9 +206,10 @@ export default function XuatKhoPage() {
     setAddingRow(false);
   }
 
-  async function handleCreate() {
+  async function doCreate() {
     const validRows = rows.filter(r => r.vatTuId && r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0);
     if (!form.soPhieu || !form.ngay || validRows.length === 0) return;
+    setThieuModal(null);
     setSaving(true);
     const res = await fetch("/api/ke-toan/xuat-kho", {
       method: "POST",
@@ -222,6 +226,27 @@ export default function XuatKhoPage() {
       resetForm();
       fetchAll();
     }
+  }
+
+  async function handleCreate() {
+    const validRows = rows.filter(r => r.vatTuId && r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0);
+    if (!form.soPhieu || !form.ngay || validRows.length === 0) return;
+    // Lấy tồn kho mới nhất để kiểm tra
+    const tonKhos: { vatTuId: string; soLuong: number; soLuongQD: number; donViQuyDoi: string; quyDoi: number }[] =
+      await fetch("/api/ke-toan/ton-kho").then(r => r.json()).catch(() => []);
+    const tkMap = new Map(tonKhos.map(t => [t.vatTuId, t]));
+    const thieu: ThieuRow[] = [];
+    for (const r of validRows) {
+      if (!r.vatTuId) continue;
+      const tk = tkMap.get(r.vatTuId);
+      const tonQD = tk?.soLuongQD ?? 0; // tồn kho theo đvCơBản
+      if (r.soLuong > tonQD + 0.001) {
+        const vt = vatTus.find(v => v.id === r.vatTuId);
+        thieu.push({ ten: vt?.ten ?? r.vatTuId, canXuat: r.soLuong, tonKho: tonQD, donVi: tk?.donViQuyDoi ?? vt?.donVi ?? "" });
+      }
+    }
+    if (thieu.length > 0) { setThieuModal(thieu); return; }
+    doCreate();
   }
 
   function resetForm() {
@@ -809,6 +834,43 @@ export default function XuatKhoPage() {
                 <span className="text-slate-700">Tổng giá trị NPL xuất</span>
                 <span className="text-indigo-700">{fmt(selected.chiTiet.reduce((s, c) => s + c.thanhTien, 0))}₫</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal cảnh báo thiếu nguyên liệu ── */}
+      {thieuModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-red-100 bg-red-50 rounded-t-2xl">
+              <AlertCircle size={20} className="text-red-500 shrink-0" />
+              <div>
+                <p className="font-bold text-red-700">Không đủ nguyên liệu</p>
+                <p className="text-xs text-red-500 mt-0.5">Tồn kho không đủ cho {thieuModal.length} vật tư dưới đây</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-2 max-h-72 overflow-y-auto">
+              {thieuModal.map((t, i) => (
+                <div key={i} className="flex items-center justify-between bg-red-50 rounded-xl px-4 py-2.5">
+                  <span className="font-medium text-slate-800 text-sm">{t.ten}</span>
+                  <div className="text-right text-xs">
+                    <p className="text-red-600 font-semibold">Cần: {fmt(t.canXuat)} {t.donVi}</p>
+                    <p className="text-slate-400">Tồn: {fmt(t.tonKho)} {t.donVi}</p>
+                    <p className="text-orange-500 font-medium">Thiếu: {fmt(t.canXuat - t.tonKho)} {t.donVi}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 px-5 py-4 border-t border-slate-100">
+              <button onClick={() => setThieuModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+                Hủy
+              </button>
+              <button onClick={doCreate}
+                className="px-5 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+                Xác nhận thiếu & Xuất kho
+              </button>
             </div>
           </div>
         </div>
