@@ -428,7 +428,7 @@ export default function DinhMucPage() {
     }
   }
 
-  const editCol = editCell ? COLUMNS.find(c => c.key === editCell.colKey) : null;
+  const editCol = editCell ? allColumns.find(c => c.key === editCell.colKey) : null;
 
   /* ── Cell render helper ─────────────────────────────────────────────────── */
   function CellContent({ hangCat, col }: { hangCat: string; col: ColDef }) {
