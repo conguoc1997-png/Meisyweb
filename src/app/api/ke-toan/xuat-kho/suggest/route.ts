@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const soSanPham = parseFloat(soSPQS) || 0;
     const CHUNG_KEY = "__CHUNG__";
 
-    const [dinhMucsProduct, dinhMucsChung] = await Promise.all([
+    const [dinhMucsProduct, dinhMucsChung, quyDoiRows] = await Promise.all([
       prisma.dinhMucNPL.findMany({
         where: { hangCat: hangCatQS },
         include: { vatTu: { include: { tonKho: true } } },
@@ -32,7 +32,13 @@ export async function GET(req: NextRequest) {
         where: { hangCat: CHUNG_KEY },
         include: { vatTu: { include: { tonKho: true } } },
       }),
+      prisma.chiTietNhapKho.findMany({
+        select: { vatTuId: true, quyDoi: true },
+        orderBy: { phieu: { ngay: "desc" } },
+        distinct: ["vatTuId"],
+      }),
     ]);
+    const quyDoiMap = new Map(quyDoiRows.map(r => [r.vatTuId, r.quyDoi ?? 1]));
 
     // Merge: product-specific takes priority; CHUNG fills gaps (phu_lieu only, not vai)
     const productVatTuIds = new Set(dinhMucsProduct.map(d => d.vatTuId));
@@ -46,15 +52,17 @@ export async function GET(req: NextRequest) {
       const heSoHao = 1 + haoHui / 100;
       const dmDonVi = (dm as { donViMua?: string }).donViMua ?? dm.vatTu.donVi;
       const haoNote = haoHui > 0 ? ` +${haoHui}% hao` : "";
-      // Luôn lưu soLuong theo đơn vị cơ bản (donVi) để recalcVatTuIds tính đúng:
-      // tồn(đvMua) = soLuongNhap(đvMua) - soLuongXuatBase(đvCơBản) / quyDoi
       const soLuongBase = Math.round(dm.soLuong * soSanPham * heSoHao * 10000) / 10000;
+      // giaTrungBinh lưu theo đvMua (kg), soLuong theo đvCơBản (m) → chia quyDoi
+      const quyDoi = quyDoiMap.get(dm.vatTuId) ?? 1;
+      const giaMua = dm.vatTu.tonKho?.giaTrungBinh ?? 0;
+      const donGia = quyDoi > 1 ? Math.round(giaMua / quyDoi * 100) / 100 : giaMua;
       return {
         type: dm.vatTu.loai === "vai" ? "vai" : "phu_lieu",
         vatTuId: dm.vatTu.id,
         vatTu: dm.vatTu,
         soLuong: soLuongBase,
-        donGia: dm.vatTu.tonKho?.giaTrungBinh ?? 0,
+        donGia,
         ghiChu: `Định mức ${dm.soLuong}${dmDonVi}/sp × ${soSanPham}sp${haoNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
         source: "dinh_muc",
       };
@@ -72,11 +80,17 @@ export async function GET(req: NextRequest) {
   if (!loCatId) return NextResponse.json({ error: "Missing loCatId or (hangCat + soSanPham)" }, { status: 400 });
 
   const CHUNG_KEY = "__CHUNG__";
-  const [lo, allDinhMucs, vatTus] = await Promise.all([
+  const [lo, allDinhMucs, vatTus, quyDoiRows2] = await Promise.all([
     prisma.loCat.findUnique({ where: { id: loCatId } }),
     prisma.dinhMucNPL.findMany({ include: { vatTu: { include: { tonKho: true } } } }),
     prisma.vatTu.findMany({ include: { tonKho: true } }),
+    prisma.chiTietNhapKho.findMany({
+      select: { vatTuId: true, quyDoi: true },
+      orderBy: { phieu: { ngay: "desc" } },
+      distinct: ["vatTuId"],
+    }),
   ]);
+  const quyDoiMap2 = new Map(quyDoiRows2.map(r => [r.vatTuId, r.quyDoi ?? 1]));
 
   if (!lo) return NextResponse.json({ error: "Không tìm thấy lô" }, { status: 404 });
 
@@ -129,14 +143,16 @@ export async function GET(req: NextRequest) {
       const heSoHao = 1 + haoHui / 100;
       const dmDonVi = (dm as { donViMua?: string }).donViMua ?? dm.vatTu.donVi;
       const haoNote = haoHui > 0 ? ` +${haoHui}% hao` : "";
-      // Lưu soLuong theo đơn vị cơ bản để recalcVatTuIds tính đúng tồn kho
       const soLuongBase = Math.round(dm.soLuong * soSanPham * heSoHao * 10000) / 10000;
+      const quyDoi2 = quyDoiMap2.get(dm.vatTuId) ?? 1;
+      const giaMua2 = dm.vatTu.tonKho?.giaTrungBinh ?? 0;
+      const donGia2 = quyDoi2 > 1 ? Math.round(giaMua2 / quyDoi2 * 100) / 100 : giaMua2;
       rows.push({
         type: "phu_lieu",
         vatTuId: dm.vatTu.id,
         vatTu: dm.vatTu,
         soLuong: soLuongBase,
-        donGia: dm.vatTu.tonKho?.giaTrungBinh ?? 0,
+        donGia: donGia2,
         ghiChu: `Định mức ${dm.soLuong}${dmDonVi}/sp × ${soSanPham}sp${haoNote}${dm.hangCat === CHUNG_KEY ? " (chung)" : ""}`,
         source: "dinh_muc",
       });
