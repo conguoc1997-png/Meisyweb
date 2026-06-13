@@ -682,6 +682,10 @@ export default function KocPage() {
   const tongDoanhThu = bookings.reduce((s, b) => s + b.doanhThu, 0);
   const tongDonHang  = bookings.reduce((s, b) => s + b.donHang, 0);
   const roiTB = tongChiPhi > 0 ? ((tongDoanhThu - tongChiPhi) / tongChiPhi * 100).toFixed(1) : "0";
+  const thangListAll = Array.from(new Set(bookings.map(b => {
+    const d = new Date(b.ngayBat);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  }))).sort().reverse();
 
   return (
     <div className="p-6">
@@ -895,13 +899,7 @@ export default function KocPage() {
 
       {/* Bookings — grouped by product */}
       {tab === "bookings" && (() => {
-        // Tạo danh sách tháng có booking
-        const thangSet = new Set<string>();
-        bookings.forEach(b => {
-          const d = new Date(b.ngayBat);
-          thangSet.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-        });
-        const thangList = Array.from(thangSet).sort().reverse();
+        const thangList = thangListAll;
 
         // Lọc bookings
         const filteredBookings = bookings.filter(b => {
@@ -1524,7 +1522,7 @@ export default function KocPage() {
               <select value={kocViewThang} onChange={e => setKocViewThang(e.target.value)}
                 className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
                 <option value="">Tất cả</option>
-                {thangList.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
+                {thangListAll.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
               </select>
             </div>
             <button onClick={() => { setContactSheetUrl(""); setContactError(""); setContactPreview([]); setContactDone(false); setModalContacts(true); }}
