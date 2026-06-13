@@ -976,9 +976,17 @@ export default function KocPage() {
               const totalCP    = group.items.reduce((s, b) => s + b.chiPhi, 0);
               const totalCast  = group.items.reduce((s, b) => s + b.chiPhiCast, 0);
               const totalSP    = group.items.reduce((s, b) => s + b.chiPhiSP, 0);
-              const totalDT    = group.items.reduce((s, b) => s + b.doanhThu, 0);
+              const totalDTdb  = group.items.reduce((s, b) => s + b.doanhThu, 0);
               const totalDon   = group.items.reduce((s, b) => s + b.donHang, 0);
               const totalView  = group.items.reduce((s, b) => s + b.luotXem, 0);
+              // Nếu có báo cáo Excel → ưu tiên dùng tổng GMV từ báo cáo
+              const groupReport = reportDataMap[group.key] ?? [];
+              const totalDT    = groupReport.length > 0
+                ? groupReport.reduce((s, r) => s + r.gmv, 0)
+                : totalDTdb;
+              const headerDon  = groupReport.length > 0
+                ? groupReport.reduce((s, r) => s + r.donHang, 0)
+                : totalDon;
               const roi        = totalCP > 0 ? ((totalDT - totalCP) / totalCP * 100).toFixed(1) : "—";
               const roiNum     = totalCP > 0 ? (totalDT - totalCP) / totalCP * 100 : 0;
               const isOpen     = expandedSP === group.key;
@@ -1028,12 +1036,12 @@ export default function KocPage() {
                         <p className="font-semibold text-slate-700">{formatCurrency(totalCP)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-400">Doanh thu</p>
+                        <p className="text-xs text-slate-400">Doanh thu{groupReport.length > 0 ? " (GMV)" : ""}</p>
                         <p className="font-semibold text-green-600">{formatCurrency(totalDT)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-slate-400">Đơn hàng</p>
-                        <p className="font-semibold text-slate-700">{totalDon.toLocaleString()}</p>
+                        <p className="font-semibold text-slate-700">{headerDon.toLocaleString()}</p>
                       </div>
                       <div className="text-right min-w-[60px]">
                         <p className="text-xs text-slate-400">ROI</p>
