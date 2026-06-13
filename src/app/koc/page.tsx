@@ -83,7 +83,7 @@ export default function KocPage() {
   const [contactDone, setContactDone] = useState(false);
 
   // ── Import báo cáo hiệu quả KOC (TikTok/platform report) ──
-  type ReportRow = { creatorName: string; gmv: number; donHang: number; hoantien: number; aov: number };
+  type ReportRow = { creatorName: string; gmv: number; donHang: number; hoantien: number; aov: number; hoaHong: number };
   const [reportDataMap, setReportDataMap] = useState<Record<string, ReportRow[]>>({});
 
   function importReportFile(groupKey: string, file: File) {
@@ -93,18 +93,38 @@ export default function KocPage() {
       const wb = XLSX.read(data, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
-      let headerIdx = rows.findIndex(row =>
+      const headerIdx = rows.findIndex(row =>
         (row as unknown[]).some(cell => String(cell ?? "").toLowerCase().includes("creator"))
       );
       if (headerIdx === -1) { alert("Không tìm thấy cột 'Creator name'"); return; }
       const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? "").toLowerCase());
       const col = (kw: string) => headers.findIndex(h => h.includes(kw));
-      const cCreator  = col("creator");
-      const cGMV      = headers.findIndex(h => h.includes("gmv") || h.includes("nhờ nhà") || h.includes("nho nha"));
-      const cDonHang  = col("đơn hàng") !== -1 ? col("đơn hàng") : col("don hang");
-      const cHoan     = col("hoàn tiền") !== -1 ? col("hoàn tiền") : col("hoan tien");
-      const cAOV      = headers.findIndex(h => h === "aov");
-      const toNum = (v: unknown) => typeof v === "number" ? v : parseFloat(String(v ?? "").replace(/[^\d.]/g, "")) || 0;
+      const cCreator = col("creator");
+      const cGMV     = headers.findIndex(h => h.includes("gmv") || h.includes("nhờ nhà") || h.includes("nho nha"));
+      const cHoan    = headers.findIndex(h => h.includes("hoàn tiền") || h.includes("hoan tien"));
+      const cDonHang = headers.findIndex(h => h.includes("đơn hàng") || h.includes("don hang"));
+      const cAOV     = headers.findIndex(h => h.trim().toLowerCase() === "aov");
+      const cHoaHong = headers.findIndex(h => h.includes("hoa hồng") || h.includes("hoa hong") || h.includes("commission"));
+      // Số VN dùng dấu chấm nghìn, dấu phẩy thập phân → phải xử lý riêng
+      const toNum = (v: unknown): number => {
+        if (typeof v === "number") return v;
+        // Bỏ ký tự không phải số, dấu phẩy, dấu chấm; rồi xử lý format VN
+        let s = String(v ?? "").replace(/[^\d.,]/g, "").trim();
+        if (!s) return 0;
+        // Nếu có cả chấm và phẩy: chấm là nghìn, phẩy là thập phân (VN format)
+        if (s.includes(".") && s.includes(",")) {
+          s = s.replace(/\./g, "").replace(",", ".");
+        } else if (s.includes(".")) {
+          // Chỉ có chấm: nếu có nhiều chấm thì là nghìn, 1 chấm + ≤2 số sau = thập phân
+          const parts = s.split(".");
+          if (parts.length > 2 || (parts.length === 2 && parts[1].length > 2)) {
+            s = s.replace(/\./g, ""); // nghìn phân cách
+          }
+        } else if (s.includes(",")) {
+          s = s.replace(",", ".");
+        }
+        return parseFloat(s) || 0;
+      };
       const parsed: ReportRow[] = [];
       for (let i = headerIdx + 1; i < rows.length; i++) {
         const r = rows[i] as unknown[];
@@ -112,9 +132,10 @@ export default function KocPage() {
         parsed.push({
           creatorName: String(r[cCreator] ?? "").trim(),
           gmv:      cGMV >= 0     ? toNum(r[cGMV])     : 0,
-          donHang:  cDonHang >= 0 ? toNum(r[cDonHang]) : 0,
           hoantien: cHoan >= 0    ? toNum(r[cHoan])     : 0,
+          donHang:  cDonHang >= 0 ? toNum(r[cDonHang])  : 0,
           aov:      cAOV >= 0     ? toNum(r[cAOV])      : 0,
+          hoaHong:  cHoaHong >= 0 ? toNum(r[cHoaHong])  : 0,
         });
       }
       setReportDataMap(prev => ({ ...prev, [groupKey]: parsed }));
@@ -1369,13 +1390,16 @@ export default function KocPage() {
                                 <th className="text-left px-3 py-2 text-slate-500">#</th>
                                 <th className="text-left px-3 py-2 text-slate-500">KOC</th>
                                 <th className="text-right px-3 py-2 text-slate-500">GMV</th>
+                                <th className="text-right px-3 py-2 text-slate-500">Hoàn tiền</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Đơn hàng</th>
+                                <th className="text-right px-3 py-2 text-slate-500">Hoa hồng</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Giá booking</th>
                                 <th className="text-right px-3 py-2 text-slate-500 font-semibold">ROI</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {sorted.map((r, i) => {
+                                const rpt = reportRows.find(x => x.creatorName.toLowerCase() === r.kocName.toLowerCase());
                                 const rRoi = r.chiPhiCast > 0 ? ((r.gmv - r.chiPhiCast) / r.chiPhiCast * 100).toFixed(1) : "—";
                                 const rRoiNum = r.chiPhiCast > 0 ? (r.gmv - r.chiPhiCast) / r.chiPhiCast * 100 : 0;
                                 return (
@@ -1386,7 +1410,9 @@ export default function KocPage() {
                                       {reportRows.length > 0 && !r.matched && <span className="ml-1 text-[10px] text-amber-500">(chưa match)</span>}
                                     </td>
                                     <td className="px-3 py-2 text-right text-green-700 font-semibold">{r.gmv > 0 ? formatCurrency(r.gmv) : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-red-500">{rpt?.hoantien ? formatCurrency(rpt.hoantien) : "—"}</td>
                                     <td className="px-3 py-2 text-right text-slate-600">{r.donHang > 0 ? r.donHang : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-amber-600">{rpt?.hoaHong ? formatCurrency(rpt.hoaHong) : "—"}</td>
                                     <td className="px-3 py-2 text-right text-slate-600">{r.chiPhiCast > 0 ? formatCurrency(r.chiPhiCast) : "—"}</td>
                                     <td className={`px-3 py-2 text-right font-bold ${rRoi === "—" ? "text-slate-400" : rRoiNum >= 0 ? "text-green-600" : "text-red-600"}`}>
                                       {rRoi}{rRoi !== "—" ? "%" : ""}
