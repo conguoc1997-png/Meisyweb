@@ -88,7 +88,7 @@ export default function KocPage() {
 
   function importReportFile(groupKey: string, file: File) {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const data = new Uint8Array(e.target!.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -105,21 +105,15 @@ export default function KocPage() {
       const cDonHang = headers.findIndex(h => h.includes("đơn hàng") || h.includes("don hang"));
       const cAOV     = headers.findIndex(h => h.trim().toLowerCase() === "aov");
       const cHoaHong = headers.findIndex(h => h.includes("hoa hồng") || h.includes("hoa hong") || h.includes("commission"));
-      // Số VN dùng dấu chấm nghìn, dấu phẩy thập phân → phải xử lý riêng
       const toNum = (v: unknown): number => {
         if (typeof v === "number") return v;
-        // Bỏ ký tự không phải số, dấu phẩy, dấu chấm; rồi xử lý format VN
         let s = String(v ?? "").replace(/[^\d.,]/g, "").trim();
         if (!s) return 0;
-        // Nếu có cả chấm và phẩy: chấm là nghìn, phẩy là thập phân (VN format)
         if (s.includes(".") && s.includes(",")) {
           s = s.replace(/\./g, "").replace(",", ".");
         } else if (s.includes(".")) {
-          // Chỉ có chấm: nếu có nhiều chấm thì là nghìn, 1 chấm + ≤2 số sau = thập phân
           const parts = s.split(".");
-          if (parts.length > 2 || (parts.length === 2 && parts[1].length > 2)) {
-            s = s.replace(/\./g, ""); // nghìn phân cách
-          }
+          if (parts.length > 2 || (parts.length === 2 && parts[1].length > 2)) s = s.replace(/\./g, "");
         } else if (s.includes(",")) {
           s = s.replace(",", ".");
         }
@@ -139,6 +133,28 @@ export default function KocPage() {
         });
       }
       setReportDataMap(prev => ({ ...prev, [groupKey]: parsed }));
+
+      // ── Tự động tạo KOC mới cho creator chưa có trong DB ──
+      const existingNames = new Set(kocs.map(k => k.ten.toLowerCase()));
+      const newCreators = parsed.filter(r => !existingNames.has(r.creatorName.toLowerCase()));
+      if (newCreators.length === 0) {
+        alert(`✅ Import xong! ${parsed.length} creator — tất cả đã có trong danh sách KOC.`);
+        return;
+      }
+      // Tạo từng KOC mới
+      let added = 0;
+      for (const creator of newCreators) {
+        const res = await fetch("/api/koc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: creator.creatorName, platform: "tiktok", follower: 0, giaCast: 0 }),
+        });
+        if (res.ok) added++;
+      }
+      // Refresh danh sách KOC
+      const refreshed = await fetch("/api/koc").then(r => r.json());
+      if (Array.isArray(refreshed)) setKocs(refreshed);
+      alert(`✅ Import xong!\n• ${parsed.length - newCreators.length} KOC đã có → bỏ qua\n• ${added} KOC mới đã thêm`);
     };
     reader.readAsArrayBuffer(file);
   }
