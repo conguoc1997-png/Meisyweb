@@ -1300,6 +1300,10 @@ export default function KocPage() {
                           });
                         }
                         const sorted = [...mergedRows].sort((a, b) => b.gmv - a.gmv);
+                        const exTotalGMV = sorted.reduce((s, r) => s + r.gmv, 0);
+                        const exTotalChi = sorted.reduce((s, r) => s + r.chiPhiCast, 0);
+                        const exRoiNum   = exTotalChi > 0 ? (exTotalGMV - exTotalChi) / exTotalChi * 100 : 0;
+                        const exRoi      = exTotalChi > 0 ? exRoiNum.toFixed(1) : "—";
                         const maxGMV = Math.max(...sorted.map(r => r.gmv), 1);
                         const maxChi = Math.max(...sorted.map(r => r.chiPhiCast), 1);
                         const maxY = Math.max(maxGMV, maxChi);
@@ -1325,9 +1329,9 @@ export default function KocPage() {
                               <p className="text-xs text-slate-500 mb-1">Tổng GMV</p>
                               <p className="text-lg font-bold text-green-600">{formatCurrency(sorted.reduce((s,r)=>s+r.gmv,0))}</p>
                             </div>
-                            <div className={`rounded-xl p-4 border ${roiNum >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                            <div className={`rounded-xl p-4 border ${exRoiNum >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                               <p className="text-xs text-slate-500 mb-1">ROI tổng</p>
-                              <p className={`text-lg font-bold ${roiNum >= 0 ? "text-green-600" : "text-red-600"}`}>{roi}{roi !== "—" ? "%" : ""}</p>
+                              <p className={`text-lg font-bold ${exRoiNum >= 0 ? "text-green-600" : "text-red-600"}`}>{exRoi}{exRoi !== "—" ? "%" : ""}</p>
                             </div>
                           </div>
 
