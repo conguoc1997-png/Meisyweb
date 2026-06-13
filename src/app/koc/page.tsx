@@ -82,6 +82,8 @@ export default function KocPage() {
   const [contactConfirming, setContactConfirming] = useState(false);
   const [contactDone, setContactDone] = useState(false);
 
+  const [kocViewThang, setKocViewThang] = useState("");
+
   // ── Import báo cáo hiệu quả KOC (TikTok/platform report) ──
   type ReportRow = { creatorName: string; gmv: number; donHang: number; hoantien: number; aov: number; hoaHong: number };
   const [reportDataMap, setReportDataMap] = useState<Record<string, ReportRow[]>>({});
@@ -1465,73 +1467,187 @@ export default function KocPage() {
       })()}
 
       {/* KOC Table */}
-      {tab === "kocs" && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {/* Search bar + action */}
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3">
-            <div className="relative max-w-sm flex-1">
+      {tab === "kocs" && (() => {
+        // ── Tổng hợp GMV từ tất cả campaigns đã import ──
+        const kocGMVMap = new Map<string, number>();
+        const kocDonMap = new Map<string, number>();
+        for (const rows of Object.values(reportDataMap)) {
+          for (const r of rows) {
+            const key = r.creatorName.toLowerCase();
+            kocGMVMap.set(key, (kocGMVMap.get(key) ?? 0) + r.gmv);
+            kocDonMap.set(key, (kocDonMap.get(key) ?? 0) + r.donHang);
+          }
+        }
+        // Chi phí cast từ bookings (lọc theo tháng nếu chọn)
+        const kocChiMap = new Map<string, number>();
+        for (const b of bookings) {
+          if (kocViewThang && b.ngayBat?.slice(0, 7) !== kocViewThang) continue;
+          kocChiMap.set(b.kocId, (kocChiMap.get(b.kocId) ?? 0) + b.chiPhiCast);
+        }
+        // Merge: KOC có GMV hoặc đã booking
+        const kocStats = kocs.map(k => {
+          const gmv = kocGMVMap.get(k.ten.toLowerCase()) ?? 0;
+          const chi = kocChiMap.get(k.id) ?? 0;
+          const roi = chi > 0 ? (gmv - chi) / chi * 100 : null;
+          const donHang = kocDonMap.get(k.ten.toLowerCase()) ?? 0;
+          const bookingCount = bookings.filter(b => b.kocId === k.id &&
+            (!kocViewThang || b.ngayBat?.slice(0, 7) === kocViewThang)).length;
+          return { koc: k, gmv, chi, roi, donHang, bookingCount };
+        }).sort((a, b) => b.gmv - a.gmv);
+
+        const hasReport = Object.keys(reportDataMap).length > 0;
+        const top20 = kocStats.filter(r => r.gmv > 0).slice(0, 20);
+        const maxGMV = Math.max(...top20.map(r => r.gmv), 1);
+        const chartH = 180;
+        const barW = 22;
+        const barGap = 8;
+        const chartPadL = 75;
+        const chartW = Math.max(700, top20.length * (barW + barGap) + chartPadL + 20);
+        const lowROI = kocStats.filter(r => r.bookingCount > 0 && r.roi !== null && r.roi < 10);
+
+        const searchFiltered = kocStats.filter(k =>
+          !searchKOC || k.koc.ten.toLowerCase().includes(searchKOC.toLowerCase())
+        );
+
+        return (
+        <div className="space-y-4">
+          {/* Toolbar */}
+          <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
+            <div className="relative max-w-xs flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchKOC}
-                onChange={e => setSearchKOC(e.target.value)}
+              <input value={searchKOC} onChange={e => setSearchKOC(e.target.value)}
                 placeholder="Tìm tên KOC..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200"
-              />
-              {searchKOC && (
-                <button onClick={() => setSearchKOC("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
-              )}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200" />
             </div>
-            <button
-              onClick={() => { setContactSheetUrl(""); setContactError(""); setContactPreview([]); setContactDone(false); setModalContacts(true); }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition whitespace-nowrap"
-            >
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 whitespace-nowrap">Tháng:</label>
+              <select value={kocViewThang} onChange={e => setKocViewThang(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
+                <option value="">Tất cả</option>
+                {thangList.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
+              </select>
+            </div>
+            <button onClick={() => { setContactSheetUrl(""); setContactError(""); setContactPreview([]); setContactDone(false); setModalContacts(true); }}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition whitespace-nowrap ml-auto">
               <FileSpreadsheet size={15} /> Cập nhật SĐT/ĐCHI từ Sheet
             </button>
           </div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-slate-600 font-medium">Tên KOC</th>
-                <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá cast</th>
-                <th className="text-right px-4 py-3 text-slate-600 font-medium">Booking</th>
-                <th className="text-left px-4 py-3 text-slate-600 font-medium">SĐT</th>
-                <th className="text-left px-4 py-3 text-slate-600 font-medium">Địa chỉ</th>
-                <th className="text-left px-4 py-3 text-slate-600 font-medium">Link</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {(() => {
-                const filtered = kocs.filter(k => !searchKOC || k.ten.toLowerCase().includes(searchKOC.toLowerCase()));
-                if (filtered.length === 0) return (
-                  <tr><td colSpan={6} className="text-center py-10 text-slate-400">
+
+          {/* Cảnh báo ROI thấp */}
+          {lowROI.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-amber-700 mb-2">⚠️ {lowROI.length} KOC đã booking nhưng ROI &lt; 10%</p>
+              <div className="flex flex-wrap gap-2">
+                {lowROI.map(r => (
+                  <span key={r.koc.id} className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-lg">
+                    {r.koc.ten} · ROI {r.roi!.toFixed(1)}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Biểu đồ GMV top KOC */}
+          {hasReport && top20.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <p className="text-xs font-semibold text-slate-600 mb-3">📊 Top {top20.length} KOC theo doanh thu (GMV)</p>
+              <div className="overflow-x-auto">
+                <svg width={chartW} height={chartH + 55} className="block">
+                  {[0,25,50,75,100].map(pct => {
+                    const y = 10 + (chartH - 10) * (1 - pct / 100);
+                    const label = pct === 0 ? "0" : (maxGMV * pct / 100 >= 1e6
+                      ? (maxGMV * pct / 100 / 1e6).toFixed(0) + "tr"
+                      : Math.round(maxGMV * pct / 100).toLocaleString("vi-VN"));
+                    return (
+                      <g key={pct}>
+                        <line x1={chartPadL} x2={chartW - 10} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={1} />
+                        <text x={chartPadL - 4} y={y + 4} fontSize={9} fill="#94a3b8" textAnchor="end">{label}</text>
+                      </g>
+                    );
+                  })}
+                  {top20.map((r, i) => {
+                    const x = chartPadL + i * (barW + barGap);
+                    const h = Math.max(2, (r.gmv / maxGMV) * (chartH - 10));
+                    const barY = chartH + 10 - h;
+                    const roiOk = r.roi === null || r.roi >= 10;
+                    return (
+                      <g key={r.koc.id}>
+                        <rect x={x} y={barY} width={barW} height={h}
+                          fill={roiOk ? "#22c55e" : "#f59e0b"} rx={3} opacity={0.85}>
+                          <title>{r.koc.ten}{"\n"}GMV: {formatCurrency(r.gmv)}{r.roi !== null ? `\nROI: ${r.roi.toFixed(1)}%` : ""}</title>
+                        </rect>
+                        {!roiOk && <text x={x + barW/2} y={barY - 3} fontSize={8} fill="#d97706" textAnchor="middle">⚠</text>}
+                        <text x={x + barW/2} y={chartH + 22} fontSize={8} fill="#64748b" textAnchor="middle"
+                          transform={`rotate(-40,${x + barW/2},${chartH + 22})`}>
+                          {r.koc.ten.length > 12 ? r.koc.ten.slice(0,11)+"…" : r.koc.ten}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  <line x1={chartPadL} x2={chartW-10} y1={chartH+10} y2={chartH+10} stroke="#e2e8f0" strokeWidth={1}/>
+                </svg>
+              </div>
+              <div className="flex gap-4 mt-1 px-1">
+                <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-500 inline-block"/><span className="text-xs text-slate-500">ROI ≥ 10%</span></div>
+                <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-400 inline-block"/><span className="text-xs text-slate-500">ROI &lt; 10% (cảnh báo)</span></div>
+              </div>
+            </div>
+          )}
+
+          {/* Bảng KOC */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-slate-600 font-medium">Tên KOC</th>
+                  {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">GMV</th>}
+                  {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">Đơn hàng</th>}
+                  <th className="text-right px-4 py-3 text-slate-600 font-medium">Chi phí cast</th>
+                  {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">ROI</th>}
+                  <th className="text-right px-4 py-3 text-slate-600 font-medium">Booking</th>
+                  <th className="text-left px-4 py-3 text-slate-600 font-medium">SĐT</th>
+                  <th className="text-left px-4 py-3 text-slate-600 font-medium">Link</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {searchFiltered.length === 0 ? (
+                  <tr><td colSpan={9} className="text-center py-10 text-slate-400">
                     {searchKOC ? `Không tìm thấy KOC nào với "${searchKOC}"` : "Chưa có KOC nào"}
                   </td></tr>
-                );
-                return filtered.map((k) => {
-                const kocBookings = bookings.filter((b) => b.kocId === k.id);
-                return (
-                  <tr key={k.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">{k.ten}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
-                    <td className="px-4 py-3 text-right font-medium text-rose-600">{kocBookings.length}</td>
-                    <td className="px-4 py-3 text-slate-500 text-sm">{k.sdt || "—"}</td>
-                    <td className="px-4 py-3 text-slate-500 text-sm max-w-[180px]">
-                      <span className="truncate block" title={k.diaChi || ""}>{k.diaChi || "—"}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs truncate block max-w-32">Xem profile</a> : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => openEditKOC(k)} className="text-xs text-rose-500 hover:underline">Sửa</button>
-                    </td>
-                  </tr>
-                );
-              })})()}
-            </tbody>
-          </table>
+                ) : searchFiltered.map(({ koc: k, gmv, chi, roi, donHang, bookingCount }) => {
+                  const warn = bookingCount > 0 && roi !== null && roi < 10;
+                  return (
+                    <tr key={k.id} className={`hover:bg-slate-50 ${warn ? "bg-amber-50/40" : ""}`}>
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {k.ten}
+                        {warn && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">ROI thấp</span>}
+                      </td>
+                      {hasReport && <td className="px-4 py-3 text-right font-semibold text-green-700">{gmv > 0 ? formatCurrency(gmv) : "—"}</td>}
+                      {hasReport && <td className="px-4 py-3 text-right text-slate-600">{donHang > 0 ? donHang : "—"}</td>}
+                      <td className="px-4 py-3 text-right text-slate-600">{chi > 0 ? formatCurrency(chi) : "—"}</td>
+                      {hasReport && (
+                        <td className={`px-4 py-3 text-right font-bold ${roi === null ? "text-slate-400" : roi < 10 ? "text-amber-600" : "text-green-600"}`}>
+                          {roi !== null ? roi.toFixed(1) + "%" : "—"}
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-right font-medium text-rose-600">{bookingCount}</td>
+                      <td className="px-4 py-3 text-slate-500 text-sm">{k.sdt || "—"}</td>
+                      <td className="px-4 py-3">
+                        {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">Profile</a> : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => openEditKOC(k)} className="text-xs text-rose-500 hover:underline">Sửa</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Modal Chọn Sản phẩm để Booking */}
       {modalPickSP && (
