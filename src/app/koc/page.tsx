@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, Upload, CheckCircle, XCircle, Search, Sparkles, ChevronDown, ChevronUp, Link2, Loader2, FileSpreadsheet, Pencil, Trash2, Download, Bell, Circle, CalendarDays, Send, PackageCheck } from "lucide-react";
+import * as XLSX from "xlsx";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
@@ -80,6 +81,46 @@ export default function KocPage() {
   const [contactPreview, setContactPreview] = useState<ContactRow[]>([]);
   const [contactConfirming, setContactConfirming] = useState(false);
   const [contactDone, setContactDone] = useState(false);
+
+  // ── Import báo cáo hiệu quả KOC (TikTok/platform report) ──
+  type ReportRow = { creatorName: string; gmv: number; donHang: number; hoantien: number; aov: number };
+  const [reportDataMap, setReportDataMap] = useState<Record<string, ReportRow[]>>({});
+
+  function importReportFile(groupKey: string, file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target!.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
+      let headerIdx = rows.findIndex(row =>
+        (row as unknown[]).some(cell => String(cell ?? "").toLowerCase().includes("creator"))
+      );
+      if (headerIdx === -1) { alert("Không tìm thấy cột 'Creator name'"); return; }
+      const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? "").toLowerCase());
+      const col = (kw: string) => headers.findIndex(h => h.includes(kw));
+      const cCreator  = col("creator");
+      const cGMV      = headers.findIndex(h => h.includes("gmv") || h.includes("nhờ nhà") || h.includes("nho nha"));
+      const cDonHang  = col("đơn hàng") !== -1 ? col("đơn hàng") : col("don hang");
+      const cHoan     = col("hoàn tiền") !== -1 ? col("hoàn tiền") : col("hoan tien");
+      const cAOV      = headers.findIndex(h => h === "aov");
+      const toNum = (v: unknown) => typeof v === "number" ? v : parseFloat(String(v ?? "").replace(/[^\d.]/g, "")) || 0;
+      const parsed: ReportRow[] = [];
+      for (let i = headerIdx + 1; i < rows.length; i++) {
+        const r = rows[i] as unknown[];
+        if (!r[cCreator]) continue;
+        parsed.push({
+          creatorName: String(r[cCreator] ?? "").trim(),
+          gmv:      cGMV >= 0     ? toNum(r[cGMV])     : 0,
+          donHang:  cDonHang >= 0 ? toNum(r[cDonHang]) : 0,
+          hoantien: cHoan >= 0    ? toNum(r[cHoan])     : 0,
+          aov:      cAOV >= 0     ? toNum(r[cAOV])      : 0,
+        });
+      }
+      setReportDataMap(prev => ({ ...prev, [groupKey]: parsed }));
+    };
+    reader.readAsArrayBuffer(file);
+  }
 
   // Inline edit booking fields — dùng ref để tránh re-render mỗi keystroke
   const [editingSLId, setEditingSLId] = useState<string | null>(null);
@@ -1199,50 +1240,156 @@ export default function KocPage() {
                       )}
 
                       {/* Tab: Hiệu quả */}
-                      {subTab === "hieugua" && (
-                        <div className="p-5">
-                          <div className="grid grid-cols-4 gap-4 mb-4">
+                      {subTab === "hieugua" && (() => {
+                        const reportRows = reportDataMap[group.key] ?? [];
+                        // Merge: ưu tiên GMV từ báo cáo, nếu không có thì dùng doanhThu DB
+                        type MergedRow = { kocName: string; gmv: number; chiPhi: number; chiPhiCast: number; donHang: number; matched: boolean };
+                        const mergedRows: MergedRow[] = group.items.map(b => {
+                          const rpt = reportRows.find(r => r.creatorName.toLowerCase() === b.koc.ten.toLowerCase());
+                          return {
+                            kocName: b.koc.ten,
+                            gmv: rpt ? rpt.gmv : b.doanhThu,
+                            chiPhi: b.chiPhi,
+                            chiPhiCast: b.chiPhiCast,
+                            donHang: rpt ? rpt.donHang : b.donHang,
+                            matched: !!rpt,
+                          };
+                        });
+                        // Thêm từ báo cáo chưa match
+                        if (reportRows.length > 0) {
+                          const matchedNames = new Set(group.items.map(b => b.koc.ten.toLowerCase()));
+                          reportRows.filter(r => !matchedNames.has(r.creatorName.toLowerCase())).forEach(r => {
+                            mergedRows.push({ kocName: r.creatorName, gmv: r.gmv, chiPhi: 0, chiPhiCast: 0, donHang: r.donHang, matched: false });
+                          });
+                        }
+                        const sorted = [...mergedRows].sort((a, b) => b.gmv - a.gmv);
+                        const maxGMV = Math.max(...sorted.map(r => r.gmv), 1);
+                        const maxChi = Math.max(...sorted.map(r => r.chiPhiCast), 1);
+                        const maxY = Math.max(maxGMV, maxChi);
+                        const chartH = 220;
+                        const barW = 18;
+                        const gap = 6;
+                        const groupW = barW * 2 + gap + 14;
+                        const chartW = Math.max(600, sorted.length * groupW + 60);
+
+                        return (
+                        <div className="p-5 space-y-5">
+                          {/* Stats */}
+                          <div className="grid grid-cols-4 gap-4">
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                               <p className="text-xs text-slate-500 mb-1">Tổng lượt xem</p>
                               <p className="text-lg font-bold text-slate-800">{totalView.toLocaleString()}</p>
                             </div>
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                               <p className="text-xs text-slate-500 mb-1">Tổng đơn hàng</p>
-                              <p className="text-lg font-bold text-slate-800">{totalDon.toLocaleString()}</p>
+                              <p className="text-lg font-bold text-slate-800">{sorted.reduce((s,r)=>s+r.donHang,0).toLocaleString()}</p>
                             </div>
                             <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                              <p className="text-xs text-slate-500 mb-1">Tổng doanh thu</p>
-                              <p className="text-lg font-bold text-green-600">{formatCurrency(totalDT)}</p>
+                              <p className="text-xs text-slate-500 mb-1">Tổng GMV</p>
+                              <p className="text-lg font-bold text-green-600">{formatCurrency(sorted.reduce((s,r)=>s+r.gmv,0))}</p>
                             </div>
                             <div className={`rounded-xl p-4 border ${roiNum >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                               <p className="text-xs text-slate-500 mb-1">ROI tổng</p>
                               <p className={`text-lg font-bold ${roiNum >= 0 ? "text-green-600" : "text-red-600"}`}>{roi}{roi !== "—" ? "%" : ""}</p>
                             </div>
                           </div>
+
+                          {/* Import button */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-600">📊 Biểu đồ hiệu suất</span>
+                              {reportRows.length > 0 && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{reportRows.length} KOC từ báo cáo</span>}
+                            </div>
+                            <label className="flex items-center gap-1.5 cursor-pointer bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-rose-100 transition">
+                              <Upload size={13} />
+                              {reportRows.length > 0 ? "Thay báo cáo Excel" : "Import báo cáo Excel"}
+                              <input type="file" accept=".xlsx,.xls" className="hidden"
+                                onChange={e => { if (e.target.files?.[0]) importReportFile(group.key, e.target.files[0]); e.target.value = ""; }} />
+                            </label>
+                          </div>
+
+                          {/* Bar chart */}
+                          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white pb-2">
+                            <svg width={chartW} height={chartH + 60} className="block">
+                              {/* Y grid lines */}
+                              {[0,25,50,75,100].map(pct => {
+                                const y = 10 + (chartH - 10) * (1 - pct/100);
+                                return (
+                                  <g key={pct}>
+                                    <line x1={50} x2={chartW - 10} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={1} />
+                                    <text x={46} y={y+4} fontSize={9} fill="#94a3b8" textAnchor="end">
+                                      {pct === 0 ? "0" : formatCurrency(maxY * pct / 100).replace("₫","")}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                              {/* Bars */}
+                              {sorted.map((r, i) => {
+                                const x = 54 + i * groupW;
+                                const gmvH = Math.max(2, (r.gmv / maxY) * (chartH - 10));
+                                const chiH = Math.max(2, (r.chiPhiCast / maxY) * (chartH - 10));
+                                const gmvY = chartH + 10 - gmvH;
+                                const chiY = chartH + 10 - chiH;
+                                return (
+                                  <g key={r.kocName}>
+                                    {/* GMV bar (green) */}
+                                    <rect x={x} y={gmvY} width={barW} height={gmvH} fill="#22c55e" rx={3} opacity={0.85}>
+                                      <title>GMV: {formatCurrency(r.gmv)}</title>
+                                    </rect>
+                                    {/* Chi phí bar (pink) */}
+                                    <rect x={x + barW + gap} y={chiY} width={barW} height={chiH} fill="#f43f5e" rx={3} opacity={0.75}>
+                                      <title>Chi phí booking: {formatCurrency(r.chiPhiCast)}</title>
+                                    </rect>
+                                    {/* KOC name */}
+                                    <text
+                                      x={x + barW + gap/2}
+                                      y={chartH + 20}
+                                      fontSize={8}
+                                      fill={r.matched ? "#475569" : "#94a3b8"}
+                                      textAnchor="middle"
+                                      transform={`rotate(-40, ${x + barW + gap/2}, ${chartH + 20})`}
+                                    >{r.kocName.length > 14 ? r.kocName.slice(0,13)+"…" : r.kocName}</text>
+                                  </g>
+                                );
+                              })}
+                              {/* X axis */}
+                              <line x1={50} x2={chartW-10} y1={chartH+10} y2={chartH+10} stroke="#e2e8f0" strokeWidth={1}/>
+                            </svg>
+                            {/* Legend */}
+                            <div className="flex items-center gap-4 px-4 pt-1 pb-1">
+                              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-500 inline-block"/><span className="text-xs text-slate-500">GMV (doanh thu)</span></div>
+                              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-500 inline-block"/><span className="text-xs text-slate-500">Giá booking</span></div>
+                            </div>
+                          </div>
+
+                          {/* Table */}
                           <table className="w-full text-xs">
                             <thead className="bg-slate-50">
                               <tr>
+                                <th className="text-left px-3 py-2 text-slate-500">#</th>
                                 <th className="text-left px-3 py-2 text-slate-500">KOC</th>
-                                <th className="text-right px-3 py-2 text-slate-500">Lượt xem</th>
+                                <th className="text-right px-3 py-2 text-slate-500">GMV</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Đơn hàng</th>
-                                <th className="text-right px-3 py-2 text-slate-500">Doanh thu</th>
-                                <th className="text-right px-3 py-2 text-slate-500">Chi phí</th>
+                                <th className="text-right px-3 py-2 text-slate-500">Giá booking</th>
                                 <th className="text-right px-3 py-2 text-slate-500 font-semibold">ROI</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                              {group.items.map(b => {
-                                const bRoi = b.chiPhi > 0 ? ((b.doanhThu - b.chiPhi) / b.chiPhi * 100).toFixed(1) : "—";
-                                const bRoiNum = b.chiPhi > 0 ? (b.doanhThu - b.chiPhi) / b.chiPhi * 100 : 0;
+                              {sorted.map((r, i) => {
+                                const rRoi = r.chiPhiCast > 0 ? ((r.gmv - r.chiPhiCast) / r.chiPhiCast * 100).toFixed(1) : "—";
+                                const rRoiNum = r.chiPhiCast > 0 ? (r.gmv - r.chiPhiCast) / r.chiPhiCast * 100 : 0;
                                 return (
-                                  <tr key={b.id}>
-                                    <td className="px-3 py-2 font-medium text-slate-700">{b.koc.ten}</td>
-                                    <td className="px-3 py-2 text-right text-slate-600">{b.luotXem > 0 ? b.luotXem.toLocaleString() : "—"}</td>
-                                    <td className="px-3 py-2 text-right text-slate-600">{b.donHang}</td>
-                                    <td className="px-3 py-2 text-right text-green-700">{formatCurrency(b.doanhThu)}</td>
-                                    <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(b.chiPhi)}</td>
-                                    <td className={`px-3 py-2 text-right font-bold ${bRoi === "—" ? "text-slate-400" : bRoiNum >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                      {bRoi}{bRoi !== "—" ? "%" : ""}
+                                  <tr key={r.kocName} className={!r.matched && reportRows.length > 0 ? "opacity-50" : ""}>
+                                    <td className="px-3 py-2 text-slate-400">{i+1}</td>
+                                    <td className="px-3 py-2 font-medium text-slate-700">
+                                      {r.kocName}
+                                      {reportRows.length > 0 && !r.matched && <span className="ml-1 text-[10px] text-amber-500">(chưa match)</span>}
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-green-700 font-semibold">{r.gmv > 0 ? formatCurrency(r.gmv) : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-slate-600">{r.donHang > 0 ? r.donHang : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-slate-600">{r.chiPhiCast > 0 ? formatCurrency(r.chiPhiCast) : "—"}</td>
+                                    <td className={`px-3 py-2 text-right font-bold ${rRoi === "—" ? "text-slate-400" : rRoiNum >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                      {rRoi}{rRoi !== "—" ? "%" : ""}
                                     </td>
                                   </tr>
                                 );
@@ -1250,7 +1397,8 @@ export default function KocPage() {
                             </tbody>
                           </table>
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
