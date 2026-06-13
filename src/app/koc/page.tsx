@@ -1311,7 +1311,7 @@ export default function KocPage() {
                         const barW = 18;
                         const gap = 6;
                         const groupW = barW * 2 + gap + 14;
-                        const chartW = Math.max(600, sorted.length * groupW + 60);
+                        const chartW = Math.max(600, sorted.length * groupW + 100);
 
                         return (
                         <div className="p-5 space-y-5">
@@ -1355,18 +1355,19 @@ export default function KocPage() {
                               {/* Y grid lines */}
                               {[0,25,50,75,100].map(pct => {
                                 const y = 10 + (chartH - 10) * (1 - pct/100);
+                                const label = pct === 0 ? "0" : (maxY * pct / 100 >= 1e6
+                                  ? (maxY * pct / 100 / 1e6).toFixed(1) + "tr"
+                                  : Math.round(maxY * pct / 100).toLocaleString("vi-VN"));
                                 return (
                                   <g key={pct}>
-                                    <line x1={50} x2={chartW - 10} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={1} />
-                                    <text x={46} y={y+4} fontSize={9} fill="#94a3b8" textAnchor="end">
-                                      {pct === 0 ? "0" : formatCurrency(maxY * pct / 100).replace("₫","")}
-                                    </text>
+                                    <line x1={80} x2={chartW - 10} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={1} />
+                                    <text x={76} y={y+4} fontSize={9} fill="#94a3b8" textAnchor="end">{label}</text>
                                   </g>
                                 );
                               })}
                               {/* Bars */}
                               {sorted.map((r, i) => {
-                                const x = 54 + i * groupW;
+                                const x = 84 + i * groupW;
                                 const gmvH = Math.max(2, (r.gmv / maxY) * (chartH - 10));
                                 const chiH = Math.max(2, (r.chiPhiCast / maxY) * (chartH - 10));
                                 const gmvY = chartH + 10 - gmvH;
@@ -1394,7 +1395,7 @@ export default function KocPage() {
                                 );
                               })}
                               {/* X axis */}
-                              <line x1={50} x2={chartW-10} y1={chartH+10} y2={chartH+10} stroke="#e2e8f0" strokeWidth={1}/>
+                              <line x1={80} x2={chartW-10} y1={chartH+10} y2={chartH+10} stroke="#e2e8f0" strokeWidth={1}/>
                             </svg>
                             {/* Legend */}
                             <div className="flex items-center gap-4 px-4 pt-1 pb-1">
