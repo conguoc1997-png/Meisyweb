@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     for (const s of allSanPhams) {
       if (!s.tiktokProductId) continue;
       productMap.set(s.tiktokProductId, s.id);
-      productMap.set(s.tiktokProductId.slice(0, 13), s.id); // fuzzy fallback
+      productMap.set(s.tiktokProductId.slice(0, 15), s.id); // fuzzy fallback
     }
     const kocMap = new Map(allKOCs.map(k => [k.ten.toLowerCase().trim(), k.id]));
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const unmatchedProducts: string[] = [];
     const spInsert: { id: string; sanPhamId: string; thang: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number }[] = [];
     for (const [pid, agg] of spAgg) {
-      const spId = productMap.get(pid) ?? productMap.get(pid.slice(0, 13));
+      const spId = productMap.get(pid) ?? productMap.get(pid.slice(0, 15));
       if (!spId) { unmatchedProducts.push(pid); continue; }
       spInsert.push({ id: cuid(), sanPhamId: spId, thang, ...agg });
     }
