@@ -1479,38 +1479,36 @@ export default function KocPage() {
 
                       {/* Tab: Hiệu quả — dữ liệu từ TikTok import */}
                       {subTab === "hieugua" && (() => {
-                        // Lấy tất cả kocId và tên KOC trong nhóm sản phẩm này
-                        const groupKocIds = new Set(group.items.map(b => b.kocId));
-                        const groupKocNames = new Set(group.items.map(b => b.koc.ten.toLowerCase().trim()));
-                        // Lọc tiktokKOC: khớp theo kocId HOẶC creatorName (phòng trường hợp tên hơi khác tạo KOC trùng)
-                        const kocRows = tiktokKOC.filter(r =>
-                          (groupKocIds.has(r.kocId) || groupKocNames.has(r.creatorName.toLowerCase().trim())) &&
-                          (!filterThang || r.thang === filterThang)
-                        );
-                        // Merge với booking để lấy chiPhiCast
-                        type HieuquaRow = { kocId: string; kocName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; chiPhiCast: number; hasTiktok: boolean };
+                        // Lọc tiktokKOC theo tháng
+                        const kocRows = tiktokKOC.filter(r => !filterThang || r.thang === filterThang);
+                        // Map booking theo kocId và tên để ghép chi phí
+                        const bookingByKocId   = new Map(group.items.map(b => [b.kocId, b]));
+                        const bookingByKocName = new Map(group.items.map(b => [b.koc.ten.toLowerCase().trim(), b]));
+                        // Build rows từ tiktokKOC (tất cả creator trong file TikTok)
+                        type HieuquaRow = { kocId: string; kocName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; chiPhiCast: number; hasTiktok: boolean; hasBooking: boolean };
                         const mergedMap = new Map<string, HieuquaRow>();
-                        // Seed từ bookings trước
-                        for (const b of group.items) {
-                          mergedMap.set(b.kocId, {
-                            kocId: b.kocId, kocName: b.koc.ten,
-                            doanhThu: 0, donHang: 0, hoaHong: 0, hoanTien: 0, soMon: 0,
-                            chiPhiCast: b.chiPhiCast,
-                            hasTiktok: false,
-                          });
-                        }
-                        // Ghi đè/cộng doanh thu từ tiktokKOC (khớp theo kocId hoặc creatorName)
                         for (const r of kocRows) {
-                          const byId   = mergedMap.get(r.kocId);
-                          const byName = [...mergedMap.values()].find(m => m.kocName.toLowerCase().trim() === r.creatorName.toLowerCase().trim());
-                          const existing = byId ?? byName;
+                          const booking = bookingByKocId.get(r.kocId) ?? bookingByKocName.get(r.creatorName.toLowerCase().trim());
+                          const key = r.kocId;
+                          const existing = mergedMap.get(key);
                           if (existing) {
-                            existing.doanhThu  += r.doanhThu;
-                            existing.donHang   += r.donHang;
-                            existing.hoaHong   += r.hoaHong;
-                            existing.hoanTien  += r.hoanTien;
-                            existing.soMon     += r.soMon;
-                            existing.hasTiktok  = true;
+                            existing.doanhThu += r.doanhThu; existing.donHang += r.donHang;
+                            existing.hoaHong  += r.hoaHong; existing.hoanTien += r.hoanTien; existing.soMon += r.soMon;
+                          } else {
+                            mergedMap.set(key, {
+                              kocId: r.kocId, kocName: r.creatorName,
+                              doanhThu: r.doanhThu, donHang: r.donHang, hoaHong: r.hoaHong, hoanTien: r.hoanTien, soMon: r.soMon,
+                              chiPhiCast: booking?.chiPhiCast ?? 0,
+                              hasTiktok: true, hasBooking: !!booking,
+                            });
+                          }
+                        }
+                        // Thêm KOC có booking nhưng không có trong TikTok
+                        for (const b of group.items) {
+                          const nameKey = b.koc.ten.toLowerCase().trim();
+                          const alreadyAdded = [...mergedMap.values()].some(r => r.kocId === b.kocId || r.kocName.toLowerCase().trim() === nameKey);
+                          if (!alreadyAdded) {
+                            mergedMap.set(b.kocId, { kocId: b.kocId, kocName: b.koc.ten, doanhThu: 0, donHang: 0, hoaHong: 0, hoanTien: 0, soMon: 0, chiPhiCast: b.chiPhiCast, hasTiktok: false, hasBooking: true });
                           }
                         }
                         const sorted = [...mergedMap.values()].sort((a, b) => b.doanhThu - a.doanhThu);
@@ -1545,7 +1543,12 @@ export default function KocPage() {
                           {!hasTiktokData && (
                             <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                               <span>⚠️</span>
-                              <span>Chưa có dữ liệu TikTok{filterThang ? ` tháng ${filterThang.replace("-","/")}` : ""}. Hãy import file TikTok ở trên.</span>
+                              <span>Chưa có dữ liệu TikTok{filterThang ? ` tháng ${filterThang.slice(0,4)}/${filterThang.slice(5,7)}` : ""}. Hãy import file TikTok ở trên.</span>
+                            </div>
+                          )}
+                          {hasTiktokData && (
+                            <div className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                              Hiển thị tất cả creator từ file TikTok{filterThang ? ` tháng ${filterThang.slice(0,4)}/${filterThang.slice(5,7)}` : ""} · {kocRows.length} creator
                             </div>
                           )}
 
@@ -1568,11 +1571,12 @@ export default function KocPage() {
                                 const rRoiNum = r.chiPhiCast > 0 ? (r.doanhThu - r.chiPhiCast) / r.chiPhiCast * 100 : 0;
                                 const rRoi = r.chiPhiCast > 0 ? rRoiNum.toFixed(1) : "—";
                                 return (
-                                  <tr key={r.kocId} className={!r.hasTiktok ? "opacity-50" : ""}>
+                                  <tr key={r.kocId} className={!r.hasTiktok ? "opacity-40" : ""}>
                                     <td className="px-3 py-2 text-slate-400">{i+1}</td>
                                     <td className="px-3 py-2 font-medium text-slate-700">
                                       {r.kocName}
-                                      {!r.hasTiktok && <span className="ml-1 text-[10px] text-amber-500">(chưa có TikTok data)</span>}
+                                      {r.hasBooking && <span className="ml-1.5 text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full">đã booking</span>}
+                                      {!r.hasTiktok && <span className="ml-1 text-[10px] text-amber-500">(chưa có data)</span>}
                                     </td>
                                     <td className="px-3 py-2 text-right text-green-700 font-semibold">{r.doanhThu > 0 ? formatCurrency(r.doanhThu) : "—"}</td>
                                     <td className="px-3 py-2 text-right text-slate-600">{r.donHang > 0 ? r.donHang.toLocaleString() : "—"}</td>
