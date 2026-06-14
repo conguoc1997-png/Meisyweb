@@ -1069,11 +1069,7 @@ export default function KocPage() {
 
         // Lọc bookings
         const filteredBookings = bookings.filter(b => {
-          if (filterThang) {
-            const d = new Date(b.ngayBat);
-            const bThang = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-            if (bThang !== filterThang) return false;
-          }
+          // Không lọc booking theo tháng — tháng chỉ lọc doanh thu TikTok
           if (filterSP && b.sanPhamId !== filterSP) return false;
           return true;
         });
