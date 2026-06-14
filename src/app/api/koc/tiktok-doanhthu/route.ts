@@ -14,9 +14,8 @@ export async function GET(req: NextRequest) {
     }),
     prisma.tiktokDoanhThuKOC.findMany({
       where: thang ? { thang } : undefined,
-      include: { koc: { select: { id: true, ten: true, platform: true } } },
-      orderBy: { doanhThu: "desc" },
       select: { id: true, kocId: true, thang: true, creatorName: true, tiktokProductId: true, doanhThu: true, donHang: true, hoanTien: true, hoaHong: true, soMon: true, koc: { select: { id: true, ten: true, platform: true } } },
+      orderBy: { doanhThu: "desc" },
     }),
   ]);
 
