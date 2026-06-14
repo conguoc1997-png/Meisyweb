@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Plus, ArrowDownCircle, ArrowUpCircle, Search, Package, Upload, CheckCircle, XCircle, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ export default function KhoPage() {
   const [formNX, setFormNX] = useState({ sanPhamId: "", soLuong: "", ghiChu: "", nguoiTao: "" });
   const [editSP, setEditSP] = useState<SanPham | null>(null);
   const [editingTikTokId, setEditingTikTokId] = useState<string | null>(null);
-  const [tikTokIdInput, setTikTokIdInput] = useState("");
+  const tikTokInputRef = useRef<HTMLInputElement>(null);
   const [formSua, setFormSua] = useState({ ten: "", sku: "", giaNhap: "", giaBan: "", mauSac: "", size: "", nguon: "" });
 
   type ImportRow = { rowIndex: number; sku: string; giaNhap: number | null; giaBan: number; coGia: boolean; isNew: boolean; existingId: string | null };
@@ -156,7 +156,8 @@ export default function KhoPage() {
     }
   };
 
-  const saveTikTokId = async (sp: SanPham, value: string) => {
+  const saveTikTokId = async (sp: SanPham) => {
+    const value = tikTokInputRef.current?.value ?? "";
     setEditingTikTokId(null);
     if (value === (sp.tiktokProductId ?? "")) return;
     await fetch(`/api/kho/san-pham/${sp.id}`, {
@@ -325,17 +326,17 @@ export default function KhoPage() {
                       {editingTikTokId === sp.id ? (
                         <input
                           autoFocus
+                          ref={tikTokInputRef}
                           type="text"
                           defaultValue={sp.tiktokProductId ?? ""}
-                          onChange={e => setTikTokIdInput(e.target.value)}
-                          onBlur={() => saveTikTokId(sp, tikTokIdInput)}
-                          onKeyDown={e => { if (e.key === "Enter") saveTikTokId(sp, tikTokIdInput); if (e.key === "Escape") setEditingTikTokId(null); }}
+                          onBlur={() => saveTikTokId(sp)}
+                          onKeyDown={e => { if (e.key === "Enter") saveTikTokId(sp); if (e.key === "Escape") setEditingTikTokId(null); }}
                           className="w-full border border-violet-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-200"
                           placeholder="VD: 1735566949..."
                         />
                       ) : (
                         <button
-                          onClick={() => { setEditingTikTokId(sp.id); setTikTokIdInput(sp.tiktokProductId ?? ""); }}
+                          onClick={() => setEditingTikTokId(sp.id)}
                           className={`text-xs font-mono ${sp.tiktokProductId ? "text-violet-700 hover:underline" : "text-slate-300 hover:text-violet-400"}`}
                         >
                           {sp.tiktokProductId ?? "+ Thêm ID"}
