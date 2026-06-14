@@ -837,12 +837,16 @@ export default function KocPage() {
     }
   };
 
-  // Stats — doanh thu/đơn hàng ưu tiên từ TikTok import, fallback sang booking DB
-  const tongChiPhi  = bookings.reduce((s, b) => s + b.chiPhi, 0);
-  const tongDoanhThuTiktok = tiktokSP.reduce((s, r) => s + r.doanhThu, 0);
-  const tongDonHangTiktok  = tiktokSP.reduce((s, r) => s + r.donHang, 0);
-  const tongDoanhThuDB     = bookings.reduce((s, b) => s + b.doanhThu, 0);
-  const tongDonHangDB      = bookings.reduce((s, b) => s + b.donHang, 0);
+  // Stats — lọc theo filterThang nếu có
+  const bookingsInThang = filterThang
+    ? bookings.filter(b => { const d = new Date(b.ngayBat); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` === filterThang; })
+    : bookings;
+  const tiktokSPInThang = filterThang ? tiktokSP.filter(r => r.thang === filterThang) : tiktokSP;
+  const tongChiPhi         = bookingsInThang.reduce((s, b) => s + b.chiPhi, 0);
+  const tongDoanhThuTiktok = tiktokSPInThang.reduce((s, r) => s + r.doanhThu, 0);
+  const tongDonHangTiktok  = tiktokSPInThang.reduce((s, r) => s + r.donHang, 0);
+  const tongDoanhThuDB     = bookingsInThang.reduce((s, b) => s + b.doanhThu, 0);
+  const tongDonHangDB      = bookingsInThang.reduce((s, b) => s + b.donHang, 0);
   const tongDoanhThu = tongDoanhThuTiktok > 0 ? tongDoanhThuTiktok : tongDoanhThuDB;
   const tongDonHang  = tongDonHangTiktok  > 0 ? tongDonHangTiktok  : tongDonHangDB;
   const roiTB = tongChiPhi > 0 ? ((tongDoanhThu - tongChiPhi) / tongChiPhi * 100).toFixed(1) : "0";
@@ -860,13 +864,28 @@ export default function KocPage() {
       </div>
 
       {/* Stats */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-medium text-slate-600">
+          {filterThang ? `Tháng ${filterThang.slice(5,7)}/${filterThang.slice(0,4)}` : "Tất cả thời gian"}
+        </span>
+        <select
+          value={filterThang}
+          onChange={e => setFilterThang(e.target.value)}
+          className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+        >
+          <option value="">Tất cả tháng</option>
+          {thangListAll.map(t => (
+            <option key={t} value={t}>{t.slice(0,4)}/{t.slice(5,7)}</option>
+          ))}
+        </select>
+      </div>
       <div className="grid grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-2"><Users size={16} className="text-rose-400" /><p className="text-xs text-slate-500">Tổng KOC</p></div>
           <p className="text-xl font-bold text-slate-800">{kocs.length}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-red-400" /><p className="text-xs text-slate-500">Tổng chi phí</p></div>
+          <div className="flex items-center gap-2 mb-2"><DollarSign size={16} className="text-red-400" /><p className="text-xs text-slate-500">Chi phí booking</p></div>
           <p className="text-xl font-bold text-slate-800">{formatCurrency(tongChiPhi)}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
