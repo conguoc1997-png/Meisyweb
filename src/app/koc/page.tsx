@@ -177,6 +177,20 @@ export default function KocPage() {
         return;
       }
 
+      // Kiểm tra tháng đã có data chưa
+      const existingSP  = tiktokSP.some(r => r.thang === thang);
+      const existingKOC = tiktokKOC.some(r => r.thang === thang);
+      if (existingSP || existingKOC) {
+        const [y, m] = thang.split("-");
+        const confirmed = window.confirm(
+          `Tháng ${m}/${y} đã có dữ liệu TikTok.\n\nBạn có muốn thay thế toàn bộ dữ liệu tháng này không?\n\n• OK → Thay thế\n• Hủy → Giữ nguyên`
+        );
+        if (!confirmed) {
+          setTiktokImportLoading(false);
+          return;
+        }
+      }
+
       const res = await fetch("/api/koc/import-tiktok", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
