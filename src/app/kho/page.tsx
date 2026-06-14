@@ -14,6 +14,7 @@ type SanPham = {
   giaBan: number;
   tonKho: number;
   nguon: string | null;
+  tiktokProductId: string | null;
 };
 
 type NhapXuat = {
@@ -39,6 +40,8 @@ export default function KhoPage() {
   const [formSP, setFormSP] = useState({ ten: "", sku: "", mauSac: "", size: "", giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
   const [formNX, setFormNX] = useState({ sanPhamId: "", soLuong: "", ghiChu: "", nguoiTao: "" });
   const [editSP, setEditSP] = useState<SanPham | null>(null);
+  const [editingTikTokId, setEditingTikTokId] = useState<string | null>(null);
+  const [tikTokIdInput, setTikTokIdInput] = useState("");
   const [formSua, setFormSua] = useState({ ten: "", sku: "", giaNhap: "", giaBan: "", mauSac: "", size: "", nguon: "" });
 
   type ImportRow = { rowIndex: number; sku: string; giaNhap: number | null; giaBan: number; coGia: boolean; isNew: boolean; existingId: string | null };
@@ -66,8 +69,8 @@ export default function KhoPage() {
       fetch("/api/kho/san-pham").then((r) => r.json()),
       fetch("/api/kho/nhap-xuat").then((r) => r.json()),
     ]);
-    setSanPhams(sp);
-    setLichSu(nx);
+    setSanPhams(Array.isArray(sp) ? sp : sp.data ?? []);
+    setLichSu(Array.isArray(nx) ? nx : []);
   };
 
   const handleSheetPreview = async () => {
@@ -151,6 +154,16 @@ export default function KhoPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveTikTokId = async (sp: SanPham, value: string) => {
+    setEditingTikTokId(null);
+    if (value === (sp.tiktokProductId ?? "")) return;
+    await fetch(`/api/kho/san-pham/${sp.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...sp, tiktokProductId: value || null }),
+    });
+    fetchData();
   };
 
   const openSua = (sp: SanPham) => {
@@ -281,6 +294,7 @@ export default function KhoPage() {
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Sản phẩm</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Size / Màu</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Nguồn</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-medium">TikTok ID</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá nhập</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Tồn kho</th>
                 <th className="px-4 py-3"></th>
@@ -306,6 +320,27 @@ export default function KhoPage() {
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${sp.nguon === "shopee" ? "bg-orange-100 text-orange-700" : sp.nguon === "tiktok" ? "bg-pink-100 text-pink-700" : "bg-slate-100 text-slate-600"}`}>
                         {sp.nguon || "—"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {editingTikTokId === sp.id ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          defaultValue={sp.tiktokProductId ?? ""}
+                          onChange={e => setTikTokIdInput(e.target.value)}
+                          onBlur={() => saveTikTokId(sp, tikTokIdInput)}
+                          onKeyDown={e => { if (e.key === "Enter") saveTikTokId(sp, tikTokIdInput); if (e.key === "Escape") setEditingTikTokId(null); }}
+                          className="w-full border border-violet-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-200"
+                          placeholder="VD: 1735566949..."
+                        />
+                      ) : (
+                        <button
+                          onClick={() => { setEditingTikTokId(sp.id); setTikTokIdInput(sp.tiktokProductId ?? ""); }}
+                          className={`text-xs font-mono ${sp.tiktokProductId ? "text-violet-700 hover:underline" : "text-slate-300 hover:text-violet-400"}`}
+                        >
+                          {sp.tiktokProductId ?? "+ Thêm ID"}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {sp.giaNhap === 0

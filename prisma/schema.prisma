@@ -24,17 +24,18 @@ model User {
 // ===================== MODULE KHO =====================
 
 model SanPham {
-  id        String   @id @default(cuid())
-  ten       String
-  sku       String   @unique
-  mauSac    String?
-  size      String?
-  giaNhap   Float    @default(0)
-  giaBan    Float    @default(0)
-  tonKho    Int      @default(0)
-  nguon     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  ten             String
+  sku             String   @unique
+  mauSac          String?
+  size            String?
+  giaNhap         Float    @default(0)
+  giaBan          Float    @default(0)
+  tonKho          Int      @default(0)
+  nguon           String?
+  tiktokProductId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   nhapXuats   NhapXuatKho[]
   kocBookings KOCBooking[]
@@ -221,14 +222,15 @@ model HoaDonTonHistory {
 model KOCBooking {
   id         String    @id @default(cuid())
   kocId      String
-  sanPhamId  String?   // SKU sản phẩm gửi KOC
-  soLuongGui Int       @default(0) // số lượng SP gửi KOC
-  chiPhiCast Float     @default(0) // giá cast KOC
-  chiPhiSP   Float     @default(0) // chi phí sản phẩm gửi (soLuongGui × giaNhap)
-  chiPhi     Float     @default(0) // tổng = chiPhiCast + chiPhiSP
+  sanPhamId  String?
+  soLuongGui Int       @default(0)
+  chiPhiCast Float     @default(0)
+  chiPhiSP   Float     @default(0)
+  chiPhi     Float     @default(0)
   ngayBat    DateTime
   ngayKet    DateTime?
   trangThai    String    @default("dang_chay")
+  loai         String    @default("booking")
   doanhThu     Float     @default(0)
   donHang      Int       @default(0)
   luotXem      Int       @default(0)
@@ -239,8 +241,26 @@ model KOCBooking {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  koc     KOC      @relation(fields: [kocId], references: [id])
-  sanPham SanPham? @relation(fields: [sanPhamId], references: [id])
+  koc           KOC      @relation(fields: [kocId], references: [id])
+  sanPham       SanPham? @relation(fields: [sanPhamId], references: [id])
+  doanhThuThang BookingDoanhThuThang[]
+}
+
+model BookingDoanhThuThang {
+  id        String   @id @default(cuid())
+  bookingId String
+  thang     String   // "2026-05"
+  doanhThu  Float    @default(0)
+  donHang   Int      @default(0)
+  hoanTien  Float    @default(0)
+  hoaHong   Float    @default(0)
+  soMon     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking KOCBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, thang])
 }
 
 model HoaDonTon {

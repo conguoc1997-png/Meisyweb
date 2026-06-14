@@ -19,6 +19,7 @@ export async function PUT(
         giaNhap: Number(body.giaNhap) || 0,
         giaBan: Number(body.giaBan) || 0,
         nguon: body.nguon || null,
+        tiktokProductId: body.tiktokProductId ?? null,
       },
     });
     return NextResponse.json(sp);
