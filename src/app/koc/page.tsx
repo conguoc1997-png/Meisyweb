@@ -402,7 +402,7 @@ export default function KocPage() {
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
   type TiktokSPRow = { id: string; sanPhamId: string; thang: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; sanPham: { id: string; ten: string; sku: string } };
-  type TiktokKOCRow = { id: string; kocId: string; thang: string; creatorName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; koc: { id: string; ten: string; platform: string } };
+  type TiktokKOCRow = { id: string; kocId: string; thang: string; creatorName: string; tiktokProductId: string | null; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; koc: { id: string; ten: string; platform: string } };
   const [tiktokSP, setTiktokSP] = useState<TiktokSPRow[]>([]);
   const [tiktokKOC, setTiktokKOC] = useState<TiktokKOCRow[]>([]);
 
@@ -1479,8 +1479,14 @@ export default function KocPage() {
 
                       {/* Tab: Hiệu quả — dữ liệu từ TikTok import */}
                       {subTab === "hieugua" && (() => {
-                        // Lọc tiktokKOC theo tháng
-                        const kocRows = tiktokKOC.filter(r => !filterThang || r.thang === filterThang);
+                        // Lọc tiktokKOC theo tháng + tiktokProductId của nhóm sản phẩm này
+                        const groupTikTokPid = sanPhams.find(s => s.id === group.spId)?.tiktokProductId ?? null;
+                        const kocRows = tiktokKOC.filter(r =>
+                          (!filterThang || r.thang === filterThang) &&
+                          (groupTikTokPid
+                            ? r.tiktokProductId === groupTikTokPid || r.tiktokProductId?.slice(0, 15) === groupTikTokPid?.slice(0, 15)
+                            : true)
+                        );
                         // Map booking theo kocId và tên để ghép chi phí
                         const bookingByKocId   = new Map(group.items.map(b => [b.kocId, b]));
                         const bookingByKocName = new Map(group.items.map(b => [b.koc.ten.toLowerCase().trim(), b]));

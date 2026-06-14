@@ -285,21 +285,22 @@ model TiktokDoanhThuSP {
 
 // Doanh thu TikTok theo KOC mỗi tháng
 model TiktokDoanhThuKOC {
-  id           String   @id @default(cuid())
-  kocId        String
-  thang        String   // "2026-05"
-  creatorName  String   // tên gốc từ file TikTok
-  doanhThu     Float    @default(0)
-  donHang      Int      @default(0)
-  hoanTien     Float    @default(0)
-  hoaHong      Float    @default(0)
-  soMon        Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  kocId           String
+  thang           String   // "2026-05"
+  creatorName     String   // tên gốc từ file TikTok
+  tiktokProductId String?  // ID sản phẩm TikTok (để lọc theo sản phẩm)
+  doanhThu        Float    @default(0)
+  donHang         Int      @default(0)
+  hoanTien        Float    @default(0)
+  hoaHong         Float    @default(0)
+  soMon           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   koc KOC @relation(fields: [kocId], references: [id], onDelete: Cascade)
 
-  @@unique([kocId, thang])
+  @@unique([kocId, thang, tiktokProductId])
 }
 
 model HoaDonTon {
