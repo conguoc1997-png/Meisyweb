@@ -187,12 +187,13 @@ export default function KocPage() {
       const result = JSON.parse(text);
       if (!res.ok) throw new Error(result.error);
       setTiktokImportResult(result);
-      // Reload KOCs nếu có KOC mới được tạo
+      // Reload KOCs nếu có KOC mới + reload tiktok doanh thu
       if (result.newKOCs?.length > 0) {
         const kr = await fetch("/api/koc");
         const kd = await kr.json();
         setKocs(Array.isArray(kd) ? kd : kd.data ?? []);
       }
+      fetchTiktokDoanhthu();
     } catch (err) {
       alert("Lỗi import: " + String(err));
     } finally {
@@ -380,6 +381,18 @@ export default function KocPage() {
   const [formBooking, setFormBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
+  type TiktokSPRow = { id: string; sanPhamId: string; thang: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; sanPham: { id: string; ten: string; sku: string } };
+  type TiktokKOCRow = { id: string; kocId: string; thang: string; creatorName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; koc: { id: string; ten: string; platform: string } };
+  const [tiktokSP, setTiktokSP] = useState<TiktokSPRow[]>([]);
+  const [tiktokKOC, setTiktokKOC] = useState<TiktokKOCRow[]>([]);
+
+  const fetchTiktokDoanhthu = async (thang?: string) => {
+    const url = thang ? `/api/koc/tiktok-doanhthu?thang=${thang}` : "/api/koc/tiktok-doanhthu";
+    const res = await fetch(url).then(r => r.json());
+    setTiktokSP(res.spData ?? []);
+    setTiktokKOC(res.kocData ?? []);
+  };
+
   const fetchData = async () => {
     const [k, b, sp, rem] = await Promise.all([
       fetch("/api/koc").then((r) => r.json()),
@@ -393,7 +406,7 @@ export default function KocPage() {
     if (Array.isArray(rem)) setReminders(rem);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); fetchTiktokDoanhthu(); }, []);
 
   // Tính chi phí booking tự động
   const selectedKOC = useMemo(() => kocs.find(k => k.id === formBooking.kocId), [kocs, formBooking.kocId]);
@@ -1162,6 +1175,19 @@ export default function KocPage() {
                             </button>
                           );
                         })()}
+                        {/* TikTok doanh thu tháng đang lọc */}
+                        {group.spId && (() => {
+                          const rows = tiktokSP.filter(r => r.sanPhamId === group.spId && (!filterThang || r.thang === filterThang));
+                          if (rows.length === 0) return null;
+                          const total = rows.reduce((acc, r) => ({ doanhThu: acc.doanhThu + r.doanhThu, donHang: acc.donHang + r.donHang }), { doanhThu: 0, donHang: 0 });
+                          return (
+                            <span className="flex items-center gap-1.5 text-xs bg-pink-50 border border-pink-200 text-pink-700 px-2 py-0.5 rounded-full font-medium">
+                              <TrendingUp size={11} />
+                              {formatCurrency(total.doanhThu)} · {total.donHang} đơn
+                              {!filterThang && rows.length > 1 && <span className="text-pink-400">({rows.length} tháng)</span>}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     {/* Xuất đã duyệt — chỉ hiện khi có tick */}
@@ -1622,15 +1648,15 @@ export default function KocPage() {
 
       {/* KOC Table */}
       {tab === "kocs" && (() => {
-        // ── Tổng hợp GMV từ tất cả campaigns đã import ──
+        // ── Tổng hợp doanh thu từ TikTok import (lọc theo tháng) ──
+        const filteredTiktokKOC = kocViewThang
+          ? tiktokKOC.filter(r => r.thang === kocViewThang)
+          : tiktokKOC;
         const kocGMVMap = new Map<string, number>();
         const kocDonMap = new Map<string, number>();
-        for (const rows of Object.values(reportDataMap)) {
-          for (const r of rows) {
-            const key = r.creatorName.toLowerCase();
-            kocGMVMap.set(key, (kocGMVMap.get(key) ?? 0) + r.gmv);
-            kocDonMap.set(key, (kocDonMap.get(key) ?? 0) + r.donHang);
-          }
+        for (const r of filteredTiktokKOC) {
+          kocGMVMap.set(r.kocId, (kocGMVMap.get(r.kocId) ?? 0) + r.doanhThu);
+          kocDonMap.set(r.kocId, (kocDonMap.get(r.kocId) ?? 0) + r.donHang);
         }
         // Chi phí cast từ bookings (lọc theo tháng nếu chọn)
         const kocChiMap = new Map<string, number>();
@@ -1638,18 +1664,18 @@ export default function KocPage() {
           if (kocViewThang && b.ngayBat?.slice(0, 7) !== kocViewThang) continue;
           kocChiMap.set(b.kocId, (kocChiMap.get(b.kocId) ?? 0) + b.chiPhiCast);
         }
-        // Merge: KOC có GMV hoặc đã booking
+        // Merge: KOC có doanh thu hoặc đã booking
         const kocStats = kocs.map(k => {
-          const gmv = kocGMVMap.get(k.ten.toLowerCase()) ?? 0;
+          const gmv = kocGMVMap.get(k.id) ?? 0;
           const chi = kocChiMap.get(k.id) ?? 0;
           const roi = chi > 0 ? (gmv - chi) / chi * 100 : null;
-          const donHang = kocDonMap.get(k.ten.toLowerCase()) ?? 0;
+          const donHang = kocDonMap.get(k.id) ?? 0;
           const bookingCount = bookings.filter(b => b.kocId === k.id &&
             (!kocViewThang || b.ngayBat?.slice(0, 7) === kocViewThang)).length;
           return { koc: k, gmv, chi, roi, donHang, bookingCount };
         }).sort((a, b) => b.gmv - a.gmv);
 
-        const hasReport = Object.keys(reportDataMap).length > 0;
+        const hasReport = tiktokKOC.length > 0;
         const top20 = kocStats.filter(r => r.gmv > 0).slice(0, 20);
         const maxGMV = Math.max(...top20.map(r => r.gmv), 1);
         const chartH = 180;
@@ -1754,7 +1780,7 @@ export default function KocPage() {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-slate-600 font-medium">Tên KOC</th>
-                  {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">GMV</th>}
+                  {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">Doanh thu TikTok</th>}
                   {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">Đơn hàng</th>}
                   <th className="text-right px-4 py-3 text-slate-600 font-medium">Chi phí cast</th>
                   {hasReport && <th className="text-right px-4 py-3 text-slate-600 font-medium">ROI</th>}
