@@ -86,6 +86,120 @@ export default function KocPage() {
   const [editingSpTikTok, setEditingSpTikTok] = useState<string | null>(null);
   const spTikTokRef = useRef<HTMLInputElement>(null);
 
+  // ── Import TikTok ──
+  const [tiktokImportLoading, setTiktokImportLoading] = useState(false);
+  const [tiktokImportResult, setTiktokImportResult] = useState<{
+    spSaved: number; spTotal: number; kocSaved: number;
+    newKOCs: string[]; unmatchedProducts: string[]; thang: string;
+  } | null>(null);
+
+  const toNum = (v: unknown): number => {
+    if (typeof v === "number") return v;
+    let s = String(v ?? "").replace(/[^\d.,]/g, "").trim();
+    if (!s) return 0;
+    if (s.includes(".") && s.includes(",")) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else if (s.includes(".")) {
+      const parts = s.split(".");
+      if (parts.length > 2 || (parts.length === 2 && parts[1].length > 2)) s = s.replace(/\./g, "");
+    } else if (s.includes(",")) { s = s.replace(",", "."); }
+    return parseFloat(s) || 0;
+  };
+
+  async function handleTikTokImport(file: File) {
+    setTiktokImportLoading(true);
+    setTiktokImportResult(null);
+    try {
+      // Đọc tháng từ tên file: ...20260501-20260531...
+      let thang = "";
+      const m = file.name.match(/(\d{4})(\d{2})\d{2}[-_]\d{8}/);
+      if (m) thang = `${m[1]}-${m[2]}`;
+      if (!thang) thang = prompt("Không đọc được tháng từ tên file. Nhập tháng (VD: 2026-05):") ?? "";
+      if (!thang) { setTiktokImportLoading(false); return; }
+
+      const data = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(new Uint8Array(data), { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
+
+      // Tìm header row
+      const headerIdx = allRows.findIndex(row =>
+        (row as unknown[]).some(cell => {
+          const s = String(cell ?? "").toLowerCase();
+          return s.includes("id sản phẩm") || s.includes("product id") || s.includes("creator");
+        })
+      );
+      if (headerIdx === -1) {
+        const sample = allRows.slice(0, 5).map(r => (r as unknown[]).slice(0, 5).map(c => String(c ?? "")).join(" | ")).join("\n");
+        alert(`Không tìm thấy header. 5 dòng đầu:\n${sample}`);
+        setTiktokImportLoading(false);
+        return;
+      }
+
+      const headers = (allRows[headerIdx] as unknown[]).map(h => String(h ?? "").toLowerCase().trim());
+      const ci = (...kws: string[]) => headers.findIndex(h => kws.some(kw => h.includes(kw)));
+
+      const cProductId = ci("id sản phẩm", "id san pham", "product id", "product_id", "mã sản phẩm");
+      const cCreator   = ci("creator name", "creator", "tên nhà sáng tạo", "ten nha sang tao");
+      const cDonHang   = ci("đơn hàng nhờ video", "don hang nho video", "orders");
+      const cDoanhThu  = ci("gmv đến từ", "gmv den tu", "gmv liên kết", "gmv lien ket", "gmv");
+      const cHoaHong   = ci("hoa hồng ước tính", "hoa hong uoc tinh", "estimated commission", "commission");
+      const cHoanTien  = ci("hoàn tiền", "hoan tien", "refund");
+      const cSoMon     = ci("số món bán ra", "so mon ban ra", "items sold", "quantity sold");
+
+      if (cProductId === -1 || cCreator === -1) {
+        alert(`Không nhận diện được cột.\nHeaders (${headers.length} cột):\n${headers.slice(0, 15).join(" | ")}`);
+        setTiktokImportLoading(false);
+        return;
+      }
+
+      const rows: { tiktokProductId: string; creatorName: string; donHang: number; doanhThu: number; hoaHong: number; hoanTien: number; soMon: number }[] = [];
+      for (let i = headerIdx + 1; i < allRows.length; i++) {
+        const r = allRows[i] as unknown[];
+        const pid  = cProductId >= 0 ? String(r[cProductId] ?? "").trim() : "";
+        const name = cCreator   >= 0 ? String(r[cCreator]   ?? "").trim() : "";
+        if (!pid || !name) continue;
+        rows.push({
+          tiktokProductId: pid,
+          creatorName: name,
+          donHang:  cDonHang  >= 0 ? toNum(r[cDonHang])  : 0,
+          doanhThu: cDoanhThu >= 0 ? toNum(r[cDoanhThu]) : 0,
+          hoaHong:  cHoaHong  >= 0 ? toNum(r[cHoaHong])  : 0,
+          hoanTien: cHoanTien >= 0 ? toNum(r[cHoanTien]) : 0,
+          soMon:    cSoMon    >= 0 ? toNum(r[cSoMon])    : 0,
+        });
+      }
+
+      if (rows.length === 0) {
+        alert(`Không có dòng dữ liệu nào.\nCột Product ID: ${cProductId} | Creator: ${cCreator}`);
+        setTiktokImportLoading(false);
+        return;
+      }
+
+      const res = await fetch("/api/koc/import-tiktok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thang, rows }),
+      });
+      const text = await res.text();
+      if (!text) throw new Error("Server trả về response rỗng");
+      const result = JSON.parse(text);
+      if (!res.ok) throw new Error(result.error);
+      setTiktokImportResult(result);
+      // Reload KOCs nếu có KOC mới được tạo
+      if (result.newKOCs?.length > 0) {
+        const kr = await fetch("/api/koc");
+        const kd = await kr.json();
+        setKocs(Array.isArray(kd) ? kd : kd.data ?? []);
+      }
+    } catch (err) {
+      alert("Lỗi import: " + String(err));
+    } finally {
+      setTiktokImportLoading(false);
+    }
+  }
+
   const saveSpTikTokId = async (sp: SanPham) => {
     const value = spTikTokRef.current?.value ?? "";
     setEditingSpTikTok(null);
@@ -894,6 +1008,11 @@ export default function KocPage() {
             <Upload size={16} className="text-slate-500" />
             {importLoading ? "Đang đọc..." : "Import Excel"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+          </label>
+          <label className={`flex items-center gap-1.5 px-3 py-2 text-sm border border-violet-300 text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 transition cursor-pointer ${tiktokImportLoading ? "opacity-50 pointer-events-none" : ""}`}>
+            <TrendingUp size={16} />
+            {tiktokImportLoading ? "Đang xử lý..." : "Import TikTok"}
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleTikTokImport(f); e.target.value = ""; }} />
           </label>
           <button
             onClick={() => { setSheetUrl(""); setSheetError(""); setModalSheet(true); }}
@@ -2695,6 +2814,54 @@ export default function KocPage() {
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">{loading ? "Đang lưu..." : "Lưu"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal kết quả Import TikTok ── */}
+      {tiktokImportResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Kết quả Import TikTok — {tiktokImportResult.thang}</h3>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1 bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-bold text-violet-700">{tiktokImportResult.spSaved}/{tiktokImportResult.spTotal}</p>
+                  <p className="text-xs text-violet-500 mt-0.5">Sản phẩm khớp</p>
+                </div>
+                <div className="flex-1 bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-bold text-green-700">{tiktokImportResult.kocSaved}</p>
+                  <p className="text-xs text-green-500 mt-0.5">KOC đã lưu</p>
+                </div>
+              </div>
+              {tiktokImportResult.newKOCs.length > 0 && (
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
+                  <p className="text-xs font-bold text-blue-700 mb-1">KOC mới được tạo ({tiktokImportResult.newKOCs.length})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {tiktokImportResult.newKOCs.map(n => (
+                      <span key={n} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">{n}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {tiktokImportResult.unmatchedProducts.length > 0 && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-xs font-bold text-amber-700 mb-1">ID sản phẩm chưa có TikTok ID ({tiktokImportResult.unmatchedProducts.length})</p>
+                  <p className="text-xs text-amber-600 mb-1">Vào trang Kho → điền TikTok ID cho các sản phẩm này rồi import lại.</p>
+                  <div className="max-h-24 overflow-y-auto space-y-0.5">
+                    {tiktokImportResult.unmatchedProducts.map(pid => (
+                      <p key={pid} className="text-xs font-mono bg-amber-100 text-amber-800 px-2 py-0.5 rounded">{pid}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => setTiktokImportResult(null)}
+                className="w-full px-4 py-2 text-sm bg-violet-500 text-white rounded-lg hover:bg-violet-600"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

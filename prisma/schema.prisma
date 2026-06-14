@@ -37,8 +37,9 @@ model SanPham {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  nhapXuats   NhapXuatKho[]
-  kocBookings KOCBooking[]
+  nhapXuats        NhapXuatKho[]
+  kocBookings      KOCBooking[]
+  tiktokDoanhThu   TiktokDoanhThuSP[]
 }
 
 model NhapXuatKho {
@@ -150,7 +151,8 @@ model KOC {
   ghiChu      String?
   createdAt   DateTime @default(now())
 
-  bookings KOCBooking[]
+  bookings       KOCBooking[]
+  tiktokDoanhThu TiktokDoanhThuKOC[]
 }
 
 // ===================== MODULE SẢN XUẤT =====================
@@ -261,6 +263,43 @@ model BookingDoanhThuThang {
   booking KOCBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, thang])
+}
+
+// Doanh thu TikTok theo sản phẩm mỗi tháng (tổng hợp từ tất cả KOC)
+model TiktokDoanhThuSP {
+  id          String   @id @default(cuid())
+  sanPhamId   String
+  thang       String   // "2026-05"
+  doanhThu    Float    @default(0)
+  donHang     Int      @default(0)
+  hoanTien    Float    @default(0)
+  hoaHong     Float    @default(0)
+  soMon       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sanPham SanPham @relation(fields: [sanPhamId], references: [id], onDelete: Cascade)
+
+  @@unique([sanPhamId, thang])
+}
+
+// Doanh thu TikTok theo KOC mỗi tháng
+model TiktokDoanhThuKOC {
+  id           String   @id @default(cuid())
+  kocId        String
+  thang        String   // "2026-05"
+  creatorName  String   // tên gốc từ file TikTok
+  doanhThu     Float    @default(0)
+  donHang      Int      @default(0)
+  hoanTien     Float    @default(0)
+  hoaHong      Float    @default(0)
+  soMon        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  koc KOC @relation(fields: [kocId], references: [id], onDelete: Cascade)
+
+  @@unique([kocId, thang])
 }
 
 model HoaDonTon {
