@@ -842,7 +842,7 @@ export default function KocPage() {
     ? bookings.filter(b => { const d = new Date(b.ngayBat); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` === filterThang; })
     : bookings;
   const tiktokSPInThang = filterThang ? tiktokSP.filter(r => r.thang === filterThang) : tiktokSP;
-  const tongChiPhi         = bookingsInThang.reduce((s, b) => s + b.chiPhi, 0);
+  const tongChiPhi         = bookingsInThang.reduce((s, b) => s + (b.chiPhi > 0 ? b.chiPhi : (b.koc.giaCast + b.chiPhiSP)), 0);
   const tongDoanhThuTiktok = tiktokSPInThang.reduce((s, r) => s + r.doanhThu, 0);
   const tongDonHangTiktok  = tiktokSPInThang.reduce((s, r) => s + r.donHang, 0);
   const tongDoanhThuDB     = bookingsInThang.reduce((s, b) => s + b.doanhThu, 0);
@@ -1167,7 +1167,7 @@ export default function KocPage() {
             <div className="space-y-4">
             {grouped.map(group => {
               const totalCP    = group.items.reduce((s, b) => s + b.chiPhi, 0);
-              const totalCast  = group.items.reduce((s, b) => s + b.chiPhiCast, 0);
+              const totalCast  = group.items.reduce((s, b) => s + (b.chiPhiCast > 0 ? b.chiPhiCast : b.koc.giaCast), 0);
               const totalSP    = group.items.reduce((s, b) => s + b.chiPhiSP, 0);
               const totalDTdb  = group.items.reduce((s, b) => s + b.doanhThu, 0);
               const totalDon   = group.items.reduce((s, b) => s + b.donHang, 0);
@@ -1358,7 +1358,11 @@ export default function KocPage() {
                                   )}
                                 </td>
                                 <td className="px-4 py-3 text-right text-xs font-medium text-rose-600">
-                                  {b.chiPhiCast > 0 ? formatCurrency(b.chiPhiCast) : <span className="text-slate-400">—</span>}
+                                  {b.chiPhiCast > 0
+                                    ? formatCurrency(b.chiPhiCast)
+                                    : b.koc.giaCast > 0
+                                      ? <span className="text-slate-400 italic">{formatCurrency(b.koc.giaCast)}</span>
+                                      : <span className="text-slate-400">—</span>}
                                 </td>
                                 <td className="px-4 py-3">
                                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${TT_COLOR[b.trangThai]}`}>
