@@ -84,6 +84,8 @@ export default function KocPage() {
 
   const [kocViewThang, setKocViewThang] = useState("");
   const [kocFilterTT, setKocFilterTT] = useState("");
+  const [editingKocGCId, setEditingKocGCId] = useState<string | null>(null);
+  const kocGcRef = useRef<HTMLTextAreaElement>(null);
   const [editingSpTikTok, setEditingSpTikTok] = useState<string | null>(null);
   const spTikTokRef = useRef<HTMLInputElement>(null);
 
@@ -351,9 +353,16 @@ export default function KocPage() {
     const val = gcRef.current?.value ?? b.ghiChu ?? "";
     setEditingGCId(null);
     if (val === (b.ghiChu ?? "")) return;
-    // Optimistic
     setBookings(prev => prev.map(x => x.id === b.id ? { ...x, ghiChu: val || null } : x));
     patchBookingBackground(b.id, { ghiChu: val || null });
+  };
+
+  const saveKocGhiChu = (k: KOC) => {
+    const val = kocGcRef.current?.value ?? k.ghiChu ?? "";
+    setEditingKocGCId(null);
+    if (val === (k.ghiChu ?? "")) return;
+    setKocs(prev => prev.map(x => x.id === k.id ? { ...x, ghiChu: val || null } : x));
+    fetch(`/api/koc/${k.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ghiChu: val || null }) });
   };
 
   // Tick duyệt booking
@@ -1620,11 +1629,11 @@ export default function KocPage() {
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">#</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Tên KOC</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Trạng thái</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Ghi chú</th>
                   <th className="text-right px-4 py-3 text-slate-500 font-medium">Giá cast</th>
                   <th className="text-center px-4 py-3 text-slate-500 font-medium">Booking{kocListThang ? ` T${kocListThang.slice(5,7)}` : ""}</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">SĐT</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Địa chỉ</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Ghi chú</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Link</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -1650,13 +1659,25 @@ export default function KocPage() {
                         ))}
                       </select>
                     </td>
+                    {/* Ghi chú — inline edit */}
+                    <td className="px-4 py-3 max-w-[180px]">
+                      {editingKocGCId === k.id ? (
+                        <textarea autoFocus rows={2} ref={kocGcRef} defaultValue={k.ghiChu ?? ""}
+                          onBlur={() => saveKocGhiChu(k)}
+                          onKeyDown={e => { if (e.key === "Escape") setEditingKocGCId(null); }}
+                          className="w-full text-xs border border-blue-300 rounded px-2 py-1 focus:outline-none resize-none" />
+                      ) : (
+                        <button onClick={() => setEditingKocGCId(k.id)} className="text-xs text-left w-full hover:text-blue-600 cursor-pointer">
+                          {k.ghiChu ? <span className="text-slate-600 line-clamp-2">{k.ghiChu}</span> : <span className="text-slate-300 italic">+ ghi chú</span>}
+                        </button>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-medium text-rose-600">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
                     <td className="px-4 py-3 text-center">
                       {bc > 0 ? <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-medium">{bc}</span> : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{k.sdt || "—"}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs max-w-[120px] truncate">{k.diaChi || "—"}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{k.ghiChu || "—"}</td>
                     <td className="px-4 py-3">
                       {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">Profile</a> : "—"}
                     </td>
