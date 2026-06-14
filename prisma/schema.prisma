@@ -148,8 +148,9 @@ model KOC {
   sdt         String?
   email       String?
   diaChi      String?
-  ghiChu      String?
-  createdAt   DateTime @default(now())
+  ghiChu          String?
+  trangThaiHopTac String   @default("chua_tra_loi")
+  createdAt       DateTime @default(now())
 
   bookings       KOCBooking[]
   tiktokDoanhThu TiktokDoanhThuKOC[]

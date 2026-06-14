@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null };
-type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null };
+type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null; trangThaiHopTac: string };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
@@ -1647,17 +1647,42 @@ export default function KocPage() {
 
       {/* KOC Table */}
       {tab === "kocs" && (() => {
+        const [kocListThang, setKocListThang] = [filterThang, setFilterThang];
+        const TRANG_THAI_HOP_TAC: Record<string, { label: string; color: string }> = {
+          chua_tra_loi:  { label: "Chưa trả lời", color: "bg-slate-100 text-slate-500" },
+          da_duyet:      { label: "Đã duyệt",     color: "bg-green-100 text-green-700" },
+          dang_hop_tac:  { label: "Đang hợp tác", color: "bg-blue-100 text-blue-700"  },
+          tu_choi:       { label: "Từ chối",       color: "bg-red-100 text-red-600"    },
+        };
+        const updateTrangThai = async (kocId: string, trangThaiHopTac: string) => {
+          await fetch(`/api/koc/${kocId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trangThaiHopTac }) });
+          setKocs(prev => prev.map(k => k.id === kocId ? { ...k, trangThaiHopTac } : k));
+        };
+        // Đếm booking theo tháng cho từng KOC
+        const bookingCountMap = new Map<string, number>();
+        for (const b of bookings) {
+          if (kocListThang && b.ngayBat?.slice(0, 7) !== kocListThang) continue;
+          bookingCountMap.set(b.kocId, (bookingCountMap.get(b.kocId) ?? 0) + 1);
+        }
         const kocSearchFiltered = kocs.filter(k =>
           !searchKOC || k.ten.toLowerCase().includes(searchKOC.toLowerCase())
         );
         return (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+          <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
             <div className="relative max-w-xs flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input value={searchKOC} onChange={e => setSearchKOC(e.target.value)}
                 placeholder="Tìm tên KOC..."
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 whitespace-nowrap">Tháng:</label>
+              <select value={kocListThang} onChange={e => setKocListThang(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
+                <option value="">Tất cả</option>
+                {thangListAll.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
+              </select>
             </div>
             <span className="text-xs text-slate-400 ml-auto">{kocSearchFiltered.length} KOC</span>
           </div>
@@ -1667,11 +1692,11 @@ export default function KocPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">#</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Tên KOC</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Nền tảng</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Trạng thái</th>
                   <th className="text-right px-4 py-3 text-slate-500 font-medium">Follower</th>
                   <th className="text-right px-4 py-3 text-slate-500 font-medium">Giá cast</th>
+                  <th className="text-center px-4 py-3 text-slate-500 font-medium">Booking{kocListThang ? ` T${kocListThang.slice(5,7)}` : ""}</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">SĐT</th>
-                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Email</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Địa chỉ</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Link</th>
                   <th className="px-4 py-3"></th>
@@ -1680,17 +1705,30 @@ export default function KocPage() {
               <tbody className="divide-y divide-slate-100">
                 {kocSearchFiltered.length === 0 ? (
                   <tr><td colSpan={10} className="text-center py-10 text-slate-400">Chưa có KOC nào</td></tr>
-                ) : kocSearchFiltered.map((k, i) => (
+                ) : kocSearchFiltered.map((k, i) => {
+                  const tt = TRANG_THAI_HOP_TAC[k.trangThaiHopTac] ?? TRANG_THAI_HOP_TAC["chua_tra_loi"];
+                  const bc = bookingCountMap.get(k.id) ?? 0;
+                  return (
                   <tr key={k.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{k.ten}</td>
                     <td className="px-4 py-3">
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{PLATFORM_LABEL[k.platform] ?? k.platform}</span>
+                      <select
+                        value={k.trangThaiHopTac || "chua_tra_loi"}
+                        onChange={e => updateTrangThai(k.id, e.target.value)}
+                        className={`text-xs rounded-lg px-2 py-1 border-0 font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-300 ${tt.color}`}
+                      >
+                        {Object.entries(TRANG_THAI_HOP_TAC).map(([v, { label }]) => (
+                          <option key={v} value={v}>{label}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3 text-right text-slate-600 text-xs">{k.follower > 0 ? k.follower.toLocaleString() : "—"}</td>
                     <td className="px-4 py-3 text-right font-medium text-rose-600">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
+                    <td className="px-4 py-3 text-center">
+                      {bc > 0 ? <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-medium">{bc}</span> : <span className="text-slate-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{k.sdt || "—"}</td>
-                    <td className="px-4 py-3 text-slate-600 text-xs">{k.email || "—"}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{k.diaChi || "—"}</td>
                     <td className="px-4 py-3">
                       {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">Profile</a> : "—"}
@@ -1699,7 +1737,7 @@ export default function KocPage() {
                       <button onClick={() => openEditKOC(k)} className="text-xs text-rose-500 hover:underline">Sửa</button>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
