@@ -1199,19 +1199,6 @@ export default function KocPage() {
                             </button>
                           );
                         })()}
-                        {/* TikTok doanh thu tháng đang lọc */}
-                        {group.spId && (() => {
-                          const rows = tiktokSP.filter(r => r.sanPhamId === group.spId && (!filterThang || r.thang === filterThang));
-                          if (rows.length === 0) return null;
-                          const total = rows.reduce((acc, r) => ({ doanhThu: acc.doanhThu + r.doanhThu, donHang: acc.donHang + r.donHang }), { doanhThu: 0, donHang: 0 });
-                          return (
-                            <span className="flex items-center gap-1.5 text-xs bg-pink-50 border border-pink-200 text-pink-700 px-2 py-0.5 rounded-full font-medium">
-                              <TrendingUp size={11} />
-                              {formatCurrency(total.doanhThu)} · {total.donHang} đơn
-                              {!filterThang && rows.length > 1 && <span className="text-pink-400">({rows.length} tháng)</span>}
-                            </span>
-                          );
-                        })()}
                       </div>
                     </div>
                     {/* Xuất đã duyệt — chỉ hiện khi có tick */}
