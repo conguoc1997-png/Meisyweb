@@ -72,14 +72,21 @@ export async function POST(req: NextRequest) {
       matchedKocIds.length > 0 ? prisma.tiktokDoanhThuKOC.deleteMany({ where: { thang, kocId: { in: matchedKocIds } } }) : Promise.resolve(),
     ]);
 
-    // ── Batch insert ──
+    // ── Batch insert — group by sanPhamId to avoid duplicate (sanPhamId,thang) ──
     const unmatchedProducts: string[] = [];
-    const spInsert: { id: string; sanPhamId: string; thang: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number }[] = [];
+    const spBySpId = new Map<string, { doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number }>();
     for (const [pid, agg] of spAgg) {
       const spId = productMap.get(pid) ?? productMap.get(pid.slice(0, 15));
       if (!spId) { unmatchedProducts.push(pid); continue; }
-      spInsert.push({ id: cuid(), sanPhamId: spId, thang, ...agg });
+      const existing = spBySpId.get(spId);
+      if (existing) {
+        existing.doanhThu += agg.doanhThu; existing.donHang += agg.donHang;
+        existing.hoaHong  += agg.hoaHong;  existing.hoanTien += agg.hoanTien; existing.soMon += agg.soMon;
+      } else {
+        spBySpId.set(spId, { ...agg });
+      }
     }
+    const spInsert = [...spBySpId.entries()].map(([spId, agg]) => ({ id: cuid(), sanPhamId: spId, thang, ...agg }));
 
     const kocInsert: { id: string; kocId: string; thang: string; creatorName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number }[] = [];
     for (const [name, agg] of kocAgg) {
