@@ -5,7 +5,7 @@ import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, U
 import * as XLSX from "xlsx";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
-type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string };
+type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null };
 type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
@@ -83,6 +83,120 @@ export default function KocPage() {
   const [contactDone, setContactDone] = useState(false);
 
   const [kocViewThang, setKocViewThang] = useState("");
+  const [editingSpTikTok, setEditingSpTikTok] = useState<string | null>(null);
+  const spTikTokRef = useRef<HTMLInputElement>(null);
+
+  const saveSpTikTokId = async (sp: SanPham) => {
+    const value = spTikTokRef.current?.value ?? "";
+    setEditingSpTikTok(null);
+    if (value === (sp.tiktokProductId ?? "")) return;
+    await fetch(`/api/kho/san-pham/${sp.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...sp, tiktokProductId: value || null }),
+    });
+    setSanPhams(prev => prev.map(s => s.id === sp.id ? { ...s, tiktokProductId: value || null } : s));
+  };
+
+  // ── Import TikTok Transaction_Analysis_Video_List ──
+  const [modalTikTokImport, setModalTikTokImport] = useState(false);
+  const [tiktokImportLoading, setTiktokImportLoading] = useState(false);
+  const [tiktokImportResult, setTiktokImportResult] = useState<{
+    ok: number; total: number;
+    unmatchedProducts: string[]; unmatchedKOCs: string[];
+  } | null>(null);
+
+  async function handleTikTokImport(file: File) {
+    setTiktokImportLoading(true);
+    setTiktokImportResult(null);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(data), { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 }) as unknown[][];
+
+      // Extract month from filename: Transaction_Analysis_Video_List_20260501-20260531
+      let thang = "";
+      const m = file.name.match(/(\d{4})(\d{2})\d{2}-\d{8}/);
+      if (m) thang = `${m[1]}-${m[2]}`;
+      if (!thang) thang = prompt("Không đọc được tháng từ tên file. Nhập tháng (VD: 2026-05):") ?? "";
+      if (!thang) { setTiktokImportLoading(false); return; }
+
+      // Find header row
+      const headerIdx = allRows.findIndex(row =>
+        (row as unknown[]).some(cell => {
+          const s = String(cell ?? "").toLowerCase();
+          return s.includes("product id") || s.includes("video id") || s.includes("creator");
+        })
+      );
+      if (headerIdx === -1) { alert("Không tìm thấy header trong file"); setTiktokImportLoading(false); return; }
+
+      const headers = (allRows[headerIdx] as unknown[]).map(h => String(h ?? "").toLowerCase().trim());
+      const ci = (...kws: string[]) => headers.findIndex(h => kws.some(kw => h.includes(kw)));
+      const cProductId  = ci("id sản phẩm", "id san pham", "product id", "product_id", "productid", "mã sản phẩm", "item id");
+      const cKocName    = ci("creator name", "creator", "seller name", "seller", "tên nhà", "ten nha", "influencer");
+      const cVideoId    = ci("id video", "video id", "video_id", "videoid", "mã video");
+      const cDonHang    = ci("đơn hàng nhờ video", "số món bán ra", "order", "đơn hàng", "don hang", "orders");
+      const cDoanhThu   = ci("gmv đến từ", "gmv liên kết", "gmv", "net revenue", "revenue", "doanh thu", "settlement amount");
+      const cHoaHong    = ci("hoa hồng ước tính", "hoa hồng", "commission", "hoa hong", "affiliate commission");
+      const cHoanTien   = ci("hoàn tiền", "hoan tien", "refund", "return");
+
+      // Debug: show detected columns if nothing useful found
+      if (cProductId === -1 && cKocName === -1) {
+        alert(`Không nhận diện được cột. Headers tìm thấy:\n${headers.slice(0,15).join(" | ")}\n\nVui lòng báo lại tên cột Product ID và Creator trong file.`);
+        setTiktokImportLoading(false);
+        return;
+      }
+
+      const toNum = (v: unknown): number => {
+        if (typeof v === "number") return v;
+        let s = String(v ?? "").replace(/[^\d.,]/g, "").trim();
+        if (!s) return 0;
+        if (s.includes(".") && s.includes(",")) {
+          s = s.replace(/\./g, "").replace(",", ".");
+        } else if (s.includes(".")) {
+          const parts = s.split(".");
+          if (parts.length > 2 || (parts.length === 2 && parts[1].length > 2)) s = s.replace(/\./g, "");
+        } else if (s.includes(",")) { s = s.replace(",", "."); }
+        return parseFloat(s) || 0;
+      };
+
+      const rows: { tiktokProductId: string; kocName: string; videoId: string; donHang: number; doanhThu: number; hoaHong: number; hoanTien: number }[] = [];
+      for (let i = headerIdx + 1; i < allRows.length; i++) {
+        const r = allRows[i] as unknown[];
+        const pid = cProductId >= 0 ? String(r[cProductId] ?? "").trim() : "";
+        const kocName = cKocName >= 0 ? String(r[cKocName] ?? "").trim() : "";
+        if (!pid || !kocName) continue;
+        rows.push({
+          tiktokProductId: pid,
+          kocName,
+          videoId: cVideoId >= 0 ? String(r[cVideoId] ?? "").trim() : "",
+          donHang:   cDonHang >= 0  ? toNum(r[cDonHang])  : 0,
+          doanhThu:  cDoanhThu >= 0 ? toNum(r[cDoanhThu]) : 0,
+          hoaHong:   cHoaHong >= 0  ? toNum(r[cHoaHong])  : 0,
+          hoanTien:  cHoanTien >= 0 ? toNum(r[cHoanTien]) : 0,
+        });
+      }
+
+      if (rows.length === 0) {
+        alert(`Không có dòng dữ liệu nào.\nHeaders: ${headers.slice(0,15).join(" | ")}\nCột product ID: ${cProductId} | Cột creator: ${cKocName}`);
+        setTiktokImportLoading(false);
+        return;
+      }
+
+      const res = await fetch("/api/koc/import-tiktok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thang, rows }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      setTiktokImportResult({ ok: result.ok, total: result.total, unmatchedProducts: result.unmatchedProducts, unmatchedKOCs: result.unmatchedKOCs });
+    } catch (err) {
+      alert("Lỗi import: " + String(err));
+    } finally {
+      setTiktokImportLoading(false);
+    }
+  }
 
   // ── Import báo cáo hiệu quả KOC (TikTok/platform report) ──
   type ReportRow = { creatorName: string; gmv: number; donHang: number; hoantien: number; aov: number; hoaHong: number };
@@ -260,8 +374,8 @@ export default function KocPage() {
       fetch("/api/kho/san-pham").then((r) => r.json()),
       fetch("/api/koc/remind").then((r) => r.json()),
     ]);
-    setKocs(k);
-    setBookings(b);
+    setKocs(Array.isArray(k) ? k : []);
+    setBookings(Array.isArray(b) ? b : []);
     setSanPhams(Array.isArray(sp) ? sp : sp.data ?? []);
     if (Array.isArray(rem)) setReminders(rem);
   };
@@ -881,6 +995,10 @@ export default function KocPage() {
             <Upload size={16} className="text-slate-500" />
             {importLoading ? "Đang đọc..." : "Import Excel"}
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+          </label>
+          <label className="flex items-center gap-1.5 px-3 py-2 text-sm border border-violet-300 text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 transition cursor-pointer">
+            <TrendingUp size={16} /> Import TikTok
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) { setModalTikTokImport(true); handleTikTokImport(f); } e.target.value = ""; }} />
           </label>
           <button
             onClick={() => { setSheetUrl(""); setSheetError(""); setModalSheet(true); }}
@@ -1684,31 +1802,55 @@ export default function KocPage() {
                 return filtered.map(sp => {
                 const soBooking = bookings.filter(b => b.sanPhamId === sp.id).length;
                 return (
-                  <button
-                    key={sp.id}
-                    onClick={() => { setModalPickSP(false); openLaunch(sp); }}
-                    className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-rose-300 hover:bg-rose-50 transition text-left group"
-                  >
-                    <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-rose-100">
-                      <Package size={16} className="text-slate-400 group-hover:text-rose-500" />
+                  <div key={sp.id} className="rounded-xl border border-slate-200 hover:border-rose-200 transition">
+                    <button
+                      onClick={() => { setModalPickSP(false); openLaunch(sp); }}
+                      className="w-full flex items-center gap-4 p-4 text-left group"
+                    >
+                      <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-rose-100">
+                        <Package size={16} className="text-slate-400 group-hover:text-rose-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-800 truncate">{sp.ten}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="font-mono">{sp.sku}</span>
+                          <span className="mx-2">·</span>
+                          Giá nhập: {formatCurrency(sp.giaNhap)}
+                          <span className="mx-2">·</span>
+                          Tồn: {sp.tonKho}
+                        </p>
+                      </div>
+                      {soBooking > 0 && (
+                        <span className="text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-full font-medium flex-shrink-0">
+                          {soBooking} KOC
+                        </span>
+                      )}
+                      <span className="text-rose-400 text-sm flex-shrink-0">→</span>
+                    </button>
+                    {/* TikTok ID inline */}
+                    <div className="px-4 pb-3 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                      <span className="text-[10px] text-slate-400 shrink-0">TikTok ID:</span>
+                      {editingSpTikTok === sp.id ? (
+                        <input
+                          autoFocus
+                          ref={spTikTokRef}
+                          type="text"
+                          defaultValue={sp.tiktokProductId ?? ""}
+                          onBlur={() => saveSpTikTokId(sp)}
+                          onKeyDown={e => { if (e.key === "Enter") saveSpTikTokId(sp); if (e.key === "Escape") setEditingSpTikTok(null); }}
+                          className="flex-1 border border-violet-300 rounded px-2 py-0.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-violet-300"
+                          placeholder="Nhập TikTok Product ID..."
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setEditingSpTikTok(sp.id)}
+                          className={`text-xs font-mono ${sp.tiktokProductId ? "text-violet-600 hover:underline" : "text-slate-300 hover:text-violet-400"}`}
+                        >
+                          {sp.tiktokProductId ?? "+ Thêm ID"}
+                        </button>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 truncate">{sp.ten}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        <span className="font-mono">{sp.sku}</span>
-                        <span className="mx-2">·</span>
-                        Giá nhập: {formatCurrency(sp.giaNhap)}
-                        <span className="mx-2">·</span>
-                        Tồn: {sp.tonKho}
-                      </p>
-                    </div>
-                    {soBooking > 0 && (
-                      <span className="text-xs bg-rose-100 text-rose-600 px-2 py-1 rounded-full font-medium flex-shrink-0">
-                        {soBooking} KOC
-                      </span>
-                    )}
-                    <span className="text-rose-400 text-sm flex-shrink-0">→</span>
-                  </button>
+                  </div>
                 );
               });
               })()}
@@ -2634,6 +2776,57 @@ export default function KocPage() {
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">{loading ? "Đang lưu..." : "Lưu"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── Modal Import TikTok result ── */}
+      {modalTikTokImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Import TikTok Video Report</h3>
+            {tiktokImportLoading ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <Loader2 size={32} className="animate-spin text-violet-500" />
+                <p className="text-sm text-slate-500">Đang xử lý dữ liệu...</p>
+              </div>
+            ) : tiktokImportResult ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200">
+                  <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">Import thành công</p>
+                    <p className="text-xs text-green-600">{tiktokImportResult.ok}/{tiktokImportResult.total} bản ghi đã lưu vào DB</p>
+                  </div>
+                </div>
+                {tiktokImportResult.unmatchedProducts.length > 0 && (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-700 mb-1">Sản phẩm chưa có TikTok ID ({tiktokImportResult.unmatchedProducts.length})</p>
+                    <p className="text-xs text-amber-600">Vào trang Sản phẩm, thêm TikTok Product ID cho các sản phẩm sau:</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {tiktokImportResult.unmatchedProducts.map(pid => (
+                        <li key={pid} className="text-xs font-mono text-amber-800 bg-amber-100 px-2 py-0.5 rounded">{pid}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {tiktokImportResult.unmatchedKOCs.length > 0 && (
+                  <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
+                    <p className="text-xs font-bold text-orange-700 mb-1">KOC chưa có trong hệ thống ({tiktokImportResult.unmatchedKOCs.length})</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {tiktokImportResult.unmatchedKOCs.map(name => (
+                        <li key={name} className="text-xs text-orange-800">{name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <button
+                  onClick={() => { setModalTikTokImport(false); setTiktokImportResult(null); }}
+                  className="w-full px-4 py-2 text-sm bg-violet-500 text-white rounded-lg hover:bg-violet-600"
+                >
+                  Đóng
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
