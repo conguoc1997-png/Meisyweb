@@ -837,10 +837,14 @@ export default function KocPage() {
     }
   };
 
-  // Stats
+  // Stats — doanh thu/đơn hàng ưu tiên từ TikTok import, fallback sang booking DB
   const tongChiPhi  = bookings.reduce((s, b) => s + b.chiPhi, 0);
-  const tongDoanhThu = bookings.reduce((s, b) => s + b.doanhThu, 0);
-  const tongDonHang  = bookings.reduce((s, b) => s + b.donHang, 0);
+  const tongDoanhThuTiktok = tiktokSP.reduce((s, r) => s + r.doanhThu, 0);
+  const tongDonHangTiktok  = tiktokSP.reduce((s, r) => s + r.donHang, 0);
+  const tongDoanhThuDB     = bookings.reduce((s, b) => s + b.doanhThu, 0);
+  const tongDonHangDB      = bookings.reduce((s, b) => s + b.donHang, 0);
+  const tongDoanhThu = tongDoanhThuTiktok > 0 ? tongDoanhThuTiktok : tongDoanhThuDB;
+  const tongDonHang  = tongDonHangTiktok  > 0 ? tongDonHangTiktok  : tongDonHangDB;
   const roiTB = tongChiPhi > 0 ? ((tongDoanhThu - tongChiPhi) / tongChiPhi * 100).toFixed(1) : "0";
   const thangListAll = Array.from(new Set([
     ...bookings.map(b => { const d = new Date(b.ngayBat); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }),
@@ -866,11 +870,19 @@ export default function KocPage() {
           <p className="text-xl font-bold text-slate-800">{formatCurrency(tongChiPhi)}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="flex items-center gap-2 mb-2"><TrendingUp size={16} className="text-green-400" /><p className="text-xs text-slate-500">Tổng doanh thu</p></div>
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp size={16} className="text-green-400" />
+            <p className="text-xs text-slate-500">Tổng doanh thu</p>
+            {tongDoanhThuTiktok > 0 && <span className="text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full ml-auto">TikTok</span>}
+          </div>
           <p className="text-xl font-bold text-green-600">{formatCurrency(tongDoanhThu)}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="flex items-center gap-2 mb-2"><ShoppingBag size={16} className="text-blue-400" /><p className="text-xs text-slate-500">Tổng đơn hàng</p></div>
+          <div className="flex items-center gap-2 mb-2">
+            <ShoppingBag size={16} className="text-blue-400" />
+            <p className="text-xs text-slate-500">Tổng đơn hàng</p>
+            {tongDonHangTiktok > 0 && <span className="text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full ml-auto">TikTok</span>}
+          </div>
           <p className="text-xl font-bold text-slate-800">{tongDonHang.toLocaleString()}</p>
         </div>
         <div className={`rounded-xl p-4 border ${Number(roiTB) >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
