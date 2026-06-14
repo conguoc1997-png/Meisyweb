@@ -100,11 +100,18 @@ export async function POST(req: NextRequest) {
       kocInsert.length > 0 ? prisma.tiktokDoanhThuKOC.createMany({ data: kocInsert }) : Promise.resolve(),
     ]);
 
+    // Debug: show unmatched IDs with their prefix so user can compare
+    const debugUnmatched = unmatchedProducts.slice(0, 10).map(pid => ({
+      pid, prefix15: pid.slice(0, 15)
+    }));
+    const debugProductMapKeys = [...productMap.keys()].slice(0, 20);
+
     return NextResponse.json({
       success: true, thang,
       spSaved: spInsert.length, spTotal: spAgg.size,
       kocSaved: kocInsert.length,
       newKOCs, unmatchedProducts,
+      debug: { debugUnmatched, debugProductMapKeys },
     });
   } catch (err) {
     console.error(err);
