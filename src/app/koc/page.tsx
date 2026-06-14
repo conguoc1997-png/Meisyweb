@@ -1119,11 +1119,35 @@ export default function KocPage() {
                     className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition"
                   >
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Package size={15} className="text-slate-400" />
                         <span className="font-semibold text-slate-800">{group.label}</span>
                         <span className="text-xs text-slate-400 font-mono">{group.sku}</span>
                         <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{group.items.length} KOC</span>
+                        {group.spId && (() => {
+                          const sp = sanPhams.find(s => s.id === group.spId);
+                          if (!sp) return null;
+                          return editingSpTikTok === group.spId ? (
+                            <input
+                              autoFocus
+                              ref={spTikTokRef}
+                              type="text"
+                              defaultValue={sp.tiktokProductId ?? ""}
+                              onClick={e => e.stopPropagation()}
+                              onBlur={() => saveSpTikTokId(sp)}
+                              onKeyDown={e => { e.stopPropagation(); if (e.key === "Enter") saveSpTikTokId(sp); if (e.key === "Escape") setEditingSpTikTok(null); }}
+                              className="border border-violet-300 rounded px-2 py-0.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-violet-300 w-48"
+                              placeholder="TikTok Product ID..."
+                            />
+                          ) : (
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditingSpTikTok(group.spId!); }}
+                              className={`text-xs font-mono px-2 py-0.5 rounded border ${sp.tiktokProductId ? "border-violet-200 text-violet-600 bg-violet-50" : "border-dashed border-slate-300 text-slate-400 hover:border-violet-300 hover:text-violet-400"}`}
+                            >
+                              {sp.tiktokProductId ? `🔗 ${sp.tiktokProductId}` : "+ TikTok ID"}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                     {/* Xuất đã duyệt — chỉ hiện khi có tick */}
