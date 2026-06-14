@@ -114,7 +114,13 @@ export default function KocPage() {
       let thang = "";
       const m = file.name.match(/(\d{4})(\d{2})\d{2}[-_]\d{8}/);
       if (m) thang = `${m[1]}-${m[2]}`;
-      if (!thang) thang = prompt("Không đọc được tháng từ tên file. Nhập tháng (VD: 2026-05):") ?? "";
+      // Luôn cho user xác nhận tháng
+      const confirmed = prompt(
+        `Tháng dữ liệu từ file:\n"${file.name}"\n\n→ Hệ thống đọc được: ${thang || "Không rõ"}\n\nNhập tháng đúng (VD: 2026-05) hoặc OK để dùng giá trị trên:`,
+        thang
+      );
+      if (confirmed === null) { setTiktokImportLoading(false); return; }
+      thang = confirmed.trim();
       if (!thang) { setTiktokImportLoading(false); return; }
 
       const data = await file.arrayBuffer();
