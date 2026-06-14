@@ -842,10 +842,11 @@ export default function KocPage() {
   const tongDoanhThu = bookings.reduce((s, b) => s + b.doanhThu, 0);
   const tongDonHang  = bookings.reduce((s, b) => s + b.donHang, 0);
   const roiTB = tongChiPhi > 0 ? ((tongDoanhThu - tongChiPhi) / tongChiPhi * 100).toFixed(1) : "0";
-  const thangListAll = Array.from(new Set(bookings.map(b => {
-    const d = new Date(b.ngayBat);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-  }))).sort().reverse();
+  const thangListAll = Array.from(new Set([
+    ...bookings.map(b => { const d = new Date(b.ngayBat); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }),
+    ...tiktokSP.map(r => r.thang),
+    ...tiktokKOC.map(r => r.thang),
+  ])).sort().reverse();
 
   return (
     <div className="p-6">
