@@ -1479,11 +1479,13 @@ export default function KocPage() {
 
                       {/* Tab: Hiệu quả — dữ liệu từ TikTok import */}
                       {subTab === "hieugua" && (() => {
-                        // Lấy tất cả kocId trong nhóm sản phẩm này
+                        // Lấy tất cả kocId và tên KOC trong nhóm sản phẩm này
                         const groupKocIds = new Set(group.items.map(b => b.kocId));
-                        // Lọc tiktokKOC theo kocId trong nhóm + filterThang nếu có
+                        const groupKocNames = new Set(group.items.map(b => b.koc.ten.toLowerCase().trim()));
+                        // Lọc tiktokKOC: khớp theo kocId HOẶC creatorName (phòng trường hợp tên hơi khác tạo KOC trùng)
                         const kocRows = tiktokKOC.filter(r =>
-                          groupKocIds.has(r.kocId) && (!filterThang || r.thang === filterThang)
+                          (groupKocIds.has(r.kocId) || groupKocNames.has(r.creatorName.toLowerCase().trim())) &&
+                          (!filterThang || r.thang === filterThang)
                         );
                         // Merge với booking để lấy chiPhiCast
                         type HieuquaRow = { kocId: string; kocName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; chiPhiCast: number; hasTiktok: boolean };
@@ -1497,9 +1499,11 @@ export default function KocPage() {
                             hasTiktok: false,
                           });
                         }
-                        // Ghi đè/cộng doanh thu từ tiktokKOC
+                        // Ghi đè/cộng doanh thu từ tiktokKOC (khớp theo kocId hoặc creatorName)
                         for (const r of kocRows) {
-                          const existing = mergedMap.get(r.kocId);
+                          const byId   = mergedMap.get(r.kocId);
+                          const byName = [...mergedMap.values()].find(m => m.kocName.toLowerCase().trim() === r.creatorName.toLowerCase().trim());
+                          const existing = byId ?? byName;
                           if (existing) {
                             existing.doanhThu  += r.doanhThu;
                             existing.donHang   += r.donHang;
