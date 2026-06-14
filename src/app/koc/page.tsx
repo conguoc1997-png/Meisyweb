@@ -83,6 +83,7 @@ export default function KocPage() {
   const [contactDone, setContactDone] = useState(false);
 
   const [kocViewThang, setKocViewThang] = useState("");
+  const [kocFilterTT, setKocFilterTT] = useState("");
   const [editingSpTikTok, setEditingSpTikTok] = useState<string | null>(null);
   const spTikTokRef = useRef<HTMLInputElement>(null);
 
@@ -1684,28 +1685,40 @@ export default function KocPage() {
                 {thangListAll.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 whitespace-nowrap">Trạng thái:</label>
+              <select value={kocFilterTT} onChange={e => setKocFilterTT(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200"
+              >
+                <option value="">Tất cả</option>
+                {Object.entries(TRANG_THAI_HOP_TAC).map(([v, { label }]) => <option key={v} value={v}>{label}</option>)}
+              </select>
+            </div>
             <span className="text-xs text-slate-400 ml-auto">{kocSearchFiltered.length} KOC</span>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          {(() => {
+            const finalFiltered = kocSearchFiltered.filter(k => !kocFilterTT || (k.trangThaiHopTac || "chua_tra_loi") === kocFilterTT);
+            return (
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">#</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Tên KOC</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Trạng thái</th>
-                  <th className="text-right px-4 py-3 text-slate-500 font-medium">Follower</th>
                   <th className="text-right px-4 py-3 text-slate-500 font-medium">Giá cast</th>
                   <th className="text-center px-4 py-3 text-slate-500 font-medium">Booking{kocListThang ? ` T${kocListThang.slice(5,7)}` : ""}</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">SĐT</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Địa chỉ</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Ghi chú</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Link</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {kocSearchFiltered.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-10 text-slate-400">Chưa có KOC nào</td></tr>
-                ) : kocSearchFiltered.map((k, i) => {
+                {finalFiltered.length === 0 ? (
+                  <tr><td colSpan={10} className="text-center py-10 text-slate-400">Không có KOC nào</td></tr>
+                ) : finalFiltered.map((k, i) => {
                   const tt = TRANG_THAI_HOP_TAC[k.trangThaiHopTac] ?? TRANG_THAI_HOP_TAC["chua_tra_loi"];
                   const bc = bookingCountMap.get(k.id) ?? 0;
                   return (
@@ -1723,13 +1736,13 @@ export default function KocPage() {
                         ))}
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-600 text-xs">{k.follower > 0 ? k.follower.toLocaleString() : "—"}</td>
                     <td className="px-4 py-3 text-right font-medium text-rose-600">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
                     <td className="px-4 py-3 text-center">
                       {bc > 0 ? <span className="text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-medium">{bc}</span> : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-600 text-xs">{k.sdt || "—"}</td>
-                    <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{k.diaChi || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs max-w-[120px] truncate">{k.diaChi || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{k.ghiChu || "—"}</td>
                     <td className="px-4 py-3">
                       {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">Profile</a> : "—"}
                     </td>
@@ -1740,7 +1753,9 @@ export default function KocPage() {
                 )})}
               </tbody>
             </table>
-          </div>
+            </div>
+            );
+          })()}
         </div>
         );
       })()}
