@@ -1140,12 +1140,16 @@ export default function KocPage() {
               const totalView  = group.items.reduce((s, b) => s + b.luotXem, 0);
               // Nếu có báo cáo Excel → ưu tiên dùng tổng GMV từ báo cáo
               const groupReport = reportDataMap[group.key] ?? [];
+              // Doanh thu TikTok từ DB (lọc theo tháng nếu có)
+              const tiktokSPRows = tiktokSP.filter(r => r.sanPhamId === group.spId && (!filterThang || r.thang === filterThang));
+              const tiktokDT  = tiktokSPRows.reduce((s, r) => s + r.doanhThu, 0);
+              const tiktokDon = tiktokSPRows.reduce((s, r) => s + r.donHang, 0);
               const totalDT    = groupReport.length > 0
                 ? groupReport.reduce((s, r) => s + r.gmv, 0)
-                : totalDTdb;
+                : tiktokDT > 0 ? tiktokDT : totalDTdb;
               const headerDon  = groupReport.length > 0
                 ? groupReport.reduce((s, r) => s + r.donHang, 0)
-                : totalDon;
+                : tiktokDon > 0 ? tiktokDon : totalDon;
               const roi        = totalCP > 0 ? ((totalDT - totalCP) / totalCP * 100).toFixed(1) : "—";
               const roiNum     = totalCP > 0 ? (totalDT - totalCP) / totalCP * 100 : 0;
               const isOpen     = expandedSP === group.key;
