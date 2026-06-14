@@ -85,6 +85,7 @@ export default function KocPage() {
   const [kocViewThang, setKocViewThang] = useState("");
   const [kocFilterTT, setKocFilterTT] = useState("");
   const [kocFilterCreated, setKocFilterCreated] = useState("");
+  const [selectedKocIds, setSelectedKocIds] = useState<Set<string>>(new Set());
   const [editingKocGCId, setEditingKocGCId] = useState<string | null>(null);
   const kocGcRef = useRef<HTMLTextAreaElement>(null);
   const [editingSpTikTok, setEditingSpTikTok] = useState<string | null>(null);
@@ -1676,6 +1677,14 @@ export default function KocPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input type="checkbox" className="rounded border-slate-300 cursor-pointer"
+                      onChange={e => {
+                        const ids = finalFiltered.map(k => k.id);
+                        setSelectedKocIds(e.target.checked ? new Set(ids) : new Set());
+                      }}
+                      checked={finalFiltered.length > 0 && finalFiltered.every(k => selectedKocIds.has(k.id))} />
+                  </th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">#</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Tên KOC</th>
                   <th className="text-left px-4 py-3 text-slate-500 font-medium">Trạng thái</th>
@@ -1695,7 +1704,12 @@ export default function KocPage() {
                   const tt = TRANG_THAI_HOP_TAC[k.trangThaiHopTac] ?? TRANG_THAI_HOP_TAC["chua_tra_loi"];
                   const bc = bookingCountMap.get(k.id) ?? 0;
                   return (
-                  <tr key={k.id} className="hover:bg-slate-50">
+                  <tr key={k.id} className={`hover:bg-slate-50 ${selectedKocIds.has(k.id) ? "bg-blue-50" : ""}`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" className="rounded border-slate-300 cursor-pointer"
+                        checked={selectedKocIds.has(k.id)}
+                        onChange={e => setSelectedKocIds(prev => { const s = new Set(prev); e.target.checked ? s.add(k.id) : s.delete(k.id); return s; })} />
+                    </td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{k.ten}</td>
                     <td className="px-4 py-3">
