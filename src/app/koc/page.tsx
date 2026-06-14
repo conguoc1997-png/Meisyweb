@@ -1144,7 +1144,10 @@ export default function KocPage() {
               // Nếu có báo cáo Excel → ưu tiên dùng tổng GMV từ báo cáo
               const groupReport = reportDataMap[group.key] ?? [];
               // Doanh thu TikTok từ DB (lọc theo tháng nếu có)
-              const tiktokSPRows = tiktokSP.filter(r => r.sanPhamId === group.spId && (!filterThang || r.thang === filterThang));
+              const groupTiktokId = sanPhams.find(s => s.id === group.spId)?.tiktokProductId;
+              const tiktokSPRows = groupTiktokId
+                ? tiktokSP.filter(r => (!filterThang || r.thang === filterThang) && sanPhams.find(s => s.id === r.sanPhamId)?.tiktokProductId === groupTiktokId)
+                : tiktokSP.filter(r => r.sanPhamId === group.spId && (!filterThang || r.thang === filterThang));
               const tiktokDT  = tiktokSPRows.reduce((s, r) => s + r.doanhThu, 0);
               const tiktokDon = tiktokSPRows.reduce((s, r) => s + r.donHang, 0);
               const totalDT    = groupReport.length > 0
