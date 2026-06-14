@@ -1477,133 +1477,73 @@ export default function KocPage() {
                         </div>
                       )}
 
-                      {/* Tab: Hiệu quả */}
+                      {/* Tab: Hiệu quả — dữ liệu từ TikTok import */}
                       {subTab === "hieugua" && (() => {
-                        const reportRows = reportDataMap[group.key] ?? [];
-                        // Merge: ưu tiên GMV từ báo cáo, nếu không có thì dùng doanhThu DB
-                        type MergedRow = { kocName: string; gmv: number; chiPhi: number; chiPhiCast: number; donHang: number; matched: boolean };
-                        const mergedRows: MergedRow[] = group.items.map(b => {
-                          const rpt = reportRows.find(r => r.creatorName.toLowerCase() === b.koc.ten.toLowerCase());
-                          return {
-                            kocName: b.koc.ten,
-                            gmv: rpt ? rpt.gmv : b.doanhThu,
-                            chiPhi: b.chiPhi,
+                        // Lấy tất cả kocId trong nhóm sản phẩm này
+                        const groupKocIds = new Set(group.items.map(b => b.kocId));
+                        // Lọc tiktokKOC theo kocId trong nhóm + filterThang nếu có
+                        const kocRows = tiktokKOC.filter(r =>
+                          groupKocIds.has(r.kocId) && (!filterThang || r.thang === filterThang)
+                        );
+                        // Merge với booking để lấy chiPhiCast
+                        type HieuquaRow = { kocId: string; kocName: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; chiPhiCast: number; hasTiktok: boolean };
+                        const mergedMap = new Map<string, HieuquaRow>();
+                        // Seed từ bookings trước
+                        for (const b of group.items) {
+                          mergedMap.set(b.kocId, {
+                            kocId: b.kocId, kocName: b.koc.ten,
+                            doanhThu: 0, donHang: 0, hoaHong: 0, hoanTien: 0, soMon: 0,
                             chiPhiCast: b.chiPhiCast,
-                            donHang: rpt ? rpt.donHang : b.donHang,
-                            matched: !!rpt,
-                          };
-                        });
-                        // Thêm từ báo cáo chưa match
-                        if (reportRows.length > 0) {
-                          const matchedNames = new Set(group.items.map(b => b.koc.ten.toLowerCase()));
-                          reportRows.filter(r => !matchedNames.has(r.creatorName.toLowerCase())).forEach(r => {
-                            mergedRows.push({ kocName: r.creatorName, gmv: r.gmv, chiPhi: 0, chiPhiCast: 0, donHang: r.donHang, matched: false });
+                            hasTiktok: false,
                           });
                         }
-                        const sorted = [...mergedRows].sort((a, b) => b.gmv - a.gmv);
-                        const exTotalGMV = sorted.reduce((s, r) => s + r.gmv, 0);
-                        const exTotalChi = sorted.reduce((s, r) => s + r.chiPhiCast, 0);
-                        const exRoiNum   = exTotalChi > 0 ? (exTotalGMV - exTotalChi) / exTotalChi * 100 : 0;
-                        const exRoi      = exTotalChi > 0 ? exRoiNum.toFixed(1) : "—";
-                        const maxGMV = Math.max(...sorted.map(r => r.gmv), 1);
-                        const maxChi = Math.max(...sorted.map(r => r.chiPhiCast), 1);
-                        const maxY = Math.max(maxGMV, maxChi);
-                        const chartH = 220;
-                        const barW = 18;
-                        const gap = 6;
-                        const groupW = barW * 2 + gap + 14;
-                        const chartW = Math.max(600, sorted.length * groupW + 100);
+                        // Ghi đè/cộng doanh thu từ tiktokKOC
+                        for (const r of kocRows) {
+                          const existing = mergedMap.get(r.kocId);
+                          if (existing) {
+                            existing.doanhThu  += r.doanhThu;
+                            existing.donHang   += r.donHang;
+                            existing.hoaHong   += r.hoaHong;
+                            existing.hoanTien  += r.hoanTien;
+                            existing.soMon     += r.soMon;
+                            existing.hasTiktok  = true;
+                          }
+                        }
+                        const sorted = [...mergedMap.values()].sort((a, b) => b.doanhThu - a.doanhThu);
+                        const totalGMV  = sorted.reduce((s, r) => s + r.doanhThu, 0);
+                        const totalChi  = sorted.reduce((s, r) => s + r.chiPhiCast, 0);
+                        const roiNum    = totalChi > 0 ? (totalGMV - totalChi) / totalChi * 100 : 0;
+                        const roiStr    = totalChi > 0 ? roiNum.toFixed(1) : "—";
+                        const hasTiktokData = kocRows.length > 0;
 
                         return (
                         <div className="p-5 space-y-5">
                           {/* Stats */}
                           <div className="grid grid-cols-4 gap-4">
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                              <p className="text-xs text-slate-500 mb-1">Tổng lượt xem</p>
-                              <p className="text-lg font-bold text-slate-800">{totalView.toLocaleString()}</p>
+                              <p className="text-xs text-slate-500 mb-1">Số KOC</p>
+                              <p className="text-lg font-bold text-slate-800">{sorted.length}</p>
                             </div>
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                               <p className="text-xs text-slate-500 mb-1">Tổng đơn hàng</p>
                               <p className="text-lg font-bold text-slate-800">{sorted.reduce((s,r)=>s+r.donHang,0).toLocaleString()}</p>
                             </div>
                             <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                              <p className="text-xs text-slate-500 mb-1">Tổng GMV</p>
-                              <p className="text-lg font-bold text-green-600">{formatCurrency(sorted.reduce((s,r)=>s+r.gmv,0))}</p>
+                              <p className="text-xs text-slate-500 mb-1">Tổng GMV (TikTok)</p>
+                              <p className="text-lg font-bold text-green-600">{totalGMV > 0 ? formatCurrency(totalGMV) : "—"}</p>
                             </div>
-                            <div className={`rounded-xl p-4 border ${exRoiNum >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                            <div className={`rounded-xl p-4 border ${roiNum >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                               <p className="text-xs text-slate-500 mb-1">ROI tổng</p>
-                              <p className={`text-lg font-bold ${exRoiNum >= 0 ? "text-green-600" : "text-red-600"}`}>{exRoi}{exRoi !== "—" ? "%" : ""}</p>
+                              <p className={`text-lg font-bold ${roiNum >= 0 ? "text-green-600" : "text-red-600"}`}>{roiStr}{roiStr !== "—" ? "%" : ""}</p>
                             </div>
                           </div>
 
-                          {/* Import button */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-slate-600">📊 Biểu đồ hiệu suất</span>
-                              {reportRows.length > 0 && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{reportRows.length} KOC từ báo cáo</span>}
+                          {!hasTiktokData && (
+                            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                              <span>⚠️</span>
+                              <span>Chưa có dữ liệu TikTok{filterThang ? ` tháng ${filterThang.replace("-","/")}` : ""}. Hãy import file TikTok ở trên.</span>
                             </div>
-                            <label className="flex items-center gap-1.5 cursor-pointer bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-rose-100 transition">
-                              <Upload size={13} />
-                              {reportRows.length > 0 ? "Thay báo cáo Excel" : "Import báo cáo Excel"}
-                              <input type="file" accept=".xlsx,.xls" className="hidden"
-                                onChange={e => { if (e.target.files?.[0]) importReportFile(group.key, e.target.files[0]); e.target.value = ""; }} />
-                            </label>
-                          </div>
-
-                          {/* Bar chart */}
-                          <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white pb-2">
-                            <svg width={chartW} height={chartH + 60} className="block">
-                              {/* Y grid lines */}
-                              {[0,25,50,75,100].map(pct => {
-                                const y = 10 + (chartH - 10) * (1 - pct/100);
-                                const label = pct === 0 ? "0" : (maxY * pct / 100 >= 1e6
-                                  ? (maxY * pct / 100 / 1e6).toFixed(1) + "tr"
-                                  : Math.round(maxY * pct / 100).toLocaleString("vi-VN"));
-                                return (
-                                  <g key={pct}>
-                                    <line x1={80} x2={chartW - 10} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={1} />
-                                    <text x={76} y={y+4} fontSize={9} fill="#94a3b8" textAnchor="end">{label}</text>
-                                  </g>
-                                );
-                              })}
-                              {/* Bars */}
-                              {sorted.map((r, i) => {
-                                const x = 84 + i * groupW;
-                                const gmvH = Math.max(2, (r.gmv / maxY) * (chartH - 10));
-                                const chiH = Math.max(2, (r.chiPhiCast / maxY) * (chartH - 10));
-                                const gmvY = chartH + 10 - gmvH;
-                                const chiY = chartH + 10 - chiH;
-                                return (
-                                  <g key={r.kocName}>
-                                    {/* GMV bar (green) */}
-                                    <rect x={x} y={gmvY} width={barW} height={gmvH} fill="#22c55e" rx={3} opacity={0.85}>
-                                      <title>GMV: {formatCurrency(r.gmv)}</title>
-                                    </rect>
-                                    {/* Chi phí bar (pink) */}
-                                    <rect x={x + barW + gap} y={chiY} width={barW} height={chiH} fill="#f43f5e" rx={3} opacity={0.75}>
-                                      <title>Chi phí booking: {formatCurrency(r.chiPhiCast)}</title>
-                                    </rect>
-                                    {/* KOC name */}
-                                    <text
-                                      x={x + barW + gap/2}
-                                      y={chartH + 20}
-                                      fontSize={8}
-                                      fill={r.matched ? "#475569" : "#94a3b8"}
-                                      textAnchor="middle"
-                                      transform={`rotate(-40, ${x + barW + gap/2}, ${chartH + 20})`}
-                                    >{r.kocName.length > 14 ? r.kocName.slice(0,13)+"…" : r.kocName}</text>
-                                  </g>
-                                );
-                              })}
-                              {/* X axis */}
-                              <line x1={80} x2={chartW-10} y1={chartH+10} y2={chartH+10} stroke="#e2e8f0" strokeWidth={1}/>
-                            </svg>
-                            {/* Legend */}
-                            <div className="flex items-center gap-4 px-4 pt-1 pb-1">
-                              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-500 inline-block"/><span className="text-xs text-slate-500">GMV (doanh thu)</span></div>
-                              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-500 inline-block"/><span className="text-xs text-slate-500">Giá booking</span></div>
-                            </div>
-                          </div>
+                          )}
 
                           {/* Table */}
                           <table className="w-full text-xs">
@@ -1612,8 +1552,8 @@ export default function KocPage() {
                                 <th className="text-left px-3 py-2 text-slate-500">#</th>
                                 <th className="text-left px-3 py-2 text-slate-500">KOC</th>
                                 <th className="text-right px-3 py-2 text-slate-500">GMV</th>
-                                <th className="text-right px-3 py-2 text-slate-500">Hoàn tiền</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Đơn hàng</th>
+                                <th className="text-right px-3 py-2 text-slate-500">Hoàn tiền</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Hoa hồng</th>
                                 <th className="text-right px-3 py-2 text-slate-500">Giá booking</th>
                                 <th className="text-right px-3 py-2 text-slate-500 font-semibold">ROI</th>
@@ -1621,20 +1561,19 @@ export default function KocPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {sorted.map((r, i) => {
-                                const rpt = reportRows.find(x => x.creatorName.toLowerCase() === r.kocName.toLowerCase());
-                                const rRoi = r.chiPhiCast > 0 ? ((r.gmv - r.chiPhiCast) / r.chiPhiCast * 100).toFixed(1) : "—";
-                                const rRoiNum = r.chiPhiCast > 0 ? (r.gmv - r.chiPhiCast) / r.chiPhiCast * 100 : 0;
+                                const rRoiNum = r.chiPhiCast > 0 ? (r.doanhThu - r.chiPhiCast) / r.chiPhiCast * 100 : 0;
+                                const rRoi = r.chiPhiCast > 0 ? rRoiNum.toFixed(1) : "—";
                                 return (
-                                  <tr key={r.kocName} className={!r.matched && reportRows.length > 0 ? "opacity-50" : ""}>
+                                  <tr key={r.kocId} className={!r.hasTiktok ? "opacity-50" : ""}>
                                     <td className="px-3 py-2 text-slate-400">{i+1}</td>
                                     <td className="px-3 py-2 font-medium text-slate-700">
                                       {r.kocName}
-                                      {reportRows.length > 0 && !r.matched && <span className="ml-1 text-[10px] text-amber-500">(chưa match)</span>}
+                                      {!r.hasTiktok && <span className="ml-1 text-[10px] text-amber-500">(chưa có TikTok data)</span>}
                                     </td>
-                                    <td className="px-3 py-2 text-right text-green-700 font-semibold">{r.gmv > 0 ? formatCurrency(r.gmv) : "—"}</td>
-                                    <td className="px-3 py-2 text-right text-red-500">{rpt?.hoantien ? formatCurrency(rpt.hoantien) : "—"}</td>
-                                    <td className="px-3 py-2 text-right text-slate-600">{r.donHang > 0 ? r.donHang : "—"}</td>
-                                    <td className="px-3 py-2 text-right text-amber-600">{rpt?.hoaHong ? formatCurrency(rpt.hoaHong) : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-green-700 font-semibold">{r.doanhThu > 0 ? formatCurrency(r.doanhThu) : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-slate-600">{r.donHang > 0 ? r.donHang.toLocaleString() : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-red-500">{r.hoanTien > 0 ? formatCurrency(r.hoanTien) : "—"}</td>
+                                    <td className="px-3 py-2 text-right text-amber-600">{r.hoaHong > 0 ? formatCurrency(r.hoaHong) : "—"}</td>
                                     <td className="px-3 py-2 text-right text-slate-600">{r.chiPhiCast > 0 ? formatCurrency(r.chiPhiCast) : "—"}</td>
                                     <td className={`px-3 py-2 text-right font-bold ${rRoi === "—" ? "text-slate-400" : rRoiNum >= 0 ? "text-green-600" : "text-red-600"}`}>
                                       {rRoi}{rRoi !== "—" ? "%" : ""}
