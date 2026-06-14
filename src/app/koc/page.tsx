@@ -1731,8 +1731,13 @@ export default function KocPage() {
                     <td className="px-4 py-3">
                       {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">Profile</a> : "—"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center gap-2">
                       <button onClick={() => openEditKOC(k)} className="text-xs text-rose-500 hover:underline">Sửa</button>
+                      <button onClick={async () => {
+                        if (!confirm(`Xóa KOC "${k.ten}"? Hành động không thể hoàn tác.`)) return;
+                        await fetch(`/api/koc/${k.id}`, { method: "DELETE" });
+                        setKocs(prev => prev.filter(x => x.id !== k.id));
+                      }} className="text-xs text-slate-400 hover:text-red-500 hover:underline">Xóa</button>
                     </td>
                   </tr>
                 )})}
