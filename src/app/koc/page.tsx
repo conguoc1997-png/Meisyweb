@@ -26,7 +26,7 @@ export default function KocPage() {
   const [kocs, setKocs] = useState<KOC[]>([]);
   const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [tab, setTab] = useState<"bookings" | "kocs">("bookings");
+  const [tab, setTab] = useState<"bookings" | "kocs" | "thanhTich">("bookings");
   const [expandedSP, setExpandedSP] = useState<string | null>(null);
   const [spSubTab, setSpSubTab] = useState<Record<string, "chiphi" | "koc" | "hieugua">>({});
   const [modalPickSP, setModalPickSP] = useState(false);
@@ -1062,9 +1062,9 @@ export default function KocPage() {
       {/* Actions */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-1">
-          {(["bookings", "kocs"] as const).map((t) => (
+          {(["bookings", "kocs", "thanhTich"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 text-sm rounded-lg font-medium transition ${tab === t ? "bg-rose-500 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
-              {t === "bookings" ? "Danh sách Booking" : "Danh sách KOC"}
+              {t === "bookings" ? "Danh sách Booking" : t === "kocs" ? "Danh sách KOC" : "Thành tích KOC"}
             </button>
           ))}
         </div>
@@ -1647,6 +1647,67 @@ export default function KocPage() {
 
       {/* KOC Table */}
       {tab === "kocs" && (() => {
+        const kocSearchFiltered = kocs.filter(k =>
+          !searchKOC || k.ten.toLowerCase().includes(searchKOC.toLowerCase())
+        );
+        return (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+            <div className="relative max-w-xs flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={searchKOC} onChange={e => setSearchKOC(e.target.value)}
+                placeholder="Tìm tên KOC..."
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200" />
+            </div>
+            <span className="text-xs text-slate-400 ml-auto">{kocSearchFiltered.length} KOC</span>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">#</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Tên KOC</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Nền tảng</th>
+                  <th className="text-right px-4 py-3 text-slate-500 font-medium">Follower</th>
+                  <th className="text-right px-4 py-3 text-slate-500 font-medium">Giá cast</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">SĐT</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Email</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Địa chỉ</th>
+                  <th className="text-left px-4 py-3 text-slate-500 font-medium">Link</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {kocSearchFiltered.length === 0 ? (
+                  <tr><td colSpan={10} className="text-center py-10 text-slate-400">Chưa có KOC nào</td></tr>
+                ) : kocSearchFiltered.map((k, i) => (
+                  <tr key={k.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{k.ten}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{PLATFORM_LABEL[k.platform] ?? k.platform}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-600 text-xs">{k.follower > 0 ? k.follower.toLocaleString() : "—"}</td>
+                    <td className="px-4 py-3 text-right font-medium text-rose-600">{k.giaCast > 0 ? formatCurrency(k.giaCast) : "—"}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs">{k.sdt || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600 text-xs">{k.email || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{k.diaChi || "—"}</td>
+                    <td className="px-4 py-3">
+                      {k.linkProfile ? <a href={k.linkProfile} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">Profile</a> : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openEditKOC(k)} className="text-xs text-rose-500 hover:underline">Sửa</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        );
+      })()}
+
+      {tab === "thanhTich" && (() => {
         // ── Tổng hợp doanh thu từ TikTok import (lọc theo tháng) ──
         const filteredTiktokKOC = kocViewThang
           ? tiktokKOC.filter(r => r.thang === kocViewThang)
