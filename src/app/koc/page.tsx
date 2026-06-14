@@ -84,6 +84,7 @@ export default function KocPage() {
 
   const [kocViewThang, setKocViewThang] = useState("");
   const [kocFilterTT, setKocFilterTT] = useState("");
+  const [kocFilterCreated, setKocFilterCreated] = useState("");
   const [editingKocGCId, setEditingKocGCId] = useState<string | null>(null);
   const kocGcRef = useRef<HTMLTextAreaElement>(null);
   const [editingSpTikTok, setEditingSpTikTok] = useState<string | null>(null);
@@ -1588,9 +1589,22 @@ export default function KocPage() {
           if (kocListThang && b.ngayBat?.slice(0, 7) !== kocListThang) continue;
           bookingCountMap.set(b.kocId, (bookingCountMap.get(b.kocId) ?? 0) + 1);
         }
-        const kocSearchFiltered = kocs.filter(k =>
-          !searchKOC || k.ten.toLowerCase().includes(searchKOC.toLowerCase())
-        );
+        // Danh sách tháng thêm KOC (từ createdAt)
+        const createdThangList = Array.from(new Set(
+          kocs.map(k => k.createdAt?.slice(0, 7)).filter(Boolean)
+        )).sort().reverse() as string[];
+
+        const kocSearchFiltered = kocs.filter(k => {
+          if (searchKOC && !k.ten.toLowerCase().includes(searchKOC.toLowerCase())) return false;
+          if (kocFilterCreated && k.createdAt?.slice(0, 7) !== kocFilterCreated) return false;
+          return true;
+        });
+
+        // Stats tỉ lệ booking
+        const totalInPeriod = kocSearchFiltered.length;
+        const bookedInPeriod = kocSearchFiltered.filter(k => bookingCountMap.get(k.id) ?? (bookings.some(b => b.kocId === k.id))).length;
+        const convRate = totalInPeriod > 0 ? (bookedInPeriod / totalInPeriod * 100).toFixed(1) : "0";
+
         return (
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
@@ -1601,11 +1615,19 @@ export default function KocPage() {
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-200" />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500 whitespace-nowrap">Tháng:</label>
+              <label className="text-xs text-slate-500 whitespace-nowrap">Tháng booking:</label>
               <select value={kocListThang} onChange={e => setKocListThang(e.target.value)}
                 className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
                 <option value="">Tất cả</option>
                 {thangListAll.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 whitespace-nowrap">Thêm vào tháng:</label>
+              <select value={kocFilterCreated} onChange={e => setKocFilterCreated(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-200">
+                <option value="">Tất cả</option>
+                {createdThangList.map(t => { const [y, m] = t.split("-"); return <option key={t} value={t}>Tháng {m}/{y}</option>; })}
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -1619,6 +1641,34 @@ export default function KocPage() {
             </div>
             <span className="text-xs text-slate-400 ml-auto">{kocSearchFiltered.length} KOC</span>
           </div>
+
+          {/* Stats tỉ lệ chuyển đổi */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center"><Users size={15} className="text-blue-500" /></div>
+              <div>
+                <p className="text-xs text-slate-400">KOC{kocFilterCreated ? ` thêm T${kocFilterCreated.slice(5,7)}/${kocFilterCreated.slice(0,4)}` : " tổng"}</p>
+                <p className="text-lg font-bold text-slate-800">{totalInPeriod}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+              <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center"><CheckCircle size={15} className="text-green-500" /></div>
+              <div>
+                <p className="text-xs text-slate-400">Đã có booking</p>
+                <p className="text-lg font-bold text-green-600">{bookedInPeriod}</p>
+              </div>
+            </div>
+            <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${Number(convRate) >= 50 ? "bg-green-50 border-green-200" : Number(convRate) >= 20 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"}`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${Number(convRate) >= 50 ? "bg-green-100" : Number(convRate) >= 20 ? "bg-amber-100" : "bg-red-100"}`}>
+                <TrendingUp size={15} className={Number(convRate) >= 50 ? "text-green-600" : Number(convRate) >= 20 ? "text-amber-600" : "text-red-500"} />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Tỉ lệ book được</p>
+                <p className={`text-lg font-bold ${Number(convRate) >= 50 ? "text-green-600" : Number(convRate) >= 20 ? "text-amber-600" : "text-red-600"}`}>{convRate}%</p>
+              </div>
+            </div>
+          </div>
+
           {(() => {
             const finalFiltered = kocSearchFiltered.filter(k => !kocFilterTT || (k.trangThaiHopTac || "chua_tra_loi") === kocFilterTT);
             return (
