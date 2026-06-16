@@ -857,6 +857,7 @@ export default function KocPage() {
   const tongChiPhi         = bookingsInThang.reduce((s, b) => s + (b.chiPhi > 0 ? b.chiPhi : (b.koc.giaCast + b.chiPhiSP)), 0);
   const tongDoanhThuTiktok = tiktokSPInThang.reduce((s, r) => s + r.doanhThu, 0);
   const tongDonHangTiktok  = tiktokSPInThang.reduce((s, r) => s + r.donHang, 0);
+  const tongHoaHong        = tiktokSPInThang.reduce((s, r) => s + r.hoaHong, 0);
   const tongDoanhThuDB     = bookingsInThang.reduce((s, b) => s + b.doanhThu, 0);
   const tongDonHangDB      = bookingsInThang.reduce((s, b) => s + b.donHang, 0);
   const tongDoanhThu = tongDoanhThuTiktok > 0 ? tongDoanhThuTiktok : tongDoanhThuDB;
@@ -891,7 +892,7 @@ export default function KocPage() {
           ))}
         </select>
       </div>
-      <div className="grid grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-6 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-2"><Users size={16} className="text-rose-400" /><p className="text-xs text-slate-500">Tổng KOC</p></div>
           <p className="text-xl font-bold text-slate-800">{kocs.length}</p>
@@ -915,6 +916,14 @@ export default function KocPage() {
             {tongDonHangTiktok > 0 && <span className="text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full ml-auto">TikTok</span>}
           </div>
           <p className="text-xl font-bold text-slate-800">{tongDonHang.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign size={16} className="text-amber-400" />
+            <p className="text-xs text-slate-500">Hoa hồng</p>
+            {tongHoaHong > 0 && <span className="text-[10px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full ml-auto">TikTok</span>}
+          </div>
+          <p className="text-xl font-bold text-amber-600">{tongHoaHong > 0 ? formatCurrency(tongHoaHong) : "—"}</p>
         </div>
         <div className={`rounded-xl p-4 border ${Number(roiTB) >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
           <div className="flex items-center gap-2 mb-2"><Star size={16} className={Number(roiTB) >= 0 ? "text-green-500" : "text-red-400"} /><p className="text-xs text-slate-500">ROI trung bình</p></div>
