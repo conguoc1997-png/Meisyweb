@@ -1036,11 +1036,7 @@ export default function KocPage() {
         // Lọc bookings
         const filteredBookings = bookings.filter(b => {
           if (filterSP && b.sanPhamId !== filterSP) return false;
-          if (filterThang) {
-            const d = new Date(b.ngayBat);
-            const bThang = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-            if (bThang !== filterThang) return false;
-          }
+          if (filterThang && b.ngayBat?.slice(0, 7) !== filterThang) return false;
           return true;
         });
 
