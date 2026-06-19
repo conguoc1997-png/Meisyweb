@@ -516,23 +516,26 @@ export default function DinhMucPage() {
     const nonTickCols = allColumns.filter(c => !c.tickOnly);
     const tickCols    = allColumns.filter(c =>  c.tickOnly);
 
-    // Helper: lấy [mã, slSauQĐ, slTrướcQĐ] cho 1 cell (lấy item đầu tiên)
+    // Helper: lấy [mã, slSauQĐ, slĐvNhập] cho 1 cell (lấy item đầu tiên)
+    // slSauQĐ  = dm.soLuong (đv cơ bản, vd: m, chiếc)
+    // slĐvNhập = dm.soLuong / quyDoi (đv mua vào, vd: cây, gói, cuộn)
     const getCellNums = (items: DinhMuc[]): [string, number | "", number | ""] => {
       if (items.length === 0) return ["", "", ""];
       const dm   = items[0];
       const vt   = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
       const ma   = vt?.ma ?? "";
-      const slSQ = dm.soLuong;                                    // đv cơ bản (sau quy đổi)
-      const qd   = tonKhoMap.get(dm.vatTuId)?.quyDoi ?? 1;
-      const slTQ = qd > 1 ? parseFloat((slSQ / qd).toFixed(4)) : slSQ; // đv mua (trước quy đổi)
-      return [ma, slSQ, slTQ];
+      const slSQ = dm.soLuong;
+      // quyDoi: ưu tiên tồn kho → vatTu.quyDoi → mặc định 1
+      const qd   = tonKhoMap.get(dm.vatTuId)?.quyDoi ?? vt?.quyDoi ?? 1;
+      const slDV = qd > 1 ? parseFloat((slSQ / qd).toFixed(4)) : slSQ;
+      return [ma, slSQ, slDV];
     };
 
     // Header
     const headers: string[] = ["SKU", "Tên sản phẩm"];
     for (const col of nonTickCols) {
       const lbl = getColLabel(col);
-      headers.push(`Mã ${lbl}`, `${lbl} (sau QĐ)`, `${lbl} (trước QĐ)`);
+      headers.push(`Mã ${lbl}`, `${lbl} (sau QĐ)`, `${lbl} (đv nhập)`);
     }
     for (const col of tickCols) {
       headers.push(getColLabel(col));
