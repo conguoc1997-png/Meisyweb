@@ -548,7 +548,7 @@ export default function DinhMucPage() {
       }
       for (const col of tickCols) {
         const { items } = getCellDisplay(sku, col);
-        row.push(items.length > 0 ? "✓" : "");
+        row.push(items.length > 0 ? (items[0].soLuong ?? 1) : "");
       }
       return row;
     };
@@ -562,7 +562,7 @@ export default function DinhMucPage() {
     }
     for (const col of tickCols) {
       const items = getOwnItems(CHUNG_KEY, col);
-      chungRow.push(items.length > 0 ? "✓" : "");
+      chungRow.push(items.length > 0 ? (items[0].soLuong ?? 1) : "");
     }
 
     const data = [headers, chungRow, ...sanPhams.map(sp => buildRow(sp.sku, sp.ten))];
