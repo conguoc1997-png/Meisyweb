@@ -513,59 +513,67 @@ export default function DinhMucPage() {
 
   /* ── Export Excel ───────────────────────────────────────────────────────── */
   function exportExcel() {
-    // Helper: format cell value for a list of định mức items
-    const fmtItems = (items: DinhMuc[], col: ColDef): string => {
-      if (items.length === 0) return "";
-      if (col.tickOnly) return "✓";
-      return items.map(dm => {
-        const vt = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
-        const tenVt = vt?.ten ?? "";
-        const dv = fmtDV(dm.donViMua ?? vt?.donVi ?? "");
-        let s = `${fmt(dm.soLuong)}${dv ? " " + dv : ""}`;
-        if ((dm.haoHui ?? 0) > 0) s += ` (+${dm.haoHui}% hao)`;
-        return tenVt ? `${tenVt}: ${s}` : s;
-      }).join(" | ");
+    const nonTickCols = allColumns.filter(c => !c.tickOnly);
+    const tickCols    = allColumns.filter(c =>  c.tickOnly);
+
+    // Helper: lấy [mã, slSauQĐ, slTrướcQĐ] cho 1 cell (lấy item đầu tiên)
+    const getCellNums = (items: DinhMuc[]): [string, number | "", number | ""] => {
+      if (items.length === 0) return ["", "", ""];
+      const dm   = items[0];
+      const vt   = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
+      const ma   = vt?.ma ?? "";
+      const slSQ = dm.soLuong;                                    // đv cơ bản (sau quy đổi)
+      const qd   = tonKhoMap.get(dm.vatTuId)?.quyDoi ?? 1;
+      const slTQ = qd > 1 ? parseFloat((slSQ / qd).toFixed(4)) : slSQ; // đv mua (trước quy đổi)
+      return [ma, slSQ, slTQ];
     };
 
-    // Header row 1: column groups
-    const headerRow1 = [
-      "SKU", "Tên sản phẩm",
-      ...COLUMNS.map(col => col.label),
-    ];
+    // Header
+    const headers: string[] = ["SKU", "Tên sản phẩm"];
+    for (const col of nonTickCols) {
+      const lbl = getColLabel(col);
+      headers.push(`Mã ${lbl}`, `${lbl} (sau QĐ)`, `${lbl} (trước QĐ)`);
+    }
+    for (const col of tickCols) {
+      headers.push(getColLabel(col));
+    }
 
-    // CHUNG row
-    const chungRow = [
-      "__CHUNG__", "Mặc định chung",
-      ...COLUMNS.map(col => fmtItems(getOwnItems(CHUNG_KEY, col), col)),
-    ];
+    // Helper: build 1 data row
+    const buildRow = (sku: string, tenSP: string): (string | number)[] => {
+      const row: (string | number)[] = [sku, tenSP];
+      for (const col of nonTickCols) {
+        const { items } = getCellDisplay(sku, col);
+        const [ma, sauQD, truocQD] = getCellNums(items);
+        row.push(ma, sauQD, truocQD);
+      }
+      for (const col of tickCols) {
+        const { items } = getCellDisplay(sku, col);
+        row.push(items.length > 0 ? "✓" : "");
+      }
+      return row;
+    };
 
-    // SP rows (all sanPhams, not filtered)
-    const spRows = sanPhams.map(sp => [
-      sp.sku,
-      sp.ten,
-      ...COLUMNS.map(col => {
-        const { items } = getCellDisplay(sp.sku, col);
-        return fmtItems(items, col);
-      }),
-    ]);
+    // CHUNG row: dùng getOwnItems cho shared cols
+    const chungRow: (string | number)[] = ["__CHUNG__", "Mặc định chung"];
+    for (const col of nonTickCols) {
+      const items = getOwnItems(CHUNG_KEY, col);
+      const [ma, sauQD, truocQD] = getCellNums(items);
+      chungRow.push(ma, sauQD, truocQD);
+    }
+    for (const col of tickCols) {
+      const items = getOwnItems(CHUNG_KEY, col);
+      chungRow.push(items.length > 0 ? "✓" : "");
+    }
 
-    const data = [headerRow1, chungRow, ...spRows];
-    const ws = XLSX.utils.aoa_to_sheet(data);
+    const data = [headers, chungRow, ...sanPhams.map(sp => buildRow(sp.sku, sp.ten))];
+    const ws   = XLSX.utils.aoa_to_sheet(data);
 
     // Column widths
     ws["!cols"] = [
-      { wch: 18 }, // SKU
-      { wch: 30 }, // Tên SP
-      ...COLUMNS.map(col => ({ wch: col.tickOnly ? 10 : 28 })),
+      { wch: 18 }, { wch: 30 },
+      ...nonTickCols.flatMap(() => [{ wch: 16 }, { wch: 12 }, { wch: 12 }]),
+      ...tickCols.map(() => ({ wch: 10 })),
     ];
-
-    // Style header row bold (basic)
-    const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c });
-      if (!ws[addr]) continue;
-      ws[addr].s = { font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
-    }
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Định Mức NPL");
