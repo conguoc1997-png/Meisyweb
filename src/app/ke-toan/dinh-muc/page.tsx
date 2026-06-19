@@ -8,7 +8,7 @@ type SanPham = { id: string; ten: string; sku: string; mauSac?: string|null; siz
 type VatTu   = { id: string; ma: string; ten: string; loai: string; nhom: string|null; donVi: string;
                  donViMua?: string; quyDoi?: number;
                  tonKho?: { soLuong: number; giaTrungBinh: number }|null };
-type TonKhoRow = { vatTuId: string; soLuongQD: number; donViQuyDoi: string; quyDoi: number };
+type TonKhoRow = { vatTuId: string; soLuongQD: number; donViQuyDoi: string; donViMua: string; quyDoi: number };
 type DinhMuc = { id: string; hangCat: string; vatTuId: string; soLuong: number;
                  haoHui?: number; donViMua?: string; ghiChu?: string|null; vatTu?: VatTu };
 
@@ -149,13 +149,14 @@ export default function DinhMucPage() {
         if (Array.isArray(tonKhos)) {
           setTonKhoMap(new Map(tonKhos.map((t: {
             vatTuId: string; soLuong: number; soLuongQD?: number;
-            donViQuyDoi?: string; quyDoi?: number; vatTu?: { donVi?: string }
+            donViQuyDoi?: string; donViMua?: string; quyDoi?: number; vatTu?: { donVi?: string }
           }) => [
             t.vatTuId,
             {
               vatTuId:     t.vatTuId,
-              soLuongQD:   t.soLuongQD ?? t.soLuong,   // đã quy đổi (ví dụ m)
+              soLuongQD:   t.soLuongQD ?? t.soLuong,
               donViQuyDoi: t.donViQuyDoi ?? t.vatTu?.donVi ?? "",
+              donViMua:    t.donViMua ?? t.vatTu?.donVi ?? "",
               quyDoi:      t.quyDoi ?? 1,
             } as TonKhoRow,
           ])));
@@ -517,25 +518,39 @@ export default function DinhMucPage() {
     const tickCols    = allColumns.filter(c =>  c.tickOnly);
 
     // Helper: lấy [mã, slSauQĐ, slĐvNhập] cho 1 cell (lấy item đầu tiên)
-    // slSauQĐ  = dm.soLuong (đv cơ bản, vd: m, chiếc)
-    // slĐvNhập = dm.soLuong / quyDoi (đv mua vào, vd: cây, gói, cuộn)
-    const getCellNums = (items: DinhMuc[]): [string, number | "", number | ""] => {
-      if (items.length === 0) return ["", "", ""];
-      const dm   = items[0];
-      const vt   = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
-      const ma   = vt?.ma ?? "";
-      const slSQ = dm.soLuong;
-      // quyDoi: ưu tiên tồn kho → vatTu.quyDoi → mặc định 1
-      const qd   = tonKhoMap.get(dm.vatTuId)?.quyDoi ?? vt?.quyDoi ?? 1;
-      const slDV = qd > 1 ? parseFloat((slSQ / qd).toFixed(4)) : slSQ;
-      return [ma, slSQ, slDV];
+    // dm.soLuong = đv cơ bản (donViQuyDoi: m, cái, chiếc...)
+    // slĐvNhập  = dm.soLuong / quyDoi → đv mua vào (donViMua: KG, gói, cuộn...)
+    const getCellNums = (items: DinhMuc[]): [string, number | "", number | "", string, string] => {
+      if (items.length === 0) return ["", "", "", "", ""];
+      const dm      = items[0];
+      const vt      = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
+      const tk      = tonKhoMap.get(dm.vatTuId);
+      const ma      = vt?.ma ?? "";
+      const slSQ    = dm.soLuong;                                      // đv cơ bản
+      const qd      = tk?.quyDoi ?? vt?.quyDoi ?? 1;
+      const slDV    = qd > 1 ? parseFloat((slSQ / qd).toFixed(4)) : slSQ;
+      const dvSauQD = fmtDV(tk?.donViQuyDoi ?? vt?.donVi ?? "");      // m, cái...
+      const dvNhap  = fmtDV(tk?.donViMua ?? vt?.donVi ?? "");         // KG, gói...
+      return [ma, slSQ, slDV, dvSauQD, dvNhap];
     };
 
-    // Header
+    // Header — dùng đơn vị từ CHUNG row của cột đầu tiên có data
+    const getColUnits = (col: ColDef): [string, string] => {
+      const items = getOwnItems(CHUNG_KEY, col);
+      if (items.length === 0) return ["", ""];
+      const [,,,dvSQ, dvNhap] = getCellNums(items);
+      return [dvSQ, dvNhap];
+    };
+
     const headers: string[] = ["SKU", "Tên sản phẩm"];
     for (const col of nonTickCols) {
       const lbl = getColLabel(col);
-      headers.push(`Mã ${lbl}`, `${lbl} (sau QĐ)`, `${lbl} (đv nhập)`);
+      const [dvSQ, dvNhap] = getColUnits(col);
+      headers.push(
+        `Mã ${lbl}`,
+        dvSQ ? `${lbl} (${dvSQ})` : `${lbl} (sau QĐ)`,
+        dvNhap && dvNhap !== dvSQ ? `${lbl} (${dvNhap})` : `${lbl} (đv nhập)`,
+      );
     }
     for (const col of tickCols) {
       headers.push(getColLabel(col));
@@ -546,8 +561,8 @@ export default function DinhMucPage() {
       const row: (string | number)[] = [sku, tenSP];
       for (const col of nonTickCols) {
         const { items } = getCellDisplay(sku, col);
-        const [ma, sauQD, truocQD] = getCellNums(items);
-        row.push(ma, sauQD, truocQD);
+        const [ma, sauQD, dvNhap] = getCellNums(items);
+        row.push(ma, sauQD, dvNhap);
       }
       for (const col of tickCols) {
         const { items } = getCellDisplay(sku, col);
@@ -560,8 +575,8 @@ export default function DinhMucPage() {
     const chungRow: (string | number)[] = ["__CHUNG__", "Mặc định chung"];
     for (const col of nonTickCols) {
       const items = getOwnItems(CHUNG_KEY, col);
-      const [ma, sauQD, truocQD] = getCellNums(items);
-      chungRow.push(ma, sauQD, truocQD);
+      const [ma, sauQD, dvNhap] = getCellNums(items);
+      chungRow.push(ma, sauQD, dvNhap);
     }
     for (const col of tickCols) {
       const items = getOwnItems(CHUNG_KEY, col);
