@@ -26,9 +26,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Lô cắt chưa có số lượng sản phẩm" }, { status: 400 });
     }
 
-    // 2. Idempotent check
+    // 2. Idempotent check — nếu phiếu đã tồn tại, đảm bảo xuatHoaDonDa=true
     const existing = await prisma.phieuXuatKho.findFirst({ where: { loCatId } });
-    if (existing) return NextResponse.json({ ok: true, phieu: existing, skipped: true });
+    if (existing) {
+      // Đảm bảo loCat được đánh dấu (phòng trường hợp PATCH riêng bị lỗi trước đó)
+      await prisma.loCat.update({
+        where: { id: loCatId },
+        data:  { xuatHoaDonDa: true },
+      }).catch(() => {});
+      return NextResponse.json({ ok: true, phieu: existing, skipped: true });
+    }
 
     // 3. Lấy định mức
     const allDMs = await prisma.dinhMucNPL.findMany({
@@ -74,8 +81,19 @@ export async function POST(req: NextRequest) {
 
     // 6. Tính soLuong theo ĐƠN VỊ CƠ BẢN (chiếc, m, bộ...) — không chia quyDoi
     const vatTuIds  = [...new Set(usedItems.map(d => d.vatTuId))];
-    const tonKhos   = await prisma.tonKhoVatTu.findMany({ where: { vatTuId: { in: vatTuIds } } });
+
+    // Lấy quyDoi mới nhất để quy đổi giá: donGia_base = giaTrungBinh(dvMua) / quyDoi
+    const [tonKhos, quyDoiForPrice] = await Promise.all([
+      prisma.tonKhoVatTu.findMany({ where: { vatTuId: { in: vatTuIds } } }),
+      prisma.chiTietNhapKho.findMany({
+        where:    { vatTuId: { in: vatTuIds } },
+        select:   { vatTuId: true, quyDoi: true },
+        orderBy:  { phieu: { ngay: "desc" } },
+        distinct: ["vatTuId"],
+      }),
+    ]);
     const tonMap    = new Map(tonKhos.map(t => [t.vatTuId, t]));
+    const quyDoiPriceMap = new Map(quyDoiForPrice.map(r => [r.vatTuId, r.quyDoi ?? 1]));
 
     const vatTuList = usedItems.map(dm => ({
       vatTuId:  dm.vatTuId,
@@ -96,7 +114,10 @@ export async function POST(req: NextRequest) {
         chiTiet: {
           create: vatTuList.map(v => {
             const ton    = tonMap.get(v.vatTuId);
-            const donGia = ton?.giaTrungBinh ?? 0;
+            const quyDoi = quyDoiPriceMap.get(v.vatTuId) ?? 1;
+            // giaTrungBinh lưu theo đv MUA → quy đổi về đv CƠ BẢN để nhân với soLuong(đv cơ bản)
+            // donGia_base = giaTrungBinh(dvMua) / quyDoi(dvBase per dvMua)
+            const donGia = ton ? (ton.giaTrungBinh / quyDoi) : 0;
             return { vatTuId: v.vatTuId, soLuong: v.soLuong, donGia, thanhTien: v.soLuong * donGia };
           }),
         },
@@ -104,7 +125,13 @@ export async function POST(req: NextRequest) {
       include: { chiTiet: true },
     });
 
-    // 8. Tính lại TonKhoVatTu từ đầu (nhập - xuất/quyDoi)
+    // 8. Đánh dấu lô cắt đã xuất hóa đơn (atomic với tạo phiếu)
+    await prisma.loCat.update({
+      where: { id: loCatId },
+      data:  { xuatHoaDonDa: true },
+    }).catch(() => {}); // non-fatal nếu field không tồn tại
+
+    // 9. Tính lại TonKhoVatTu từ đầu (nhập - xuất/quyDoi)
     await recalcVatTuIds(vatTuIds);
 
     return NextResponse.json({ ok: true, phieu }, { status: 201 });
@@ -123,21 +150,24 @@ export async function POST(req: NextRequest) {
  * Công thức: ton_mua = Σ nhap.soLuongMua − Σ (xuat.soLuong / quyDoi)
  */
 async function recalcVatTuIds(vatTuIds: string[]) {
-  // Lấy quyDoi mới nhất từ lịch sử nhập
+  // quyDoi mới nhất per vatTuId (lấy từ nhập mới nhất theo ngày)
+  const quyDoiInfos = await prisma.chiTietNhapKho.findMany({
+    where:    { vatTuId: { in: vatTuIds } },
+    select:   { vatTuId: true, quyDoi: true },
+    orderBy:  { phieu: { ngay: "desc" } },
+    distinct: ["vatTuId"],
+  });
+  const quyDoiMap = new Map(quyDoiInfos.map(r => [r.vatTuId, r.quyDoi ?? 1]));
+
   const nhapInfos = await prisma.chiTietNhapKho.findMany({
     where:    { vatTuId: { in: vatTuIds } },
-    select:   { vatTuId: true, soLuongMua: true, donGia: true, vat: true, quyDoi: true },
+    select:   { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
   });
+  // Lọc bỏ orphaned records (phiếu cha đã xóa nhưng chiTiet còn lại do cascade fail)
   const xuatInfos = await prisma.phieuXuatChiTiet.findMany({
-    where:  { vatTuId: { in: vatTuIds } },
+    where:  { vatTuId: { in: vatTuIds }, phieu: { soPhieu: { not: "" } } },
     select: { vatTuId: true, soLuong: true },
   });
-
-  // quyDoi mới nhất per vatTuId
-  const quyDoiMap = new Map<string, number>();
-  for (const r of nhapInfos) {
-    if (!quyDoiMap.has(r.vatTuId)) quyDoiMap.set(r.vatTuId, r.quyDoi ?? 1);
-  }
 
   type TonInfo = { soLuongNhap: number; giaTriNhap: number; soLuongXuatBase: number };
   const map = new Map<string, TonInfo>();
@@ -154,16 +184,15 @@ async function recalcVatTuIds(vatTuIds: string[]) {
     map.set(r.vatTuId, cur);
   }
 
-  for (const [vatTuId, d] of map.entries()) {
+  await Promise.all([...map.entries()].map(([vatTuId, d]) => {
     const quyDoi       = quyDoiMap.get(vatTuId) ?? 1;
-    // Chuyển xuất về đv mua để trừ với nhập
-    const xuatDvMua    = d.soLuongXuatBase / quyDoi;
-    const soLuong      = Math.max(0, d.soLuongNhap - xuatDvMua);
+    const soLuong      = Math.max(0, d.soLuongNhap - d.soLuongXuatBase / quyDoi);
     const giaTrungBinh = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
-    await prisma.tonKhoVatTu.upsert({
+    const giaTriTon    = soLuong * giaTrungBinh;
+    return prisma.tonKhoVatTu.upsert({
       where:  { vatTuId },
-      update: { soLuong, giaTrungBinh, giaTriTon: soLuong * giaTrungBinh },
-      create: { vatTuId, soLuong, giaTrungBinh, giaTriTon: soLuong * giaTrungBinh },
+      update: { soLuong, giaTrungBinh, giaTriTon },
+      create: { vatTuId, soLuong, giaTrungBinh, giaTriTon },
     });
-  }
+  }));
 }

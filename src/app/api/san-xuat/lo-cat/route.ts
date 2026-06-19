@@ -15,8 +15,21 @@ export async function GET(req: NextRequest) {
     }
     if (xuong) where.xuong = xuong;
     if (trangThai) where.trangThai = trangThai;
-    const data = await prisma.loCat.findMany({ where, orderBy: [{ ngay: "desc" }, { createdAt: "desc" }] });
-    return NextResponse.json(data);
+    const [data, phieuXuats] = await Promise.all([
+      prisma.loCat.findMany({ where, orderBy: [{ ngay: "desc" }, { createdAt: "desc" }] }),
+      // Lấy danh sách loCatId có phiếu xuất kho để detect trạng thái thực tế
+      prisma.phieuXuatKho.findMany({
+        select: { loCatId: true },
+        where:  { loCatId: { not: null } },
+      }),
+    ]);
+    const loCoPhieuSet = new Set(phieuXuats.map(p => p.loCatId));
+    // Nếu có phiếu xuất kho → buộc xuatHoaDonDa=true (dù DB chưa cập nhật kịp)
+    const result = data.map(lo => ({
+      ...lo,
+      xuatHoaDonDa: lo.xuatHoaDonDa || loCoPhieuSet.has(lo.id),
+    }));
+    return NextResponse.json(result);
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
   }

@@ -13,22 +13,25 @@ import { prisma } from "@/lib/prisma";
  */
 export async function POST() {
   try {
-    // 1. Nhập kho: soLuongMua theo ĐV MUA, quyDoi = số đv cơ bản / 1 đv mua
+    // 1. quyDoi mới nhất per vatTuId — PHẢI lấy từ nhập mới nhất theo ngày
+    const quyDoiInfos = await prisma.chiTietNhapKho.findMany({
+      select:   { vatTuId: true, quyDoi: true },
+      orderBy:  { phieu: { ngay: "desc" } },
+      distinct: ["vatTuId"],
+    });
+    const quyDoiMap = new Map(quyDoiInfos.map(r => [r.vatTuId, r.quyDoi ?? 1]));
+
+    // 2. Nhập kho: soLuongMua theo ĐV MUA, quyDoi = số đv cơ bản / 1 đv mua
     const allNhap = await prisma.chiTietNhapKho.findMany({
-      select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true, quyDoi: true },
+      select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
     });
 
-    // 2. Xuất kho: soLuong theo ĐV CƠ BẢN (chiếc, m, bộ...)
+    // 3. Xuất kho: soLuong theo ĐV CƠ BẢN (chiếc, m, bộ...)
+    //    Lọc bỏ orphaned records (phieuXuatKho đã xóa nhưng chiTiet còn lại do cascade fail)
     const allXuat = await prisma.phieuXuatChiTiet.findMany({
+      where:  { phieu: { soPhieu: { not: "" } } },
       select: { vatTuId: true, soLuong: true },
     });
-
-    // 3. quyDoi mới nhất per vatTuId (lấy từ nhập mới nhất)
-    const quyDoiMap = new Map<string, number>();
-    // allNhap đã order by phieu.ngay desc qua distinct — lấy first per vatTuId
-    for (const r of allNhap) {
-      if (!quyDoiMap.has(r.vatTuId)) quyDoiMap.set(r.vatTuId, r.quyDoi ?? 1);
-    }
 
     type TonInfo = { soLuongNhap: number; giaTriNhap: number; soLuongXuatBase: number };
     const map = new Map<string, TonInfo>();
@@ -45,25 +48,22 @@ export async function POST() {
       map.set(r.vatTuId, cur);
     }
 
-    // 4. Upsert TonKhoVatTu
+    // 4. Upsert TonKhoVatTu song song
     // ton (đv mua) = nhap (đv mua) − xuat_base / quyDoi
-    let updated = 0;
-    for (const [vatTuId, d] of map.entries()) {
+    const entries = [...map.entries()];
+    await Promise.all(entries.map(([vatTuId, d]) => {
       const quyDoi       = quyDoiMap.get(vatTuId) ?? 1;
-      const xuatDvMua    = d.soLuongXuatBase / quyDoi;
-      const soLuong      = Math.max(0, d.soLuongNhap - xuatDvMua);
+      const soLuong      = Math.max(0, d.soLuongNhap - d.soLuongXuatBase / quyDoi);
       const giaTrungBinh = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
       const giaTriTon    = soLuong * giaTrungBinh;
-
-      await prisma.tonKhoVatTu.upsert({
+      return prisma.tonKhoVatTu.upsert({
         where:  { vatTuId },
         update: { soLuong, giaTrungBinh, giaTriTon },
         create: { vatTuId, soLuong, giaTrungBinh, giaTriTon },
       });
-      updated++;
-    }
+    }));
 
-    return NextResponse.json({ ok: true, updated });
+    return NextResponse.json({ ok: true, updated: entries.length });
   } catch (e: unknown) {
     console.error("[ton-kho recalc]", e);
     return NextResponse.json(

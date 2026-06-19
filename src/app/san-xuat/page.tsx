@@ -204,6 +204,10 @@ export default function SanXuatPage() {
   const [editingCayMau, setEditingCayMau] = useState<{ id: string; ci: number } | null>(null);
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
 
+  // ── SKU combobox ──
+  const [showSkuDropdown, setShowSkuDropdown] = useState(false);
+  const [skuSearch, setSkuSearch] = useState("");
+
   // ── Size picker ──
   const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL"];
   type SzItem = { size: string; qty: number; checked: boolean };
@@ -371,12 +375,21 @@ export default function SanXuatPage() {
   const viSinhDuTong = useMemo(() => hoaDonTon.giat_vi_sinh - calcUsed("hdGiatViSinhDa"), [allLoCat, hoaDonTon.giat_vi_sinh]);
   const mauDuTong = useMemo(() => hoaDonTon.giat_mau - calcUsed("hdGiatMauDa"), [allLoCat, hoaDonTon.giat_mau]);
 
+  // Danh sách SKU: kết hợp sanPhams + hangCat đã dùng trong allLoCat, dedup + sort
+  const skuOptions = useMemo(() => {
+    const set = new Set<string>();
+    sanPhams.forEach(sp => sp.sku && set.add(sp.sku.trim()));
+    allLoCat.forEach(lo => lo.hangCat && set.add(lo.hangCat.trim()));
+    return [...set].sort();
+  }, [sanPhams, allLoCat]);
+
   const openAdd = () => {
     setForm({ ...emptyForm, ngay: new Date().toISOString().slice(0, 10) });
     setCayRows([emptyCayRow()]);
     setSizeItems(SIZES.map(s => ({ size: s, qty: 1, checked: false })));
     setSelectedVaiCayIdxs([]);
     setSelectedVaiId("");
+    setSkuSearch(""); setShowSkuDropdown(false);
     setModalAdd(true);
   };
 
@@ -431,6 +444,7 @@ export default function SanXuatPage() {
       setSelectedVaiId("");
       setSelectedVaiCayIdxs([]);
     }
+    setSkuSearch(""); setShowSkuDropdown(false);
     setModalEdit(lo);
   };
 
@@ -674,8 +688,10 @@ export default function SanXuatPage() {
         : lo.hangThucTe;
       const soLuongThieu = (soSanPham != null && hangThucTeAgg != null) ? soSanPham - hangThucTeAgg : null;
       const newCayData = JSON.stringify(parsed);
-      // Optimistic update
-      setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu } : l));
+      // Optimistic update — cả losCat lẫn allLoCat để tongThieu tính đúng
+      const upd2 = (l: LoCat) => l.id === lo.id ? { ...l, cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu } : l;
+      setLosCat(prev => prev.map(upd2));
+      setAllLoCat(prev => prev.map(upd2));
       fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cayData: newCayData, soLaThucTe, soSanPham, soLuongThieu }),
@@ -697,7 +713,9 @@ export default function SanXuatPage() {
       const hangThucTe = anyFilled ? totalHT : null;
       const soLuongThieu = (lo.soSanPham != null && hangThucTe != null) ? lo.soSanPham - hangThucTe : null;
       const newCayData = JSON.stringify(parsed);
-      setLosCat(prev => prev.map(l => l.id === lo.id ? { ...l, cayData: newCayData, hangThucTe, soLuongThieu } : l));
+      const upd = (l: LoCat) => l.id === lo.id ? { ...l, cayData: newCayData, hangThucTe, soLuongThieu } : l;
+      setLosCat(prev => prev.map(upd));
+      setAllLoCat(prev => prev.map(upd));   // ← fix: allLoCat cũng cập nhật → tongThieu đúng
       fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cayData: newCayData, hangThucTe, soLuongThieu }),
@@ -770,18 +788,23 @@ export default function SanXuatPage() {
   const handleHoanTac = async (lo: LoCat) => {
     if (!confirm(`Hoàn tác xuất kho cho lô "${lo.hangCat}"?\nTồn kho NPL sẽ được hoàn trả lại.`)) return;
     setHoanTacLoading(prev => new Set(prev).add(lo.id));
+    // Optimistic update ngay lập tức
+    const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: false } : l);
+    setLosCat(update); setAllLoCat(update);
     try {
       const res = await fetch("/api/ke-toan/xuat-kho/hoan-tac", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ loCatId: lo.id }),
       }).then(r => r.json());
-      if (res.ok) {
-        const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: false } : l);
-        setLosCat(update); setAllLoCat(update);
-      } else {
+      if (!res.ok) {
+        // Rollback nếu lỗi
+        const rollback = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: true } : l);
+        setLosCat(rollback); setAllLoCat(rollback);
         alert(`⚠️ Hoàn tác: ${res.error ?? "Lỗi không xác định"}`);
       }
     } catch {
+      const rollback = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: true } : l);
+      setLosCat(rollback); setAllLoCat(rollback);
       alert("⚠️ Lỗi kết nối khi hoàn tác");
     } finally {
       setHoanTacLoading(prev => { const s = new Set(prev); s.delete(lo.id); return s; });
@@ -790,21 +813,24 @@ export default function SanXuatPage() {
 
   const handleXuatKho = async (lo: LoCat) => {
     setXuatKhoLoading(prev => new Set(prev).add(lo.id));
+    // Optimistic update ngay lập tức
+    const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: true } : l);
+    setLosCat(update); setAllLoCat(update);
     try {
-      // 1. Đánh dấu xuatHoaDonDa = true
-      const update = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: true } : l);
-      setLosCat(update); setAllLoCat(update);
-      await fetch(`/api/san-xuat/lo-cat/${lo.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ xuatHoaDonDa: true }),
-      });
-      // 2. Tạo phiếu xuất kho từ định mức
+      // API tu-dinh-muc tự set xuatHoaDonDa=true (atomic) — không cần PATCH riêng
       const res = await fetch("/api/ke-toan/xuat-kho/tu-dinh-muc", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ loCatId: lo.id }),
       }).then(r => r.json());
-      if (!res.ok) alert(`⚠️ Xuất kho: ${res.error ?? "Lỗi không xác định"}`);
+      if (!res.ok) {
+        // Rollback chỉ khi API trả về lỗi thực sự
+        const rollback = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: false } : l);
+        setLosCat(rollback); setAllLoCat(rollback);
+        alert(`⚠️ Xuất kho: ${res.error ?? "Lỗi không xác định"}`);
+      }
     } catch {
+      const rollback = (prev: LoCat[]) => prev.map(l => l.id === lo.id ? { ...l, xuatHoaDonDa: false } : l);
+      setLosCat(rollback); setAllLoCat(rollback);
       alert("⚠️ Lỗi kết nối khi xuất kho");
     } finally {
       setXuatKhoLoading(prev => { const s = new Set(prev); s.delete(lo.id); return s; });
@@ -947,7 +973,13 @@ export default function SanXuatPage() {
     }
     return {
       tongNhan: rows.reduce((s, l) => s + (l.hangThucTe ?? 0), 0),
-      tongThieu: rows.reduce((s, l) => s + (l.hangThucTe != null ? Math.max(0, l.soLuongThieu ?? 0) : 0), 0),
+      // Tính thiếu live từ soSanPham − hangThucTe (không dùng soLuongThieu có thể null ở dữ liệu cũ)
+      tongThieu: rows.reduce((s, l) => {
+        if (l.hangThucTe == null) return s;
+        const sp = l.soSanPham ?? (l.soLaThucTe != null && l.tongSize != null ? l.soLaThucTe * l.tongSize : null);
+        if (sp == null) return s;
+        return s + Math.max(0, sp - l.hangThucTe);
+      }, 0),
       tongNhan_byLoai: byLoai,
     };
   }, [allLoCat, filterThang, filterXuong]);
@@ -2175,15 +2207,40 @@ export default function SanXuatPage() {
                         {xuongList.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
                       </select>
                     </div>
-                    <div>
+                    <div className="relative">
                       <label className="text-xs text-slate-600 mb-1 block">Hàng cắt (SKU) *</label>
-                      <input required value={form.hangCat} onChange={sf("hangCat")} className={inp}
-                        list="hang-cat-list" placeholder="Nhập hoặc chọn mã hàng..." />
-                      <datalist id="hang-cat-list">
-                        {sanPhams.map(sp => (
-                          <option key={sp.id} value={sp.sku}>{sp.ten}</option>
-                        ))}
-                      </datalist>
+                      <div className="relative">
+                        <input
+                          required
+                          value={form.hangCat}
+                          onChange={e => { setForm(f => ({ ...f, hangCat: e.target.value })); setSkuSearch(e.target.value); setShowSkuDropdown(true); }}
+                          onFocus={() => { setSkuSearch(""); setShowSkuDropdown(true); }}
+                          onBlur={() => setTimeout(() => setShowSkuDropdown(false), 150)}
+                          className={inp}
+                          placeholder="Nhập hoặc chọn mã hàng..."
+                          autoComplete="off"
+                        />
+                        {showSkuDropdown && (
+                          <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                            {skuOptions
+                              .filter(s => !skuSearch || s.toLowerCase().includes(skuSearch.toLowerCase()))
+                              .map(sku => (
+                                <button
+                                  key={sku}
+                                  type="button"
+                                  onMouseDown={() => { setForm(f => ({ ...f, hangCat: sku })); setShowSkuDropdown(false); }}
+                                  className={`w-full text-left px-3 py-2 text-sm hover:bg-rose-50 hover:text-rose-700 transition-colors ${form.hangCat === sku ? "bg-rose-50 text-rose-700 font-semibold" : "text-slate-700"}`}
+                                >
+                                  {sku}
+                                </button>
+                              ))
+                            }
+                            {skuOptions.filter(s => !skuSearch || s.toLowerCase().includes(skuSearch.toLowerCase())).length === 0 && (
+                              <div className="px-3 py-2 text-xs text-slate-400 italic">Không tìm thấy — nhập tay để tạo mới</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="col-span-2">
                       <label className="text-xs text-slate-600 mb-1 block">Size & Số lượng mỗi size</label>

@@ -80,7 +80,9 @@ const DON_VI_OPTIONS = [
   { value: "thuong", label: "Thương" },
 ];
 
-const fmt = (n: number) => n.toLocaleString("vi-VN");
+// Dùng en-US: dấu phẩy = nghìn, dấu chấm = thập phân
+// → 59.865 gói (decimal ≈60) vs 59,865 chiếc (integer ≈60000) rõ ràng khác nhau
+const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 10 });
 
 const DON_VI_LABEL: Record<string, string> = {
   m: "m", met: "m", yard: "yard", kg: "kg",
@@ -476,7 +478,7 @@ export default function TonKhoPage() {
                   {g.nhom && <span className="ml-1.5 text-xs text-slate-400">{NHOM_LABEL[g.nhom] ?? g.nhom}</span>}
                 </td>
                 <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                  {fmt(Math.round(g.soLuong * 100) / 100)}
+                  {fmt(g.soLuong)}
                   {g.items.length > 1 && (
                     <span className="ml-1.5 text-[10px] text-indigo-400">({g.items.length} mã)</span>
                   )}
@@ -486,7 +488,7 @@ export default function TonKhoPage() {
                 <td className="px-4 py-3 text-right">
                   {(() => {
                     const totalQD = g.items.reduce((s, t) => s + (t.soLuongQD ?? t.soLuong), 0);
-                    return <span className="font-semibold text-teal-700">{fmt(Math.round(totalQD * 100) / 100)}</span>;
+                    return <span className="font-semibold text-teal-700">{fmt(totalQD)}</span>;
                   })()}
                 </td>
                 {/* Đơn vị QĐ */}
@@ -538,7 +540,7 @@ export default function TonKhoPage() {
                 {/* SL quy đổi — luôn hiện, nếu không quy đổi = soLuong */}
                 <td className="px-4 py-3 text-right">
                   <span className={`font-semibold ${(t.quyDoi ?? 1) !== 1 ? "text-teal-700" : "text-slate-500"}`}>
-                    {fmt(Math.round((t.soLuongQD ?? t.soLuong) * 100) / 100)}
+                    {fmt(t.soLuongQD ?? t.soLuong)}
                   </span>
                 </td>
                 {/* Đơn vị QĐ — luôn hiện */}

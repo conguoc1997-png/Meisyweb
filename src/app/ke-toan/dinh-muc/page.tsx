@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, X, Search, Trash2, Lock, Settings2 } from "lucide-react";
+import { Plus, X, Search, Trash2, Lock, Settings2, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 type SanPham = { id: string; ten: string; sku: string; mauSac?: string|null; size?: string|null };
@@ -510,6 +511,67 @@ export default function DinhMucPage() {
     );
   }
 
+  /* ── Export Excel ───────────────────────────────────────────────────────── */
+  function exportExcel() {
+    // Helper: format cell value for a list of định mức items
+    const fmtItems = (items: DinhMuc[], col: ColDef): string => {
+      if (items.length === 0) return "";
+      if (col.tickOnly) return "✓";
+      return items.map(dm => {
+        const vt = dm.vatTu || vatTus.find(v => v.id === dm.vatTuId);
+        const tenVt = vt?.ten ?? "";
+        const dv = fmtDV(dm.donViMua ?? vt?.donVi ?? "");
+        let s = `${fmt(dm.soLuong)}${dv ? " " + dv : ""}`;
+        if ((dm.haoHui ?? 0) > 0) s += ` (+${dm.haoHui}% hao)`;
+        return tenVt ? `${tenVt}: ${s}` : s;
+      }).join(" | ");
+    };
+
+    // Header row 1: column groups
+    const headerRow1 = [
+      "SKU", "Tên sản phẩm",
+      ...COLUMNS.map(col => col.label),
+    ];
+
+    // CHUNG row
+    const chungRow = [
+      "__CHUNG__", "Mặc định chung",
+      ...COLUMNS.map(col => fmtItems(getOwnItems(CHUNG_KEY, col), col)),
+    ];
+
+    // SP rows (all sanPhams, not filtered)
+    const spRows = sanPhams.map(sp => [
+      sp.sku,
+      sp.ten,
+      ...COLUMNS.map(col => {
+        const { items } = getCellDisplay(sp.sku, col);
+        return fmtItems(items, col);
+      }),
+    ]);
+
+    const data = [headerRow1, chungRow, ...spRows];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Column widths
+    ws["!cols"] = [
+      { wch: 18 }, // SKU
+      { wch: 30 }, // Tên SP
+      ...COLUMNS.map(col => ({ wch: col.tickOnly ? 10 : 28 })),
+    ];
+
+    // Style header row bold (basic)
+    const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r: 0, c });
+      if (!ws[addr]) continue;
+      ws[addr].s = { font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Định Mức NPL");
+    XLSX.writeFile(wb, `dinh-muc-npl-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   /* ── Render ─────────────────────────────────────────────────────────────── */
   return (
     <div className="p-6 max-w-full">
@@ -523,6 +585,13 @@ export default function DinhMucPage() {
             <span className="ml-1 text-teal-600 font-medium">Vải</span> = điền riêng từng sản phẩm
           </p>
         </div>
+        <button
+          onClick={exportExcel}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+        >
+          <Download size={15} />
+          Xuất Excel
+        </button>
       </div>
 
       {/* Search */}
@@ -706,10 +775,15 @@ export default function DinhMucPage() {
                         }}
                         onFocus={e => { e.target.select(); setVtDropOpen(idx); }}
                         placeholder="Tìm vật tư bất kỳ..."
+                        title={vt ? vt.ten : ""}
                         className="w-full border border-indigo-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 cursor-text"
                       />
+                      {/* Hiện tên đầy đủ bên dưới input khi đã chọn (không bị clip) */}
+                      {vt && !item.vtSearch && (
+                        <p className="text-[11px] text-indigo-700 font-medium mt-0.5 leading-tight break-words">{vt.ten}</p>
+                      )}
                       {vtDropOpen === idx && (
-                        <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto mt-1">
+                        <div className="absolute top-full left-0 min-w-[300px] w-full bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-56 overflow-y-auto mt-1">
                           {colVts.length === 0
                             ? <p className="text-xs text-slate-400 px-3 py-2">Không tìm thấy vật tư nhóm &ldquo;{editCol.label}&rdquo;</p>
                             : colVts.map(v => {
@@ -719,20 +793,27 @@ export default function DinhMucPage() {
                                 const hasStock = stock > 0;
                                 return (
                                   <button key={v.id}
-                                    className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors
+                                    title={v.ten}
+                                    className={`w-full text-left px-3 py-2.5 flex flex-col gap-1 transition-colors border-b border-slate-50 last:border-0
                                       ${hasStock ? "hover:bg-emerald-50" : "hover:bg-slate-50 opacity-60"}`}
                                     onMouseDown={e => e.preventDefault()}
                                     onClick={() => selectVatTu(idx, v)}>
-                                    <span className={`flex-1 ${hasStock ? "text-slate-800" : "text-slate-400"}`}>{v.ten}</span>
-                                    {!v.nhom && (
-                                      <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 font-medium">→ tự link</span>
-                                    )}
-                                    {tk
-                                      ? <span className={`shrink-0 font-medium text-right ${hasStock ? "text-emerald-600" : "text-slate-400"}`}>
-                                          {fmt(stock)} {donViHien}
-                                        </span>
-                                      : <span className="shrink-0 text-slate-300 text-[10px]">chưa nhập</span>
-                                    }
+                                    {/* Tên đầy đủ — không truncate, wrap nếu dài */}
+                                    <span className={`text-sm font-medium break-words leading-snug ${hasStock ? "text-slate-800" : "text-slate-400"}`}>
+                                      {v.ten}
+                                    </span>
+                                    {/* Dòng 2: badge + tồn kho */}
+                                    <div className="flex items-center gap-2">
+                                      {!v.nhom && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 font-medium whitespace-nowrap">→ tự link</span>
+                                      )}
+                                      {tk
+                                        ? <span className={`text-[11px] font-medium ${hasStock ? "text-emerald-600" : "text-slate-400"}`}>
+                                            {fmt(stock)} {donViHien}
+                                          </span>
+                                        : <span className="text-[10px] text-slate-300">chưa nhập kho</span>
+                                      }
+                                    </div>
                                   </button>
                                 );
                               })}
