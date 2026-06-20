@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2, RotateCcw } from "lucide-react";
 
 type NhanVien = {
   id: string; maNV: string; ten: string;
@@ -349,6 +349,25 @@ export default function ChamCongPage() {
     }).catch(() => fetchData());
   };
 
+  // Reset toàn bộ chấm công 1 nhân viên trong tháng
+  const resetEmployee = async (nvId: string, tenNV: string) => {
+    if (!confirm(`Xoá toàn bộ chấm công của "${tenNV}" tháng ${month}/${year}?\nHành động này không thể hoàn tác.`)) return;
+    const daysWithData = days.filter(d => ccMap[getKey(nvId, d)]);
+    if (daysWithData.length === 0) { alert("Chưa có dữ liệu chấm công để xoá."); return; }
+    // Optimistic: xoá khỏi UI ngay
+    const prefix = `${year}-${String(month).padStart(2, "0")}`;
+    setChamCongs(prev => prev.filter(c => !(c.nhanVienId === nvId && c.ngay.startsWith(prefix))));
+    // Gọi API xoá từng ngày song song
+    await Promise.all(daysWithData.map(d => {
+      const ngay = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      return fetch("/api/cham-cong", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: null, tangCa: null }),
+      });
+    })).catch(() => fetchData());
+  };
+
   // Summary per employee
   const getSummary = (nvId: string) => {
     const counts: Record<string, number> = {};
@@ -604,8 +623,19 @@ export default function ChamCongPage() {
                       </td>
                       {/* Tên NV — rowSpan=2 */}
                       <td rowSpan={2} className={`sticky left-8 z-10 px-3 py-1.5 border-r border-slate-100 border-b-2 border-b-slate-200 ${rowBg}`}>
-                        <p className="font-semibold text-slate-800 text-[13px]">{nv.ten}</p>
-                        {nv.chucVu && <p className="text-[11px] text-slate-400">{nv.chucVu}</p>}
+                        <div className="flex items-center justify-between gap-1 group">
+                          <div>
+                            <p className="font-semibold text-slate-800 text-[13px]">{nv.ten}</p>
+                            {nv.chucVu && <p className="text-[11px] text-slate-400">{nv.chucVu}</p>}
+                          </div>
+                          <button
+                            title="Xoá toàn bộ chấm công tháng này"
+                            onClick={() => resetEmployee(nv.id, nv.ten)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 text-slate-300 hover:text-red-500 transition-all shrink-0"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
                       </td>
                       {/* Cells chấm công */}
                       {days.map(d => {
