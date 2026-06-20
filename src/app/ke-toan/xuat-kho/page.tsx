@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Search, X, Trash2, Eye, AlertCircle, CheckCircle, Layers, Package, BarChart2, Download } from "lucide-react";
+import { Plus, Search, X, Trash2, Eye, AlertCircle, CheckCircle, Layers, Package, BarChart2, Download, Pencil } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type VatTu = { id: string; ma: string; ten: string; donVi: string; nhom: string | null; loai: string };
@@ -61,7 +61,7 @@ export default function XuatKhoPage() {
   const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
-  const [modal, setModal]     = useState<"create" | "view" | null>(null);
+  const [modal, setModal]     = useState<"create" | "view" | "edit" | null>(null);
   const [selected, setSelected] = useState<PhieuXuat | null>(null);
 
   // Form
@@ -295,6 +295,63 @@ export default function XuatKhoPage() {
     fetchAll();
   }
 
+  function openEdit(p: PhieuXuat) {
+    setForm({
+      soPhieu:    p.soPhieu,
+      ngay:       p.ngay.slice(0, 10),
+      loCatId:    p.loCatId || "",
+      hangCat:    p.hangCat || "",
+      soSanPham:  String(p.soSanPham || ""),
+      lyDo:       p.lyDo,
+      ghiChu:     p.ghiChu || "",
+      nguoiTao:   "",
+    });
+    const loadedRows: XuatRow[] = p.chiTiet.map(c => ({
+      type:     (c.vatTu?.loai === "vai" ? "vai" : "phu_lieu") as "vai" | "phu_lieu",
+      vatTuId:  c.vatTuId,
+      vatTu:    c.vatTu,
+      soLuong:  c.soLuong,
+      donGia:   c.donGia,
+      ghiChu:   c.ghiChu || "",
+    }));
+    setRows(loadedRows);
+    setVtSearch(loadedRows.map(() => ""));
+    setSelected(p);
+    setModal("edit");
+    fetch("/api/ke-toan/ton-kho").then(r => r.json()).then((data: { vatTuId: string; soLuongQD: number; donViQuyDoi: string }[]) => {
+      if (Array.isArray(data)) setTkMap(new Map(data.map(t => [t.vatTuId, { soLuongQD: t.soLuongQD, donViQuyDoi: t.donViQuyDoi }])));
+    }).catch(() => {});
+  }
+
+  async function doEdit() {
+    if (!selected) return;
+    const validRows = rows.filter(r => r.vatTuId && r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0);
+    if (!form.ngay || validRows.length === 0) return;
+    setSaving(true);
+    const res = await fetch(`/api/ke-toan/xuat-kho/${selected.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action:     "edit",
+        ngay:       form.ngay,
+        hangCat:    form.hangCat,
+        soSanPham:  parseFloat(form.soSanPham) || 0,
+        lyDo:       form.lyDo,
+        ghiChu:     form.ghiChu,
+        chiTiet:    validRows,
+      }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setModal(null);
+      resetForm();
+      fetchAll();
+    } else {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      alert(`Lỗi sửa phiếu: ${err.error ?? JSON.stringify(err)}`);
+    }
+  }
+
   const tongTien = rows.filter(r => r.vatTuId !== "__UNMAPPED__").reduce((s, r) => s + r.soLuong * r.donGia, 0);
   const vaiRows  = rows.filter(r => r.type === "vai");
   const phuRows  = rows.filter(r => r.type === "phu_lieu");
@@ -480,9 +537,17 @@ export default function XuatKhoPage() {
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
                     <button onClick={() => { setSelected(p); setModal("view"); }}
+                      title="Xem chi tiết"
                       className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
                       <Eye size={14} />
                     </button>
+                    {!daHuy && (
+                      <button onClick={() => openEdit(p)}
+                        title="Sửa phiếu"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50">
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     {!daHuy && (
                       <button onClick={() => handleHuy(p.id, p.soPhieu)}
                         title="Hủy phiếu (giữ lịch sử, hoàn tồn kho)"
@@ -505,12 +570,14 @@ export default function XuatKhoPage() {
       </div>
       </> }
 
-      {/* ── CREATE MODAL ── */}
-      {modal === "create" && (
+      {/* ── CREATE / EDIT MODAL ── */}
+      {(modal === "create" || modal === "edit") && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-6 px-4 pb-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">Tạo phiếu xuất kho NPL</h2>
+              <h2 className="text-lg font-bold text-slate-800">
+                {modal === "edit" ? `Sửa phiếu ${selected?.soPhieu}` : "Tạo phiếu xuất kho NPL"}
+              </h2>
               <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
 
@@ -533,94 +600,96 @@ export default function XuatKhoPage() {
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
 
-                {/* ── Chế độ xuất ── */}
-                <div className="col-span-3">
-                  <div className="flex rounded-xl border border-slate-200 overflow-hidden w-fit">
-                    <button onClick={() => { setXuatMode("lo_cat"); setRows([]); setVtSearch([]); setSelectedSP(null); setSpSearch(""); setForm(f => ({ ...f, loCatId: "", hangCat: "", soSanPham: "" })); }}
-                      className={`px-4 py-2 text-sm font-medium transition-colors ${xuatMode === "lo_cat" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
-                      📋 Theo lô cắt
-                    </button>
-                    <button onClick={() => { setXuatMode("san_pham"); setRows([]); setVtSearch([]); setForm(f => ({ ...f, loCatId: "", hangCat: "", soSanPham: "" })); }}
-                      className={`px-4 py-2 text-sm font-medium transition-colors border-l border-slate-200 ${xuatMode === "san_pham" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
-                      📦 Theo sản phẩm
-                    </button>
+                {/* ── Chế độ xuất — chỉ hiện khi tạo mới ── */}
+                {modal === "create" && <>
+                  <div className="col-span-3">
+                    <div className="flex rounded-xl border border-slate-200 overflow-hidden w-fit">
+                      <button onClick={() => { setXuatMode("lo_cat"); setRows([]); setVtSearch([]); setSelectedSP(null); setSpSearch(""); setForm(f => ({ ...f, loCatId: "", hangCat: "", soSanPham: "" })); }}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${xuatMode === "lo_cat" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+                        📋 Theo lô cắt
+                      </button>
+                      <button onClick={() => { setXuatMode("san_pham"); setRows([]); setVtSearch([]); setForm(f => ({ ...f, loCatId: "", hangCat: "", soSanPham: "" })); }}
+                        className={`px-4 py-2 text-sm font-medium transition-colors border-l border-slate-200 ${xuatMode === "san_pham" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+                        📦 Theo sản phẩm
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {xuatMode === "lo_cat" ? (
-                  <div className="col-span-2">
-                    <label className="text-xs font-medium text-slate-500 block mb-1">
-                      Chọn lô cắt
-                      <span className="ml-1.5 text-indigo-400 font-normal">— tự điền vải từ lô + phụ liệu từ định mức</span>
-                    </label>
-                    <select value={form.loCatId} onChange={e => onSelectLo(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                      <option value="">— Chọn lô cắt —</option>
-                      {loCats.map(l => (
-                        <option key={l.id} value={l.id}>
-                          {fmtDate(l.ngay)} · {l.hangCat}
-                          {l.maVai ? ` · ${l.maVai}` : ""}
-                          {` · ${l.hangThucTe ?? l.soSanPham ?? "?"} sp`}
-                          {l.soM ? ` · ${l.soM}m` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <>
-                    <div className="col-span-2 relative">
+                  {xuatMode === "lo_cat" ? (
+                    <div className="col-span-2">
                       <label className="text-xs font-medium text-slate-500 block mb-1">
-                        Chọn sản phẩm từ kho
-                        <span className="ml-1.5 text-indigo-400 font-normal">— tự tính NPL từ định mức</span>
+                        Chọn lô cắt
+                        <span className="ml-1.5 text-indigo-400 font-normal">— tự điền vải từ lô + phụ liệu từ định mức</span>
                       </label>
-                      <input value={selectedSP ? selectedSP.ten : spSearch}
-                        onChange={e => { setSpSearch(e.target.value); setSelectedSP(null); setForm(f => ({ ...f, hangCat: "", soSanPham: "" })); setRows([]); }}
-                        placeholder="Tìm tên sản phẩm..."
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                      {!selectedSP && spSearch && (() => {
-                        const q = spSearch.toLowerCase();
-                        const uniqueNames = [...new Set(sanPhams.map(s => s.ten))].filter(n => n.toLowerCase().includes(q));
-                        if (!uniqueNames.length) return null;
-                        return (
-                          <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto mt-1">
-                            {uniqueNames.slice(0, 12).map(name => {
-                              const spItems = sanPhams.filter(s => s.ten === name);
-                              const totalTon = spItems.reduce((s, sp) => s + sp.tonKho, 0);
-                              return (
-                                <button key={name} onClick={() => {
-                                  setSelectedSP({ ten: name, totalTon });
-                                  setSpSearch("");
-                                  setForm(f => ({ ...f, hangCat: name }));
-                                }} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-50 last:border-0">
-                                  <p className="text-sm font-medium text-slate-800">{name}</p>
-                                  <p className="text-xs text-slate-400">{spItems.length} màu/size · tồn {totalTon} sp</p>
-                                </button>
-                              );
-                            })}
+                      <select value={form.loCatId} onChange={e => onSelectLo(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <option value="">— Chọn lô cắt —</option>
+                        {loCats.map(l => (
+                          <option key={l.id} value={l.id}>
+                            {fmtDate(l.ngay)} · {l.hangCat}
+                            {l.maVai ? ` · ${l.maVai}` : ""}
+                            {` · ${l.hangThucTe ?? l.soSanPham ?? "?"} sp`}
+                            {l.soM ? ` · ${l.soM}m` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="col-span-2 relative">
+                        <label className="text-xs font-medium text-slate-500 block mb-1">
+                          Chọn sản phẩm từ kho
+                          <span className="ml-1.5 text-indigo-400 font-normal">— tự tính NPL từ định mức</span>
+                        </label>
+                        <input value={selectedSP ? selectedSP.ten : spSearch}
+                          onChange={e => { setSpSearch(e.target.value); setSelectedSP(null); setForm(f => ({ ...f, hangCat: "", soSanPham: "" })); setRows([]); }}
+                          placeholder="Tìm tên sản phẩm..."
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        {!selectedSP && spSearch && (() => {
+                          const q = spSearch.toLowerCase();
+                          const uniqueNames = [...new Set(sanPhams.map(s => s.ten))].filter(n => n.toLowerCase().includes(q));
+                          if (!uniqueNames.length) return null;
+                          return (
+                            <div className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto mt-1">
+                              {uniqueNames.slice(0, 12).map(name => {
+                                const spItems = sanPhams.filter(s => s.ten === name);
+                                const totalTon = spItems.reduce((s, sp) => s + sp.tonKho, 0);
+                                return (
+                                  <button key={name} onClick={() => {
+                                    setSelectedSP({ ten: name, totalTon });
+                                    setSpSearch("");
+                                    setForm(f => ({ ...f, hangCat: name }));
+                                  }} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-50 last:border-0">
+                                    <p className="text-sm font-medium text-slate-800">{name}</p>
+                                    <p className="text-xs text-slate-400">{spItems.length} màu/size · tồn {totalTon} sp</p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                        {selectedSP && (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className="text-xs text-slate-500">Tồn kho: <strong>{selectedSP.totalTon} sp</strong></span>
+                            <button onClick={() => { setSelectedSP(null); setSpSearch(""); setForm(f => ({ ...f, hangCat: "", soSanPham: "" })); setRows([]); }}
+                              className="text-xs text-red-400 hover:text-red-600">✕ Đổi</button>
                           </div>
-                        );
-                      })()}
-                      {selectedSP && (
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <span className="text-xs text-slate-500">Tồn kho: <strong>{selectedSP.totalTon} sp</strong></span>
-                          <button onClick={() => { setSelectedSP(null); setSpSearch(""); setForm(f => ({ ...f, hangCat: "", soSanPham: "" })); setRows([]); }}
-                            className="text-xs text-red-400 hover:text-red-600">✕ Đổi</button>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 block mb-1">Số sản phẩm xuất *</label>
-                      <input type="number" min={1} value={form.soSanPham}
-                        onChange={e => onSoSanPhamSP(e.target.value)}
-                        disabled={!form.hangCat}
-                        placeholder={form.hangCat ? "Nhập số lượng..." : "Chọn SP trước"}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-40" />
-                      {form.hangCat && !rows.length && !suggestLoad && parseFloat(form.soSanPham) > 0 && (
-                        <p className="text-xs text-amber-500 mt-1">⚠ Chưa có định mức cho &quot;{form.hangCat}&quot;</p>
-                      )}
-                    </div>
-                  </>
-                )}
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 block mb-1">Số sản phẩm xuất *</label>
+                        <input type="number" min={1} value={form.soSanPham}
+                          onChange={e => onSoSanPhamSP(e.target.value)}
+                          disabled={!form.hangCat}
+                          placeholder={form.hangCat ? "Nhập số lượng..." : "Chọn SP trước"}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-40" />
+                        {form.hangCat && !rows.length && !suggestLoad && parseFloat(form.soSanPham) > 0 && (
+                          <p className="text-xs text-amber-500 mt-1">⚠ Chưa có định mức cho &quot;{form.hangCat}&quot;</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </>}
 
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Ghi chú</label>
@@ -911,12 +980,20 @@ export default function XuatKhoPage() {
             )}
 
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-              <button onClick={() => setModal(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
-              <button onClick={handleCreate} disabled={saving || rows.filter(r => r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0).length === 0}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
-                <Layers size={15} />
-                {saving ? "Đang xuất..." : "Xuất kho"}
-              </button>
+              <button onClick={() => { setModal(null); resetForm(); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Huỷ</button>
+              {modal === "edit" ? (
+                <button onClick={doEdit} disabled={saving || rows.filter(r => r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0).length === 0}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                  <Pencil size={15} />
+                  {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                </button>
+              ) : (
+                <button onClick={handleCreate} disabled={saving || rows.filter(r => r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0).length === 0}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                  <Layers size={15} />
+                  {saving ? "Đang xuất..." : "Xuất kho"}
+                </button>
+              )}
             </div>
           </div>
         </div>

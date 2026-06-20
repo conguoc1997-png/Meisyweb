@@ -10,6 +10,54 @@ export async function PATCH(
   try {
     const body = await req.json();
 
+    // ── Sửa phiếu ──
+    if (body.action === "edit") {
+      const phieu = await prisma.phieuXuatKho.findUnique({
+        where: { id },
+        include: { chiTiet: { select: { vatTuId: true } } },
+      });
+      if (!phieu) return NextResponse.json({ error: "Không tìm thấy phiếu" }, { status: 404 });
+      if ((phieu as { trangThai?: string }).trangThai === "da_huy")
+        return NextResponse.json({ error: "Không thể sửa phiếu đã hủy" }, { status: 400 });
+
+      const oldVatTuIds = [...new Set(phieu.chiTiet.map((c: { vatTuId: string }) => c.vatTuId))];
+
+      type ChiTietInput = { vatTuId: string; soLuong: number; donGia: number; ghiChu?: string };
+      const chiTiet: ChiTietInput[] = body.chiTiet ?? [];
+      const newVatTuIds = [...new Set(chiTiet.map((c: ChiTietInput) => c.vatTuId))];
+      const allVatTuIds = [...new Set([...oldVatTuIds, ...newVatTuIds])];
+
+      // 1. Cập nhật thông tin phiếu
+      await prisma.phieuXuatKho.update({
+        where: { id },
+        data: {
+          ngay:       body.ngay ? new Date(body.ngay) : undefined,
+          hangCat:    body.hangCat ?? undefined,
+          soSanPham:  body.soSanPham != null ? body.soSanPham : undefined,
+          lyDo:       body.lyDo ?? undefined,
+          ghiChu:     body.ghiChu ?? null,
+        },
+      });
+
+      // 2. Xóa chiTiet cũ, tạo mới
+      await prisma.phieuXuatChiTiet.deleteMany({ where: { phieuXuatId: id } });
+      await prisma.phieuXuatChiTiet.createMany({
+        data: chiTiet.map((c: ChiTietInput) => ({
+          phieuXuatId: id,
+          vatTuId:     c.vatTuId,
+          soLuong:     c.soLuong,
+          donGia:      c.donGia,
+          thanhTien:   c.soLuong * c.donGia,
+          ghiChu:      c.ghiChu || null,
+        })),
+      });
+
+      // 3. Recalc tồn kho cho tất cả vatTu liên quan
+      if (allVatTuIds.length > 0) await recalcVatTuIds(allVatTuIds);
+
+      return NextResponse.json({ ok: true, message: "Đã cập nhật phiếu xuất" });
+    }
+
     // Hủy phiếu: đánh dấu da_huy + hoàn tồn kho
     if (body.trangThai === "da_huy") {
       const phieu = await prisma.phieuXuatKho.findUnique({
