@@ -328,27 +328,39 @@ export default function XuatKhoPage() {
     const validRows = rows.filter(r => r.vatTuId && r.vatTuId !== "__UNMAPPED__" && r.soLuong > 0);
     if (!form.ngay || validRows.length === 0) return;
     setSaving(true);
-    const res = await fetch(`/api/ke-toan/xuat-kho/${selected.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action:     "edit",
-        ngay:       form.ngay,
-        hangCat:    form.hangCat,
-        soSanPham:  parseFloat(form.soSanPham) || 0,
-        lyDo:       form.lyDo,
-        ghiChu:     form.ghiChu,
-        chiTiet:    validRows,
-      }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      setModal(null);
-      resetForm();
-      fetchAll();
-    } else {
-      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      alert(`Lỗi sửa phiếu: ${err.error ?? JSON.stringify(err)}`);
+    try {
+      // Chỉ gửi các field cần thiết, không gửi vatTu object để giảm payload
+      const chiTietPayload = validRows.map(r => ({
+        vatTuId:  r.vatTuId,
+        soLuong:  r.soLuong,
+        donGia:   r.donGia,
+        ghiChu:   r.ghiChu,
+      }));
+      const res = await fetch(`/api/ke-toan/xuat-kho/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action:    "edit",
+          ngay:      form.ngay,
+          hangCat:   form.hangCat,
+          soSanPham: parseFloat(form.soSanPham) || 0,
+          lyDo:      form.lyDo,
+          ghiChu:    form.ghiChu,
+          chiTiet:   chiTietPayload,
+        }),
+      });
+      if (res.ok) {
+        setModal(null);
+        resetForm();
+        fetchAll();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Lỗi sửa phiếu: ${err.error ?? `HTTP ${res.status}`}`);
+      }
+    } catch (e) {
+      alert(`Lỗi kết nối: ${e instanceof Error ? e.message : "Không thể kết nối server"}`);
+    } finally {
+      setSaving(false);
     }
   }
 

@@ -143,26 +143,30 @@ export async function DELETE(
 }
 
 async function recalcVatTuIds(vatTuIds: string[]) {
-  // quyDoi mới nhất per vatTuId (lấy từ nhập mới nhất theo ngày)
-  const quyDoiInfos = await prisma.chiTietNhapKho.findMany({
-    where:    { vatTuId: { in: vatTuIds } },
-    select:   { vatTuId: true, quyDoi: true },
-    orderBy:  { phieu: { ngay: "desc" } },
-    distinct: ["vatTuId"],
-  });
+  // Chạy 3 query song song để giảm thời gian
+  const [quyDoiInfos, nhapInfos, xuatInfos] = await Promise.all([
+    // quyDoi mới nhất per vatTuId
+    prisma.chiTietNhapKho.findMany({
+      where:    { vatTuId: { in: vatTuIds } },
+      select:   { vatTuId: true, quyDoi: true },
+      orderBy:  { phieu: { ngay: "desc" } },
+      distinct: ["vatTuId"],
+    }),
+    // Tổng nhập
+    prisma.chiTietNhapKho.findMany({
+      where:  { vatTuId: { in: vatTuIds } },
+      select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
+    }),
+    // Tổng xuất (bỏ phiếu đã hủy)
+    prisma.phieuXuatChiTiet.findMany({
+      where:  {
+        vatTuId: { in: vatTuIds },
+        phieu: { trangThai: { not: "da_huy" } } as Record<string, unknown>,
+      },
+      select: { vatTuId: true, soLuong: true },
+    }),
+  ]);
   const quyDoiMap = new Map(quyDoiInfos.map(r => [r.vatTuId, r.quyDoi ?? 1]));
-
-  const nhapInfos = await prisma.chiTietNhapKho.findMany({
-    where:  { vatTuId: { in: vatTuIds } },
-    select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
-  });
-  const xuatInfos = await prisma.phieuXuatChiTiet.findMany({
-    where:  {
-      vatTuId: { in: vatTuIds },
-      phieu: { trangThai: { not: "da_huy" } }, // bỏ qua phiếu đã hủy
-    },
-    select: { vatTuId: true, soLuong: true },
-  });
 
   type TonInfo = { soLuongNhap: number; giaTriNhap: number; soLuongXuatBase: number };
   const map = new Map<string, TonInfo>();
