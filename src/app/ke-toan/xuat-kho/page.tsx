@@ -81,6 +81,7 @@ export default function XuatKhoPage() {
   const [rows, setRows]         = useState<XuatRow[]>([]);
   const [suggestLoad, setSuggestLoad] = useState(false);
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const origSoSanPhamRef = useRef<number>(0); // lưu soSanPham gốc để tính tỷ lệ scale
   const [saving, setSaving]     = useState(false);
   // per-row vat-tu search state
   const [vtSearch, setVtSearch] = useState<string[]>([]);
@@ -295,7 +296,23 @@ export default function XuatKhoPage() {
     fetchAll();
   }
 
+  // Scale tất cả số lượng theo tỷ lệ soSanPham mới / cũ
+  function scaleRows() {
+    const origSP = origSoSanPhamRef.current;
+    const newSP  = parseFloat(form.soSanPham) || 0;
+    if (!origSP || !newSP || origSP === newSP) return;
+    const ratio = newSP / origSP;
+    setRows(prev => prev.map(r => ({
+      ...r,
+      soLuong: parseFloat((r.soLuong * ratio).toFixed(4)),
+      // Cập nhật "×318sp" → "×213sp" trong ghi chú nếu có
+      ghiChu: r.ghiChu.replace(/× \d+(\.\d+)?sp/, `× ${newSP}sp`),
+    })));
+    origSoSanPhamRef.current = newSP; // cập nhật gốc để scale tiếp được
+  }
+
   function openEdit(p: PhieuXuat) {
+    origSoSanPhamRef.current = p.soSanPham || 0;
     setForm({
       soPhieu:    p.soPhieu,
       ngay:       p.ngay.slice(0, 10),
@@ -620,8 +637,30 @@ export default function XuatKhoPage() {
                     </div>
                     <div>
                       <label className="text-xs font-medium text-slate-500 block mb-1">Số sản phẩm</label>
-                      <input type="number" min={0} value={form.soSanPham} onChange={e => setForm(f => ({ ...f, soSanPham: e.target.value }))}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                      <div className="flex gap-2 items-center">
+                        <input type="number" min={0} value={form.soSanPham}
+                          onChange={e => setForm(f => ({ ...f, soSanPham: e.target.value }))}
+                          className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                        {parseFloat(form.soSanPham) > 0 &&
+                         parseFloat(form.soSanPham) !== origSoSanPhamRef.current &&
+                         origSoSanPhamRef.current > 0 && (
+                          <button
+                            type="button"
+                            onClick={scaleRows}
+                            title={`Tính lại số lượng theo tỷ lệ ${origSoSanPhamRef.current} → ${form.soSanPham} sp`}
+                            className="flex items-center gap-1 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-xl border border-emerald-200 whitespace-nowrap transition-colors"
+                          >
+                            ↻ Tính lại
+                          </button>
+                        )}
+                      </div>
+                      {parseFloat(form.soSanPham) > 0 &&
+                       parseFloat(form.soSanPham) !== origSoSanPhamRef.current &&
+                       origSoSanPhamRef.current > 0 && (
+                        <p className="text-[11px] text-emerald-600 mt-1">
+                          Nhấn &quot;Tính lại&quot; để scale số lượng theo tỷ lệ {origSoSanPhamRef.current} → {form.soSanPham} sp
+                        </p>
+                      )}
                     </div>
                   </>
                 ) : (
