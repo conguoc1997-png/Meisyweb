@@ -574,31 +574,64 @@ export default function XuatKhoPage() {
       {(modal === "create" || modal === "edit") && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-6 px-4 pb-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">
-                {modal === "edit" ? `Sửa phiếu ${selected?.soPhieu}` : "Tạo phiếu xuất kho NPL"}
-              </h2>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${modal === "edit" ? "border-emerald-100 bg-emerald-50/40" : "border-slate-100"}`}>
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">
+                  {modal === "edit" ? "Sửa phiếu xuất kho" : "Tạo phiếu xuất kho NPL"}
+                </h2>
+                {modal === "edit" && (
+                  <p className="text-xs text-emerald-700 font-mono mt-0.5">{selected?.soPhieu}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {modal === "edit" && (
+                  <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">Đang sửa</span>
+                )}
+                <button onClick={() => { setModal(null); resetForm(); }} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
+              </div>
             </div>
 
             <div className="p-6 space-y-6">
               {/* ── Thông tin phiếu ── */}
               <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Số phiếu *</label>
-                  <input value={form.soPhieu} onChange={e => setForm(f => ({ ...f, soPhieu: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Ngày xuất *</label>
-                  <input type="date" value={form.ngay} onChange={e => setForm(f => ({ ...f, ngay: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Người tạo</label>
-                  <input value={form.nguoiTao} onChange={e => setForm(f => ({ ...f, nguoiTao: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
+                {modal === "edit" ? (
+                  /* Edit mode: số phiếu readonly, chỉ sửa ngày + ghi chú */
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Số phiếu</label>
+                      <div className="w-full border border-slate-100 bg-slate-50 rounded-xl px-3 py-2 text-sm font-mono text-slate-500">{form.soPhieu}</div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Ngày xuất *</label>
+                      <input type="date" value={form.ngay} onChange={e => setForm(f => ({ ...f, ngay: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Số sản phẩm</label>
+                      <input type="number" min={0} value={form.soSanPham} onChange={e => setForm(f => ({ ...f, soSanPham: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                    </div>
+                  </>
+                ) : (
+                  /* Create mode: full form */
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Số phiếu *</label>
+                      <input value={form.soPhieu} onChange={e => setForm(f => ({ ...f, soPhieu: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Ngày xuất *</label>
+                      <input type="date" value={form.ngay} onChange={e => setForm(f => ({ ...f, ngay: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">Người tạo</label>
+                      <input value={form.nguoiTao} onChange={e => setForm(f => ({ ...f, nguoiTao: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                    </div>
+                  </>
+                )}
 
                 {/* ── Chế độ xuất — chỉ hiện khi tạo mới ── */}
                 {modal === "create" && <>
