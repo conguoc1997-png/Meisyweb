@@ -87,15 +87,16 @@ async function recalcVatTuIds(vatTuIds: string[]) {
     map.set(r.vatTuId, cur);
   }
 
-  await Promise.all([...map.entries()].map(([vatTuId, d]) => {
+  // Sequential upserts — tránh connection pool timeout (Supabase limit=1)
+  for (const [vatTuId, d] of map.entries()) {
     const quyDoi       = quyDoiMap.get(vatTuId) ?? 1;
     const soLuong      = Math.max(0, d.soLuongNhap - d.soLuongXuatBase / quyDoi);
     const giaTrungBinh = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
     const giaTriTon    = soLuong * giaTrungBinh;
-    return prisma.tonKhoVatTu.upsert({
+    await prisma.tonKhoVatTu.upsert({
       where:  { vatTuId },
       update: { soLuong, giaTrungBinh, giaTriTon },
       create: { vatTuId, soLuong, giaTrungBinh, giaTriTon },
     });
-  }));
+  }
 }

@@ -48,20 +48,19 @@ export async function POST() {
       map.set(r.vatTuId, cur);
     }
 
-    // 4. Upsert TonKhoVatTu song song
-    // ton (đv mua) = nhap (đv mua) − xuat_base / quyDoi
+    // 4. Upsert TonKhoVatTu — sequential để tránh connection pool timeout
     const entries = [...map.entries()];
-    await Promise.all(entries.map(([vatTuId, d]) => {
+    for (const [vatTuId, d] of entries) {
       const quyDoi       = quyDoiMap.get(vatTuId) ?? 1;
       const soLuong      = Math.max(0, d.soLuongNhap - d.soLuongXuatBase / quyDoi);
       const giaTrungBinh = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
       const giaTriTon    = soLuong * giaTrungBinh;
-      return prisma.tonKhoVatTu.upsert({
+      await prisma.tonKhoVatTu.upsert({
         where:  { vatTuId },
         update: { soLuong, giaTrungBinh, giaTriTon },
         create: { vatTuId, soLuong, giaTrungBinh, giaTriTon },
       });
-    }));
+    }
 
     return NextResponse.json({ ok: true, updated: entries.length });
   } catch (e: unknown) {
