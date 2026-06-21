@@ -28,6 +28,7 @@ interface TaiKhoanQuy {
 
 const DANH_MUC_LABEL: Record<string, string> = {
   doanh_thu_ban_hang: "Doanh thu bán hàng",
+  chi_phi_san: "Chi phí sàn",
   luong:       "Lương & thưởng",
   van_phong:   "Văn phòng phẩm",
   nguyen_lieu: "Nguyên liệu",

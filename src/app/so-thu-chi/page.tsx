@@ -46,6 +46,7 @@ const HO_LABELS: Record<Ho, { label: string; icon: string; color: string; bg: st
 
 const DANH_MUC_OPTIONS = [
   { value: "doanh_thu_ban_hang", label: "🛍️ Doanh thu bán hàng" },
+  { value: "chi_phi_san", label: "🛒 Chi phí sàn" },
   { value: "luong",       label: "💰 Lương & thưởng" },
   { value: "van_phong",   label: "🖊️ Văn phòng phẩm" },
   { value: "nguyen_lieu", label: "📦 Nguyên liệu" },

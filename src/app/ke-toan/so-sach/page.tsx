@@ -101,6 +101,10 @@ export default function SoSachPage() {
     }));
   }, [manualKey, chiPhiLuong, chiPhiKhauHao, chiPhiLaiVay, thueSuatGTGT, thueSuatTNCN]);
 
+  useEffect(() => {
+    if (ho === "meisy" && tab === "s2d") setTab("s2b");
+  }, [ho, tab]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { from, to } = monthRange(thang);
@@ -162,14 +166,20 @@ export default function SoSachPage() {
       .reduce((s, p) => s + p.soTien, 0),
     [phieus]
   );
+  const chiPhiSan = useMemo(
+    () => phieus
+      .filter(p => p.loai === "chi" && p.danhMuc === "chi_phi_san")
+      .reduce((s, p) => s + p.soTien, 0),
+    [phieus]
+  );
   const chiPhiKhac = useMemo(
     () => phieus
-      .filter(p => p.loai === "chi" && !["dien_nuoc", "van_phong", "van_chuyen"].includes(p.danhMuc))
+      .filter(p => p.loai === "chi" && !["dien_nuoc", "van_phong", "van_chuyen", "chi_phi_san"].includes(p.danhMuc))
       .reduce((s, p) => s + p.soTien, 0),
     [phieus]
   );
   const tongChiPhi = chiPhiNVL + (Number(chiPhiLuong) || 0) + (Number(chiPhiKhauHao) || 0)
-    + chiPhiDichVuMuaNgoai + (Number(chiPhiLaiVay) || 0) + chiPhiKhac;
+    + chiPhiDichVuMuaNgoai + chiPhiSan + (Number(chiPhiLaiVay) || 0) + chiPhiKhac;
   const chenhLech = tongDoanhThu - tongChiPhi;
   const thueTNCN = chenhLech > 0 ? chenhLech * (Number(thueSuatTNCN) || 0) / 100 : 0;
 
@@ -240,7 +250,7 @@ export default function SoSachPage() {
         {[
           { key: "s2b", label: "S2b — Doanh thu" },
           { key: "s2c", label: "S2c — Doanh thu & Chi phí" },
-          { key: "s2d", label: "S2d — Vật tư, hàng hóa" },
+          ...(ho === "nguyen_cong_uoc" ? [{ key: "s2d", label: "S2d — Vật tư, hàng hóa" }] : []),
           { key: "s2e", label: "S2e — Sổ chi tiết tiền" },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
@@ -360,14 +370,18 @@ export default function SoSachPage() {
                   <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiDichVuMuaNgoai)}</td>
                 </tr>
                 <tr>
-                  <td className="border border-stone-200 px-3 py-2 pl-6">đ) Lãi vay vốn sản xuất, kinh doanh</td>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">đ) Chi phí sàn (hoa hồng, phí dịch vụ TMĐT)</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiSan)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">e) Lãi vay vốn sản xuất, kinh doanh</td>
                   <td className="border border-stone-200 px-3 py-2 text-right">
                     <input value={chiPhiLaiVay} onChange={e => setChiPhiLaiVay(e.target.value)} className={inp + " print:hidden"} />
                     <span className="print:inline hidden">{fmtSo(Number(chiPhiLaiVay) || 0)}</span>
                   </td>
                 </tr>
                 <tr>
-                  <td className="border border-stone-200 px-3 py-2 pl-6">e) Chi khác (từ Sổ Thu Chi)</td>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">g) Chi khác (từ Sổ Thu Chi)</td>
                   <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiKhac)}</td>
                 </tr>
                 <tr className="bg-stone-100 font-bold">
