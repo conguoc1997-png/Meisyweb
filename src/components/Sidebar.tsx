@@ -107,8 +107,13 @@ const MODULES: NavModule[] = [
     children: [
       { href: "/cham-cong",   label: "Chấm công",   icon: CalendarCheck, moduleKey: "cham-cong" },
       { href: "/bang-luong",  label: "Bảng lương",   icon: Banknote,      moduleKey: "cham-cong" },
-      { href: "/so-thu-chi",  label: "Sổ thu chi",   icon: Landmark,      moduleKey: "cham-cong" },
     ],
+  },
+  {
+    key: "so-thu-chi", moduleKey: "cham-cong",
+    label: "Sổ Thu Chi", icon: Landmark,
+    bg: "bg-emerald-50", text: "text-emerald-500",
+    href: "/so-thu-chi",
   },
   {
     key: "backup", moduleKey: "users",
