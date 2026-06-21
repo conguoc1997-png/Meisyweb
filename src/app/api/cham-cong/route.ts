@@ -3,25 +3,30 @@ import { prisma } from "@/lib/prisma";
 
 // GET /api/cham-cong?thang=2026-06
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const thang = searchParams.get("thang"); // YYYY-MM
+  try {
+    const { searchParams } = new URL(req.url);
+    const thang = searchParams.get("thang"); // YYYY-MM
 
-  const nhanViens = await prisma.nhanVien.findMany({
-    where: { active: true },
-    orderBy: { ten: "asc" },
-  });
-
-  let chamCongs: object[] = [];
-  if (thang) {
-    const [y, m] = thang.split("-").map(Number);
-    const start = new Date(y, m - 1, 1);
-    const end   = new Date(y, m, 1);
-    chamCongs = await prisma.chamCong.findMany({
-      where: { ngay: { gte: start, lt: end } },
+    const nhanViens = await prisma.nhanVien.findMany({
+      where: { active: true },
+      orderBy: { ten: "asc" },
     });
-  }
 
-  return NextResponse.json({ nhanViens, chamCongs });
+    let chamCongs: object[] = [];
+    if (thang) {
+      const [y, m] = thang.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end   = new Date(y, m, 1);
+      chamCongs = await prisma.chamCong.findMany({
+        where: { ngay: { gte: start, lt: end } },
+      });
+    }
+
+    return NextResponse.json({ nhanViens, chamCongs });
+  } catch (e) {
+    console.error("GET /api/cham-cong error:", e);
+    return NextResponse.json({ error: String(e), nhanViens: [], chamCongs: [] }, { status: 500 });
+  }
 }
 
 // POST /api/cham-cong — upsert 1 ô (trangThai hoặc tangCa)
