@@ -511,6 +511,39 @@ model ChamCong {
   @@unique([nhanVienId, ngay])
 }
 
+// ===================== MODULE SỔ THU CHI =====================
+
+// Số dư tài khoản quỹ theo hộ
+model TaiKhoanQuy {
+  id        String   @id @default(cuid())
+  ho        String   @unique // "meisy" | "nguyen_cong_uoc"
+  tenHo     String
+  soDuDauKy Float    @default(0) // số dư đầu kỳ (nhập tay mỗi tháng)
+  thang     String   @default("2026-06") // tháng hiện tại đang theo dõi
+  updatedAt DateTime @updatedAt
+}
+
+// Phiếu thu chi (đề xuất → duyệt → đã chi)
+model PhieuThuChi {
+  id          String    @id @default(cuid())
+  ho          String    // "meisy" | "nguyen_cong_uoc"
+  loai        String    // "thu" | "chi"
+  soTien      Float     @default(0)
+  danhMuc     String    @default("khac")
+  // "luong" | "van_phong" | "nguyen_lieu" | "van_chuyen" | "dien_nuoc" | "thue" | "khac"
+  dienGiai    String    // mô tả chi tiết
+  nguoiDeXuat String?   // tên người đề xuất
+  trangThai   String    @default("cho_duyet")
+  // "cho_duyet" | "da_duyet" | "tu_choi" | "da_chi"
+  ghiChuDuyet String?
+  ngay        DateTime  @default(now()) // ngày phát sinh
+  thang       String    // "2026-06" để lọc theo tháng
+  nguoiDuyet  String?
+  ngayDuyet   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 // ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================
 
 model DonHoanTra {
