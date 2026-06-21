@@ -349,7 +349,7 @@ export default function ChamCongPage() {
       const existing = prev.find(c => c.nhanVienId === nvId && c.ngay.slice(0, 10) === ngay);
       if (!next) return prev.filter(c => !(c.nhanVienId === nvId && c.ngay.slice(0, 10) === ngay));
       if (existing) return prev.map(c => c.nhanVienId === nvId && c.ngay.slice(0, 10) === ngay ? { ...c, trangThai: next } : c);
-      return [...prev, { id: "tmp", nhanVienId: nvId, ngay: ngay + "T00:00:00.000Z", trangThai: next, ghiChu: null }];
+      return [...prev, { id: "tmp", nhanVienId: nvId, ngay: ngay + "T00:00:00.000Z", trangThai: next, tangCa: null, ghiChu: null }];
     });
 
     setSaving(key);
