@@ -16,7 +16,6 @@ const HO_LIST = [
   { key: "nguyen_cong_uoc", label: "Nguyễn Công Ước", color: "indigo", emoji: "🏭" },
   { key: "meisy",           label: "Meisy",            color: "rose",   emoji: "🌸" },
 ] as const;
-type HoKey = typeof HO_LIST[number]["key"];
 
 type LocatStats = { dai_thuong: number; dai_kieu: number; short: number };
 const LOAI_HANG_LABEL: Record<string, string> = {
@@ -57,6 +56,11 @@ const FIXED_HOLIDAYS: { key: string; label: string }[] = [
 // Tạo danh sách ngày lễ mặc định cho 1 năm (YYYY-MM-DD)
 const buildDefaultHolidays = (y: number): string[] =>
   FIXED_HOLIDAYS.map(h => `${y}-${h.key}`);
+
+// Helper: lấy hộ kinh doanh dựa theo phòng ban
+type HoKey = "nguyen_cong_uoc" | "meisy";
+const getHo = (nv: { phongBan?: string | null }): HoKey =>
+  nv.phongBan?.toUpperCase() === "MAY" ? "nguyen_cong_uoc" : "meisy";
 
 export default function ChamCongPage() {
   const now = new Date();
@@ -470,10 +474,6 @@ export default function ChamCongPage() {
     fetchData();
   };
 
-  // Helper: lấy hộ của NV dựa theo phongBan
-  const getHo = (nv: NhanVien): HoKey => {
-    return nv.phongBan?.toUpperCase() === "MAY" ? "nguyen_cong_uoc" : "meisy";
-  };
 
   // ── Màn hình chọn hộ ──
   if (!selectedHo) {
