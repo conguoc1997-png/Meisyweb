@@ -311,6 +311,9 @@ function BangLuongContent({ auth, onLogout }: { auth: string; onLogout: () => vo
   const [data, setData] = useState<BangLuongData | null>(null);
   const [loading, setLoading] = useState(false);
   const [filterPhongBan, setFilterPhongBan] = useState("");
+  const [filterHo, setFilterHo] = useState<"" | "nguyen_cong_uoc" | "meisy">(() => {
+    try { return (localStorage.getItem("meisy_selected_ho") as "" | "nguyen_cong_uoc" | "meisy") || ""; } catch { return ""; }
+  });
   const [phieuLuong, setPhieuLuong] = useState<PhieuLuong | null>(null);
   const [locatStats, setLocatStats] = useState<LocatStats>({ dai_thuong: 0, dai_kieu: 0, short: 0 });
   const [khoanPrices, setKhoanPrices] = useState<Record<LocatKey, string>>({ dai_thuong: "", dai_kieu: "", short: "" });
@@ -395,9 +398,11 @@ function BangLuongContent({ auth, onLogout }: { auth: string; onLogout: () => vo
     const source = khoanAdjustedRows.length ? khoanAdjustedRows : (data?.rows ?? []);
     let filtered = source;
     if (!isAdmin) filtered = filtered.filter(r => r.maNV.toUpperCase() === auth.toUpperCase());
+    if (filterHo === "nguyen_cong_uoc") filtered = filtered.filter(r => isMayGroup(r.phongBan));
+    if (filterHo === "meisy") filtered = filtered.filter(r => !isMayGroup(r.phongBan));
     if (filterPhongBan) filtered = filtered.filter(r => r.phongBan === filterPhongBan);
     return filtered;
-  }, [khoanAdjustedRows, data, filterPhongBan, isAdmin, auth]);
+  }, [khoanAdjustedRows, data, filterPhongBan, filterHo, isAdmin, auth]);
 
   const tongFiltered = useMemo(() => ({
     luongChinh:  rows.reduce((s, r) => s + r.luongChinh, 0),
@@ -463,8 +468,23 @@ function BangLuongContent({ auth, onLogout }: { auth: string; onLogout: () => vo
               <ChevronRight size={15} />
             </button>
           </div>
+          {/* Filter hộ kinh doanh — chỉ admin */}
+          {isAdmin && (
+            <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
+              {[
+                { key: "", label: "Tất cả" },
+                { key: "nguyen_cong_uoc", label: "🏭 NCƯ" },
+                { key: "meisy", label: "🌸 Meisy" },
+              ].map(h => (
+                <button key={h.key} onClick={() => { setFilterHo(h.key as "" | "nguyen_cong_uoc" | "meisy"); setFilterPhongBan(""); try { if (h.key) localStorage.setItem("meisy_selected_ho", h.key); else localStorage.removeItem("meisy_selected_ho"); } catch {} }}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${filterHo === h.key ? "bg-violet-600 text-white" : "text-slate-500 hover:bg-slate-100"}`}>
+                  {h.label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Filter phòng ban — chỉ admin */}
-          {isAdmin && phongBans.length > 0 && (
+          {isAdmin && phongBans.length > 0 && !filterHo && (
             <select value={filterPhongBan} onChange={e => setFilterPhongBan(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200">
               <option value="">Tất cả bộ phận</option>
