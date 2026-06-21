@@ -254,9 +254,17 @@ export default function ChamCongPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const data = await fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json());
-    setNhanViens(Array.isArray(data.nhanViens) ? data.nhanViens : []);
-    setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs : []);
+    try {
+      const res = await fetch(`/api/cham-cong?thang=${thang}`);
+      const text = await res.text();
+      let data: { nhanViens?: unknown[]; chamCongs?: unknown[]; error?: string } = {};
+      try { data = JSON.parse(text); } catch { console.error("API không trả JSON:", text.slice(0, 500)); }
+      if (data.error) console.error("API error:", data.error);
+      setNhanViens(Array.isArray(data.nhanViens) ? data.nhanViens as NhanVien[] : []);
+      setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
+    } catch (e) {
+      console.error("fetchData error:", e);
+    }
     setLoading(false);
   }, [thang]);
 
