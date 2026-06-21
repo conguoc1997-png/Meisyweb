@@ -299,9 +299,10 @@ export default function ChamCongPage() {
   const getKey = (nvId: string, day: number) =>
     `${nvId}_${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-  // Filter nhân viên theo hộ đang chọn
+  // Filter nhân viên theo hộ đang chọn (getHo defined above)
   const nhanViens = useMemo(() =>
-    selectedHo ? nhanViensAll.filter(nv => (nv.hoKinhDoanh || "meisy") === selectedHo) : nhanViensAll,
+    selectedHo ? nhanViensAll.filter(nv => getHo(nv) === selectedHo) : nhanViensAll,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   [nhanViensAll, selectedHo]);
 
   // ── Birthday notifications ──
@@ -462,6 +463,13 @@ export default function ChamCongPage() {
     fetchData();
   };
 
+  // Helper: lấy hộ của NV (fallback theo phongBan nếu chưa có hoKinhDoanh)
+  const getHo = (nv: NhanVien): HoKey => {
+    if (nv.hoKinhDoanh === "nguyen_cong_uoc") return "nguyen_cong_uoc";
+    if (nv.hoKinhDoanh === "meisy") return "meisy";
+    return nv.phongBan?.toUpperCase() === "MAY" ? "nguyen_cong_uoc" : "meisy";
+  };
+
   // ── Màn hình chọn hộ ──
   if (!selectedHo) {
     return (
@@ -485,7 +493,7 @@ export default function ChamCongPage() {
                   {ho.label}
                 </span>
                 <span className="text-xs text-slate-400">
-                  {nhanViensAll.filter(nv => (nv.hoKinhDoanh || "meisy") === ho.key).length} nhân viên
+                  {nhanViensAll.filter(nv => getHo(nv) === ho.key).length} nhân viên
                 </span>
               </button>
             ))}
