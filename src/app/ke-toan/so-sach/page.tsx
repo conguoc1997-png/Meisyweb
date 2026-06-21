@@ -129,13 +129,14 @@ export default function SoSachPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ─── S2b: Doanh thu bán hàng ───────────────────────────────────────────
+  // Doanh thu TikTok chỉ thuộc về hộ Meisy, không tính sang Nguyễn Công Ước
   const doanhThuTiktok = useMemo(
-    () => tiktokSP.reduce((s, r) => s + r.doanhThu, 0),
-    [tiktokSP]
+    () => ho === "meisy" ? tiktokSP.reduce((s, r) => s + r.doanhThu, 0) : 0,
+    [tiktokSP, ho]
   );
   const donHangTiktok = useMemo(
-    () => tiktokSP.reduce((s, r) => s + r.donHang, 0),
-    [tiktokSP]
+    () => ho === "meisy" ? tiktokSP.reduce((s, r) => s + r.donHang, 0) : 0,
+    [tiktokSP, ho]
   );
   const phieusDoanhThuKhac = useMemo(
     () => phieus.filter(p => p.loai === "thu" && p.danhMuc === "doanh_thu_ban_hang"),
@@ -149,9 +150,11 @@ export default function SoSachPage() {
   const thueGTGT = tongDoanhThu * (Number(thueSuatGTGT) || 0) / 100;
 
   // ─── S2c: Doanh thu, chi phí ────────────────────────────────────────────
+  // Hộ Meisy mua hàng từ hộ Nguyễn Công Ước — tiền mua đã ghi nhận qua Sổ Thu Chi
+  // nên KHÔNG cộng thêm chi phí NVL từ nhập kho (tránh tính trùng). Chỉ áp dụng cho Công Ước.
   const chiPhiNVL = useMemo(
-    () => nhapKho.reduce((s, p) => s + p.tongTien, 0),
-    [nhapKho]
+    () => ho === "nguyen_cong_uoc" ? nhapKho.reduce((s, p) => s + p.tongTien, 0) : 0,
+    [nhapKho, ho]
   );
   const chiPhiDichVuMuaNgoai = useMemo(
     () => phieus
@@ -276,7 +279,10 @@ export default function SoSachPage() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-stone-200 px-3 py-2">1. Doanh thu bán hàng qua TikTok</td>
+                    <td className="border border-stone-200 px-3 py-2">
+                      1. Doanh thu bán hàng qua TikTok
+                      {ho === "nguyen_cong_uoc" && <span className="text-stone-400 text-[11px] block">Không áp dụng — doanh thu TikTok thuộc hộ Meisy</span>}
+                    </td>
                     <td className="border border-stone-200 px-3 py-2 text-right">{donHangTiktok.toLocaleString()}</td>
                     <td className="border border-stone-200 px-3 py-2 text-right font-medium text-green-700">{fmtSo(doanhThuTiktok)}</td>
                   </tr>
@@ -329,7 +335,10 @@ export default function SoSachPage() {
                   <td className="border border-stone-200 px-3 py-2 text-right text-red-600">{fmtSo(tongChiPhi)}</td>
                 </tr>
                 <tr>
-                  <td className="border border-stone-200 px-3 py-2 pl-6">a) NVL, vật liệu, hàng hóa (nhập kho trong kỳ)</td>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">
+                    a) NVL, vật liệu, hàng hóa (nhập kho trong kỳ)
+                    {ho === "meisy" && <span className="text-stone-400 text-[11px] block">Không áp dụng — Meisy mua hàng từ Nguyễn Công Ước, đã ghi nhận qua Sổ Thu Chi</span>}
+                  </td>
                   <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiNVL)}</td>
                 </tr>
                 <tr>
