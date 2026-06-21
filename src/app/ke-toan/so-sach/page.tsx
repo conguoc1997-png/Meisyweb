@@ -17,7 +17,18 @@ interface TiktokSPRow {
 
 interface PhieuThuChi {
   id: string; ho: string; loai: "thu" | "chi"; soTien: number;
-  danhMuc: string; dienGiai: string; thang: string;
+  danhMuc: string; dienGiai: string; thang: string; ngay: string;
+  nguoiDeXuat: string | null; trangThai: string;
+}
+
+interface TaiKhoanQuy {
+  ho: string; tenHo: string; soDuDauKy: number; thang: string;
+  daChot: boolean; ngayChot: string | null;
+}
+
+function fmtNgay(s: string) {
+  const d = new Date(s);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 interface ChiTietNhap {
@@ -50,12 +61,14 @@ function monthRange(thang: string) {
 }
 
 export default function SoSachPage() {
-  const [tab, setTab] = useState<"s2b" | "s2c" | "s2d">("s2b");
+  const [tab, setTab] = useState<"s2b" | "s2c" | "s2d" | "s2e">("s2b");
   const [thang, setThang] = useState(currentThang());
   const [ho, setHo] = useState<Ho>("meisy");
 
   const [tiktokSP, setTiktokSP] = useState<TiktokSPRow[]>([]);
   const [phieus, setPhieus] = useState<PhieuThuChi[]>([]);
+  const [phieusDaDuyet, setPhieusDaDuyet] = useState<PhieuThuChi[]>([]);
+  const [taiKhoan, setTaiKhoan] = useState<TaiKhoanQuy | null>(null);
   const [nhapKho, setNhapKho] = useState<PhieuNhap[]>([]);
   const [xuatKho, setXuatKho] = useState<PhieuXuat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,19 +104,23 @@ export default function SoSachPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { from, to } = monthRange(thang);
-    const [tiktokRes, sttcRes, nhapRes, xuatRes] = await Promise.all([
+    const [tiktokRes, sttcRes, sttcInRes, nhapRes, xuatRes] = await Promise.all([
       fetch(`/api/koc/tiktok-doanhthu?thang=${thang}`),
       fetch(`/api/so-thu-chi?thang=${thang}&ho=${ho}`),
+      fetch(`/api/so-thu-chi/in?thang=${thang}&ho=${ho}`),
       fetch(`/api/ke-toan/nhap-kho?from=${from}&to=${to}`),
       fetch(`/api/ke-toan/xuat-kho?from=${from}&to=${to}`),
     ]);
     const tiktokData = await tiktokRes.json();
     const sttcData   = await sttcRes.json();
+    const sttcInData  = await sttcInRes.json();
     const nhapData   = await nhapRes.json();
     const xuatData   = await xuatRes.json();
 
     setTiktokSP(Array.isArray(tiktokData.spData) ? tiktokData.spData : []);
     setPhieus(Array.isArray(sttcData.phieus) ? sttcData.phieus : []);
+    setPhieusDaDuyet(Array.isArray(sttcInData.phieus) ? sttcInData.phieus : []);
+    setTaiKhoan(sttcInData.taiKhoan ?? null);
     setNhapKho(Array.isArray(nhapData) ? nhapData : []);
     setXuatKho(Array.isArray(xuatData) ? xuatData : []);
     setLoading(false);
@@ -174,6 +191,19 @@ export default function SoSachPage() {
   const tongNhapTT = vatTuRows.reduce((s, r) => s + r.nhapTT, 0);
   const tongXuatTT = vatTuRows.reduce((s, r) => s + r.xuatTT, 0);
 
+  // ─── S2e: Sổ chi tiết tiền ───────────────────────────────────────────────
+  const soDuDauKy = taiKhoan?.soDuDauKy ?? 0;
+  const tongThuTien = phieusDaDuyet.filter(p => p.loai === "thu").reduce((s, p) => s + p.soTien, 0);
+  const tongChiTien = phieusDaDuyet.filter(p => p.loai === "chi").reduce((s, p) => s + p.soTien, 0);
+  const soDuCuoiKy = soDuDauKy + tongThuTien - tongChiTien;
+  const tienRows = useMemo(() => {
+    let running = soDuDauKy;
+    return phieusDaDuyet.map(p => {
+      running += p.loai === "thu" ? p.soTien : -p.soTien;
+      return { ...p, soDuSauGD: running };
+    });
+  }, [phieusDaDuyet, soDuDauKy]);
+
   const [yy, mm] = thang.split("-");
   const inp = "w-full border border-stone-200 rounded-lg px-2.5 py-1.5 text-[13px] text-right focus:outline-none focus:border-rose-300";
 
@@ -208,6 +238,7 @@ export default function SoSachPage() {
           { key: "s2b", label: "S2b — Doanh thu" },
           { key: "s2c", label: "S2c — Doanh thu & Chi phí" },
           { key: "s2d", label: "S2d — Vật tư, hàng hóa" },
+          { key: "s2e", label: "S2e — Sổ chi tiết tiền" },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
             className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-colors ${
@@ -228,6 +259,7 @@ export default function SoSachPage() {
               {tab === "s2b" && "Sổ chi tiết doanh thu bán hàng hóa, dịch vụ"}
               {tab === "s2c" && "Sổ chi tiết doanh thu, chi phí"}
               {tab === "s2d" && "Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa"}
+              {tab === "s2e" && "Sổ chi tiết tiền"}
             </h2>
             <p className="text-[12px] text-stone-400 mt-0.5">Kỳ kê khai: Tháng {mm}/{yy}</p>
           </div>
@@ -379,6 +411,67 @@ export default function SoSachPage() {
                 </tr>
               </tbody>
             </table>
+          )}
+
+          {tab === "s2e" && (
+            <>
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                {[
+                  { label: "Số dư đầu kỳ", value: soDuDauKy, color: "text-stone-700" },
+                  { label: "Tổng thu", value: tongThuTien, color: "text-green-700" },
+                  { label: "Tổng chi", value: tongChiTien, color: "text-red-600" },
+                  { label: "Số dư cuối kỳ", value: soDuCuoiKy, color: soDuCuoiKy >= 0 ? "text-emerald-700" : "text-red-600" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="border border-stone-200 rounded-xl p-3 text-center">
+                    <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">{label}</p>
+                    <p className={`text-[15px] font-bold ${color}`}>{fmtSo(value)}</p>
+                  </div>
+                ))}
+              </div>
+              <table className="w-full border-collapse text-[12px]">
+                <thead>
+                  <tr className="bg-stone-50">
+                    <th className="border border-stone-200 px-2 py-2 text-center w-[32px]">STT</th>
+                    <th className="border border-stone-200 px-2 py-2 text-center w-[72px]">Ngày</th>
+                    <th className="border border-stone-200 px-2 py-2 text-left">Diễn giải</th>
+                    <th className="border border-stone-200 px-2 py-2 text-right w-[100px]">Thu (đ)</th>
+                    <th className="border border-stone-200 px-2 py-2 text-right w-[100px]">Chi (đ)</th>
+                    <th className="border border-stone-200 px-2 py-2 text-right w-[110px]">Số dư (đ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="bg-stone-50">
+                    <td className="border border-stone-200 px-2 py-1.5 text-center text-stone-400">—</td>
+                    <td className="border border-stone-200 px-2 py-1.5"></td>
+                    <td className="border border-stone-200 px-2 py-1.5 font-semibold text-stone-600">Số dư đầu kỳ</td>
+                    <td className="border border-stone-200 px-2 py-1.5"></td>
+                    <td className="border border-stone-200 px-2 py-1.5"></td>
+                    <td className="border border-stone-200 px-2 py-1.5 text-right font-semibold">{fmtSo(soDuDauKy)}</td>
+                  </tr>
+                  {tienRows.length === 0 ? (
+                    <tr><td colSpan={6} className="border border-stone-200 px-3 py-6 text-center text-stone-400">Chưa có giao dịch đã duyệt trong kỳ</td></tr>
+                  ) : tienRows.map((p, i) => (
+                    <tr key={p.id}>
+                      <td className="border border-stone-200 px-2 py-1.5 text-center text-stone-400">{i + 1}</td>
+                      <td className="border border-stone-200 px-2 py-1.5 text-center text-stone-500">{fmtNgay(p.ngay)}</td>
+                      <td className="border border-stone-200 px-2 py-1.5">{p.dienGiai}</td>
+                      <td className="border border-stone-200 px-2 py-1.5 text-right text-green-700">{p.loai === "thu" ? fmtSo(p.soTien) : ""}</td>
+                      <td className="border border-stone-200 px-2 py-1.5 text-right text-red-600">{p.loai === "chi" ? fmtSo(p.soTien) : ""}</td>
+                      <td className="border border-stone-200 px-2 py-1.5 text-right font-medium">{fmtSo(p.soDuSauGD)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-stone-100 font-bold">
+                    <td colSpan={3} className="border border-stone-200 px-2 py-2 text-right">Tổng cộng</td>
+                    <td className="border border-stone-200 px-2 py-2 text-right text-green-700">{fmtSo(tongThuTien)}</td>
+                    <td className="border border-stone-200 px-2 py-2 text-right text-red-600">{fmtSo(tongChiTien)}</td>
+                    <td className={`border border-stone-200 px-2 py-2 text-right ${soDuCuoiKy >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmtSo(soDuCuoiKy)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="text-[11px] text-stone-400 mt-2 print:hidden">
+                Sổ này chỉ tính các khoản đã được duyệt trong Sổ Thu Chi. Số liệu đồng bộ với trang Sổ Thu Chi.
+              </p>
+            </>
           )}
 
           <div className="mt-8 grid grid-cols-2 gap-8 text-center text-[12px] print:mt-16">
