@@ -483,6 +483,7 @@ model NhanVien {
   ten        String
   chucVu     String?
   phongBan   String?
+  hoKinhDoanh String    @default("meisy") // meisy | nguyen_cong_uoc
   loaiLuong       String  @default("co_ban") // co_ban | khoan
   luongCB         Float?
   phuCapChuyenCan Float?  // phụ cấp chuyên cần cố định/tháng

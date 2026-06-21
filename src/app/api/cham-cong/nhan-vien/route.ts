@@ -10,7 +10,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const data = await req.json();
-  const { maNV, ten, chucVu, phongBan, luongCB, loaiLuong } = data;
+  const { maNV, ten, chucVu, phongBan, luongCB, loaiLuong, hoKinhDoanh } = data;
   if (!maNV || !ten) return NextResponse.json({ error: "Thiếu mã NV hoặc tên" }, { status: 400 });
 
   const existing = await prisma.nhanVien.findUnique({ where: { maNV } });
@@ -20,11 +20,12 @@ export async function POST(req: NextRequest) {
   const nv = await prisma.nhanVien.create({
     data: {
       maNV, ten,
-      chucVu:    chucVu    || null,
-      phongBan:  phongBan  || null,
-      loaiLuong: loaiLuong || "co_ban",
-      luongCB:   luongCB   ? Number(luongCB) : null,
-      ngaySinh:  ngaySinh  ? new Date(ngaySinh) : null,
+      chucVu:       chucVu       || null,
+      phongBan:     phongBan     || null,
+      hoKinhDoanh:  hoKinhDoanh  || "meisy",
+      loaiLuong:    loaiLuong    || "co_ban",
+      luongCB:      luongCB      ? Number(luongCB) : null,
+      ngaySinh:     ngaySinh     ? new Date(ngaySinh) : null,
     },
   });
   return NextResponse.json(nv);
