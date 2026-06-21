@@ -452,7 +452,7 @@ export default function ChamCongPage() {
       const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
       const list = Array.isArray(data) ? data : [];
       setAllNVs(list);
-      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", hoKinhDoanh: selectedHo || "meisy", loaiLuong: "co_ban", luongCB: "", ngaySinh: "" });
+      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "" });
       setEditingNV(null);
       fetchData();
     } finally {
