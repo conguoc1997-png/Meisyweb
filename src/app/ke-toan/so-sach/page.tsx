@@ -1,0 +1,405 @@
+"use client";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Printer, BookOpen } from "lucide-react";
+
+type Ho = "meisy" | "nguyen_cong_uoc";
+
+const HO_LABELS: Record<Ho, string> = {
+  meisy: "Meisy",
+  nguyen_cong_uoc: "Nguyễn Công Ước",
+};
+
+interface TiktokSPRow {
+  id: string; thang: string; doanhThu: number; donHang: number;
+  sanPham: { id: string; ten: string; sku: string } | null;
+}
+
+interface PhieuThuChi {
+  id: string; ho: string; loai: "thu" | "chi"; soTien: number;
+  danhMuc: string; dienGiai: string; thang: string;
+}
+
+interface ChiTietNhap {
+  vatTuId: string; soLuongMua: number; donViMua: string; thanhTien: number;
+  vatTu: { ten: string; donVi: string };
+}
+interface PhieuNhap { ngay: string; tongTien: number; chiTiet: ChiTietNhap[]; }
+
+interface ChiTietXuat {
+  vatTuId: string; soLuong: number; donGia: number;
+  vatTu: { ten: string; donVi: string };
+}
+interface PhieuXuat { ngay: string; chiTiet: ChiTietXuat[]; }
+
+function fmtSo(n: number) {
+  return Math.round(n).toLocaleString("vi-VN");
+}
+
+function currentThang() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthRange(thang: string) {
+  const [y, m] = thang.split("-").map(Number);
+  const from = `${thang}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const to = `${thang}-${String(lastDay).padStart(2, "0")}`;
+  return { from, to };
+}
+
+export default function SoSachPage() {
+  const [tab, setTab] = useState<"s2b" | "s2c" | "s2d">("s2b");
+  const [thang, setThang] = useState(currentThang());
+  const [ho, setHo] = useState<Ho>("meisy");
+
+  const [tiktokSP, setTiktokSP] = useState<TiktokSPRow[]>([]);
+  const [phieus, setPhieus] = useState<PhieuThuChi[]>([]);
+  const [nhapKho, setNhapKho] = useState<PhieuNhap[]>([]);
+  const [xuatKho, setXuatKho] = useState<PhieuXuat[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Inputs thủ công cho S2c (lưu theo localStorage theo hộ + tháng)
+  const [chiPhiLuong, setChiPhiLuong] = useState("0");
+  const [chiPhiKhauHao, setChiPhiKhauHao] = useState("0");
+  const [chiPhiLaiVay, setChiPhiLaiVay] = useState("0");
+  const [thueSuatGTGT, setThueSuatGTGT] = useState("1");
+  const [thueSuatTNCN, setThueSuatTNCN] = useState("0.5");
+
+  const manualKey = `meisy_sosach_manual_${ho}_${thang}`;
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(manualKey) ?? "{}");
+      setChiPhiLuong(saved.chiPhiLuong ?? "0");
+      setChiPhiKhauHao(saved.chiPhiKhauHao ?? "0");
+      setChiPhiLaiVay(saved.chiPhiLaiVay ?? "0");
+      setThueSuatGTGT(saved.thueSuatGTGT ?? "1");
+      setThueSuatTNCN(saved.thueSuatTNCN ?? "0.5");
+    } catch {
+      // ignore
+    }
+  }, [manualKey]);
+
+  useEffect(() => {
+    localStorage.setItem(manualKey, JSON.stringify({
+      chiPhiLuong, chiPhiKhauHao, chiPhiLaiVay, thueSuatGTGT, thueSuatTNCN,
+    }));
+  }, [manualKey, chiPhiLuong, chiPhiKhauHao, chiPhiLaiVay, thueSuatGTGT, thueSuatTNCN]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const { from, to } = monthRange(thang);
+    const [tiktokRes, sttcRes, nhapRes, xuatRes] = await Promise.all([
+      fetch(`/api/koc/tiktok-doanhthu?thang=${thang}`),
+      fetch(`/api/so-thu-chi?thang=${thang}&ho=${ho}`),
+      fetch(`/api/ke-toan/nhap-kho?from=${from}&to=${to}`),
+      fetch(`/api/ke-toan/xuat-kho?from=${from}&to=${to}`),
+    ]);
+    const tiktokData = await tiktokRes.json();
+    const sttcData   = await sttcRes.json();
+    const nhapData   = await nhapRes.json();
+    const xuatData   = await xuatRes.json();
+
+    setTiktokSP(Array.isArray(tiktokData.spData) ? tiktokData.spData : []);
+    setPhieus(Array.isArray(sttcData.phieus) ? sttcData.phieus : []);
+    setNhapKho(Array.isArray(nhapData) ? nhapData : []);
+    setXuatKho(Array.isArray(xuatData) ? xuatData : []);
+    setLoading(false);
+  }, [thang, ho]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ─── S2b: Doanh thu bán hàng ───────────────────────────────────────────
+  const doanhThuTiktok = useMemo(
+    () => tiktokSP.reduce((s, r) => s + r.doanhThu, 0),
+    [tiktokSP]
+  );
+  const donHangTiktok = useMemo(
+    () => tiktokSP.reduce((s, r) => s + r.donHang, 0),
+    [tiktokSP]
+  );
+  const phieusDoanhThuKhac = useMemo(
+    () => phieus.filter(p => p.loai === "thu" && p.danhMuc === "doanh_thu_ban_hang"),
+    [phieus]
+  );
+  const doanhThuKhac = useMemo(
+    () => phieusDoanhThuKhac.reduce((s, p) => s + p.soTien, 0),
+    [phieusDoanhThuKhac]
+  );
+  const tongDoanhThu = doanhThuTiktok + doanhThuKhac;
+  const thueGTGT = tongDoanhThu * (Number(thueSuatGTGT) || 0) / 100;
+
+  // ─── S2c: Doanh thu, chi phí ────────────────────────────────────────────
+  const chiPhiNVL = useMemo(
+    () => nhapKho.reduce((s, p) => s + p.tongTien, 0),
+    [nhapKho]
+  );
+  const chiPhiDichVuMuaNgoai = useMemo(
+    () => phieus
+      .filter(p => p.loai === "chi" && ["dien_nuoc", "van_phong", "van_chuyen"].includes(p.danhMuc))
+      .reduce((s, p) => s + p.soTien, 0),
+    [phieus]
+  );
+  const chiPhiKhac = useMemo(
+    () => phieus
+      .filter(p => p.loai === "chi" && !["dien_nuoc", "van_phong", "van_chuyen"].includes(p.danhMuc))
+      .reduce((s, p) => s + p.soTien, 0),
+    [phieus]
+  );
+  const tongChiPhi = chiPhiNVL + (Number(chiPhiLuong) || 0) + (Number(chiPhiKhauHao) || 0)
+    + chiPhiDichVuMuaNgoai + (Number(chiPhiLaiVay) || 0) + chiPhiKhac;
+  const chenhLech = tongDoanhThu - tongChiPhi;
+  const thueTNCN = chenhLech > 0 ? chenhLech * (Number(thueSuatTNCN) || 0) / 100 : 0;
+
+  // ─── S2d: Vật liệu, dụng cụ, SP, hàng hóa ───────────────────────────────
+  const vatTuRows = useMemo(() => {
+    const map = new Map<string, { ten: string; donVi: string; nhapSL: number; nhapTT: number; xuatSL: number; xuatTT: number }>();
+    nhapKho.forEach(p => p.chiTiet.forEach(c => {
+      const cur = map.get(c.vatTuId) ?? { ten: c.vatTu.ten, donVi: c.vatTu.donVi, nhapSL: 0, nhapTT: 0, xuatSL: 0, xuatTT: 0 };
+      cur.nhapSL += c.soLuongMua;
+      cur.nhapTT += c.thanhTien;
+      map.set(c.vatTuId, cur);
+    }));
+    xuatKho.forEach(p => p.chiTiet.forEach(c => {
+      const cur = map.get(c.vatTuId) ?? { ten: c.vatTu.ten, donVi: c.vatTu.donVi, nhapSL: 0, nhapTT: 0, xuatSL: 0, xuatTT: 0 };
+      cur.xuatSL += c.soLuong;
+      cur.xuatTT += c.soLuong * c.donGia;
+      map.set(c.vatTuId, cur);
+    }));
+    return [...map.values()].sort((a, b) => a.ten.localeCompare(b.ten));
+  }, [nhapKho, xuatKho]);
+
+  const tongNhapTT = vatTuRows.reduce((s, r) => s + r.nhapTT, 0);
+  const tongXuatTT = vatTuRows.reduce((s, r) => s + r.xuatTT, 0);
+
+  const [yy, mm] = thang.split("-");
+  const inp = "w-full border border-stone-200 rounded-lg px-2.5 py-1.5 text-[13px] text-right focus:outline-none focus:border-rose-300";
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-5 print:hidden">
+        <div className="flex items-center gap-2.5">
+          <BookOpen className="text-violet-500" size={22} />
+          <div>
+            <h1 className="text-[18px] font-bold text-stone-800">Sổ sách thuế Hộ kinh doanh</h1>
+            <p className="text-[12px] text-stone-400">Theo Thông tư 152/2025/TT-BTC — tự động tổng hợp từ dữ liệu Meisy</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={ho} onChange={e => setHo(e.target.value as Ho)}
+            className="border border-stone-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none">
+            {(Object.entries(HO_LABELS) as [Ho, string][]).map(([k, l]) => (
+              <option key={k} value={k}>{l}</option>
+            ))}
+          </select>
+          <input type="month" value={thang} onChange={e => setThang(e.target.value)}
+            className="border border-stone-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none" />
+          <button onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500 text-white text-[13px] font-medium hover:bg-rose-600 transition-colors">
+            <Printer size={14} /> In sổ
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-1.5 mb-5 print:hidden">
+        {[
+          { key: "s2b", label: "S2b — Doanh thu" },
+          { key: "s2c", label: "S2c — Doanh thu & Chi phí" },
+          { key: "s2d", label: "S2d — Vật tư, hàng hóa" },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
+            className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-colors ${
+              tab === t.key ? "bg-violet-100 text-violet-700" : "text-stone-400 hover:bg-stone-50"
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="text-center text-stone-400 py-16 text-[14px]">Đang tải dữ liệu...</div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-stone-200 p-6">
+          <div className="text-center mb-5">
+            <p className="text-[12px] text-stone-500">Hộ kinh doanh: <strong>{HO_LABELS[ho]}</strong></p>
+            <h2 className="text-[17px] font-bold text-stone-800 uppercase mt-1">
+              {tab === "s2b" && "Sổ chi tiết doanh thu bán hàng hóa, dịch vụ"}
+              {tab === "s2c" && "Sổ chi tiết doanh thu, chi phí"}
+              {tab === "s2d" && "Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa"}
+            </h2>
+            <p className="text-[12px] text-stone-400 mt-0.5">Kỳ kê khai: Tháng {mm}/{yy}</p>
+          </div>
+
+          {tab === "s2b" && (
+            <>
+              <table className="w-full border-collapse text-[13px] mb-4">
+                <thead>
+                  <tr className="bg-stone-50">
+                    <th className="border border-stone-200 px-3 py-2 text-left">Diễn giải</th>
+                    <th className="border border-stone-200 px-3 py-2 text-right w-[120px]">Đơn hàng</th>
+                    <th className="border border-stone-200 px-3 py-2 text-right w-[160px]">Số tiền (đ)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-stone-200 px-3 py-2">1. Doanh thu bán hàng qua TikTok</td>
+                    <td className="border border-stone-200 px-3 py-2 text-right">{donHangTiktok.toLocaleString()}</td>
+                    <td className="border border-stone-200 px-3 py-2 text-right font-medium text-green-700">{fmtSo(doanhThuTiktok)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-stone-200 px-3 py-2">2. Doanh thu khác (bán sỉ/lẻ — nhập từ Sổ Thu Chi)</td>
+                    <td className="border border-stone-200 px-3 py-2 text-right text-stone-300">—</td>
+                    <td className="border border-stone-200 px-3 py-2 text-right font-medium text-green-700">{fmtSo(doanhThuKhac)}</td>
+                  </tr>
+                  <tr className="bg-stone-100 font-bold">
+                    <td className="border border-stone-200 px-3 py-2">Tổng cộng (1)</td>
+                    <td className="border border-stone-200 px-3 py-2 text-right">{(donHangTiktok).toLocaleString()}</td>
+                    <td className="border border-stone-200 px-3 py-2 text-right text-green-700">{fmtSo(tongDoanhThu)}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-stone-200 px-3 py-2">
+                      Thuế GTGT (
+                      <input value={thueSuatGTGT} onChange={e => setThueSuatGTGT(e.target.value)}
+                        className="w-12 border border-stone-200 rounded px-1 text-center print:hidden" />
+                      <span className="print:inline hidden">{thueSuatGTGT}</span>
+                      %)
+                    </td>
+                    <td className="border border-stone-200 px-3 py-2"></td>
+                    <td className="border border-stone-200 px-3 py-2 text-right text-amber-700">{fmtSo(thueGTGT)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              {doanhThuKhac === 0 && (
+                <p className="text-[12px] text-stone-400 print:hidden">
+                  Chưa có doanh thu nhập tay tháng này. Vào <strong>Sổ Thu Chi</strong> → tạo khoản <strong>Thu</strong>, danh mục <strong>“Doanh thu bán hàng”</strong> để cộng vào đây.
+                </p>
+              )}
+            </>
+          )}
+
+          {tab === "s2c" && (
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-stone-50">
+                  <th className="border border-stone-200 px-3 py-2 text-left">Diễn giải</th>
+                  <th className="border border-stone-200 px-3 py-2 text-right w-[180px]">Số tiền (đ)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="font-medium">
+                  <td className="border border-stone-200 px-3 py-2">1. Doanh thu bán hàng hóa, dịch vụ</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right text-green-700">{fmtSo(tongDoanhThu)}</td>
+                </tr>
+                <tr className="font-medium">
+                  <td className="border border-stone-200 px-3 py-2">2. Chi phí hợp lý</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right text-red-600">{fmtSo(tongChiPhi)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">a) NVL, vật liệu, hàng hóa (nhập kho trong kỳ)</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiNVL)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">b) Lương, tiền công, phụ cấp, BHXH</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">
+                    <input value={chiPhiLuong} onChange={e => setChiPhiLuong(e.target.value)} className={inp + " print:hidden"} />
+                    <span className="print:inline hidden">{fmtSo(Number(chiPhiLuong) || 0)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">c) Khấu hao tài sản cố định</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">
+                    <input value={chiPhiKhauHao} onChange={e => setChiPhiKhauHao(e.target.value)} className={inp + " print:hidden"} />
+                    <span className="print:inline hidden">{fmtSo(Number(chiPhiKhauHao) || 0)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">d) Dịch vụ mua ngoài (điện, nước, vận chuyển, văn phòng)</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiDichVuMuaNgoai)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">đ) Lãi vay vốn sản xuất, kinh doanh</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">
+                    <input value={chiPhiLaiVay} onChange={e => setChiPhiLaiVay(e.target.value)} className={inp + " print:hidden"} />
+                    <span className="print:inline hidden">{fmtSo(Number(chiPhiLaiVay) || 0)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2 pl-6">e) Chi khác (từ Sổ Thu Chi)</td>
+                  <td className="border border-stone-200 px-3 py-2 text-right">{fmtSo(chiPhiKhac)}</td>
+                </tr>
+                <tr className="bg-stone-100 font-bold">
+                  <td className="border border-stone-200 px-3 py-2">3. Chênh lệch (3 = 1 - 2)</td>
+                  <td className={`border border-stone-200 px-3 py-2 text-right ${chenhLech >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmtSo(chenhLech)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-200 px-3 py-2">
+                    4. Thuế TNCN phải nộp (4 = 3 ×
+                    <input value={thueSuatTNCN} onChange={e => setThueSuatTNCN(e.target.value)} className="w-12 mx-1 border border-stone-200 rounded px-1 text-center print:hidden" />
+                    <span className="print:inline hidden">{thueSuatTNCN}</span>
+                    %)
+                  </td>
+                  <td className="border border-stone-200 px-3 py-2 text-right text-amber-700 font-medium">{fmtSo(thueTNCN)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          {tab === "s2d" && (
+            <table className="w-full border-collapse text-[12.5px]">
+              <thead>
+                <tr className="bg-stone-50">
+                  <th className="border border-stone-200 px-2 py-2 text-left">Tên vật liệu, dụng cụ, hàng hóa</th>
+                  <th className="border border-stone-200 px-2 py-2 text-center w-[60px]">ĐVT</th>
+                  <th className="border border-stone-200 px-2 py-2 text-right w-[80px]">SL nhập</th>
+                  <th className="border border-stone-200 px-2 py-2 text-right w-[120px]">TT nhập (đ)</th>
+                  <th className="border border-stone-200 px-2 py-2 text-right w-[80px]">SL xuất</th>
+                  <th className="border border-stone-200 px-2 py-2 text-right w-[120px]">TT xuất (đ)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vatTuRows.length === 0 ? (
+                  <tr><td colSpan={6} className="border border-stone-200 px-3 py-6 text-center text-stone-400">Không có phát sinh nhập/xuất kho trong kỳ</td></tr>
+                ) : vatTuRows.map(r => (
+                  <tr key={r.ten}>
+                    <td className="border border-stone-200 px-2 py-1.5">{r.ten}</td>
+                    <td className="border border-stone-200 px-2 py-1.5 text-center text-stone-400">{r.donVi}</td>
+                    <td className="border border-stone-200 px-2 py-1.5 text-right">{r.nhapSL > 0 ? r.nhapSL.toLocaleString() : "—"}</td>
+                    <td className="border border-stone-200 px-2 py-1.5 text-right text-green-700">{r.nhapTT > 0 ? fmtSo(r.nhapTT) : "—"}</td>
+                    <td className="border border-stone-200 px-2 py-1.5 text-right">{r.xuatSL > 0 ? r.xuatSL.toLocaleString() : "—"}</td>
+                    <td className="border border-stone-200 px-2 py-1.5 text-right text-red-600">{r.xuatTT > 0 ? fmtSo(r.xuatTT) : "—"}</td>
+                  </tr>
+                ))}
+                <tr className="bg-stone-100 font-bold">
+                  <td colSpan={3} className="border border-stone-200 px-2 py-2 text-right">Tổng cộng</td>
+                  <td className="border border-stone-200 px-2 py-2 text-right text-green-700">{fmtSo(tongNhapTT)}</td>
+                  <td className="border border-stone-200 px-2 py-2"></td>
+                  <td className="border border-stone-200 px-2 py-2 text-right text-red-600">{fmtSo(tongXuatTT)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div className="mt-8 grid grid-cols-2 gap-8 text-center text-[12px] print:mt-16">
+            <div>
+              <p className="font-semibold text-stone-600 mb-12">Người lập sổ</p>
+              <div className="border-t border-stone-300 pt-2 text-stone-400">(Ký, ghi rõ họ tên)</div>
+            </div>
+            <div>
+              <p className="font-semibold text-stone-600 mb-12">Người đại diện hộ kinh doanh</p>
+              <div className="border-t border-stone-300 pt-2 text-stone-400">(Ký, đóng dấu nếu có)</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 15mm 12mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      `}</style>
+    </div>
+  );
+}

@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
 type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null };
-type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null; trangThaiHopTac: string };
+type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null; trangThaiHopTac: string; createdAt: string };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
