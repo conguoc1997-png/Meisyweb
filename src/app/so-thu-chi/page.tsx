@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, Check, X, Wallet, TrendingUp, TrendingDown,
   ArrowUpCircle, ArrowDownCircle, Clock, ChevronDown,
-  Pencil, Trash2, BookOpen
+  Pencil, Trash2, BookOpen, Printer, Lock, LockOpen
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -17,6 +17,8 @@ interface TaiKhoanQuy {
   tenHo: string;
   soDuDauKy: number;
   thang: string;
+  daChot: boolean;
+  ngayChot: string | null;
 }
 
 interface PhieuThuChi {
@@ -406,8 +408,9 @@ export default function SoThuChiPage() {
 
   // ─── Tài khoản hiện tại ──────────────────────────────────────────────────
 
-  const taiKhoan = taiKhoans.find(t => t.ho === selectedHo);
+  const taiKhoan  = taiKhoans.find(t => t.ho === selectedHo);
   const soDuDauKy = taiKhoan?.soDuDauKy ?? 0;
+  const daChot    = taiKhoan?.daChot ?? false;
 
   const { tongThu, tongChi, choDuyet } = useMemo(() => {
     let tongThu = 0, tongChi = 0;
@@ -473,6 +476,27 @@ export default function SoThuChiPage() {
     fetchData();
   }
 
+  async function handleChotThang() {
+    const action = daChot ? "mở khóa" : "chốt";
+    if (!confirm(`Bạn có chắc muốn ${action} tháng ${thang} cho hộ ${hoCfg.label}?`)) return;
+    const cfg = HO_LABELS[selectedHo];
+    await fetch("/api/so-thu-chi/tai-khoan", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ho: selectedHo,
+        tenHo: cfg.label,
+        daChot: !daChot,
+        ngayChot: !daChot ? new Date().toISOString() : null,
+      }),
+    });
+    fetchData();
+  }
+
+  function handleInSo() {
+    window.open(`/so-thu-chi/in?ho=${selectedHo}&thang=${thang}`, "_blank");
+  }
+
   async function handleSaveSoDu(soDu: number) {
     const cfg = HO_LABELS[selectedHo];
     await fetch("/api/so-thu-chi/tai-khoan", {
@@ -504,7 +528,7 @@ export default function SoThuChiPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Month picker */}
             <input
               type="month"
@@ -513,8 +537,25 @@ export default function SoThuChiPage() {
               className="border border-stone-200 rounded-xl px-3 py-1.5 text-[13px] text-stone-600 focus:outline-none focus:border-rose-300"
             />
             <button
+              onClick={handleInSo}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 bg-white text-stone-600 text-[13px] font-medium hover:bg-stone-50 transition-colors"
+            >
+              <Printer size={14} /> In sổ
+            </button>
+            <button
+              onClick={handleChotThang}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-medium transition-colors
+                ${daChot
+                  ? "bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100"
+                  : "bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100"
+                }`}
+            >
+              {daChot ? <><LockOpen size={14} /> Mở khóa</> : <><Lock size={14} /> Chốt tháng</>}
+            </button>
+            <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500 text-white text-[13px] font-medium hover:bg-rose-600 transition-colors"
+              disabled={daChot}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500 text-white text-[13px] font-medium hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Plus size={14} /> Tạo đề xuất
             </button>
@@ -558,9 +599,16 @@ export default function SoThuChiPage() {
         {/* ── Tóm tắt tháng ── */}
         <div className={`rounded-2xl border ${hoCfg.border} ${hoCfg.bg} p-5`}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className={`font-semibold text-[14px] ${hoCfg.color}`}>
-              {hoCfg.icon} {hoCfg.label} — Tháng {thang.split("-").reverse().join("/")}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className={`font-semibold text-[14px] ${hoCfg.color}`}>
+                {hoCfg.icon} {hoCfg.label} — Tháng {thang.split("-").reverse().join("/")}
+              </h2>
+              {daChot && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-200">
+                  <Lock size={9} /> Đã chốt
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setSoDuModal(true)}
               className="flex items-center gap-1 text-[11px] text-stone-400 hover:text-stone-600 transition-colors border border-stone-200 rounded-lg px-2 py-1 bg-white"

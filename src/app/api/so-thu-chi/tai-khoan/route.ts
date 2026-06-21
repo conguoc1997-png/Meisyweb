@@ -20,13 +20,17 @@ export async function PUT(req: NextRequest) {
 
     if (!ho) return NextResponse.json({ error: "Thiếu ho" }, { status: 400 });
 
+    const updatePayload: Record<string, unknown> = {};
+    if (soDuDauKy !== undefined) updatePayload.soDuDauKy = Number(soDuDauKy);
+    if (thang)  updatePayload.thang  = thang;
+    if (tenHo)  updatePayload.tenHo  = tenHo;
+    // Chốt tháng
+    if (data.daChot !== undefined) updatePayload.daChot = data.daChot;
+    if (data.ngayChot !== undefined) updatePayload.ngayChot = data.ngayChot ? new Date(data.ngayChot) : null;
+
     const taiKhoan = await prisma.taiKhoanQuy.upsert({
       where: { ho },
-      update: {
-        soDuDauKy: soDuDauKy !== undefined ? Number(soDuDauKy) : undefined,
-        thang:     thang     || undefined,
-        tenHo:     tenHo     || undefined,
-      },
+      update: updatePayload,
       create: {
         ho,
         tenHo:     tenHo     || ho,

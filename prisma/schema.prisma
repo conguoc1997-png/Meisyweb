@@ -515,12 +515,14 @@ model ChamCong {
 
 // Số dư tài khoản quỹ theo hộ
 model TaiKhoanQuy {
-  id        String   @id @default(cuid())
-  ho        String   @unique // "meisy" | "nguyen_cong_uoc"
+  id        String    @id @default(cuid())
+  ho        String    @unique // "meisy" | "nguyen_cong_uoc"
   tenHo     String
-  soDuDauKy Float    @default(0) // số dư đầu kỳ (nhập tay mỗi tháng)
-  thang     String   @default("2026-06") // tháng hiện tại đang theo dõi
-  updatedAt DateTime @updatedAt
+  soDuDauKy Float     @default(0) // số dư đầu kỳ (nhập tay mỗi tháng)
+  thang     String    @default("2026-06") // tháng hiện tại đang theo dõi
+  daChot    Boolean   @default(false) // đã chốt tháng (khóa chỉnh sửa)
+  ngayChot  DateTime? // ngày chốt
+  updatedAt DateTime  @updatedAt
 }
 
 // Phiếu thu chi (đề xuất → duyệt → đã chi)
