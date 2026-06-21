@@ -58,6 +58,21 @@ const DANH_MUC_LABEL: Record<string, string> = Object.fromEntries(
   DANH_MUC_OPTIONS.map(d => [d.value, d.label])
 );
 
+const CUSTOM_DANH_MUC_KEY = "meisy_custom_danh_muc";
+
+function loadCustomDanhMuc(): { value: string; label: string }[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_DANH_MUC_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomDanhMuc(list: { value: string; label: string }[]) {
+  localStorage.setItem(CUSTOM_DANH_MUC_KEY, JSON.stringify(list));
+}
+
 const TRANG_THAI_CONFIG = {
   cho_duyet: { label: "Chờ duyệt", color: "text-amber-600",  bg: "bg-amber-50",  icon: Clock },
   da_duyet:  { label: "Đã duyệt",  color: "text-blue-600",   bg: "bg-blue-50",   icon: Check },
@@ -95,6 +110,25 @@ function ModalPhieu({ defaultHo, editing, onClose, onSave }: ModalPhieuProps) {
   const [loai, setLoai] = useState<"thu" | "chi">(editing?.loai ?? "chi");
   const [soTien, setSoTien] = useState(editing?.soTien?.toString() ?? "");
   const [danhMuc, setDanhMuc] = useState(editing?.danhMuc ?? "khac");
+  const [customDanhMucs, setCustomDanhMucs] = useState<{ value: string; label: string }[]>([]);
+  const [addingDanhMuc, setAddingDanhMuc] = useState(false);
+  const [newDanhMucLabel, setNewDanhMucLabel] = useState("");
+
+  useEffect(() => {
+    setCustomDanhMucs(loadCustomDanhMuc());
+  }, []);
+
+  function handleAddDanhMuc() {
+    const label = newDanhMucLabel.trim();
+    if (!label) return;
+    const value = `📋 ${label}`;
+    const next = [...customDanhMucs, { value, label: value }];
+    setCustomDanhMucs(next);
+    saveCustomDanhMuc(next);
+    setDanhMuc(value);
+    setNewDanhMucLabel("");
+    setAddingDanhMuc(false);
+  }
   const [dienGiai, setDienGiai] = useState(editing?.dienGiai ?? "");
   const [nguoiDeXuat, setNguoiDeXuat] = useState(editing?.nguoiDeXuat ?? "");
   const [ngay, setNgay] = useState(
@@ -178,18 +212,48 @@ function ModalPhieu({ defaultHo, editing, onClose, onSave }: ModalPhieuProps) {
           {/* Danh mục */}
           <div>
             <label className="text-[12px] font-medium text-stone-500 mb-1.5 block">Danh mục</label>
-            <div className="relative">
-              <select
-                value={danhMuc}
-                onChange={e => setDanhMuc(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[14px] focus:outline-none focus:border-rose-300 appearance-none bg-white pr-8"
-              >
-                {DANH_MUC_OPTIONS.map(d => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
-            </div>
+            {!addingDanhMuc ? (
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <select
+                    value={danhMuc}
+                    onChange={e => setDanhMuc(e.target.value)}
+                    className="w-full border border-stone-200 rounded-xl px-3 py-2 text-[14px] focus:outline-none focus:border-rose-300 appearance-none bg-white pr-8"
+                  >
+                    {[...DANH_MUC_OPTIONS, ...customDanhMucs].map(d => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddingDanhMuc(true)}
+                  title="Thêm danh mục mới"
+                  className="w-9 h-9 flex items-center justify-center rounded-xl border border-stone-200 text-stone-500 hover:border-rose-300 hover:text-rose-500 transition-colors"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Tên danh mục mới..."
+                  value={newDanhMucLabel}
+                  onChange={e => setNewDanhMucLabel(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddDanhMuc(); } if (e.key === "Escape") setAddingDanhMuc(false); }}
+                  className="flex-1 border border-stone-200 rounded-xl px-3 py-2 text-[14px] focus:outline-none focus:border-rose-300"
+                />
+                <button type="button" onClick={handleAddDanhMuc} className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500 text-white hover:bg-rose-600 transition-colors">
+                  <Check size={16} />
+                </button>
+                <button type="button" onClick={() => { setAddingDanhMuc(false); setNewDanhMucLabel(""); }} className="w-9 h-9 flex items-center justify-center rounded-xl border border-stone-200 text-stone-400 hover:text-stone-600 transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Diễn giải */}
