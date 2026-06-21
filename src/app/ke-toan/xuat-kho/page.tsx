@@ -1091,8 +1091,8 @@ export default function XuatKhoPage() {
               )}
             </div>
 
-            {/* Đề xuất thiếu nguyên liệu */}
-            {thieuRows.length > 0 && (
+            {/* Đề xuất thiếu nguyên liệu — chỉ hiện khi tạo mới, không hiện khi sửa */}
+            {thieuRows.length > 0 && modal === "create" && (
               <div className="mx-6 mb-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
                 <p className="text-xs font-semibold text-orange-700 mb-2 flex items-center gap-1">
                   <AlertCircle size={13} /> Đề xuất — {thieuRows.length} nguyên liệu có thể không đủ tồn kho
