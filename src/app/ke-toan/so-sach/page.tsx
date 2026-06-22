@@ -60,10 +60,33 @@ function monthRange(thang: string) {
   return { from, to };
 }
 
+function currentNam() {
+  return new Date().getFullYear();
+}
+
+function currentQuy() {
+  return Math.floor(new Date().getMonth() / 3) + 1;
+}
+
+// Danh sách "YYYY-MM" của các tháng trong 1 quý
+function thangsInQuy(nam: number, quy: number): string[] {
+  const startMonth = (quy - 1) * 3 + 1;
+  return [0, 1, 2].map(i => `${nam}-${String(startMonth + i).padStart(2, "0")}`);
+}
+
 export default function SoSachPage() {
   const [tab, setTab] = useState<"s2b" | "s2c" | "s2d" | "s2e">("s2b");
+  const [kyLoai, setKyLoai] = useState<"thang" | "quy">("thang");
   const [thang, setThang] = useState(currentThang());
+  const [nam, setNam] = useState(currentNam());
+  const [quy, setQuy] = useState(currentQuy());
   const [ho, setHo] = useState<Ho>("meisy");
+
+  // Danh sách tháng cần lấy dữ liệu — 1 tháng hoặc cả quý (3 tháng)
+  const thangList = useMemo(
+    () => kyLoai === "quy" ? thangsInQuy(nam, quy) : [thang],
+    [kyLoai, nam, quy, thang]
+  );
 
   const [tiktokSP, setTiktokSP] = useState<TiktokSPRow[]>([]);
   const [phieus, setPhieus] = useState<PhieuThuChi[]>([]);
@@ -80,7 +103,7 @@ export default function SoSachPage() {
   const [thueSuatGTGT, setThueSuatGTGT] = useState("1");
   const [thueSuatTNCN, setThueSuatTNCN] = useState("0.5");
 
-  const manualKey = `meisy_sosach_manual_${ho}_${thang}`;
+  const manualKey = `meisy_sosach_manual_${ho}_${thangList.join("_")}`;
 
   useEffect(() => {
     try {
@@ -107,28 +130,26 @@ export default function SoSachPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { from, to } = monthRange(thang);
-    const [tiktokRes, sttcRes, sttcInRes, nhapRes, xuatRes] = await Promise.all([
-      fetch(`/api/koc/tiktok-doanhthu?thang=${thang}`),
-      fetch(`/api/so-thu-chi?thang=${thang}&ho=${ho}`),
-      fetch(`/api/so-thu-chi/in?thang=${thang}&ho=${ho}`),
-      fetch(`/api/ke-toan/nhap-kho?from=${from}&to=${to}`),
-      fetch(`/api/ke-toan/xuat-kho?from=${from}&to=${to}`),
-    ]);
-    const tiktokData = await tiktokRes.json();
-    const sttcData   = await sttcRes.json();
-    const sttcInData  = await sttcInRes.json();
-    const nhapData   = await nhapRes.json();
-    const xuatData   = await xuatRes.json();
+    const from = monthRange(thangList[0]).from;
+    const to   = monthRange(thangList[thangList.length - 1]).to;
 
-    setTiktokSP(Array.isArray(tiktokData.spData) ? tiktokData.spData : []);
-    setPhieus(Array.isArray(sttcData.phieus) ? sttcData.phieus : []);
-    setPhieusDaDuyet(Array.isArray(sttcInData.phieus) ? sttcInData.phieus : []);
-    setTaiKhoan(sttcInData.taiKhoan ?? null);
-    setNhapKho(Array.isArray(nhapData) ? nhapData : []);
-    setXuatKho(Array.isArray(xuatData) ? xuatData : []);
+    const [tiktokResults, sttcResults, sttcInResults, nhapRes, xuatRes] = await Promise.all([
+      Promise.all(thangList.map(t => fetch(`/api/koc/tiktok-doanhthu?thang=${t}`).then(r => r.json()))),
+      Promise.all(thangList.map(t => fetch(`/api/so-thu-chi?thang=${t}&ho=${ho}`).then(r => r.json()))),
+      Promise.all(thangList.map(t => fetch(`/api/so-thu-chi/in?thang=${t}&ho=${ho}`).then(r => r.json()))),
+      fetch(`/api/ke-toan/nhap-kho?from=${from}&to=${to}`).then(r => r.json()),
+      fetch(`/api/ke-toan/xuat-kho?from=${from}&to=${to}`).then(r => r.json()),
+    ]);
+
+    setTiktokSP(tiktokResults.flatMap(d => Array.isArray(d.spData) ? d.spData : []));
+    setPhieus(sttcResults.flatMap(d => Array.isArray(d.phieus) ? d.phieus : []));
+    setPhieusDaDuyet(sttcInResults.flatMap(d => Array.isArray(d.phieus) ? d.phieus : []));
+    // Số dư đầu kỳ: lấy của tháng đầu tiên trong kỳ (tháng hoặc quý)
+    setTaiKhoan(sttcInResults[0]?.taiKhoan ?? null);
+    setNhapKho(Array.isArray(nhapRes) ? nhapRes : []);
+    setXuatKho(Array.isArray(xuatRes) ? xuatRes : []);
     setLoading(false);
-  }, [thang, ho]);
+  }, [thangList, ho]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -217,7 +238,9 @@ export default function SoSachPage() {
     });
   }, [phieusDaDuyet, soDuDauKy]);
 
-  const [yy, mm] = thang.split("-");
+  const kyLabel = kyLoai === "thang"
+    ? `Tháng ${thang.slice(5, 7)}/${thang.slice(0, 4)}`
+    : `Quý ${quy}/${nam} (Tháng ${thangList[0].slice(5,7)} - ${thangList[2].slice(5,7)})`;
   const inp = "w-full border border-stone-200 rounded-lg px-2.5 py-1.5 text-[13px] text-right focus:outline-none focus:border-rose-300";
 
   return (
@@ -237,8 +260,29 @@ export default function SoSachPage() {
               <option key={k} value={k}>{l}</option>
             ))}
           </select>
-          <input type="month" value={thang} onChange={e => setThang(e.target.value)}
-            className="border border-stone-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none" />
+          <div className="flex border border-stone-200 rounded-xl overflow-hidden text-[13px]">
+            <button onClick={() => setKyLoai("thang")}
+              className={`px-3 py-2 transition-colors ${kyLoai === "thang" ? "bg-violet-100 text-violet-700 font-medium" : "text-stone-400 hover:bg-stone-50"}`}>
+              Tháng
+            </button>
+            <button onClick={() => setKyLoai("quy")}
+              className={`px-3 py-2 transition-colors ${kyLoai === "quy" ? "bg-violet-100 text-violet-700 font-medium" : "text-stone-400 hover:bg-stone-50"}`}>
+              Quý
+            </button>
+          </div>
+          {kyLoai === "thang" ? (
+            <input type="month" value={thang} onChange={e => setThang(e.target.value)}
+              className="border border-stone-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none" />
+          ) : (
+            <>
+              <select value={quy} onChange={e => setQuy(Number(e.target.value))}
+                className="border border-stone-200 rounded-xl px-3 py-2 text-[13px] focus:outline-none">
+                {[1, 2, 3, 4].map(q => <option key={q} value={q}>Quý {q}</option>)}
+              </select>
+              <input type="number" value={nam} onChange={e => setNam(Number(e.target.value) || currentNam())}
+                className="border border-stone-200 rounded-xl px-3 py-2 text-[13px] w-[80px] focus:outline-none" />
+            </>
+          )}
           <button onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500 text-white text-[13px] font-medium hover:bg-rose-600 transition-colors">
             <Printer size={14} /> In sổ
@@ -274,7 +318,7 @@ export default function SoSachPage() {
               {tab === "s2d" && "Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa"}
               {tab === "s2e" && "Sổ chi tiết tiền"}
             </h2>
-            <p className="text-[12px] text-stone-400 mt-0.5">Kỳ kê khai: Tháng {mm}/{yy}</p>
+            <p className="text-[12px] text-stone-400 mt-0.5">Kỳ kê khai: {kyLabel}</p>
           </div>
 
           {tab === "s2b" && (
