@@ -12,10 +12,14 @@ export async function GET() {
       dbUrl.match(/\/\/([^:@]+)@/)?.[1] ??
       "check-url";
 
-    // Show partial URL (no password)
-    const safeUrl = dbUrl.replace(/:([^@]+)@/, ":***@").substring(0, 80);
+    // Check if tables exist
+    const tables = await prisma.$queryRaw<{table_schema: string; table_name: string}[]>`
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE table_name IN ('PhieuThuChi', 'TaiKhoanQuy')
+    `;
 
-    return NextResponse.json({ projectId, safeUrl });
+    return NextResponse.json({ projectId, tables });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
