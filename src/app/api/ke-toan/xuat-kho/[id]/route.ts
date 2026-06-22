@@ -143,29 +143,25 @@ export async function DELETE(
 }
 
 async function recalcVatTuIds(vatTuIds: string[]) {
-  // Chạy 3 query song song để giảm thời gian
-  const [quyDoiInfos, nhapInfos, xuatInfos] = await Promise.all([
-    // quyDoi mới nhất per vatTuId
-    prisma.chiTietNhapKho.findMany({
-      where:    { vatTuId: { in: vatTuIds } },
-      select:   { vatTuId: true, quyDoi: true },
-      orderBy:  { phieu: { ngay: "desc" } },
-      distinct: ["vatTuId"],
-    }),
-    // Tổng nhập
-    prisma.chiTietNhapKho.findMany({
-      where:  { vatTuId: { in: vatTuIds } },
-      select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
-    }),
-    // Tổng xuất (bỏ phiếu đã hủy)
-    prisma.phieuXuatChiTiet.findMany({
-      where:  {
-        vatTuId: { in: vatTuIds },
-        phieu: { trangThai: { not: "da_huy" } } as Record<string, unknown>,
-      },
-      select: { vatTuId: true, soLuong: true },
-    }),
-  ]);
+  // Sequential queries — tránh connection pool timeout (Supabase limit=1)
+  const quyDoiInfos = await prisma.chiTietNhapKho.findMany({
+    where:    { vatTuId: { in: vatTuIds } },
+    select:   { vatTuId: true, quyDoi: true },
+    orderBy:  { phieu: { ngay: "desc" } },
+    distinct: ["vatTuId"],
+  });
+  const nhapInfos = await prisma.chiTietNhapKho.findMany({
+    where:  { vatTuId: { in: vatTuIds } },
+    select: { vatTuId: true, soLuongMua: true, donGia: true, vat: true },
+  });
+  const xuatInfos = await prisma.phieuXuatChiTiet.findMany({
+    where:  {
+      vatTuId: { in: vatTuIds },
+      phieu: { trangThai: { not: "da_huy" } } as Record<string, unknown>,
+    },
+    select: { vatTuId: true, soLuong: true },
+  });
+
   const quyDoiMap = new Map(quyDoiInfos.map(r => [r.vatTuId, r.quyDoi ?? 1]));
 
   type TonInfo = { soLuongNhap: number; giaTriNhap: number; soLuongXuatBase: number };
@@ -182,15 +178,16 @@ async function recalcVatTuIds(vatTuIds: string[]) {
     map.set(r.vatTuId, cur);
   }
 
-  await Promise.all([...map.entries()].map(([vatTuId, d]) => {
+  // Sequential upserts — không dùng Promise.all để tránh timeout khi limit=1
+  for (const [vatTuId, d] of map.entries()) {
     const quyDoi       = quyDoiMap.get(vatTuId) ?? 1;
     const soLuong      = Math.max(0, d.soLuongNhap - d.soLuongXuatBase / quyDoi);
     const giaTrungBinh = d.soLuongNhap > 0 ? d.giaTriNhap / d.soLuongNhap : 0;
     const giaTriTon    = soLuong * giaTrungBinh;
-    return prisma.tonKhoVatTu.upsert({
+    await prisma.tonKhoVatTu.upsert({
       where:  { vatTuId },
       update: { soLuong, giaTrungBinh, giaTriTon },
       create: { vatTuId, soLuong, giaTrungBinh, giaTriTon },
     });
-  }));
+  }
 }

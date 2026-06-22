@@ -305,14 +305,59 @@ export default function XuatKhoPage() {
     setRows(prev => prev.map(r => ({
       ...r,
       soLuong: parseFloat((r.soLuong * ratio).toFixed(4)),
-      // Cập nhật "×318sp" → "×213sp" trong ghi chú nếu có
-      ghiChu: r.ghiChu.replace(/× \d+(\.\d+)?sp/, `× ${newSP}sp`),
+      ghiChu: r.ghiChu.replace(/×\s*\d+(\.\d+)?\s*sp/, `× ${newSP}sp`),
     })));
-    origSoSanPhamRef.current = newSP; // cập nhật gốc để scale tiếp được
+    origSoSanPhamRef.current = newSP;
+  }
+
+  // Tải lại phụ liệu từ định mức với soSanPham hiện tại (giữ nguyên hàng vải)
+  async function reloadPhuLieuFromDinhMuc() {
+    const hangCat = form.hangCat;
+    const spNum   = parseFloat(form.soSanPham) || 0;
+    if (!hangCat || spNum <= 0) return;
+    setSuggestLoad(true);
+    try {
+      const res = await fetch(`/api/ke-toan/xuat-kho/suggest?hangCat=${encodeURIComponent(hangCat)}&soSanPham=${spNum}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const vaiRows    = rows.filter(r => r.type === "vai");
+      const newPhuLieu = (data.rows as SuggestRow[])
+        .filter(r => r.type === "phu_lieu")
+        .map(r => ({
+          type:     "phu_lieu" as const,
+          vatTuId:  r.vatTuId || "__UNMAPPED__",
+          vatTu:    r.vatTu || undefined,
+          soLuong:  r.soLuong,
+          donGia:   r.donGia,
+          ghiChu:   r.ghiChu,
+        }));
+      const merged = [...vaiRows, ...newPhuLieu];
+      setRows(merged);
+      setVtSearch(merged.map(() => ""));
+      origSoSanPhamRef.current = spNum;
+    } finally {
+      setSuggestLoad(false);
+    }
   }
 
   function openEdit(p: PhieuXuat) {
-    origSoSanPhamRef.current = p.soSanPham || 0;
+    const loadedRows: XuatRow[] = p.chiTiet.map(c => ({
+      type:     (c.vatTu?.loai === "vai" ? "vai" : "phu_lieu") as "vai" | "phu_lieu",
+      vatTuId:  c.vatTuId,
+      vatTu:    c.vatTu,
+      soLuong:  c.soLuong,
+      donGia:   c.donGia,
+      ghiChu:   c.ghiChu || "",
+    }));
+
+    // Ưu tiên đọc soSanPham thực tế từ ghiChu của phu_lieu rows ("× 13sp")
+    // vì p.soSanPham có thể bị lệch với soLuong thực tế đã lưu
+    const phuLieuRows = loadedRows.filter(r => r.type === "phu_lieu");
+    const spFromGhiChu = phuLieuRows.length > 0
+      ? parseFloat(phuLieuRows[0].ghiChu?.match(/×\s*(\d+(?:\.\d+)?)\s*sp/)?.[1] || "0") || 0
+      : 0;
+    origSoSanPhamRef.current = spFromGhiChu > 0 ? spFromGhiChu : (p.soSanPham || 0);
+
     setForm({
       soPhieu:    p.soPhieu,
       ngay:       p.ngay.slice(0, 10),
@@ -323,14 +368,6 @@ export default function XuatKhoPage() {
       ghiChu:     p.ghiChu || "",
       nguoiTao:   "",
     });
-    const loadedRows: XuatRow[] = p.chiTiet.map(c => ({
-      type:     (c.vatTu?.loai === "vai" ? "vai" : "phu_lieu") as "vai" | "phu_lieu",
-      vatTuId:  c.vatTuId,
-      vatTu:    c.vatTu,
-      soLuong:  c.soLuong,
-      donGia:   c.donGia,
-      ghiChu:   c.ghiChu || "",
-    }));
     setRows(loadedRows);
     setVtSearch(loadedRows.map(() => ""));
     setSelected(p);
@@ -651,6 +688,17 @@ export default function XuatKhoPage() {
                             className="flex items-center gap-1 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-xl border border-emerald-200 whitespace-nowrap transition-colors"
                           >
                             ↻ Tính lại
+                          </button>
+                        )}
+                        {form.hangCat && parseFloat(form.soSanPham) > 0 && (
+                          <button
+                            type="button"
+                            onClick={reloadPhuLieuFromDinhMuc}
+                            disabled={suggestLoad}
+                            title="Tính lại phụ liệu từ đầu theo định mức × soSanPham (bỏ qua số lũy cũ)"
+                            className="flex items-center gap-1 px-3 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-medium rounded-xl border border-violet-200 whitespace-nowrap transition-colors disabled:opacity-50"
+                          >
+                            ⟳ Tải lại định mức
                           </button>
                         )}
                       </div>
@@ -1043,8 +1091,8 @@ export default function XuatKhoPage() {
               )}
             </div>
 
-            {/* Đề xuất thiếu nguyên liệu */}
-            {thieuRows.length > 0 && (
+            {/* Đề xuất thiếu nguyên liệu — chỉ hiện khi tạo mới, không hiện khi sửa */}
+            {thieuRows.length > 0 && modal === "create" && (
               <div className="mx-6 mb-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
                 <p className="text-xs font-semibold text-orange-700 mb-2 flex items-center gap-1">
                   <AlertCircle size={13} /> Đề xuất — {thieuRows.length} nguyên liệu có thể không đủ tồn kho
