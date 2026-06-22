@@ -306,7 +306,7 @@ function ModalPhieu({ defaultHo, editing, onClose, onSave }: ModalPhieuProps) {
             disabled={saving || !soTien || !dienGiai}
             className="flex-1 py-2.5 rounded-xl bg-rose-500 text-white text-[13px] font-medium hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Đang lưu..." : editing ? "Cập nhật" : "Tạo đề xuất"}
+            {saving ? "Đang lưu..." : editing ? "Cập nhật" : loai === "thu" ? "Ghi nhận thu" : "Tạo đề xuất chi"}
           </button>
         </div>
       </div>
@@ -518,7 +518,8 @@ export default function SoThuChiPage() {
       // Thêm vào state ngay (optimistic) — không chờ refetch
       setPhieus(prev => [newPhieu, ...prev]);
       setShowCreate(false);
-      setTab("cho_duyet");
+      // Thu ghi thẳng vào sổ, chi mới cần duyệt
+      setTab(newPhieu.loai === "thu" ? "so" : "cho_duyet");
       // Refetch để đồng bộ dữ liệu đầy đủ sau
       fetchData();
     } catch (e) {
