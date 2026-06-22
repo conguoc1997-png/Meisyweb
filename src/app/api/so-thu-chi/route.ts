@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
         danhMuc: danhMuc || "khac",
         dienGiai,
         nguoiDeXuat: nguoiDeXuat || null,
-        // Thu: ghi nhận thẳng. Chi: cần duyệt
-        trangThai: loai === "thu" ? "da_chi" : "cho_duyet",
+        // Thu: xác nhận đã thu luôn. Chi: cần duyệt trước
+        trangThai: loai === "thu" ? "da_duyet" : "cho_duyet",
         ngay: ngayDate,
         thang,
       },
