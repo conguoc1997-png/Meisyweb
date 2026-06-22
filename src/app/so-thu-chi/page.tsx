@@ -512,8 +512,12 @@ export default function SoThuChiPage() {
         alert("Tạo đề xuất thất bại: " + (err.error ?? res.statusText));
         return;
       }
+      const newPhieu: PhieuThuChi = await res.json();
+      // Thêm vào state ngay (optimistic) — không chờ refetch
+      setPhieus(prev => [newPhieu, ...prev]);
       setShowCreate(false);
       setTab("cho_duyet");
+      // Refetch để đồng bộ dữ liệu đầy đủ sau
       fetchData();
     } catch (e) {
       alert("Lỗi kết nối, vui lòng thử lại.");
