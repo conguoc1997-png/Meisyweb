@@ -46,7 +46,16 @@ export async function POST(req: NextRequest) {
     const skuItems   = allDMs.filter(d => d.hangCat === sku);
 
     // 4. Merge theo cột (loai+nhom): SKU override CHUNG
+    // Một số cột là "tick phát sinh" (shared:false trong trang Định mức NPL) — ví dụ
+    // Giặt Màu, Giặt VS: dòng CHUNG chỉ dùng để gợi ý VatTu nguồn cho UI, KHÔNG được
+    // áp dụng mặc định cho mọi SKU. Chỉ SKU nào tự tick (có dòng riêng hangCat=SKU)
+    // mới được tính. Phải đồng bộ với COLUMNS trong src/app/ke-toan/dinh-muc/page.tsx.
     const colKey = (loai: string, nhom: string | null) => `${loai}|${nhom ?? ""}`;
+    const NO_CHUNG_FALLBACK = new Set([
+      colKey("hoan_thien", "giat_mau"),
+      colKey("hoan_thien", "giat_vi_sinh"),
+    ]);
+
     const chungByCol = new Map<string, typeof chungItems>();
     for (const dm of chungItems) {
       const k = colKey(dm.vatTu.loai, dm.vatTu.nhom);
@@ -61,7 +70,13 @@ export async function POST(req: NextRequest) {
     }
     const usedItems: typeof allDMs = [];
     for (const [k, items] of chungByCol.entries()) {
-      usedItems.push(...(skuByCol.get(k) ?? items));
+      const skuOverride = skuByCol.get(k);
+      if (skuOverride) {
+        usedItems.push(...skuOverride);
+      } else if (!NO_CHUNG_FALLBACK.has(k)) {
+        usedItems.push(...items);
+      }
+      // NO_CHUNG_FALLBACK + chưa tick riêng cho SKU này → bỏ qua, không xuất
     }
     for (const [k, items] of skuByCol.entries()) {
       if (!chungByCol.has(k)) usedItems.push(...items);
