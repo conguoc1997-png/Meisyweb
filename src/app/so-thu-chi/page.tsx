@@ -501,13 +501,24 @@ export default function SoThuChiPage() {
   // ─── Actions ─────────────────────────────────────────────────────────────
 
   async function handleCreate(data: Partial<PhieuThuChi>) {
-    await fetch("/api/so-thu-chi", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    setShowCreate(false);
-    fetchData();
+    try {
+      const res = await fetch("/api/so-thu-chi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("Tạo đề xuất thất bại: " + (err.error ?? res.statusText));
+        return;
+      }
+      setShowCreate(false);
+      setTab("cho_duyet");
+      fetchData();
+    } catch (e) {
+      alert("Lỗi kết nối, vui lòng thử lại.");
+      console.error("handleCreate error:", e);
+    }
   }
 
   async function handleEdit(data: Partial<PhieuThuChi>) {
