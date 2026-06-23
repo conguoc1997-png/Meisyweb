@@ -693,7 +693,7 @@ export default function ChamCongPage() {
                       {nvList.map((nv) => {
                   const idx = globalIdx++;
                   const summary = getSummary(nv.id);
-                  const cong = (summary["di_lam"] ?? 0) + (summary["di_muon"] ?? 0) + (summary["nua_ngay"] ?? 0);
+                  const cong = (summary["di_lam"] ?? 0) + (summary["di_muon"] ?? 0) + (summary["nua_ngay"] ?? 0) * 0.5;
                   const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                   const rowBg = idx % 2 === 0 ? "bg-white" : "bg-slate-50/40";
                   return (
