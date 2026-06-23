@@ -847,6 +847,16 @@ export default function ChamCongPage() {
               </tfoot>
             </table>
           </div>
+          <div className="hidden print:grid print:grid-cols-2 gap-8 text-center text-[12px] px-8 py-10">
+            <div>
+              <p className="font-semibold text-slate-700 mb-12">Người chấm công</p>
+              <div className="border-t border-slate-400 pt-2 text-slate-400">(Ký, ghi rõ họ tên)</div>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700 mb-12">Người đại diện ký trả lương</p>
+              <div className="border-t border-slate-400 pt-2 text-slate-400">(Ký, ghi rõ họ tên)</div>
+            </div>
+          </div>
         </div>
       ))}
 
