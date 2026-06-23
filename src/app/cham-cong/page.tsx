@@ -518,8 +518,9 @@ export default function ChamCongPage() {
       <style>{phieuLuong ? `
         @media print {
           body * { visibility: hidden !important; }
-          #phieu-luong-modal, #phieu-luong-modal * { visibility: visible !important; }
-          #phieu-luong-modal { position: absolute; top: 0; left: 0; width: 100%; background: white; }
+          #phieu-luong-overlay, #phieu-luong-overlay * { visibility: visible !important; }
+          #phieu-luong-overlay { position: static !important; height: auto !important; padding: 0 !important; display: block !important; }
+          #phieu-luong-modal { position: absolute !important; top: 0; left: 0; width: 100% !important; max-width: 100% !important; background: white; }
           .no-print { display: none !important; }
           @page { size: A5; margin: 12mm; }
         }
@@ -1530,8 +1531,8 @@ export default function ChamCongPage() {
           isKhoan, isCoBanMay, gioNV, donGiaGio, luongMay } = phieuLuong;
         const fmtVND = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
         return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
-            <div id="phieu-luong-modal" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm print:shadow-none print:rounded-none">
+          <div id="phieu-luong-overlay" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
+            <div id="phieu-luong-modal" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm print:shadow-none print:rounded-none print:max-w-full">
               {/* Toolbar — ẩn khi in */}
               <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-100">
                 <span className="font-semibold text-slate-700">Phiếu lương cá nhân</span>
