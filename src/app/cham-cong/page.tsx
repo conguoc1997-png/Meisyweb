@@ -695,7 +695,7 @@ export default function ChamCongPage() {
                       {nvList.map((nv) => {
                   const idx = globalIdx++;
                   const summary = getSummary(nv.id);
-                  const cong = (summary["di_lam"] ?? 0) + (summary["di_muon"] ?? 0) + (summary["nua_ngay"] ?? 0) * 0.5;
+                  const cong = (summary["di_lam"] ?? 0) + (summary["di_muon"] ?? 0) + (summary["nua_ngay"] ?? 0);
                   const tongTC = days.reduce((s, d) => s + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                   const rowBg = idx % 2 === 0 ? "bg-white" : "bg-slate-50/40";
                   return (
@@ -923,7 +923,7 @@ export default function ChamCongPage() {
 
                   const getHoursNV = (nvId: string) => {
                     const sum = getSummary(nvId);
-                    const cong = (sum["di_lam"] ?? 0) + (sum["di_muon"] ?? 0) + (sum["nua_ngay"] ?? 0) * 0.5 + (sum["nghi_phep"] ?? 0) + (sum["nghi_le"] ?? 0);
+                    const cong = (sum["di_lam"] ?? 0) + (sum["di_muon"] ?? 0) + (sum["nua_ngay"] ?? 0) + (sum["nghi_phep"] ?? 0) + (sum["nghi_le"] ?? 0);
                     const tc   = days.reduce((s, d) => s + (tcMap[getKey(nvId, d)] ?? 0), 0);
                     return cong * 8 + tc;
                   };
@@ -1060,7 +1060,7 @@ export default function ChamCongPage() {
                   const congPhep   = summary["nghi_phep"] ?? 0;
                   const congLe     = summary["nghi_le"]   ?? 0;
                   const congVang   = summary["vang"]      ?? 0;
-                  const congTinhLuong = congCoMat + congMuon + congNuaNgay * 0.5 + congPhep + congLe;
+                  const congTinhLuong = congCoMat + congMuon + congNuaNgay + congPhep + congLe;
 
                   const heSoTC        = nv.heSoTC ?? 1.5;
                   const phuCapCC      = nv.phuCapChuyenCan ?? 0;
@@ -1241,7 +1241,7 @@ export default function ChamCongPage() {
                     <td className="px-3 py-2 text-center text-emerald-700">
                       {nhanViens.reduce((s, nv) => {
                         const sum = getSummary(nv.id);
-                        return s + (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0)*0.5 + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
+                        return s + (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0) + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
                       }, 0) || "—"}
                     </td>
                     <td colSpan={4}></td>
@@ -1254,7 +1254,7 @@ export default function ChamCongPage() {
                         const sum = getSummary(nv.id);
                         const tongTC = days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                         const lcb = nv.luongCB ?? 0;
-                        const cong = (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0)*0.5 + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
+                        const cong = (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0) + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
                         const luongCong = soNgayLamViec > 0 ? (lcb / soNgayLamViec) * cong : 0;
                         const luongTC = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * 1.5 * tongTC : 0;
                         return s + luongCong + luongTC;
