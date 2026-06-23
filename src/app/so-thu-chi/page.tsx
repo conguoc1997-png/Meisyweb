@@ -306,7 +306,7 @@ function ModalPhieu({ defaultHo, editing, onClose, onSave }: ModalPhieuProps) {
             disabled={saving || !soTien || !dienGiai}
             className="flex-1 py-2.5 rounded-xl bg-rose-500 text-white text-[13px] font-medium hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Đang lưu..." : editing ? "Cập nhật" : "Tạo đề xuất"}
+            {saving ? "Đang lưu..." : editing ? "Cập nhật" : loai === "thu" ? "Ghi nhận thu" : "Tạo đề xuất chi"}
           </button>
         </div>
       </div>
@@ -447,7 +447,7 @@ export default function SoThuChiPage() {
   const [phieus, setPhieus] = useState<PhieuThuChi[]>([]);
   const [taiKhoans, setTaiKhoans] = useState<TaiKhoanQuy[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"so" | "cho_duyet">("so");
+  const [tab, setTab] = useState<"so" | "cho_duyet" | "da_duyet">("so");
 
   // Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -478,18 +478,20 @@ export default function SoThuChiPage() {
   const soDuDauKy = taiKhoan?.soDuDauKy ?? 0;
   const daChot    = taiKhoan?.daChot ?? false;
 
-  const { tongThu, tongChi, choDuyet } = useMemo(() => {
+  const { tongThu, tongChi, choDuyet, daDuyet } = useMemo(() => {
     let tongThu = 0, tongChi = 0;
     const choDuyet: PhieuThuChi[] = [];
+    const daDuyet: PhieuThuChi[] = [];
 
     phieus.forEach(p => {
       if (p.trangThai === "cho_duyet") { choDuyet.push(p); return; }
       if (p.trangThai === "tu_choi") return;
+      if (p.trangThai === "da_duyet") { daDuyet.push(p); }
       if (p.loai === "thu") tongThu += p.soTien;
       else tongChi += p.soTien;
     });
 
-    return { tongThu, tongChi, choDuyet };
+    return { tongThu, tongChi, choDuyet, daDuyet };
   }, [phieus]);
 
   const soDuCuoiKy = soDuDauKy + tongThu - tongChi;
@@ -501,13 +503,29 @@ export default function SoThuChiPage() {
   // ─── Actions ─────────────────────────────────────────────────────────────
 
   async function handleCreate(data: Partial<PhieuThuChi>) {
-    await fetch("/api/so-thu-chi", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    setShowCreate(false);
-    fetchData();
+    try {
+      const res = await fetch("/api/so-thu-chi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("Tạo đề xuất thất bại: " + (err.error ?? res.statusText));
+        return;
+      }
+      const newPhieu: PhieuThuChi = await res.json();
+      // Thêm vào state ngay (optimistic) — không chờ refetch
+      setPhieus(prev => [newPhieu, ...prev]);
+      setShowCreate(false);
+      // Thu ghi thẳng vào sổ, chi mới cần duyệt
+      setTab(newPhieu.loai === "thu" ? "so" : "cho_duyet");
+      // Refetch để đồng bộ dữ liệu đầy đủ sau
+      fetchData();
+    } catch (e) {
+      alert("Lỗi kết nối, vui lòng thử lại.");
+      console.error("handleCreate error:", e);
+    }
   }
 
   async function handleEdit(data: Partial<PhieuThuChi>) {
@@ -739,6 +757,18 @@ export default function SoThuChiPage() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setTab("da_duyet")}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all flex items-center gap-1.5
+              ${tab === "da_duyet" ? "bg-white text-stone-700 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}
+          >
+            Đã duyệt
+            {daDuyet.length > 0 && (
+              <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                {daDuyet.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* ── Tab: Sổ thu chi ── */}
@@ -918,6 +948,67 @@ export default function SoThuChiPage() {
                     <button
                       onClick={() => handleDelete(p.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-50 text-red-400 text-[12px] font-medium hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Đã duyệt ── */}
+        {tab === "da_duyet" && (
+          <div className="space-y-3">
+            {loading ? (
+              <div className="bg-white rounded-2xl border border-stone-100 py-12 flex items-center justify-center text-stone-400 text-[13px]">
+                Đang tải...
+              </div>
+            ) : daDuyet.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-stone-100 py-12 flex flex-col items-center justify-center text-stone-400">
+                <Check size={32} className="mb-2 opacity-30 text-blue-400" />
+                <p className="text-[13px]">Không có phiếu nào đã duyệt</p>
+              </div>
+            ) : (
+              daDuyet.map(p => (
+                <div key={p.id} className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5
+                          ${p.loai === "chi" ? "bg-red-50 text-red-500" : "bg-green-50 text-green-600"}`}>
+                          {p.loai === "chi" ? <ArrowDownCircle size={10} /> : <ArrowUpCircle size={10} />}
+                          {p.loai === "chi" ? "Khoản chi" : "Khoản thu"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                          <Check size={9} /> Đã duyệt
+                        </span>
+                        <span className="text-[11px] text-stone-400">{fmtNgay(p.ngay)}</span>
+                      </div>
+                      <p className="text-[14px] font-semibold text-stone-800 mb-0.5">{p.dienGiai}</p>
+                      <p className="text-[12px] text-stone-400">{DANH_MUC_LABEL[p.danhMuc] ?? p.danhMuc}</p>
+                      {p.ghiChuDuyet && (
+                        <p className="text-[11px] text-blue-500 mt-1 italic">💬 {p.ghiChuDuyet}</p>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-[18px] font-bold ${p.loai === "chi" ? "text-red-500" : "text-green-600"}`}>
+                        {p.loai === "chi" ? "-" : "+"}{fmtSo(p.soTien)}
+                        <span className="text-[11px] font-normal text-stone-400 ml-0.5">đ</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-stone-50">
+                    <button
+                      onClick={() => setDuyetTarget({ phieu: p, action: "da_chi" })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-600 text-[12px] font-medium hover:bg-green-100 transition-colors"
+                    >
+                      <Check size={12} /> Xác nhận đã chi
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-50 text-red-400 text-[12px] font-medium hover:bg-red-50 transition-colors ml-auto"
                     >
                       <Trash2 size={12} />
                     </button>

@@ -8,17 +8,12 @@ export async function GET(req: NextRequest) {
     const thang = searchParams.get("thang") || "";
     const ho    = searchParams.get("ho")    || "";
 
-    const [phieus, taiKhoan] = await Promise.all([
-      prisma.phieuThuChi.findMany({
-        where: {
-          thang,
-          ho,
-          trangThai: { in: ["da_duyet", "da_chi"] },
-        },
-        orderBy: { ngay: "asc" },
-      }),
-      prisma.taiKhoanQuy.findUnique({ where: { ho } }),
-    ]);
+    // Sequential queries — tránh connection pool timeout (Supabase limit=1)
+    const phieus = await prisma.phieuThuChi.findMany({
+      where: { thang, ho, trangThai: { in: ["da_duyet", "da_chi"] } },
+      orderBy: { ngay: "asc" },
+    });
+    const taiKhoan = await prisma.taiKhoanQuy.findUnique({ where: { ho } });
 
     return NextResponse.json({ phieus, taiKhoan });
   } catch (e) {

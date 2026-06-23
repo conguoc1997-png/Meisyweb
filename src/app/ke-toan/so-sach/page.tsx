@@ -133,19 +133,35 @@ export default function SoSachPage() {
     const from = monthRange(thangList[0]).from;
     const to   = monthRange(thangList[thangList.length - 1]).to;
 
-    const [tiktokResults, sttcResults, sttcInResults, nhapRes, xuatRes] = await Promise.all([
-      Promise.all(thangList.map(t => fetch(`/api/koc/tiktok-doanhthu?thang=${t}`).then(r => r.json()))),
-      Promise.all(thangList.map(t => fetch(`/api/so-thu-chi?thang=${t}&ho=${ho}`).then(r => r.json()))),
-      Promise.all(thangList.map(t => fetch(`/api/so-thu-chi/in?thang=${t}&ho=${ho}`).then(r => r.json()))),
-      fetch(`/api/ke-toan/nhap-kho?from=${from}&to=${to}`).then(r => r.json()),
-      fetch(`/api/ke-toan/xuat-kho?from=${from}&to=${to}`).then(r => r.json()),
-    ]);
+    // Sequential — tránh connection pool timeout (Supabase free tier limit=1)
+    // TikTok không dùng Supabase nên có thể chạy song song với phần còn lại
+    const tiktokPromise = Promise.all(
+      thangList.map(t => fetch(`/api/koc/tiktok-doanhthu?thang=${t}`).then(r => r.json()))
+    );
 
-    setTiktokSP(tiktokResults.flatMap(d => Array.isArray(d.spData) ? d.spData : []));
-    setPhieus(sttcResults.flatMap(d => Array.isArray(d.phieus) ? d.phieus : []));
-    setPhieusDaDuyet(sttcInResults.flatMap(d => Array.isArray(d.phieus) ? d.phieus : []));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sttcResults: any[] = [];
+    for (const t of thangList) {
+      const d = await fetch(`/api/so-thu-chi?thang=${t}&ho=${ho}`).then(r => r.json());
+      sttcResults.push(d);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sttcInResults: any[] = [];
+    for (const t of thangList) {
+      const d = await fetch(`/api/so-thu-chi/in?thang=${t}&ho=${ho}`).then(r => r.json());
+      sttcInResults.push(d);
+    }
+
+    const nhapRes = await fetch(`/api/ke-toan/nhap-kho?from=${from}&to=${to}`).then(r => r.json());
+    const xuatRes = await fetch(`/api/ke-toan/xuat-kho?from=${from}&to=${to}`).then(r => r.json());
+    const tiktokResults = await tiktokPromise;
+
+    setTiktokSP(tiktokResults.flatMap((d: { spData?: TiktokSPRow[] }) => Array.isArray(d.spData) ? d.spData : []));
+    setPhieus(sttcResults.flatMap((d: { phieus?: PhieuThuChi[] }) => Array.isArray(d.phieus) ? d.phieus : []));
+    setPhieusDaDuyet(sttcInResults.flatMap((d: { phieus?: PhieuThuChi[] }) => Array.isArray(d.phieus) ? d.phieus : []));
     // Số dư đầu kỳ: lấy của tháng đầu tiên trong kỳ (tháng hoặc quý)
-    setTaiKhoan(sttcInResults[0]?.taiKhoan ?? null);
+    setTaiKhoan((sttcInResults[0]?.taiKhoan as TaiKhoanQuy) ?? null);
     setNhapKho(Array.isArray(nhapRes) ? nhapRes : []);
     setXuatKho(Array.isArray(xuatRes) ? xuatRes : []);
     setLoading(false);

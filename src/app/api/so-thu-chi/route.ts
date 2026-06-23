@@ -12,13 +12,9 @@ export async function GET(req: NextRequest) {
     if (thang) where.thang = thang;
     if (ho)    where.ho    = ho;
 
-    const [phieus, taiKhoans] = await Promise.all([
-      prisma.phieuThuChi.findMany({
-        where,
-        orderBy: { ngay: "desc" },
-      }),
-      prisma.taiKhoanQuy.findMany(),
-    ]);
+    // Sequential queries — tránh connection pool timeout (Supabase limit=1)
+    const phieus    = await prisma.phieuThuChi.findMany({ where, orderBy: { ngay: "desc" } });
+    const taiKhoans = await prisma.taiKhoanQuy.findMany();
 
     return NextResponse.json({ phieus, taiKhoans });
   } catch (e) {
@@ -48,7 +44,8 @@ export async function POST(req: NextRequest) {
         danhMuc: danhMuc || "khac",
         dienGiai,
         nguoiDeXuat: nguoiDeXuat || null,
-        trangThai: "cho_duyet",
+        // Thu: xác nhận đã thu luôn. Chi: cần duyệt trước
+        trangThai: loai === "thu" ? "da_duyet" : "cho_duyet",
         ngay: ngayDate,
         thang,
       },
