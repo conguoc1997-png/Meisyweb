@@ -17,6 +17,8 @@ export const ALL_MODULES = [
   { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban", "/api/gia-ban"] },
   { key: "ke-toan",   label: "Kế toán",           routes: ["/ke-toan", "/api/ke-toan"] },
   { key: "cham-cong", label: "Chấm công",           routes: ["/cham-cong", "/api/cham-cong"] },
+  { key: "so-thu-chi", label: "Sổ Thu Chi",        routes: ["/so-thu-chi", "/api/so-thu-chi"] },
+  { key: "cong-no",    label: "Công Nợ & DT",       routes: ["/cong-no", "/api/cong-no-ncc", "/api/cong-no-khach-hang", "/api/doanh-thu"] },
   { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
   { key: "backup",    label: "Backup & Restore",  routes: ["/backup", "/api/backup"] },
 ] as const;

@@ -1091,11 +1091,26 @@ export default function ChamCongPage() {
                         {nv.chucVu && <p className="text-xs text-slate-400">{nv.chucVu}</p>}
                       </td>
                       <td className="px-3 py-2 text-right text-slate-600">
-                        {isKhoan
-                          ? <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-semibold">Khoán</span>
-                          : isCoBanMay
-                            ? <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">Tiếng</span>
-                            : lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
+                        {(isKhoan || isCoBanMay)
+                          ? (
+                            <button
+                              title="Nhấn để đổi Khoán ↔ Tiếng"
+                              onClick={async () => {
+                                const next = nv.loaiLuong === "khoan" ? "co_ban" : "khoan";
+                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ loaiLuong: next }),
+                                });
+                                fetchData();
+                              }}
+                              className={`text-xs px-1.5 py-0.5 rounded font-semibold cursor-pointer hover:opacity-70 transition-opacity
+                                ${isKhoan ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
+                            >
+                              {isKhoan ? "Khoán" : "Tiếng"}
+                            </button>
+                          )
+                          : lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
                       </td>
                       <td className="px-3 py-2 text-center font-semibold text-emerald-700">{congTinhLuong || "—"}</td>
                       <td className="px-3 py-2 text-center text-blue-600">{congPhep || ""}</td>

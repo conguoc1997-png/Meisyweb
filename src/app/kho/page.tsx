@@ -52,9 +52,11 @@ export default function KhoPage() {
 
   // ── Sheet update states ───────────────────────────────────────────────────
   type SheetRow = {
-    rowIndex: number; ten: string; giaNhap: number | null;
+    rowIndex: number; ten: string;
+    giaNhap: number | null; giaBan: number | null;
     existingId: string | null; existingSku: string | null;
-    oldGiaNhap: number | null; isNew: boolean;
+    oldGiaNhap: number | null; oldGiaBan: number | null;
+    isNew: boolean;
   };
   const [modalSheet, setModalSheet] = useState(false);
   const [sheetUrl, setSheetUrl] = useState("");
@@ -94,6 +96,7 @@ export default function KhoPage() {
       const rows = sheetPreview.map(r => ({
         ten: r.ten,
         giaNhap: r.giaNhap,
+        giaBan:  r.giaBan,
         existingId: r.existingId ?? null,
       }));
       const res = await fetch("/api/kho/update-sheet", {
@@ -297,6 +300,7 @@ export default function KhoPage() {
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">Nguồn</th>
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">TikTok ID</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá nhập</th>
+                <th className="text-right px-4 py-3 text-green-600 font-medium">Giá bán</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Tồn kho</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -304,7 +308,7 @@ export default function KhoPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredSP.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <Package size={32} className="mx-auto mb-2 opacity-40" />
                     Chưa có sản phẩm nào
                   </td>
@@ -347,6 +351,11 @@ export default function KhoPage() {
                       {sp.giaNhap === 0
                         ? <span className="text-amber-500 text-xs font-medium">Chưa có giá</span>
                         : <span className="text-slate-600">{formatCurrency(sp.giaNhap)}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {sp.giaBan === 0
+                        ? <span className="text-slate-300 text-xs">—</span>
+                        : <span className="font-semibold text-green-600">{formatCurrency(sp.giaBan)}</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className={`font-bold ${sp.tonKho <= 5 ? "text-red-600" : sp.tonKho <= 20 ? "text-amber-600" : "text-green-600"}`}>
@@ -625,7 +634,7 @@ export default function KhoPage() {
                 <h2 className="font-bold text-slate-800 flex items-center gap-2">
                   <FileSpreadsheet size={18} className="text-emerald-600" /> Thêm / Cập nhật sản phẩm từ Google Sheet
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">Cột B = Tên sản phẩm &nbsp;·&nbsp; Cột I = Giá nhập</p>
+                <p className="text-xs text-slate-400 mt-0.5">Cột B = Tên &nbsp;·&nbsp; Cột H = Giá nhập &nbsp;·&nbsp; Cột I = Giá bán</p>
               </div>
               <button onClick={() => setModalSheet(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
             </div>
@@ -670,8 +679,8 @@ export default function KhoPage() {
                       <tr>
                         <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">Tên (cột B)</th>
                         <th className="text-left px-4 py-2.5 text-slate-500 font-medium text-xs">SP khớp (SKU)</th>
-                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá nhập cũ</th>
-                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá nhập mới (cột I)</th>
+                        <th className="text-right px-4 py-2.5 text-slate-500 font-medium text-xs">Giá nhập mới (H)</th>
+                        <th className="text-right px-4 py-2.5 text-green-600 font-medium text-xs">Giá bán mới (I)</th>
                         <th className="text-center px-4 py-2.5 text-slate-500 font-medium text-xs w-24">Hành động</th>
                       </tr>
                     </thead>
@@ -684,12 +693,11 @@ export default function KhoPage() {
                               ? <span className="text-green-600 italic">Sản phẩm mới</span>
                               : <span className="font-mono text-slate-600">{row.existingSku}</span>}
                           </td>
-                          <td className="px-4 py-2 text-right text-xs text-slate-400">
-                            {!row.isNew && row.oldGiaNhap != null && row.oldGiaNhap > 0
-                              ? row.oldGiaNhap.toLocaleString("vi-VN") + " ₫" : "—"}
-                          </td>
-                          <td className="px-4 py-2 text-right text-sm font-semibold text-emerald-700">
+                          <td className="px-4 py-2 text-right text-sm font-semibold text-slate-700">
                             {row.giaNhap != null ? row.giaNhap.toLocaleString("vi-VN") + " ₫" : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm font-semibold text-green-600">
+                            {row.giaBan != null ? row.giaBan.toLocaleString("vi-VN") + " ₫" : "—"}
                           </td>
                           <td className="px-4 py-2 text-center">
                             {row.isNew
