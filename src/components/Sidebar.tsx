@@ -111,10 +111,16 @@ const MODULES: NavModule[] = [
     ],
   },
   {
-    key: "so-thu-chi", moduleKey: "cham-cong",
+    key: "so-thu-chi", moduleKey: "so-thu-chi",
     label: "Sổ Thu Chi", icon: Landmark,
     bg: "bg-emerald-50", text: "text-emerald-500",
     href: "/so-thu-chi",
+  },
+  {
+    key: "cong-no", moduleKey: "cong-no",
+    label: "Công Nợ & DT", icon: Landmark,
+    bg: "bg-rose-50", text: "text-rose-500",
+    href: "/cong-no",
   },
   {
     key: "backup", moduleKey: "users",

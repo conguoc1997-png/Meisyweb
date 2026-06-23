@@ -353,16 +353,19 @@ model DinhMucNPL {
 
 // Phiếu xuất kho NPL (liên kết lô cắt)
 model PhieuXuatKho {
-  id        String    @id @default(cuid())
-  soPhieu   String    @unique
-  loCatId   String?   // lô cắt tương ứng
-  hangCat   String?   // loại hàng cắt
-  soSanPham Int       @default(0) // số SP thực tế của lô
-  ngay      DateTime
-  lyDo      String    @default("san_xuat") // san_xuat | dieu_chinh | khac
-  ghiChu    String?
-  nguoiTao  String?
-  createdAt DateTime  @default(now())
+  id            String    @id @default(cuid())
+  soPhieu       String    @unique
+  loCatId       String?   // lô cắt tương ứng
+  hangCat       String?   // loại hàng cắt
+  soSanPham     Int       @default(0) // số SP thực tế của lô
+  ngay          DateTime
+  ho            String    @default("meisy") // "meisy" | "nguyen_cong_uoc"
+  lyDo          String    @default("san_xuat") // san_xuat | ban_hang | dieu_chinh | khac
+  tenKhachHang  String?   // tên khách hàng mua (khi lyDo = ban_hang)
+  giaBanTong    Float?    // tổng giá bán (tính từ chi tiết × giaBan)
+  ghiChu        String?
+  nguoiTao      String?
+  createdAt     DateTime  @default(now())
 
   // Trạng thái hủy
   trangThai  String    @default("active")  // active | da_huy
@@ -370,7 +373,8 @@ model PhieuXuatKho {
   ngayHuy    DateTime?
   nguoiHuy   String?
 
-  chiTiet PhieuXuatChiTiet[]
+  chiTiet         PhieuXuatChiTiet[]
+  doanhThu        DoanhThu?
 }
 
 // Chi tiết phiếu xuất
@@ -381,6 +385,8 @@ model PhieuXuatChiTiet {
   soLuong     Float
   donGia      Float  @default(0) // giá vốn bình quân tại thời điểm xuất
   thanhTien   Float  @default(0)
+  giaBan      Float  @default(0) // giá bán / đơn vị (lấy từ VatTu.giaBan, có thể sửa)
+  doanhThuCt  Float  @default(0) // = soLuong × giaBan
   ghiChu      String?
 
   phieu PhieuXuatKho @relation(fields: [phieuXuatId], references: [id], onDelete: Cascade)
@@ -399,6 +405,7 @@ model VatTu {
   donVi     String   @default("m")    // đơn vị tồn kho (cơ bản): m | chiếc | kg...
   donViMua  String   @default("m")    // đơn vị mua thường dùng: cây | gói | cuộn...
   quyDoi    Float    @default(1)      // 1 donViMua = quyDoi donVi (VD: 1 cây = 50m)
+  giaBan    Float?                    // giá bán (dùng cho xuất kho → doanh thu)
   ghiChu    String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -423,19 +430,22 @@ model TonKhoVatTu {
 
 // Phiếu nhập kho
 model PhieuNhapKho {
-  id          String    @id @default(cuid())
-  soPhieu     String    @unique
-  ngay        DateTime
-  nhaCC       String    // "hac_long" | "an_huy" | "viet_hoa" | custom
-  tenNhaCC    String?
-  soHoaDon    String?
-  ngayHoaDon  DateTime?
-  tongTien    Float     @default(0)
-  trangThai   String    @default("chua_thanh_toan") // chua_thanh_toan | da_thanh_toan | thanh_toan_1_phan
-  ghiChu      String?
-  nguoiTao    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  soPhieu         String    @unique
+  ngay            DateTime
+  ho              String    @default("meisy") // "meisy" | "nguyen_cong_uoc"
+  nhaCC           String    // "hac_long" | "an_huy" | "viet_hoa" | custom
+  tenNhaCC        String?
+  soHoaDon        String?
+  ngayHoaDon      DateTime?
+  tongTien        Float     @default(0)
+  soTienHoaDon    Float?    // tiền trên hoá đơn NCC xuất
+  chiPhiThucNhap  Float?    // chi phí thực tế nhận hàng (có thể khác hoá đơn)
+  trangThai       String    @default("chua_thanh_toan") // chua_thanh_toan | da_thanh_toan | thanh_toan_1_phan
+  ghiChu          String?
+  nguoiTao        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   chiTiet ChiTietNhapKho[]
 }
@@ -544,6 +554,71 @@ model PhieuThuChi {
   ngayDuyet   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ===================== MODULE CÔNG NỢ & DOANH THU =====================
+
+// Doanh thu từ xuất kho bán hàng
+model DoanhThu {
+  id              String    @id @default(cuid())
+  ho              String    // "meisy" | "nguyen_cong_uoc"
+  ngay            DateTime
+  thang           String    // "2026-06"
+  phieuXuatId     String?   @unique // liên kết phiếu xuất kho
+  tenKhachHang    String?
+  soTien          Float     @default(0) // tổng doanh thu (giaBan × soLuong)
+  giaVon          Float     @default(0) // tổng giá vốn (donGia × soLuong)
+  loiNhuan        Float     @default(0) // lợi nhuận = soTien - giaVon
+  trangThai       String    @default("chua_thu") // chua_thu | da_thu
+  ghiChu          String?
+  nguoiTao        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  phieuXuat       PhieuXuatKho?       @relation(fields: [phieuXuatId], references: [id])
+  congNoKhachHang CongNoKhachHang?
+}
+
+// Công nợ khách hàng (accounts receivable) — tạo khi xuất kho có tên KH
+model CongNoKhachHang {
+  id              String    @id @default(cuid())
+  ho              String    // "meisy" | "nguyen_cong_uoc"
+  ngay            DateTime
+  thang           String    // "2026-06"
+  tenKhachHang    String
+  doanhThuId      String?   @unique
+  soTien          Float     @default(0) // tổng nợ
+  daTra           Float     @default(0) // đã thanh toán
+  conLai          Float     @default(0) // còn lại
+  trangThai       String    @default("con_no") // con_no | da_thanh_toan | thanh_toan_1_phan
+  phieuThuChiId   String?   // liên kết PhieuThuChi khi nhận tiền
+  ghiChu          String?
+  nguoiTao        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  doanhThu        DoanhThu? @relation(fields: [doanhThuId], references: [id])
+}
+
+// Công nợ NCC mới — theo hộ, tách hoá đơn vs thực tế
+model CongNoNCC {
+  id              String    @id @default(cuid())
+  ho              String    // "meisy" | "nguyen_cong_uoc"
+  ngay            DateTime
+  thang           String    // "2026-06"
+  tenNCC          String
+  phieuNhapId     String?   // liên kết PhieuNhapKho (tuỳ chọn)
+  soHoaDon        String?
+  soTienHoaDon    Float     @default(0) // tiền trên hoá đơn
+  chiPhiThucNhap  Float     @default(0) // chi phí thực tế nhận hàng
+  daTra           Float     @default(0) // đã thanh toán
+  conLai          Float     @default(0) // còn nợ (= chiPhiThucNhap - daTra)
+  trangThai       String    @default("con_no") // con_no | da_thanh_toan | thanh_toan_1_phan
+  phieuThuChiId   String?   // liên kết PhieuThuChi khi trả nợ
+  ghiChu          String?
+  nguoiTao        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // ===================== MODULE ĐỐI SOÁT HOÀN TRẢ =====================
