@@ -971,7 +971,7 @@ export default function XuatKhoPage() {
                         <thead>
                           <tr className="bg-orange-50 text-left">
                             <th className="px-4 py-2 text-xs font-medium text-orange-700">Vật tư</th>
-                            <th className="px-4 py-2 text-xs font-medium text-orange-700 text-right w-28">Số lượng</th>
+                            <th className="px-4 py-2 text-xs font-medium text-orange-700 text-right w-32">Số lượng</th>
                             <th className="px-4 py-2 text-xs font-medium text-orange-700 w-14">ĐV</th>
                             <th className="px-4 py-2 text-xs font-medium text-orange-700 text-right w-28">Giá vốn</th>
                             <th className="px-4 py-2 text-xs font-medium text-orange-700 text-right w-28">Thành tiền</th>
@@ -994,7 +994,7 @@ export default function XuatKhoPage() {
                                 <td className="px-4 py-2">
                                   <input type="number" min={0} step="0.1" value={row.soLuong || ""}
                                     onChange={e => updateRow(i, { soLuong: parseFloat(e.target.value) || 0 })}
-                                    className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-300" />
+                                    className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                                 </td>
                                 <td className="px-4 py-2 text-xs text-slate-500">{selVT?.donVi || "—"}</td>
                                 <td className="px-4 py-2">
