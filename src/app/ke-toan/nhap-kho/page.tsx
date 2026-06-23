@@ -581,7 +581,7 @@ export default function NhapKhoPage() {
                         <th className="px-3 py-2 text-left text-xs font-medium text-teal-600 w-28">≈ Tổng QĐ</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 w-28">Đơn giá</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-slate-500 w-28">Thành tiền</th>
-                        <th className="px-3 py-2 text-center text-xs font-medium text-orange-500 w-16">VAT %</th>
+                        <th className="px-3 py-2 text-center text-xs font-medium text-orange-500 w-20">VAT %</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">Ghi chú</th>
                         <th className="w-6"></th>
                       </tr>
@@ -763,7 +763,7 @@ export default function NhapKhoPage() {
                                 value={row.vat || ""}
                                 placeholder="0"
                                 onChange={e => updateRow(i, { vat: parseFloat(e.target.value) || 0 })}
-                                className="w-full border border-orange-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-orange-300 bg-orange-50"
+                                className="w-full border border-orange-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-orange-300 bg-orange-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </td>
 
