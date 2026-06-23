@@ -519,7 +519,7 @@ export default function ChamCongPage() {
         @media print {
           body * { visibility: hidden !important; }
           #phieu-luong-modal, #phieu-luong-modal * { visibility: visible !important; }
-          #phieu-luong-modal { position: fixed; top: 0; left: 0; width: 100%; background: white; }
+          #phieu-luong-modal { position: absolute; top: 0; left: 0; width: 100%; background: white; }
           .no-print { display: none !important; }
           @page { size: A5; margin: 12mm; }
         }
@@ -527,7 +527,7 @@ export default function ChamCongPage() {
         @media print {
           body * { visibility: hidden !important; }
           #bang-luong-in, #bang-luong-in * { visibility: visible !important; }
-          #bang-luong-in { position: fixed; top: 0; left: 0; width: 100%; }
+          #bang-luong-in { position: absolute; top: 0; left: 0; width: 100%; }
           @page { size: A4 landscape; margin: 10mm 8mm; }
         }
       `}</style>
