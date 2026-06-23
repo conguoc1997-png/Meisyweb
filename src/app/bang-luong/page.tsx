@@ -149,10 +149,15 @@ function PhieuLuongContent({ phieu }: { phieu: PhieuLuong }) {
     { label: "Tăng ca",          val: row.luongTC,      note: `${row.tongTC} giờ × ${fmt(row.heSoTC)}đ/giờ` },
   ];
 
+  const tenHKD = isMayGroup(row.phongBan)
+    ? "HỘ KINH DOANH NGUYỄN CÔNG ƯỚC"
+    : "HỘ KINH DOANH MEISY";
+
   return (
     <div className="text-[12px] font-[sans-serif]">
       {/* Header */}
       <div className="text-center mb-4">
+        <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-0.5">{tenHKD}</p>
         <p className="font-bold text-[15px] uppercase tracking-wide">PHIẾU LƯƠNG</p>
         <p className="text-slate-500 text-[11px] uppercase">{thangLabel}</p>
       </div>
@@ -422,7 +427,9 @@ function BangLuongContent({ auth, onLogout }: { auth: string; onLogout: () => vo
         body * { visibility: hidden !important; }
         #phieu-luong-modal, #phieu-luong-modal * { visibility: visible !important; overflow: visible !important; }
         #phieu-luong-modal { position: fixed; top: 0; left: 0; width: 100%; background: white; }
-        @page { size: A5; margin: 12mm 14mm; }
+        @page { size: A5; margin: 8mm 14mm; }
+        /* Ẩn browser header/footer (date, title) */
+        @page { margin-top: 0; }
       }
     ` : `
       @media print {
