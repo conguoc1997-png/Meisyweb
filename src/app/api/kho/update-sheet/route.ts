@@ -93,20 +93,20 @@ export async function POST(req: NextRequest) {
         inserted = result.count;
       }
 
-      // Cập nhật: gom vào 1 transaction
+      // Cập nhật: 1 câu SQL CASE WHEN duy nhất — nhanh, tránh timeout
       let updated = 0;
       if (toUpdate.length > 0) {
-        await prisma.$transaction(
-          toUpdate.map(r =>
-            prisma.sanPham.update({
-              where: { id: r.existingId! },
-              data: {
-                ten: r.ten,
-                ...(r.giaBan !== null ? { giaBan: r.giaBan } : {}),
-              },
-            })
-          )
-        );
+        const withGia = toUpdate.filter(r => r.giaBan !== null);
+        if (withGia.length > 0) {
+          // Build: UPDATE "SanPham" SET "giaBan" = CASE "id" WHEN ... END WHERE "id" IN (...)
+          const caseWhen = withGia
+            .map(r => `WHEN '${r.existingId}' THEN ${r.giaBan}`)
+            .join(" ");
+          const ids = withGia.map(r => `'${r.existingId}'`).join(",");
+          await prisma.$executeRawUnsafe(
+            `UPDATE "SanPham" SET "giaBan" = CASE "id" ${caseWhen} END WHERE "id" IN (${ids})`
+          );
+        }
         updated = toUpdate.length;
       }
 
