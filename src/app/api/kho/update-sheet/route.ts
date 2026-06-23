@@ -44,25 +44,29 @@ function slugSKU(ten: string): string {
 }
 
 // ── Cột cố định ──
-const COL_TEN    = 1; // cột B
-const COL_GIABAN = 8; // cột I = giá bán
+const COL_TEN     = 1; // cột B
+const COL_GIANHAP = 7; // cột H = giá nhập
+const COL_GIABAN  = 8; // cột I = giá bán
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type SheetPreviewRow = {
   rowIndex: number;
   ten: string;
-  giaBan: number | null;
+  giaNhap: number | null;
+  giaBan:  number | null;
   existingId:  string | null;
   existingSku: string | null;
+  oldGiaNhap:  number | null;
   oldGiaBan:   number | null;
-  isNew: boolean;   // true = chưa có trong DB → sẽ tạo mới
+  isNew: boolean;
 };
 
 type ConfirmRow = {
   ten: string;
-  giaBan: number | null;
-  existingId: string | null; // null = tạo mới
+  giaNhap: number | null;
+  giaBan:  number | null;
+  existingId: string | null;
 };
 
 // ── POST /api/kho/update-sheet ────────────────────────────────────────────────
@@ -83,8 +87,8 @@ export async function POST(req: NextRequest) {
           data: toInsert.map(r => ({
             ten:     r.ten,
             sku:     slugSKU(r.ten),
-            giaNhap: 0,
-            giaBan:  r.giaBan ?? 0,
+            giaNhap: r.giaNhap ?? 0,
+            giaBan:  r.giaBan  ?? 0,
             tonKho:  0,
             nguon:   "shopee",
           })),
@@ -93,20 +97,35 @@ export async function POST(req: NextRequest) {
         inserted = result.count;
       }
 
-      // Cập nhật: 1 câu SQL CASE WHEN duy nhất — nhanh, tránh timeout
+      // Cập nhật: 1 câu SQL CASE WHEN cho từng cột — tránh timeout
       let updated = 0;
       if (toUpdate.length > 0) {
-        const withGia = toUpdate.filter(r => r.giaBan !== null);
-        if (withGia.length > 0) {
-          // Build: UPDATE "SanPham" SET "giaBan" = CASE "id" WHEN ... END WHERE "id" IN (...)
-          const caseWhen = withGia
-            .map(r => `WHEN '${r.existingId}' THEN ${r.giaBan}`)
-            .join(" ");
-          const ids = withGia.map(r => `'${r.existingId}'`).join(",");
+        const ids = toUpdate.map(r => `'${r.existingId}'`).join(",");
+
+        // Update giaNhap
+        const withNhap = toUpdate.filter(r => r.giaNhap !== null);
+        if (withNhap.length > 0) {
+          const caseNhap = withNhap.map(r => `WHEN '${r.existingId}' THEN ${r.giaNhap}`).join(" ");
+          const idsNhap  = withNhap.map(r => `'${r.existingId}'`).join(",");
           await prisma.$executeRawUnsafe(
-            `UPDATE "SanPham" SET "giaBan" = CASE "id" ${caseWhen} END WHERE "id" IN (${ids})`
+            `UPDATE "SanPham" SET "giaNhap" = CASE "id" ${caseNhap} END WHERE "id" IN (${idsNhap})`
           );
         }
+
+        // Update giaBan
+        const withBan = toUpdate.filter(r => r.giaBan !== null);
+        if (withBan.length > 0) {
+          const caseBan = withBan.map(r => `WHEN '${r.existingId}' THEN ${r.giaBan}`).join(" ");
+          const idsBan  = withBan.map(r => `'${r.existingId}'`).join(",");
+          await prisma.$executeRawUnsafe(
+            `UPDATE "SanPham" SET "giaBan" = CASE "id" ${caseBan} END WHERE "id" IN (${idsBan})`
+          );
+        }
+
+        // Update tên (nếu muốn sync tên từ sheet)
+        // Bỏ qua tên để tránh ghi đè dữ liệu đã chỉnh
+
+        void ids; // suppress unused warning
         updated = toUpdate.length;
       }
 
@@ -143,8 +162,9 @@ export async function POST(req: NextRequest) {
     const allSP = await prisma.sanPham.findMany();
 
     const preview: SheetPreviewRow[] = rows.slice(startIdx).map((r, idx) => {
-      const ten    = r[COL_TEN]?.trim()    ?? "";
-      const giaBan = parsePrice(r[COL_GIABAN]?.trim() ?? "");
+      const ten     = r[COL_TEN]?.trim()     ?? "";
+      const giaNhap = parsePrice(r[COL_GIANHAP]?.trim() ?? "");
+      const giaBan  = parsePrice(r[COL_GIABAN]?.trim()  ?? "");
 
       if (!ten) return null; // bỏ dòng trống
 
@@ -155,12 +175,14 @@ export async function POST(req: NextRequest) {
         null;
 
       return {
-        rowIndex: startIdx + idx,
+        rowIndex:    startIdx + idx,
         ten,
+        giaNhap,
         giaBan,
-        existingId:  matched?.id     ?? null,
-        existingSku: matched?.sku    ?? null,
-        oldGiaBan:   matched?.giaBan ?? null,
+        existingId:  matched?.id      ?? null,
+        existingSku: matched?.sku     ?? null,
+        oldGiaNhap:  matched?.giaNhap ?? null,
+        oldGiaBan:   matched?.giaBan  ?? null,
         isNew: !matched,
       };
     }).filter((r): r is SheetPreviewRow => r !== null);
