@@ -406,8 +406,10 @@ export default function ChamCongPage() {
   const getSummary = (nvId: string) => {
     const counts: Record<string, number> = {};
     days.forEach(d => {
-      if (isDayOff(d)) return;
       const tt = ccMap[getKey(nvId, d)] ?? "";
+      // Chủ nhật/ngày lễ mặc định không tính công, nhưng nếu đã chấm công
+      // (đi làm/½ ngày...) cho ngày đó thì vẫn tính bình thường.
+      if (!tt && isDayOff(d)) return;
       if (tt) counts[tt] = (counts[tt] ?? 0) + (tt === "nua_ngay" ? 0.5 : 1);
     });
     return counts;
