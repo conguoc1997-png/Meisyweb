@@ -514,7 +514,7 @@ export default function ChamCongPage() {
 
   return (
     <div className="p-5">
-      {/* Print styles — chuyển đổi giữa in phiếu cá nhân và bảng lương */}
+      {/* Print styles — chuyển đổi giữa in phiếu cá nhân, bảng lương, bảng chấm công */}
       <style>{phieuLuong ? `
         @media print {
           body * { visibility: hidden !important; }
@@ -524,12 +524,19 @@ export default function ChamCongPage() {
           .no-print { display: none !important; }
           @page { size: A5; margin: 12mm; }
         }
-      ` : `
+      ` : activeTab === "luong" ? `
         @media print {
           body * { visibility: hidden !important; }
           #bang-luong-in, #bang-luong-in * { visibility: visible !important; }
           #bang-luong-in { position: absolute; top: 0; left: 0; width: 100%; }
           @page { size: A4 landscape; margin: 10mm 8mm; }
+        }
+      ` : `
+        @media print {
+          body * { visibility: hidden !important; }
+          #bang-chamcong-in, #bang-chamcong-in * { visibility: visible !important; }
+          #bang-chamcong-in { position: absolute; top: 0; left: 0; width: 100%; }
+          @page { size: A3 landscape; margin: 8mm; }
         }
       `}</style>
       {/* Header */}
@@ -645,7 +652,12 @@ export default function ChamCongPage() {
           <p>Chưa có nhân viên. <button onClick={openNVModal} className="text-rose-500 hover:underline">Thêm nhân viên</button></p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div id="bang-chamcong-in" className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="hidden print:block px-4 pt-3 pb-1 text-center">
+            <p className="text-[11px] text-slate-500">Hộ kinh doanh: <strong>{currentHo.label}</strong></p>
+            <h2 className="text-base font-bold uppercase">Bảng Chấm Công</h2>
+            <p className="text-[12px] text-slate-600">Tháng {month}/{year}</p>
+          </div>
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse" style={{ minWidth: `${80 + 180 + daysInMonth * 34 + 180}px` }}>
               <thead>
