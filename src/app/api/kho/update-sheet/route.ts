@@ -45,23 +45,23 @@ function slugSKU(ten: string): string {
 
 // ── Cột cố định ──
 const COL_TEN    = 1; // cột B
-const COL_GIANHAP = 8; // cột I = giá nhập
+const COL_GIABAN = 8; // cột I = giá bán
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type SheetPreviewRow = {
   rowIndex: number;
   ten: string;
-  giaNhap: number | null;
+  giaBan: number | null;
   existingId:  string | null;
   existingSku: string | null;
-  oldGiaNhap:  number | null;
+  oldGiaBan:   number | null;
   isNew: boolean;   // true = chưa có trong DB → sẽ tạo mới
 };
 
 type ConfirmRow = {
   ten: string;
-  giaNhap: number | null;
+  giaBan: number | null;
   existingId: string | null; // null = tạo mới
 };
 
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
           data: toInsert.map(r => ({
             ten:     r.ten,
             sku:     slugSKU(r.ten),
-            giaNhap: r.giaNhap ?? 0,
-            giaBan:  0,
+            giaNhap: 0,
+            giaBan:  r.giaBan ?? 0,
             tonKho:  0,
             nguon:   "shopee",
           })),
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
               where: { id: r.existingId! },
               data: {
                 ten: r.ten,
-                ...(r.giaNhap !== null ? { giaNhap: r.giaNhap } : {}),
+                ...(r.giaBan !== null ? { giaBan: r.giaBan } : {}),
               },
             })
           )
@@ -143,8 +143,8 @@ export async function POST(req: NextRequest) {
     const allSP = await prisma.sanPham.findMany();
 
     const preview: SheetPreviewRow[] = rows.slice(startIdx).map((r, idx) => {
-      const ten     = r[COL_TEN]?.trim()     ?? "";
-      const giaNhap = parsePrice(r[COL_GIANHAP]?.trim() ?? "");
+      const ten    = r[COL_TEN]?.trim()    ?? "";
+      const giaBan = parsePrice(r[COL_GIABAN]?.trim() ?? "");
 
       if (!ten) return null; // bỏ dòng trống
 
@@ -157,10 +157,10 @@ export async function POST(req: NextRequest) {
       return {
         rowIndex: startIdx + idx,
         ten,
-        giaNhap,
-        existingId:  matched?.id      ?? null,
-        existingSku: matched?.sku     ?? null,
-        oldGiaNhap:  matched?.giaNhap ?? null,
+        giaBan,
+        existingId:  matched?.id     ?? null,
+        existingSku: matched?.sku    ?? null,
+        oldGiaBan:   matched?.giaBan ?? null,
         isNew: !matched,
       };
     }).filter((r): r is SheetPreviewRow => r !== null);
