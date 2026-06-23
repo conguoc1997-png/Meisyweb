@@ -65,6 +65,13 @@ export default function CongNoPage() {
   const [payNCC, setPayNCC] = useState<CongNoNCC | null>(null);
   const [payNccAmount, setPayNccAmount] = useState("");
 
+  // Modal tạo KH thủ công
+  const [showCreateKH, setShowCreateKH] = useState(false);
+  const [khForm, setKhForm] = useState({
+    ngay: new Date().toISOString().slice(0, 10),
+    tenKhachHang: "", soTien: "", ghiChu: "",
+  });
+
   // Modal thu KH
   const [payKH, setPayKH]   = useState<CongNoKH | null>(null);
   const [payKhAmount, setPayKhAmount] = useState("");
@@ -113,6 +120,19 @@ export default function CongNoPage() {
     if (!res.ok) { alert("Lỗi tạo công nợ"); return; }
     setShowCreateNCC(false);
     setNccForm({ ngay: new Date().toISOString().slice(0, 10), tenNCC: "", soHoaDon: "", soTienHoaDon: "", chiPhiThucNhap: "", ghiChu: "" });
+    fetchData();
+  }
+
+  // ─── Create KH thủ công ───
+  async function handleCreateKH() {
+    const res = await fetch("/api/cong-no-khach-hang", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...khForm, ho }),
+    });
+    if (!res.ok) { alert("Lỗi tạo công nợ khách hàng"); return; }
+    setShowCreateKH(false);
+    setKhForm({ ngay: new Date().toISOString().slice(0, 10), tenKhachHang: "", soTien: "", ghiChu: "" });
     fetchData();
   }
 
@@ -306,6 +326,16 @@ export default function CongNoPage() {
               <p className="text-xs text-orange-500 mb-1">Còn phải thu</p>
               <p className="text-lg font-bold text-orange-600">{fmt(summaryKH.tongConNo)}</p>
             </div>
+          </div>
+
+          {/* Button thêm thủ công */}
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={() => setShowCreateKH(true)}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
+            >
+              <Plus size={16} /> Thêm công nợ KH
+            </button>
           </div>
 
           {/* Table */}
@@ -506,6 +536,60 @@ export default function CongNoPage() {
                 className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"
               >
                 Xác nhận thu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══ Modal tạo công nợ KH thủ công ══ */}
+      {showCreateKH && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-slate-800 text-lg">Thêm công nợ Khách hàng</h3>
+              <button onClick={() => setShowCreateKH(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Ngày *</label>
+                  <input type="date" value={khForm.ngay}
+                    onChange={e => setKhForm(p => ({ ...p, ngay: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Số tiền *</label>
+                  <input type="number" value={khForm.soTien}
+                    onChange={e => setKhForm(p => ({ ...p, soTien: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="0" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Tên khách hàng *</label>
+                <input value={khForm.tenKhachHang}
+                  onChange={e => setKhForm(p => ({ ...p, tenKhachHang: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Công ty ABC, Chị Lan..." />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Ghi chú</label>
+                <input value={khForm.ghiChu}
+                  onChange={e => setKhForm(p => ({ ...p, ghiChu: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Đơn hàng tháng 6..." />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowCreateKH(false)}
+                className="flex-1 border rounded-lg py-2 text-sm text-slate-600 hover:bg-slate-50">
+                Huỷ
+              </button>
+              <button
+                onClick={handleCreateKH}
+                disabled={!khForm.tenKhachHang || !khForm.soTien}
+                className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                Tạo công nợ
               </button>
             </div>
           </div>
