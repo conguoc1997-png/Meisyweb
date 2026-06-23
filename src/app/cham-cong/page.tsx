@@ -1138,11 +1138,11 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right text-slate-700">
                         {isKhoan
                           ? (donGiaGioKhoan > 0 && gioNV > 0
-                            ? <span className="text-amber-600 font-semibold">{fmt(Math.round(luongKhoan))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(Math.round(donGiaGioKhoan))}₫/h</span></span>
+                            ? <span className="text-amber-600 font-semibold">{fmt(Math.round(luongKhoan))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(Math.round(donGiaGioKhoan))}₫/h</span></span>
                             : <span className="text-slate-300 text-xs">—</span>)
                           : isCoBanMay
                             ? (gioNV > 0
-                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
+                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
                               : <span className="text-slate-300 text-xs">—</span>)
                             : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
                         }
@@ -1233,7 +1233,7 @@ export default function ChamCongPage() {
                             phuCapCC, phuCapAnNgay, ngayAnDuCong, phuCapDB, tongPhuCap: Math.round(tongPhuCap),
                             thucLinh: isKhoan ? Math.round(thucLinhKhoan) : isCoBanMay ? Math.round(thucLinhCoBanMay) : Math.round(thucLinh),
                             isKhoan, isCoBanMay,
-                            gioNV: (isKhoan || isCoBanMay) ? Math.round(gioNV) : undefined,
+                            gioNV: (isKhoan || isCoBanMay) ? gioNV : undefined,
                             donGiaGio: isKhoan ? Math.round(donGiaGioKhoan) : isCoBanMay ? (nv.heSoTC ?? 1.5) : undefined,
                             luongMay: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : undefined,
                           })}
