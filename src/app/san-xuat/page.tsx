@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -90,6 +91,10 @@ export default function SanXuatPage() {
   });
   const [xuongAddInput, setXuongAddInput] = useState("");
   const [showXuongManage, setShowXuongManage] = useState(false);
+  const [nhaCCList, setNhaCCList] = useState<{ id: string; ten: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/ke-toan/nha-cung-cap").then(r => r.json()).then(d => setNhaCCList(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
   const setXuongList = (list: { key: string; label: string }[]) => {
     setXuongListRaw(list);
     try { localStorage.setItem("xuong_list", JSON.stringify(list)); } catch {}
@@ -1264,7 +1269,14 @@ export default function SanXuatPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-slate-500">{v.donVi}</td>
-                        <td className="px-3 py-2 text-slate-400 italic">{v.ghiChu ?? ""}</td>
+                        <td className="px-3 py-2 text-slate-400 italic">
+                          {v.ghiChu ?? ""}
+                          {v.congNoId && (
+                            <Link href="/cong-no" className="ml-2 text-amber-600 hover:underline not-italic font-medium">
+                              💰 Xem công nợ
+                            </Link>
+                          )}
+                        </td>
                         <td className="px-3 py-2 flex gap-2 items-center">
                           <button onClick={() => {
                             setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "", nhaCC: v.nhaCC ?? "", donGia: v.donGia ? String(v.donGia) : "" });
@@ -2110,8 +2122,14 @@ export default function SanXuatPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Nhà cung cấp</label>
-                  <input value={vaiForm.nhaCC} onChange={e => setVaiForm(f => ({ ...f, nhaCC: e.target.value }))}
-                    className={inp} placeholder="VD: Hắc Long..." />
+                  <input
+                    list="vai-ncc-list"
+                    value={vaiForm.nhaCC}
+                    onChange={e => setVaiForm(f => ({ ...f, nhaCC: e.target.value }))}
+                    className={inp} placeholder="Chọn hoặc nhập..." />
+                  <datalist id="vai-ncc-list">
+                    {nhaCCList.map(n => <option key={n.id} value={n.ten} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Đơn giá (đ/{vaiForm.donVi})</label>
@@ -2119,11 +2137,20 @@ export default function SanXuatPage() {
                     className={inp + " [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"} placeholder="0" />
                 </div>
               </div>
-              {vaiForm.nhaCC.trim() && Number(vaiForm.donGia) > 0 && (
-                <p className="text-[12px] text-amber-600 -mt-1">
-                  → Sẽ tự tạo công nợ NCC (hộ Nguyễn Công Ước) ~{(vaiCayRows.reduce((s, r) => s + (Number(r.soMet) || 0), 0) * Number(vaiForm.donGia)).toLocaleString("vi-VN")}đ
-                </p>
-              )}
+              {Number(vaiForm.donGia) > 0 && (() => {
+                const tongGiaTri = vaiCayRows.reduce((s, r) => s + (Number(r.soMet) || 0), 0) * Number(vaiForm.donGia);
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 -mt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-amber-700 font-medium">Tổng giá trị</span>
+                      <span className="text-sm font-bold text-amber-700">{tongGiaTri.toLocaleString("vi-VN")}đ</span>
+                    </div>
+                    {vaiForm.nhaCC.trim() && (
+                      <p className="text-[11px] text-amber-600 mt-0.5">→ Sẽ tự tạo công nợ NCC (hộ Nguyễn Công Ước)</p>
+                    )}
+                  </div>
+                );
+              })()}
               <div>
                 <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
                 <input value={vaiForm.ghiChu} onChange={e => setVaiForm(f => ({ ...f, ghiChu: e.target.value }))}
