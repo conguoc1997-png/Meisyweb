@@ -209,6 +209,9 @@ model VaiTon {
   mauSac    String?  // màu vải
   xuong     String?  // xưởng tồn
   ghiChu    String?
+  nhaCC     String?  // nhà cung cấp (nếu mua, để link công nợ)
+  donGia    Float?   // giá vốn / đơn vị (nếu mua, để tính công nợ)
+  congNoId  String?  // CongNoNCC tạo ra khi thêm vải có nhà CC + đơn giá
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

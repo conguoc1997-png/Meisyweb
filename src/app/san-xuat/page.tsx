@@ -9,6 +9,7 @@ type SanPham = { id: string; sku: string; ten: string };
 type VaiTon = {
   id: string; maVai: string; soMet: number; soCay: number; cayData: string | null;
   donVi: string; mauSac: string | null; xuong: string | null; ghiChu: string | null; updatedAt: string;
+  nhaCC: string | null; donGia: number | null; congNoId: string | null;
 };
 
 type LoCat = {
@@ -100,7 +101,7 @@ export default function SanXuatPage() {
   const [vaiTons, setVaiTons] = useState<VaiTon[]>([]);
   const [showVaiTon, setShowVaiTon] = useState(false);
   const [modalVai, setModalVai] = useState<VaiTon | "new" | null>(null);
-  const [vaiForm, setVaiForm] = useState({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "" });
+  const [vaiForm, setVaiForm] = useState({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", nhaCC: "", donGia: "" });
   const [vaiCayRows, setVaiCayRows] = useState<{ soMet: string }[]>([{ soMet: "" }]);
   const [editingVaiMet, setEditingVaiMet] = useState<{ id: string; val: string } | null>(null);
   const [savingVai, setSavingVai] = useState(false);
@@ -540,17 +541,13 @@ export default function SanXuatPage() {
             }
           }
 
-          // Kiểm tra tất cả cây đã cắt chưa
-          const allCut = vCays.every((c: { cut?: boolean }) => c.cut);
-          if (allCut) {
-            // Xoá hẳn record nếu không còn cây nào chưa cắt
-            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, { method: "DELETE" });
-          } else {
-            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
-              method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cayData: vCays }),
-            });
-          }
+          // Luôn giữ lại record vải — cây đã dùng hiện gạch ngang (cut:true) trong bảng,
+          // KHÔNG xoá record dù tất cả cây đã được gán vào lô cắt. Chỉ xoá khi người dùng
+          // bấm xoá tay, để tránh mất dấu vải khi lô cắt chưa thực sự "Đã cắt".
+          await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cayData: vCays }),
+          });
           fetchVaiTon();
         }
       }
@@ -1126,7 +1123,7 @@ export default function SanXuatPage() {
             <span className="text-xs text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{vaiTons.length} loại</span>
           </div>
           <button
-            onClick={e => { e.stopPropagation(); setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "" }); setVaiCayRows([{ soMet: "" }]); setModalVai("new"); }}
+            onClick={e => { e.stopPropagation(); setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", nhaCC: "", donGia: "" }); setVaiCayRows([{ soMet: "" }]); setModalVai("new"); }}
             className="flex items-center gap-1 text-xs bg-rose-500 text-white px-3 py-1.5 rounded-lg hover:bg-rose-600 transition">
             <Plus size={12} /> Thêm vải
           </button>
@@ -1270,7 +1267,7 @@ export default function SanXuatPage() {
                         <td className="px-3 py-2 text-slate-400 italic">{v.ghiChu ?? ""}</td>
                         <td className="px-3 py-2 flex gap-2 items-center">
                           <button onClick={() => {
-                            setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "" });
+                            setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "", nhaCC: v.nhaCC ?? "", donGia: v.donGia ? String(v.donGia) : "" });
                             try { setVaiCayRows(v.cayData ? JSON.parse(v.cayData).map((c: {soMet: number}) => ({ soMet: String(c.soMet) })) : [{ soMet: String(v.soMet) }]); }
                             catch { setVaiCayRows([{ soMet: String(v.soMet) }]); }
                             setModalVai(v);
@@ -2106,6 +2103,23 @@ export default function SanXuatPage() {
                   </div>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Nhà cung cấp</label>
+                  <input value={vaiForm.nhaCC} onChange={e => setVaiForm(f => ({ ...f, nhaCC: e.target.value }))}
+                    className={inp} placeholder="VD: Hắc Long..." />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Đơn giá (đ/{vaiForm.donVi})</label>
+                  <input type="number" min={0} value={vaiForm.donGia} onChange={e => setVaiForm(f => ({ ...f, donGia: e.target.value }))}
+                    className={inp + " [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"} placeholder="0" />
+                </div>
+              </div>
+              {vaiForm.nhaCC.trim() && Number(vaiForm.donGia) > 0 && (
+                <p className="text-[12px] text-amber-600 -mt-1">
+                  → Sẽ tự tạo công nợ NCC (hộ Nguyễn Công Ước) ~{(vaiCayRows.reduce((s, r) => s + (Number(r.soMet) || 0), 0) * Number(vaiForm.donGia)).toLocaleString("vi-VN")}đ
+                </p>
+              )}
               <div>
                 <label className="text-xs text-slate-600 mb-1 block">Ghi chú</label>
                 <input value={vaiForm.ghiChu} onChange={e => setVaiForm(f => ({ ...f, ghiChu: e.target.value }))}
