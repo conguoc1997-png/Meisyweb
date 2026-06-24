@@ -1378,6 +1378,7 @@ export default function SanXuatPage() {
                 <th className="px-2 py-2.5 w-6"></th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ngày</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
+                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Tên vải</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
@@ -1433,6 +1434,7 @@ export default function SanXuatPage() {
                     </td>
                     <td className="px-3 py-2.5 text-slate-600">{formatDate(lo.ngay)}</td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{lo.hangCat}</td>
+                    <td className="px-3 py-2.5 text-slate-500">{lo.maVai ?? "—"}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-600">{lo.soM != null ? lo.soM.toFixed(2) : "—"}</td>
@@ -1501,9 +1503,9 @@ export default function SanXuatPage() {
                         );
                       })()}
                     </td>
-                    {/* Ghi chú may — chỉ hiện cho lô 1 cây; lô nhiều cây dùng per-cây */}
+                    {/* Ghi chú may — ghi chú chung cấp lô, luôn hiện dù 1 hay nhiều cây */}
                     <td className="px-1.5 py-1 max-w-[150px]">
-                      {!hasCay ? (editingGhiChuMay?.id === lo.id ? (
+                      {editingGhiChuMay?.id === lo.id ? (
                         <input
                           autoFocus
                           value={editingGhiChuMay.val}
@@ -1523,7 +1525,7 @@ export default function SanXuatPage() {
                         >
                           {lo.ghiChuMay ?? <span className="text-slate-300 font-normal text-xs">— nhập</span>}
                         </button>
-                      )) : null}
+                      )}
                     </td>
                     {/* Màu giặt — inline select */}
                     <td className="px-1.5 py-1 text-center">
@@ -1651,6 +1653,8 @@ export default function SanXuatPage() {
                         <td></td>
                         {/* col 3: Hàng cắt — label */}
                         <td className="px-3 py-1.5 text-[14px] text-slate-400 font-semibold">└ Cây #{ci + 1}</td>
+                        {/* col 3b: Tên vải — empty */}
+                        <td></td>
                         {/* col 4: Size — empty */}
                         <td></td>
                         {/* col 5: T.Size — empty */}
@@ -1808,7 +1812,7 @@ export default function SanXuatPage() {
             {losCat.length > 0 && (
               <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-semibold text-xs">
                 <tr>
-                  <td colSpan={13} className="px-3 py-2 text-slate-500">Tổng</td>
+                  <td colSpan={14} className="px-3 py-2 text-slate-500">Tổng</td>
                   <td className="px-3 py-2 text-right text-green-700">{tongNhan.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-red-600">{tongThieu > 0 ? tongThieu.toLocaleString() : <span className="text-green-600">0</span>}</td>
                   <td colSpan={2}></td>
