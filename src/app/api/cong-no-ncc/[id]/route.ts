@@ -49,18 +49,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ congNo: updated, phieuThuChi: phieu });
     }
 
-    // Cập nhật thông thường
+    // Sửa trực tiếp (daTra override + các trường khác)
+    const record = await prisma.congNoNCC.findUnique({ where: { id } });
+    if (!record) return NextResponse.json({ error: "Không tìm thấy công nợ" }, { status: 404 });
+
+    const chiPhi   = body.chiPhiThucNhap !== undefined ? parseFloat(body.chiPhiThucNhap) : record.chiPhiThucNhap;
+    const daTra    = body.setDaTra       !== undefined ? parseFloat(body.setDaTra)        : record.daTra;
+    const conLai   = Math.max(0, chiPhi - daTra);
+    const trangThai = conLai <= 0 ? "da_thanh_toan" : daTra > 0 ? "thanh_toan_1_phan" : "con_no";
+
     const updated = await prisma.congNoNCC.update({
       where: { id },
       data: {
         ...(body.tenNCC && { tenNCC: body.tenNCC }),
         ...(body.soHoaDon !== undefined && { soHoaDon: body.soHoaDon }),
         ...(body.soTienHoaDon !== undefined && { soTienHoaDon: parseFloat(body.soTienHoaDon) }),
-        ...(body.chiPhiThucNhap !== undefined && {
-          chiPhiThucNhap: parseFloat(body.chiPhiThucNhap),
-          conLai: parseFloat(body.chiPhiThucNhap) - (body.daTra ?? 0),
-        }),
+        ...(body.chiPhiThucNhap !== undefined && { chiPhiThucNhap: chiPhi }),
+        ...(body.setDaTra !== undefined && { daTra }),
         ...(body.ghiChu !== undefined && { ghiChu: body.ghiChu }),
+        conLai,
+        trangThai,
       },
     });
     return NextResponse.json(updated);

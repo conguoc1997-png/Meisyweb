@@ -66,6 +66,13 @@ export default function CongNoPage() {
   const [payNccAmount, setPayNccAmount] = useState("");
   const [payingNCC, setPayingNCC] = useState(false);
 
+  // Modal sửa NCC
+  const [editNCC, setEditNCC] = useState<CongNoNCC | null>(null);
+  const [editNccForm, setEditNccForm] = useState({
+    tenNCC: "", soHoaDon: "", soTienHoaDon: "", chiPhiThucNhap: "", setDaTra: "", ghiChu: "",
+  });
+  const [savingNCC, setSavingNCC] = useState(false);
+
   // Modal tạo KH thủ công
   const [showCreateKH, setShowCreateKH] = useState(false);
   const [khForm, setKhForm] = useState({
@@ -123,6 +130,37 @@ export default function CongNoPage() {
     setShowCreateNCC(false);
     setNccForm({ ngay: new Date().toISOString().slice(0, 10), tenNCC: "", soHoaDon: "", soTienHoaDon: "", chiPhiThucNhap: "", ghiChu: "" });
     fetchData();
+  }
+
+  // ─── Open edit NCC modal ───
+  function openEditNCC(r: CongNoNCC) {
+    setEditNCC(r);
+    setEditNccForm({
+      tenNCC:         r.tenNCC,
+      soHoaDon:       r.soHoaDon || "",
+      soTienHoaDon:   String(r.soTienHoaDon),
+      chiPhiThucNhap: String(r.chiPhiThucNhap),
+      setDaTra:       String(r.daTra),
+      ghiChu:         r.ghiChu || "",
+    });
+  }
+
+  // ─── Save edit NCC ───
+  async function handleSaveEditNCC() {
+    if (!editNCC || savingNCC) return;
+    setSavingNCC(true);
+    try {
+      const res = await fetch(`/api/cong-no-ncc/${editNCC.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editNccForm),
+      });
+      if (!res.ok) { alert("Lỗi lưu chỉnh sửa"); return; }
+      setEditNCC(null);
+      fetchData();
+    } finally {
+      setSavingNCC(false);
+    }
   }
 
   // ─── Create KH thủ công ───
@@ -303,14 +341,22 @@ export default function CongNoPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {r.trangThai !== "da_thanh_toan" && (
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => { setPayNCC(r); setPayNccAmount(String(r.conLai)); }}
-                            className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded hover:bg-red-100"
+                            onClick={() => openEditNCC(r)}
+                            className="text-xs bg-slate-50 text-slate-600 border border-slate-200 px-2 py-1 rounded hover:bg-slate-100"
                           >
-                            Trả nợ
+                            Sửa
                           </button>
-                        )}
+                          {r.trangThai !== "da_thanh_toan" && (
+                            <button
+                              onClick={() => { setPayNCC(r); setPayNccAmount(String(r.conLai)); }}
+                              className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded hover:bg-red-100"
+                            >
+                              Trả nợ
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -472,6 +518,77 @@ export default function CongNoPage() {
                 className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 Tạo công nợ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal sửa công nợ NCC ══ */}
+      {editNCC && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b">
+              <h3 className="font-bold text-slate-800 text-lg">Sửa công nợ NCC</h3>
+              <button onClick={() => setEditNCC(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Tên nhà cung cấp</label>
+                <input value={editNccForm.tenNCC}
+                  onChange={e => setEditNccForm(p => ({ ...p, tenNCC: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Số hoá đơn</label>
+                  <input value={editNccForm.soHoaDon}
+                    onChange={e => setEditNccForm(p => ({ ...p, soHoaDon: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="HĐ-001" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Tiền hoá đơn</label>
+                  <input type="number" value={editNccForm.soTienHoaDon}
+                    onChange={e => setEditNccForm(p => ({ ...p, soTienHoaDon: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Chi phí thực nhập (gốc nợ)</label>
+                <input type="number" value={editNccForm.chiPhiThucNhap}
+                  onChange={e => setEditNccForm(p => ({ ...p, chiPhiThucNhap: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium text-amber-700">Số đã trả (sửa trực tiếp)</label>
+                <input type="number" value={editNccForm.setDaTra}
+                  onChange={e => setEditNccForm(p => ({ ...p, setDaTra: e.target.value }))}
+                  className="w-full border-2 border-amber-300 rounded-lg px-3 py-2 text-sm bg-amber-50" />
+                {editNccForm.chiPhiThucNhap && editNccForm.setDaTra && (
+                  <p className="text-xs mt-1 text-slate-500">
+                    Còn lại: <span className="font-semibold text-red-600">
+                      {fmt(Math.max(0, parseFloat(editNccForm.chiPhiThucNhap) - parseFloat(editNccForm.setDaTra)))}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Ghi chú</label>
+                <input value={editNccForm.ghiChu}
+                  onChange={e => setEditNccForm(p => ({ ...p, ghiChu: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="..." />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t flex gap-3">
+              <button onClick={() => setEditNCC(null)} className="flex-1 border rounded-lg py-2 text-sm text-slate-600 hover:bg-slate-50">
+                Huỷ
+              </button>
+              <button
+                onClick={handleSaveEditNCC}
+                disabled={savingNCC}
+                className="flex-1 bg-amber-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-amber-600 disabled:opacity-50"
+              >
+                {savingNCC ? "Đang lưu..." : "Lưu chỉnh sửa"}
               </button>
             </div>
           </div>
