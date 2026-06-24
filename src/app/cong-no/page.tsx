@@ -64,6 +64,7 @@ export default function CongNoPage() {
   // Modal trả nợ NCC
   const [payNCC, setPayNCC] = useState<CongNoNCC | null>(null);
   const [payNccAmount, setPayNccAmount] = useState("");
+  const [payingNCC, setPayingNCC] = useState(false);
 
   // Modal tạo KH thủ công
   const [showCreateKH, setShowCreateKH] = useState(false);
@@ -75,6 +76,7 @@ export default function CongNoPage() {
   // Modal thu KH
   const [payKH, setPayKH]   = useState<CongNoKH | null>(null);
   const [payKhAmount, setPayKhAmount] = useState("");
+  const [payingKH, setPayingKH] = useState(false);
 
   // ─── Fetch ───
   async function fetchData() {
@@ -138,30 +140,40 @@ export default function CongNoPage() {
 
   // ─── Pay NCC ───
   async function handlePayNCC() {
-    if (!payNCC) return;
-    const res = await fetch(`/api/cong-no-ncc/${payNCC.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ soTienTra: payNccAmount }),
-    });
-    if (!res.ok) { alert("Lỗi ghi nhận trả nợ"); return; }
-    setPayNCC(null);
-    setPayNccAmount("");
-    fetchData();
+    if (!payNCC || payingNCC) return;
+    setPayingNCC(true);
+    try {
+      const res = await fetch(`/api/cong-no-ncc/${payNCC.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soTienTra: payNccAmount }),
+      });
+      if (!res.ok) { alert("Lỗi ghi nhận trả nợ"); return; }
+      setPayNCC(null);
+      setPayNccAmount("");
+      fetchData();
+    } finally {
+      setPayingNCC(false);
+    }
   }
 
   // ─── Pay KH ───
   async function handlePayKH() {
-    if (!payKH) return;
-    const res = await fetch(`/api/cong-no-khach-hang/${payKH.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ soTienThu: payKhAmount }),
-    });
-    if (!res.ok) { alert("Lỗi ghi nhận thu tiền"); return; }
-    setPayKH(null);
-    setPayKhAmount("");
-    fetchData();
+    if (!payKH || payingKH) return;
+    setPayingKH(true);
+    try {
+      const res = await fetch(`/api/cong-no-khach-hang/${payKH.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soTienThu: payKhAmount }),
+      });
+      if (!res.ok) { alert("Lỗi ghi nhận thu tiền"); return; }
+      setPayKH(null);
+      setPayKhAmount("");
+      fetchData();
+    } finally {
+      setPayingKH(false);
+    }
   }
 
   // ─── Render ───
@@ -494,10 +506,10 @@ export default function CongNoPage() {
               <button onClick={() => setPayNCC(null)} className="flex-1 border rounded-lg py-2 text-sm text-slate-600">Huỷ</button>
               <button
                 onClick={handlePayNCC}
-                disabled={!payNccAmount || parseFloat(payNccAmount) <= 0}
+                disabled={!payNccAmount || parseFloat(payNccAmount) <= 0 || payingNCC}
                 className="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50"
               >
-                Xác nhận trả
+                {payingNCC ? "Đang xử lý..." : "Xác nhận trả"}
               </button>
             </div>
           </div>
@@ -532,10 +544,10 @@ export default function CongNoPage() {
               <button onClick={() => setPayKH(null)} className="flex-1 border rounded-lg py-2 text-sm text-slate-600">Huỷ</button>
               <button
                 onClick={handlePayKH}
-                disabled={!payKhAmount || parseFloat(payKhAmount) <= 0}
+                disabled={!payKhAmount || parseFloat(payKhAmount) <= 0 || payingKH}
                 className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"
               >
-                Xác nhận thu
+                {payingKH ? "Đang xử lý..." : "Xác nhận thu"}
               </button>
             </div>
           </div>
