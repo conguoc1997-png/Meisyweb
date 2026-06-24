@@ -514,21 +514,29 @@ export default function ChamCongPage() {
 
   return (
     <div className="p-5">
-      {/* Print styles — chuyển đổi giữa in phiếu cá nhân và bảng lương */}
+      {/* Print styles — chuyển đổi giữa in phiếu cá nhân, bảng lương, bảng chấm công */}
       <style>{phieuLuong ? `
         @media print {
           body * { visibility: hidden !important; }
-          #phieu-luong-modal, #phieu-luong-modal * { visibility: visible !important; }
-          #phieu-luong-modal { position: fixed; top: 0; left: 0; width: 100%; background: white; }
+          #phieu-luong-overlay, #phieu-luong-overlay * { visibility: visible !important; }
+          #phieu-luong-overlay { position: static !important; height: auto !important; padding: 0 !important; display: block !important; }
+          #phieu-luong-modal { position: absolute !important; top: 0; left: 0; width: 100% !important; max-width: 100% !important; background: white; }
           .no-print { display: none !important; }
           @page { size: A5; margin: 12mm; }
+        }
+      ` : activeTab === "luong" ? `
+        @media print {
+          body * { visibility: hidden !important; }
+          #bang-luong-in, #bang-luong-in * { visibility: visible !important; }
+          #bang-luong-in { position: absolute; top: 0; left: 0; width: 100%; }
+          @page { size: A4 landscape; margin: 10mm 8mm; }
         }
       ` : `
         @media print {
           body * { visibility: hidden !important; }
-          #bang-luong-in, #bang-luong-in * { visibility: visible !important; }
-          #bang-luong-in { position: fixed; top: 0; left: 0; width: 100%; }
-          @page { size: A4 landscape; margin: 10mm 8mm; }
+          #bang-chamcong-in, #bang-chamcong-in * { visibility: visible !important; }
+          #bang-chamcong-in { position: absolute; top: 0; left: 0; width: 100%; }
+          @page { size: A3 landscape; margin: 8mm; }
         }
       `}</style>
       {/* Header */}
@@ -644,7 +652,12 @@ export default function ChamCongPage() {
           <p>Chưa có nhân viên. <button onClick={openNVModal} className="text-rose-500 hover:underline">Thêm nhân viên</button></p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div id="bang-chamcong-in" className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="hidden print:block px-4 pt-3 pb-1 text-center">
+            <p className="text-[11px] text-slate-500">Hộ kinh doanh: <strong>{currentHo.label}</strong></p>
+            <h2 className="text-base font-bold uppercase">Bảng Chấm Công</h2>
+            <p className="text-[12px] text-slate-600">Tháng {month}/{year}</p>
+          </div>
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse" style={{ minWidth: `${80 + 180 + daysInMonth * 34 + 180}px` }}>
               <thead>
@@ -833,6 +846,16 @@ export default function ChamCongPage() {
                 </tr>
               </tfoot>
             </table>
+          </div>
+          <div className="hidden print:grid print:grid-cols-2 gap-8 text-center text-[12px] px-8 py-10">
+            <div>
+              <p className="font-semibold text-slate-700 mb-12">Người chấm công</p>
+              <div className="border-t border-slate-400 pt-2 text-slate-400">(Ký, ghi rõ họ tên)</div>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700 mb-12">Người đại diện ký trả lương</p>
+              <div className="border-t border-slate-400 pt-2 text-slate-400">(Ký, ghi rõ họ tên)</div>
+            </div>
           </div>
         </div>
       ))}
@@ -1138,11 +1161,11 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right text-slate-700">
                         {isKhoan
                           ? (donGiaGioKhoan > 0 && gioNV > 0
-                            ? <span className="text-amber-600 font-semibold">{fmt(Math.round(luongKhoan))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(Math.round(donGiaGioKhoan))}₫/h</span></span>
+                            ? <span className="text-amber-600 font-semibold">{fmt(Math.round(luongKhoan))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(Math.round(donGiaGioKhoan))}₫/h</span></span>
                             : <span className="text-slate-300 text-xs">—</span>)
                           : isCoBanMay
                             ? (gioNV > 0
-                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{Math.round(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
+                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
                               : <span className="text-slate-300 text-xs">—</span>)
                             : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
                         }
@@ -1233,7 +1256,7 @@ export default function ChamCongPage() {
                             phuCapCC, phuCapAnNgay, ngayAnDuCong, phuCapDB, tongPhuCap: Math.round(tongPhuCap),
                             thucLinh: isKhoan ? Math.round(thucLinhKhoan) : isCoBanMay ? Math.round(thucLinhCoBanMay) : Math.round(thucLinh),
                             isKhoan, isCoBanMay,
-                            gioNV: (isKhoan || isCoBanMay) ? Math.round(gioNV) : undefined,
+                            gioNV: (isKhoan || isCoBanMay) ? gioNV : undefined,
                             donGiaGio: isKhoan ? Math.round(donGiaGioKhoan) : isCoBanMay ? (nv.heSoTC ?? 1.5) : undefined,
                             luongMay: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : undefined,
                           })}
@@ -1530,8 +1553,8 @@ export default function ChamCongPage() {
           isKhoan, isCoBanMay, gioNV, donGiaGio, luongMay } = phieuLuong;
         const fmtVND = (n: number) => n > 0 ? n.toLocaleString("vi-VN") + " ₫" : "—";
         return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
-            <div id="phieu-luong-modal" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm print:shadow-none print:rounded-none">
+          <div id="phieu-luong-overlay" className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto print:bg-transparent print:inset-auto print:block print:overflow-visible">
+            <div id="phieu-luong-modal" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm print:shadow-none print:rounded-none print:max-w-full">
               {/* Toolbar — ẩn khi in */}
               <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-100">
                 <span className="font-semibold text-slate-700">Phiếu lương cá nhân</span>

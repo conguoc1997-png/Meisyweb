@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -9,6 +10,8 @@ type SanPham = { id: string; sku: string; ten: string };
 type VaiTon = {
   id: string; maVai: string; soMet: number; soCay: number; cayData: string | null;
   donVi: string; mauSac: string | null; xuong: string | null; ghiChu: string | null; updatedAt: string;
+  tenNCC: string | null; soHoaDon: string | null; chiPhiThucNhap: number | null;
+  soTienHoaDon: number | null; vatPct: number | null; tinhNoTheo: string; congNoNccId: string | null;
 };
 
 type LoCat = {
@@ -88,6 +91,10 @@ export default function SanXuatPage() {
     try { const s = localStorage.getItem("xuong_list"); return s ? JSON.parse(s) : DEFAULT_XUONG; } catch { return DEFAULT_XUONG; }
   });
   const [xuongAddInput, setXuongAddInput] = useState("");
+  const [showXuongManage, setShowXuongManage] = useState(false);
+  useEffect(() => {
+    fetch("/api/nha-cung-cap").then(r => r.json()).then(d => setNccList(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
   const setXuongList = (list: { key: string; label: string }[]) => {
     setXuongListRaw(list);
     try { localStorage.setItem("xuong_list", JSON.stringify(list)); } catch {}
@@ -564,17 +571,13 @@ export default function SanXuatPage() {
             }
           }
 
-          // Kiểm tra tất cả cây đã cắt chưa
-          const allCut = vCays.every((c: { cut?: boolean }) => c.cut);
-          if (allCut) {
-            // Xoá hẳn record nếu không còn cây nào chưa cắt
-            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, { method: "DELETE" });
-          } else {
-            await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
-              method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cayData: vCays }),
-            });
-          }
+          // Luôn giữ lại record vải — cây đã dùng hiện gạch ngang (cut:true) trong bảng,
+          // KHÔNG xoá record dù tất cả cây đã được gán vào lô cắt. Chỉ xoá khi người dùng
+          // bấm xoá tay, để tránh mất dấu vải khi lô cắt chưa thực sự "Đã cắt".
+          await fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cayData: vCays }),
+          });
           fetchVaiTon();
         }
       }
@@ -1030,7 +1033,7 @@ export default function SanXuatPage() {
       </div>
 
       {/* Stats xưởng filter */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 relative">
         <span className="text-xs text-slate-400 font-medium">Lọc xưởng:</span>
         <button onClick={() => setFilterXuong("")}
           className={`text-xs px-3 py-1 rounded-full border transition font-medium ${filterXuong === "" ? "bg-slate-700 text-white border-slate-700" : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"}`}>
@@ -1045,7 +1048,53 @@ export default function SanXuatPage() {
             {x.label}
           </button>
         ))}
+        <button onClick={() => setShowXuongManage(s => !s)} title="Thêm/quản lý xưởng"
+          className="w-6 h-6 flex items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-rose-300 hover:text-rose-500 transition">
+          <Plus size={12} />
+        </button>
         {filterXuong && <span className="text-[14px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
+
+        {showXuongManage && (
+          <div className="absolute top-full left-0 mt-1 z-20 w-64 border border-slate-200 rounded-lg p-2.5 bg-white shadow-lg">
+            <p className="text-[12px] text-slate-400 mb-1.5 font-medium">Quản lý danh sách xưởng</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {xuongList.map(x => (
+                <span key={x.key} className="flex items-center gap-1 text-xs bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5">
+                  {x.label}
+                  <button type="button" onClick={() => setXuongList(xuongList.filter(i => i.key !== x.key))}
+                    className="text-slate-300 hover:text-red-500 transition ml-0.5"><X size={10} /></button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                autoFocus
+                value={xuongAddInput}
+                onChange={e => setXuongAddInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && xuongAddInput.trim()) {
+                    e.preventDefault();
+                    const key = xuongAddInput.trim().toLowerCase().replace(/\s+/g, "_");
+                    if (!xuongList.find(x => x.key === key)) setXuongList([...xuongList, { key, label: xuongAddInput.trim() }]);
+                    setXuongAddInput("");
+                  }
+                }}
+                placeholder="Tên xưởng mới..."
+                className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white" />
+              <button type="button"
+                onClick={() => {
+                  if (!xuongAddInput.trim()) return;
+                  const key = xuongAddInput.trim().toLowerCase().replace(/\s+/g, "_");
+                  if (!xuongList.find(x => x.key === key)) setXuongList([...xuongList, { key, label: xuongAddInput.trim() }]);
+                  setXuongAddInput("");
+                }}
+                className="px-2 py-1 bg-rose-500 text-white rounded text-xs hover:bg-rose-600 transition">
+                <Plus size={11} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats — 4 ô chính */}
@@ -1245,7 +1294,14 @@ export default function SanXuatPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-slate-500">{v.donVi}</td>
-                        <td className="px-3 py-2 text-slate-400 italic">{v.ghiChu ?? ""}</td>
+                        <td className="px-3 py-2 text-slate-400 italic">
+                          {v.ghiChu ?? ""}
+                          {v.congNoNccId && (
+                            <Link href="/cong-no" className="ml-2 text-amber-600 hover:underline not-italic font-medium">
+                              💰 Xem công nợ
+                            </Link>
+                          )}
+                        </td>
                         <td className="px-3 py-2 flex gap-2 items-center">
                           <button onClick={() => {
                             setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" });
@@ -1359,6 +1415,7 @@ export default function SanXuatPage() {
                 <th className="px-2 py-2.5 w-6"></th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ngày</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
+                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Tên vải</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
@@ -1414,6 +1471,7 @@ export default function SanXuatPage() {
                     </td>
                     <td className="px-3 py-2.5 text-slate-600">{formatDate(lo.ngay)}</td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{lo.hangCat}</td>
+                    <td className="px-3 py-2.5 text-slate-500">{lo.maVai ?? "—"}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-600">{lo.soM != null ? lo.soM.toFixed(2) : "—"}</td>
@@ -1482,9 +1540,9 @@ export default function SanXuatPage() {
                         );
                       })()}
                     </td>
-                    {/* Ghi chú may — chỉ hiện cho lô 1 cây; lô nhiều cây dùng per-cây */}
+                    {/* Ghi chú may — ghi chú chung cấp lô, luôn hiện dù 1 hay nhiều cây */}
                     <td className="px-1.5 py-1 max-w-[150px]">
-                      {!hasCay ? (editingGhiChuMay?.id === lo.id ? (
+                      {editingGhiChuMay?.id === lo.id ? (
                         <input
                           autoFocus
                           value={editingGhiChuMay.val}
@@ -1504,7 +1562,7 @@ export default function SanXuatPage() {
                         >
                           {lo.ghiChuMay ?? <span className="text-slate-300 font-normal text-xs">— nhập</span>}
                         </button>
-                      )) : null}
+                      )}
                     </td>
                     {/* Màu giặt — inline select */}
                     <td className="px-1.5 py-1 text-center">
@@ -1632,6 +1690,8 @@ export default function SanXuatPage() {
                         <td></td>
                         {/* col 3: Hàng cắt — label */}
                         <td className="px-3 py-1.5 text-[14px] text-slate-400 font-semibold">└ Cây #{ci + 1}</td>
+                        {/* col 3b: Tên vải — empty */}
+                        <td></td>
                         {/* col 4: Size — empty */}
                         <td></td>
                         {/* col 5: T.Size — empty */}
@@ -1789,7 +1849,7 @@ export default function SanXuatPage() {
             {losCat.length > 0 && (
               <tfoot className="bg-slate-50 border-t-2 border-slate-200 font-semibold text-xs">
                 <tr>
-                  <td colSpan={13} className="px-3 py-2 text-slate-500">Tổng</td>
+                  <td colSpan={14} className="px-3 py-2 text-slate-500">Tổng</td>
                   <td className="px-3 py-2 text-right text-green-700">{tongNhan.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-red-600">{tongThieu > 0 ? tongThieu.toLocaleString() : <span className="text-green-600">0</span>}</td>
                   <td colSpan={2}></td>
