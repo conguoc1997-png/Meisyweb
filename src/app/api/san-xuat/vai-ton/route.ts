@@ -6,8 +6,21 @@ export async function GET() {
   try {
     const data = await prisma.vaiTon.findMany({ orderBy: { updatedAt: "desc" } });
     return NextResponse.json(data);
-  } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
+  } catch {
+    // Fallback: cột mới chưa tồn tại trong DB → query thủ công các cột cũ
+    try {
+      const data = await prisma.$queryRaw`
+        SELECT id, "maVai", "soMet", "soCay", "cayData", "donVi",
+               "mauSac", "xuong", "ghiChu", "createdAt", "updatedAt",
+               NULL as "tenNCC", NULL as "soHoaDon",
+               NULL as "chiPhiThucNhap", NULL as "soTienHoaDon",
+               NULL as "vatPct", 'thuc_te' as "tinhNoTheo", NULL as "congNoNccId"
+        FROM "VaiTon" ORDER BY "updatedAt" DESC
+      `;
+      return NextResponse.json(data);
+    } catch (e2: unknown) {
+      return NextResponse.json({ error: e2 instanceof Error ? e2.message : "Lỗi server" }, { status: 500 });
+    }
   }
 }
 

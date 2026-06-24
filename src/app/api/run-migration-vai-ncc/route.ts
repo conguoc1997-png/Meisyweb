@@ -19,6 +19,15 @@ export async function GET() {
     }
   }
 
+  // Kiểm tra kết nối DB trước
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    results.push("✅ DB connection OK");
+  } catch (e: unknown) {
+    results.push(`❌ DB connection FAILED: ${e instanceof Error ? e.message : String(e)}`);
+    return NextResponse.json({ ok: false, results });
+  }
+
   // ── VaiTon: thêm cột NCC ──
   await run("VaiTon: add tenNCC",         `ALTER TABLE "VaiTon" ADD COLUMN IF NOT EXISTS "tenNCC" TEXT`);
   await run("VaiTon: add soHoaDon",       `ALTER TABLE "VaiTon" ADD COLUMN IF NOT EXISTS "soHoaDon" TEXT`);
@@ -45,5 +54,18 @@ export async function GET() {
   `);
   await run("NhaCungCap: unique ma", `CREATE UNIQUE INDEX IF NOT EXISTS "NhaCungCap_ma_key" ON "NhaCungCap"("ma")`);
 
-  return NextResponse.json({ ok: true, results });
+  // ── Verify kết quả ──
+  try {
+    const cols = await prisma.$queryRaw<{column_name: string}[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'VaiTon' AND column_name IN ('tenNCC','soHoaDon','chiPhiThucNhap','tinhNoTheo','congNoNccId')
+      ORDER BY column_name
+    `;
+    results.push(`✅ Verify: VaiTon có ${cols.length}/5 cột mới [${cols.map(c => c.column_name).join(", ")}]`);
+  } catch (e: unknown) {
+    results.push(`⚠ Verify failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  const ok = results.every(r => !r.startsWith("❌"));
+  return NextResponse.json({ ok, results });
 }
