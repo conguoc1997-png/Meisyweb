@@ -99,8 +99,11 @@ export default function SanXuatPage() {
   const [vaiTons, setVaiTons] = useState<VaiTon[]>([]);
   const [showVaiTon, setShowVaiTon] = useState(false);
   const [modalVai, setModalVai] = useState<VaiTon | "new" | null>(null);
-  const [vaiForm, setVaiForm] = useState({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "" });
+  const [vaiForm, setVaiForm] = useState({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" });
   const [vaiCayRows, setVaiCayRows] = useState<{ soMet: string }[]>([{ soMet: "" }]);
+  const [nccList, setNccList] = useState<{ id: string; ten: string }[]>([]);
+  const [showAddNCC, setShowAddNCC] = useState(false);
+  const [newNccName, setNewNccName] = useState("");
   const [editingVaiMet, setEditingVaiMet] = useState<{ id: string; val: string } | null>(null);
   const [savingVai, setSavingVai] = useState(false);
   const [editingVaiXuong, setEditingVaiXuong] = useState<string | null>(null);
@@ -117,6 +120,22 @@ export default function SanXuatPage() {
     setVaiTons(Array.isArray(data) ? data : []);
   };
 
+  const handleAddNCC = async () => {
+    if (!newNccName.trim()) return;
+    const res = await fetch("/api/nha-cung-cap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ten: newNccName.trim() }),
+    });
+    if (res.ok) {
+      const ncc = await res.json();
+      setNccList(prev => [...prev, ncc].sort((a, b) => a.ten.localeCompare(b.ten)));
+      setVaiForm(f => ({ ...f, tenNCC: ncc.ten }));
+      setNewNccName("");
+      setShowAddNCC(false);
+    }
+  };
+
   const saveVai = async () => {
     if (savingVai) return;
     setSavingVai(true);
@@ -125,7 +144,10 @@ export default function SanXuatPage() {
       const method = modalVai && modalVai !== "new" ? "PATCH" : "POST";
       const cayData = vaiCayRows.map(r => ({ soMet: Number(r.soMet) || 0 }));
       await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...vaiForm, cayData }) });
-      setModalVai(null); fetchVaiTon();
+      setModalVai(null);
+      setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" });
+      setVaiCayRows([{ soMet: "" }]);
+      fetchVaiTon();
     } finally {
       setSavingVai(false);
     }
@@ -347,6 +369,9 @@ export default function SanXuatPage() {
   useEffect(() => { fetchVaiTon(); }, []);
   useEffect(() => {
     fetch("/api/kho/san-pham").then(r => r.json()).then(d => setSanPhams(Array.isArray(d) ? d : []));
+  }, []);
+  useEffect(() => {
+    fetch("/api/nha-cung-cap").then(r => r.json()).then(d => Array.isArray(d) ? setNccList(d) : null);
   }, []);
   // Close action menu when clicking outside
   useEffect(() => {
@@ -1079,7 +1104,7 @@ export default function SanXuatPage() {
             <span className="text-xs text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{vaiTons.length} loại</span>
           </div>
           <button
-            onClick={e => { e.stopPropagation(); setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "" }); setVaiCayRows([{ soMet: "" }]); setModalVai("new"); }}
+            onClick={e => { e.stopPropagation(); setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" }); setVaiCayRows([{ soMet: "" }]); setShowAddNCC(false); setNewNccName(""); setModalVai("new"); }}
             className="flex items-center gap-1 text-xs bg-rose-500 text-white px-3 py-1.5 rounded-lg hover:bg-rose-600 transition">
             <Plus size={12} /> Thêm vải
           </button>
@@ -1223,7 +1248,7 @@ export default function SanXuatPage() {
                         <td className="px-3 py-2 text-slate-400 italic">{v.ghiChu ?? ""}</td>
                         <td className="px-3 py-2 flex gap-2 items-center">
                           <button onClick={() => {
-                            setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "" });
+                            setVaiForm({ maVai: v.maVai, donVi: v.donVi, mauSac: v.mauSac ?? "", xuong: v.xuong ?? "", ghiChu: v.ghiChu ?? "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" });
                             try { setVaiCayRows(v.cayData ? JSON.parse(v.cayData).map((c: {soMet: number}) => ({ soMet: String(c.soMet) })) : [{ soMet: String(v.soMet) }]); }
                             catch { setVaiCayRows([{ soMet: String(v.soMet) }]); }
                             setModalVai(v);
@@ -2064,6 +2089,119 @@ export default function SanXuatPage() {
                 <input value={vaiForm.ghiChu} onChange={e => setVaiForm(f => ({ ...f, ghiChu: e.target.value }))}
                   className={inp} placeholder="Ghi chú thêm..." />
               </div>
+
+              {/* ─── NCC & Công nợ (chỉ hiện khi thêm mới) ─── */}
+              {modalVai === "new" && (
+                <div className="border-t border-slate-100 pt-3 space-y-3">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nhà cung cấp &amp; Công nợ</p>
+
+                  {/* Chọn NCC */}
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Nhà cung cấp</label>
+                    {!showAddNCC ? (
+                      <div className="flex gap-1.5">
+                        <select value={vaiForm.tenNCC} onChange={e => setVaiForm(f => ({ ...f, tenNCC: e.target.value }))} className={`${inp} flex-1`}>
+                          <option value="">— Không có —</option>
+                          {nccList.map(n => <option key={n.id} value={n.ten}>{n.ten}</option>)}
+                        </select>
+                        <button type="button" onClick={() => setShowAddNCC(true)}
+                          className="px-2.5 py-1.5 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 hover:border-rose-300 hover:text-rose-500 transition whitespace-nowrap">
+                          + NCC mới
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <input autoFocus value={newNccName} onChange={e => setNewNccName(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddNCC(); } }}
+                          className={`${inp} flex-1`} placeholder="Tên nhà cung cấp mới..." />
+                        <button type="button" onClick={handleAddNCC} className="px-2.5 py-1.5 bg-rose-500 text-white rounded-lg text-xs hover:bg-rose-600 transition">Lưu</button>
+                        <button type="button" onClick={() => { setShowAddNCC(false); setNewNccName(""); }} className="px-2.5 py-1.5 border rounded-lg text-xs text-slate-400 hover:text-slate-600 transition">Huỷ</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chi tiết công nợ — chỉ hiện khi đã chọn NCC */}
+                  {vaiForm.tenNCC && (
+                    <>
+                      {/* Số HĐ */}
+                      <div>
+                        <label className="text-xs text-slate-600 mb-1 block">Số hoá đơn <span className="text-slate-400">(không bắt buộc)</span></label>
+                        <input value={vaiForm.soHoaDon} onChange={e => setVaiForm(f => ({ ...f, soHoaDon: e.target.value }))}
+                          className={inp} placeholder="VD: HD-2024-001" />
+                      </div>
+
+                      {/* Chi phí thực + Tiền HĐ */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-slate-600 mb-1 block">Chi phí thực tế <span className="text-rose-400">*</span></label>
+                          <input type="number" value={vaiForm.chiPhiThucNhap} onChange={e => setVaiForm(f => ({ ...f, chiPhiThucNhap: e.target.value }))}
+                            className={inp} placeholder="0" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-600 mb-1 block">Tiền hoá đơn <span className="text-slate-400">(nếu có)</span></label>
+                          <input type="number" value={vaiForm.soTienHoaDon} onChange={e => setVaiForm(f => ({ ...f, soTienHoaDon: e.target.value }))}
+                            className={inp} placeholder="0" />
+                        </div>
+                      </div>
+
+                      {/* VAT */}
+                      <div>
+                        <label className="text-xs text-slate-600 mb-1 block">VAT</label>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {["", "8", "10"].map(v => (
+                            <button key={v} type="button" onClick={() => setVaiForm(f => ({ ...f, vatPct: v }))}
+                              className={`px-3 py-1.5 text-xs rounded-lg border transition ${vaiForm.vatPct === v ? "bg-slate-700 text-white border-slate-700" : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"}`}>
+                              {v === "" ? "Không VAT" : `${v}%`}
+                            </button>
+                          ))}
+                          <input type="number" value={!["", "8", "10"].includes(vaiForm.vatPct) ? vaiForm.vatPct : ""}
+                            onChange={e => setVaiForm(f => ({ ...f, vatPct: e.target.value }))}
+                            className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200"
+                            placeholder="Khác %" />
+                        </div>
+                      </div>
+
+                      {/* Tính nợ theo */}
+                      <div>
+                        <label className="text-xs text-slate-600 mb-1 block">Tính nợ theo</label>
+                        <div className="flex gap-2">
+                          {[{ k: "thuc_te", l: "Thực tế" }, { k: "hoa_don", l: "Hoá đơn" }].map(o => (
+                            <button key={o.k} type="button" onClick={() => setVaiForm(f => ({ ...f, tinhNoTheo: o.k }))}
+                              className={`flex-1 py-1.5 text-xs rounded-lg border transition ${vaiForm.tinhNoTheo === o.k ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-600 border-slate-200 hover:border-rose-300"}`}>
+                              {o.l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Preview nợ */}
+                      {(vaiForm.chiPhiThucNhap || vaiForm.soTienHoaDon) && (() => {
+                        const thuc     = parseFloat(vaiForm.chiPhiThucNhap) || 0;
+                        const hd       = parseFloat(vaiForm.soTienHoaDon)   || 0;
+                        const vat      = parseFloat(vaiForm.vatPct)         || 0;
+                        const hdVat    = hd > 0 ? hd * (1 + vat / 100)     : 0;
+                        const no       = vaiForm.tinhNoTheo === "hoa_don"   ? hdVat : thuc;
+                        const chenh    = hdVat - thuc;
+                        return (
+                          <div className="bg-rose-50 border border-rose-100 rounded-lg px-3 py-2.5 text-xs space-y-1">
+                            {thuc > 0 && <div className="flex justify-between text-slate-500"><span>Thực tế:</span><span className="font-semibold text-slate-700">{thuc.toLocaleString("vi-VN")} ₫</span></div>}
+                            {hd > 0 && <div className="flex justify-between text-slate-500"><span>HĐ{vat > 0 ? ` + ${vat}% VAT` : ""}:</span><span className="font-semibold">{hdVat.toLocaleString("vi-VN")} ₫</span></div>}
+                            {thuc > 0 && hd > 0 && chenh !== 0 && (
+                              <div className={`flex justify-between text-xs ${chenh > 0 ? "text-amber-600" : "text-green-600"}`}>
+                                <span>Chênh lệch:</span>
+                                <span>{chenh > 0 ? "+" : ""}{chenh.toLocaleString("vi-VN")} ₫</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-bold border-t border-rose-200 pt-1 mt-1 text-rose-700">
+                              <span>→ Ghi nợ NCC:</span><span>{no.toLocaleString("vi-VN")} ₫</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {modalVai !== "new" && typeof modalVai === "object" && (
               <div className="mt-4 pt-4 border-t border-slate-100">
