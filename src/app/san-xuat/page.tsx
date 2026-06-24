@@ -88,6 +88,7 @@ export default function SanXuatPage() {
     try { const s = localStorage.getItem("xuong_list"); return s ? JSON.parse(s) : DEFAULT_XUONG; } catch { return DEFAULT_XUONG; }
   });
   const [xuongAddInput, setXuongAddInput] = useState("");
+  const [showXuongManage, setShowXuongManage] = useState(false);
   const setXuongList = (list: { key: string; label: string }[]) => {
     setXuongListRaw(list);
     try { localStorage.setItem("xuong_list", JSON.stringify(list)); } catch {}
@@ -1005,7 +1006,7 @@ export default function SanXuatPage() {
       </div>
 
       {/* Stats xưởng filter */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 relative">
         <span className="text-xs text-slate-400 font-medium">Lọc xưởng:</span>
         <button onClick={() => setFilterXuong("")}
           className={`text-xs px-3 py-1 rounded-full border transition font-medium ${filterXuong === "" ? "bg-slate-700 text-white border-slate-700" : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"}`}>
@@ -1020,7 +1021,53 @@ export default function SanXuatPage() {
             {x.label}
           </button>
         ))}
+        <button onClick={() => setShowXuongManage(s => !s)} title="Thêm/quản lý xưởng"
+          className="w-6 h-6 flex items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-rose-300 hover:text-rose-500 transition">
+          <Plus size={12} />
+        </button>
         {filterXuong && <span className="text-[14px] text-slate-400 ml-1">· Đang xem: <strong className="text-slate-600">{XUONG_LABEL[filterXuong] ?? filterXuong}</strong></span>}
+
+        {showXuongManage && (
+          <div className="absolute top-full left-0 mt-1 z-20 w-64 border border-slate-200 rounded-lg p-2.5 bg-white shadow-lg">
+            <p className="text-[12px] text-slate-400 mb-1.5 font-medium">Quản lý danh sách xưởng</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {xuongList.map(x => (
+                <span key={x.key} className="flex items-center gap-1 text-xs bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5">
+                  {x.label}
+                  <button type="button" onClick={() => setXuongList(xuongList.filter(i => i.key !== x.key))}
+                    className="text-slate-300 hover:text-red-500 transition ml-0.5"><X size={10} /></button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                autoFocus
+                value={xuongAddInput}
+                onChange={e => setXuongAddInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && xuongAddInput.trim()) {
+                    e.preventDefault();
+                    const key = xuongAddInput.trim().toLowerCase().replace(/\s+/g, "_");
+                    if (!xuongList.find(x => x.key === key)) setXuongList([...xuongList, { key, label: xuongAddInput.trim() }]);
+                    setXuongAddInput("");
+                  }
+                }}
+                placeholder="Tên xưởng mới..."
+                className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-200 bg-white" />
+              <button type="button"
+                onClick={() => {
+                  if (!xuongAddInput.trim()) return;
+                  const key = xuongAddInput.trim().toLowerCase().replace(/\s+/g, "_");
+                  if (!xuongList.find(x => x.key === key)) setXuongList([...xuongList, { key, label: xuongAddInput.trim() }]);
+                  setXuongAddInput("");
+                }}
+                className="px-2 py-1 bg-rose-500 text-white rounded text-xs hover:bg-rose-600 transition">
+                <Plus size={11} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats — 4 ô chính */}
