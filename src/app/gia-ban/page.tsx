@@ -63,6 +63,7 @@ type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSa
 function fmtVnd(n: number) { return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }); }
 
 export default function GiaBanPage() {
+  const [mainTab, setMainTab] = useState<"calculator" | "quantri">("calculator");
   const [shopType, setShopType] = useState<"thuong" | "mall">("thuong");
   const [categoryIdx, setCategoryIdx] = useState(0);
   const [giaNhap, setGiaNhap] = useState("");
@@ -243,12 +244,25 @@ export default function GiaBanPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Calculator size={22} className="text-rose-500" /> Tính giá bán sản phẩm
+            <Calculator size={22} className="text-rose-500" /> Cấu trúc chi phí
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Tính lợi nhuận sau khi trừ các loại phí Shopee</p>
+          <p className="text-slate-500 text-sm mt-1">Tính lợi nhuận sau khi trừ các loại phí Shopee, và quản trị cấu trúc giá niêm yết</p>
         </div>
       </div>
 
+      <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setMainTab("calculator")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${mainTab === "calculator" ? "bg-white text-rose-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          Tính giá bán sản phẩm
+        </button>
+        <button onClick={() => setMainTab("quantri")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${mainTab === "quantri" ? "bg-white text-rose-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          Quản trị giá
+        </button>
+      </div>
+
+      {mainTab === "calculator" && (
+      <>
       {/* ── CALCULATOR ─────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
@@ -613,6 +627,91 @@ export default function GiaBanPage() {
             {filteredRows.length} sản phẩm · Giá Shopee/TikTok = Giá nhập ÷ {markupPct}% · Flash Sale / Ngày Sale / Live = % giảm so với giá Shopee
           </div>
         )}
+      </div>
+      </>
+      )}
+
+      {mainTab === "quantri" && <QuanTriGiaTab />}
+    </div>
+  );
+}
+
+// ─── TAB: Quản trị giá — cấu trúc giá niêm yết theo cộng dồn chi phí ─────────
+type QuanTriField = { key: string; label: string; pct: string };
+
+const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
+  { key: "loiNhuan",  label: "Lợi nhuận mong muốn",        defaultPct: "20" },
+  { key: "khauHao",   label: "Khấu hao tài sản cố định",    defaultPct: "0" },
+  { key: "quanLy",    label: "Chi phí quản lý",             defaultPct: "0" },
+  { key: "vanChuyen", label: "Chi phí vận chuyển",          defaultPct: "0" },
+  { key: "banHang",   label: "Chi phí bán hàng",            defaultPct: "0" },
+  { key: "mkt",       label: "Chi phí MKT",                 defaultPct: "0" },
+];
+
+function QuanTriGiaTab() {
+  const [giaVon, setGiaVon] = useState("");
+  const [fields, setFields] = useState<QuanTriField[]>(
+    () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct }))
+  );
+
+  const giaVonNum = Number(giaVon) || 0;
+  const rows = fields.map(f => ({ ...f, amount: giaVonNum * (Number(f.pct) || 0) / 100 }));
+  const tongChiPhi = rows.reduce((s, r) => s + r.amount, 0);
+  const giaNiemYet = giaVonNum + tongChiPhi;
+
+  const updatePct = (key: string, val: string) =>
+    setFields(prev => prev.map(f => f.key === key ? { ...f, pct: val } : f));
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="p-5 border-b border-slate-100">
+        <label className="text-sm font-medium text-slate-600 mb-1.5 block">Giá vốn (đ)</label>
+        <input
+          type="number" min={0} value={giaVon}
+          onChange={e => setGiaVon(e.target.value)}
+          placeholder="0"
+          className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+      </div>
+
+      <div className="p-5">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="text-left py-2 text-slate-500 font-medium">Khoản mục</th>
+              <th className="text-right py-2 text-slate-500 font-medium w-32">% / Giá vốn</th>
+              <th className="text-right py-2 text-slate-500 font-medium w-40">Số tiền (đ)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            <tr>
+              <td className="py-2.5 font-medium text-slate-700">Giá vốn</td>
+              <td className="py-2.5 text-right text-slate-400">—</td>
+              <td className="py-2.5 text-right font-semibold text-slate-800">{fmtVnd(giaVonNum)}đ</td>
+            </tr>
+            {rows.map(r => (
+              <tr key={r.key}>
+                <td className="py-2.5 text-slate-600">{r.label}</td>
+                <td className="py-2.5 text-right">
+                  <input
+                    type="number" min={0} value={r.pct}
+                    onChange={e => updatePct(r.key, e.target.value)}
+                    className="w-20 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  /> %
+                </td>
+                <td className="py-2.5 text-right font-medium text-slate-700">{fmtVnd(r.amount)}đ</td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-slate-200">
+              <td className="py-3 font-bold text-slate-800">Giá niêm yết</td>
+              <td></td>
+              <td className="py-3 text-right font-bold text-rose-600 text-lg">{fmtVnd(giaNiemYet)}đ</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="text-xs text-slate-400 mt-3">
+          Giá niêm yết = Giá vốn + tổng các khoản chi phí (mỗi khoản tính theo % của Giá vốn).
+        </p>
       </div>
     </div>
   );
