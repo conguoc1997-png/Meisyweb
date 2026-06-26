@@ -368,11 +368,21 @@ export default function ChamCongPage() {
     });
 
     setSaving(key);
-    await fetch("/api/cham-cong", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null }),
-    }).catch(() => fetchData());
+    try {
+      const res = await fetch("/api/cham-cong", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null }),
+      });
+      if (!res.ok) {
+        // Lưu thất bại — đồng bộ lại từ server để tránh hiển thị sai (optimistic không khớp dữ liệu thật)
+        await fetchData();
+        alert("Lưu chấm công thất bại, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+      }
+    } catch {
+      await fetchData();
+      alert("Mất kết nối khi lưu chấm công, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+    }
     setSaving(null);
   };
 
@@ -776,7 +786,7 @@ export default function ChamCongPage() {
                         return (
                           <td key={d}
                             className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition hover:brightness-95 ${defaultBg} ${isSaving ? "opacity-50" : ""}`}
-                            onClick={() => handleCellClick(nv.id, d)}
+                            onClick={() => { if (!isSaving) handleCellClick(nv.id, d); }}
                             title={info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
