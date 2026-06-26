@@ -10,7 +10,23 @@ export async function GET() {
     });
     return NextResponse.json(bookings);
   } catch {
-    return NextResponse.json({ error: "Lỗi server" }, { status: 500 });
+    // Fallback: cột ngayRaHang chưa tồn tại trong DB
+    try {
+      const bookings = await prisma.$queryRaw`
+        SELECT b.*, b."ngayBat"::text, b."ngayKet"::text,
+               b."ngayLenVideo"::text,
+               NULL::timestamp as "ngayRaHang",
+               row_to_json(k.*) as koc,
+               row_to_json(s.*) as "sanPham"
+        FROM "KOCBooking" b
+        JOIN "KOC" k ON k.id = b."kocId"
+        LEFT JOIN "SanPham" s ON s.id = b."sanPhamId"
+        ORDER BY b."createdAt" DESC
+      `;
+      return NextResponse.json(bookings);
+    } catch (e2: unknown) {
+      return NextResponse.json({ error: e2 instanceof Error ? e2.message : "Lỗi server" }, { status: 500 });
+    }
   }
 }
 
