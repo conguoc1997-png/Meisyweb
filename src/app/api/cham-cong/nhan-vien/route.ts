@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const list = await prisma.nhanVien.findMany({
     orderBy: { ten: "asc" },
+    include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
   });
   return NextResponse.json(list);
 }
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.nhanVien.findUnique({ where: { maNV } });
   if (existing) return NextResponse.json({ error: "Mã NV đã tồn tại" }, { status: 400 });
 
-  const { ngaySinh } = data;
+  const { ngaySinh, thangApDung } = data;
   const nv = await prisma.nhanVien.create({
     data: {
       maNV, ten,
@@ -28,5 +29,12 @@ export async function POST(req: NextRequest) {
       ngaySinh:     ngaySinh     ? new Date(ngaySinh) : null,
     },
   });
+
+  if (luongCB && thangApDung) {
+    await prisma.luongCBHistory.create({
+      data: { nhanVienId: nv.id, thangApDung, luongCB: Number(luongCB) || 0 },
+    });
+  }
+
   return NextResponse.json(nv);
 }

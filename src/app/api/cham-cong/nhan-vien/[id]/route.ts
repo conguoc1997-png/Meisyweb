@@ -20,6 +20,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       active:       data.active       !== undefined ? data.active : undefined,
     },
   });
+
+  // Đổi Lương CB kèm tháng áp dụng → lưu lịch sử, không ảnh hưởng các tháng trước đó
+  if (data.luongCB !== undefined && data.thangApDung) {
+    await prisma.luongCBHistory.upsert({
+      where: { nhanVienId_thangApDung: { nhanVienId: id, thangApDung: data.thangApDung } },
+      update: { luongCB: Number(data.luongCB) || 0 },
+      create: { nhanVienId: id, thangApDung: data.thangApDung, luongCB: Number(data.luongCB) || 0 },
+    });
+  }
+
   return NextResponse.json(nv);
 }
 

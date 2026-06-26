@@ -512,6 +512,20 @@ model NhanVien {
   active     Boolean    @default(true)
   createdAt  DateTime   @default(now())
   chamCongs  ChamCong[]
+  luongCBHistory LuongCBHistory[]
+}
+
+// Lịch sử thay đổi Lương CB — áp dụng từ 1 tháng cụ thể, không ảnh hưởng các tháng trước
+model LuongCBHistory {
+  id          String   @id @default(cuid())
+  nhanVienId  String
+  luongCB     Float
+  thangApDung String   // "2026-03" — áp dụng từ tháng này trở đi
+  createdAt   DateTime @default(now())
+
+  nhanVien NhanVien @relation(fields: [nhanVienId], references: [id], onDelete: Cascade)
+
+  @@unique([nhanVienId, thangApDung])
 }
 
 model ChamCong {

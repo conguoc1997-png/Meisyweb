@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     const nhanViens = await prisma.nhanVien.findMany({
       where: { active: true },
       orderBy: { ten: "asc" },
+      include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
     });
 
     let chamCongs: object[] = [];
