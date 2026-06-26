@@ -674,16 +674,29 @@ function QuanTriGiaTab() {
     setNewLabel("");
   };
 
+  const resetAll = () => {
+    if (!confirm("Đặt lại Giá vốn và toàn bộ khoản mục về mặc định?")) return;
+    setGiaVon("");
+    setFields(QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct })));
+    setNewLabel("");
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-5 border-b border-slate-100">
-        <label className="text-sm font-medium text-slate-600 mb-1.5 block">Giá vốn (đ)</label>
-        <input
-          type="number" min={0} value={giaVon}
-          onChange={e => setGiaVon(e.target.value)}
-          placeholder="0"
-          className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
+      <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">Giá vốn (đ)</label>
+          <input
+            type="number" min={0} value={giaVon}
+            onChange={e => setGiaVon(e.target.value)}
+            placeholder="0"
+            className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </div>
+        <button onClick={resetAll}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">
+          <RotateCcw size={14} /> Reset
+        </button>
       </div>
 
       <div className="p-5">
