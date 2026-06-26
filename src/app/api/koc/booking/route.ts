@@ -24,16 +24,18 @@ export async function POST(req: NextRequest) {
 
     const booking = await prisma.kOCBooking.create({
       data: {
-        kocId:      body.kocId,
-        sanPhamId:  body.sanPhamId  || null,
-        soLuongGui: Number(body.soLuongGui) || 0,
+        kocId:        body.kocId,
+        sanPhamId:    body.sanPhamId  || null,
+        soLuongGui:   Number(body.soLuongGui) || 0,
         chiPhiCast,
         chiPhiSP,
         chiPhi,
-        ngayBat:   new Date(body.ngayBat),
-        ngayKet:   body.ngayKet ? new Date(body.ngayKet) : null,
-        trangThai: body.trangThai || "dang_chay",
-        ghiChu:    body.ghiChu || null,
+        ngayBat:      new Date(body.ngayBat),
+        ngayKet:      body.ngayKet      ? new Date(body.ngayKet)      : null,
+        ngayRaHang:   body.ngayRaHang   ? new Date(body.ngayRaHang)   : null,
+        ngayLenVideo: body.ngayLenVideo ? new Date(body.ngayLenVideo) : null,
+        trangThai:    body.trangThai || "dang_chay",
+        ghiChu:       body.ghiChu || null,
       },
       include: { koc: true, sanPham: true },
     });

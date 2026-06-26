@@ -12,7 +12,7 @@ type Booking = {
   soLuongGui: number; chiPhiCast: number; chiPhiSP: number; chiPhi: number;
   ngayBat: string; ngayKet: string | null;
   trangThai: string; doanhThu: number; donHang: number; luotXem: number; ghiChu: string | null;
-  ngayLenVideo: string | null; daSent: boolean; daRecv: boolean;
+  ngayRaHang: string | null; ngayLenVideo: string | null; daSent: boolean; daRecv: boolean;
   koc: KOC; sanPham: SanPham | null;
 };
 
@@ -40,7 +40,7 @@ export default function KocPage() {
   const [modalEditKOC, setModalEditKOC] = useState<KOC | null>(null);
   const [modalEditBooking, setModalEditBooking] = useState<Booking | null>(null);
   const [modalEditChiPhi, setModalEditChiPhi] = useState<Booking | null>(null);
-  const [formEditBooking, setFormEditBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", chiPhiCast: "", ngayBat: "", ngayKet: "", ghiChu: "" });
+  const [formEditBooking, setFormEditBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", chiPhiCast: "", ngayRaHang: "", ngayBat: "", ngayKet: "", ngayLenVideo: "", ghiChu: "" });
   const [formEditChiPhi, setFormEditChiPhi] = useState({ chiPhiCast: "", chiPhiSP: "" });
   const [modalLaunch, setModalLaunch] = useState<SanPham | null>(null);
   const [launchKOCs, setLaunchKOCs] = useState<Record<string, { checked: boolean; soLuong: string }>>({});
@@ -410,7 +410,7 @@ export default function KocPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkEditInput, setLinkEditInput] = useState("");
   const [linkEditLoading, setLinkEditLoading] = useState(false);
-  const [formBooking, setFormBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
+  const [formBooking, setFormBooking] = useState({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayRaHang: "", ngayBat: "", ngayLenVideo: "", ngayKet: "", ghiChu: "" });
   const [formUpdate, setFormUpdate] = useState({ doanhThu: "", donHang: "", luotXem: "", trangThai: "", ghiChu: "" });
 
   type TiktokSPRow = { id: string; sanPhamId: string; thang: string; doanhThu: number; donHang: number; hoaHong: number; hoanTien: number; soMon: number; sanPham: { id: string; ten: string; sku: string } };
@@ -548,7 +548,7 @@ export default function KocPage() {
       const res = await fetch("/api/koc/booking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error((await res.json()).error);
       setModalBooking(false);
-      setFormBooking({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayBat: "", ngayKet: "", ghiChu: "" });
+      setFormBooking({ kocId: "", sanPhamId: "", soLuongGui: "1", ngayRaHang: "", ngayBat: "", ngayLenVideo: "", ngayKet: "", ghiChu: "" });
       fetchData();
     } catch (err: unknown) { alert(err instanceof Error ? err.message : "Lỗi"); }
     finally { setLoading(false); }
@@ -609,8 +609,10 @@ export default function KocPage() {
       kocId: b.kocId, sanPhamId: b.sanPhamId ?? "",
       soLuongGui: String(b.soLuongGui),
       chiPhiCast: String(defaultCast),
-      ngayBat: b.ngayBat.slice(0, 10),
-      ngayKet: b.ngayKet ? b.ngayKet.slice(0, 10) : "",
+      ngayRaHang:   b.ngayRaHang   ? b.ngayRaHang.slice(0, 10)   : "",
+      ngayBat:      b.ngayBat.slice(0, 10),
+      ngayLenVideo: b.ngayLenVideo ? b.ngayLenVideo.slice(0, 10) : "",
+      ngayKet:      b.ngayKet ? b.ngayKet.slice(0, 10) : "",
       ghiChu: b.ghiChu ?? "",
     });
     setModalEditBooking(b);
@@ -1958,7 +1960,7 @@ export default function KocPage() {
       {/* ═══ TAB SCHEDULE ═══ */}
       {tab === "schedule" && (() => {
         // Tất cả bookings (không lọc theo tháng để thấy full timeline)
-        const allB = bookings.filter(b => b.ngayBat || b.ngayLenVideo);
+        const allB = bookings.filter(b => b.ngayBat || b.ngayLenVideo || b.ngayRaHang);
 
         if (allB.length === 0) {
           return (
@@ -1972,6 +1974,7 @@ export default function KocPage() {
         // ── Tính khung ngày (min/max) ──
         const allMs: number[] = [];
         allB.forEach(b => {
+          if (b.ngayRaHang)   allMs.push(new Date(b.ngayRaHang).getTime());
           if (b.ngayBat)      allMs.push(new Date(b.ngayBat).getTime());
           if (b.ngayLenVideo) allMs.push(new Date(b.ngayLenVideo).getTime());
         });
@@ -2025,21 +2028,31 @@ export default function KocPage() {
 
         return (
           <div className="mt-2 space-y-4">
-            {/* Legend */}
+            {/* Legend + Tạo Booking */}
             <div className="flex flex-wrap items-center gap-5 bg-white border rounded-xl px-5 py-3 text-xs text-slate-600">
               <span className="font-semibold text-slate-700 mr-1">Chú thích:</span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block w-3 h-3 rounded-sm bg-rose-500" />
-                Lịch gửi KOC
+                <span className="inline-block w-3 h-3 rotate-45 bg-emerald-500 rounded-sm" />
+                🚀 Lịch ra hàng
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rotate-45 rounded-sm" style={{ backgroundColor: "#f43f5e" }} />
+                📦 Lịch gửi hàng
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block w-3 h-3 rounded-full bg-blue-500" />
-                Ngày lên video
+                🎬 Air video (tên KOC)
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block w-3.5 h-0.5 bg-amber-400" style={{ borderTop: "2px dashed #f59e0b" }} />
+                <span className="inline-block w-3.5 h-0.5" style={{ borderTop: "2px dashed #f59e0b" }} />
                 Hôm nay
               </span>
+              <button
+                onClick={() => { setModalBooking(true); }}
+                className="ml-auto flex items-center gap-1.5 bg-rose-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-rose-600"
+              >
+                <Plus size={13} /> Tạo Booking
+              </button>
             </div>
 
             {/* Timeline container */}
@@ -2086,7 +2099,7 @@ export default function KocPage() {
                     </div>
 
                     {/* Timeline area */}
-                    <div className="flex-1 relative min-w-[600px]" style={{ minHeight: Math.max(72, 48 + g.items.filter(b => b.ngayLenVideo).length * 22) }}>
+                    <div className="flex-1 relative min-w-[600px]" style={{ minHeight: Math.max(80, 60 + g.items.filter(b => b.ngayLenVideo).length * 22) }}>
                       {/* Grid lines */}
                       {axisLabels.map((al, i) => (
                         <div key={i} className="absolute top-0 bottom-0 w-px bg-slate-100" style={{ left: `${al.x}%` }} />
@@ -2096,9 +2109,10 @@ export default function KocPage() {
                         <div className="absolute top-0 bottom-0 w-0.5 bg-amber-200 z-10" style={{ left: `${todayX}%` }} />
                       )}
 
-                      {/* Track bar spanning send → latest video */}
+                      {/* Track bar spanning ra hàng → latest video */}
                       {(() => {
                         const xs = [
+                          ...g.items.filter(b => b.ngayRaHang).map(b => pct(b.ngayRaHang!)),
                           ...g.items.filter(b => b.ngayBat).map(b => pct(b.ngayBat!)),
                           ...g.items.filter(b => b.ngayLenVideo).map(b => pct(b.ngayLenVideo!)),
                         ];
@@ -2113,40 +2127,45 @@ export default function KocPage() {
                         );
                       })()}
 
-                      {/* ── Lịch gửi KOC (ngayBat) — diamond marker ── */}
+                      {/* ── 🚀 Lịch ra hàng (ngayRaHang) — diamond xanh lá ── */}
+                      {(() => {
+                        const raDates = Array.from(new Set(g.items.map(b => b.ngayRaHang).filter(Boolean))) as string[];
+                        return raDates.map((nd, si) => {
+                          const x = pct(nd);
+                          return (
+                            <div key={`ra-${si}`} className="absolute z-20 flex flex-col items-center" style={{ left: `${x}%`, top: "50%", transform: "translate(-50%, -50%)" }}>
+                              <div title={`Ra hàng: ${new Date(nd).toLocaleDateString("vi-VN")}`} className="w-4 h-4 rotate-45 rounded-sm shadow bg-emerald-500" />
+                              <span className="absolute top-6 text-[9px] whitespace-nowrap font-semibold text-emerald-700">
+                                {new Date(nd).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                              </span>
+                              <span className="absolute -top-5 text-[9px] whitespace-nowrap text-emerald-600 font-medium">🚀 Ra hàng</span>
+                            </div>
+                          );
+                        });
+                      })()}
+
+                      {/* ── 📦 Lịch gửi hàng (ngayBat) — diamond trackColor ── */}
                       {sendDates.map((nd, si) => {
                         const x = pct(nd);
                         return (
                           <div key={si} className="absolute z-20 flex flex-col items-center" style={{ left: `${x}%`, top: "50%", transform: "translate(-50%, -50%)" }}>
-                            {/* Diamond shape */}
-                            <div
-                              title={`Gửi KOC: ${new Date(nd).toLocaleDateString("vi-VN")}`}
-                              className="w-3.5 h-3.5 rotate-45 rounded-sm shadow-sm"
-                              style={{ backgroundColor: trackColor }}
-                            />
+                            <div title={`Gửi hàng: ${new Date(nd).toLocaleDateString("vi-VN")}`} className="w-3.5 h-3.5 rotate-45 rounded-sm shadow-sm" style={{ backgroundColor: trackColor }} />
                             <span className="absolute top-5 text-[9px] whitespace-nowrap font-semibold" style={{ color: trackColor }}>
                               {new Date(nd).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
                             </span>
-                            <span className="absolute -top-4 text-[9px] whitespace-nowrap text-slate-500">
-                              📦 Gửi KOC
-                            </span>
+                            <span className="absolute -top-4 text-[9px] whitespace-nowrap text-slate-500">📦 Gửi hàng</span>
                           </div>
                         );
                       })}
 
-                      {/* ── Ngày lên video — circle + KOC name ── */}
+                      {/* ── 🎬 Air video (ngayLenVideo) — circle xanh + KOC name ── */}
                       {g.items.filter(b => b.ngayLenVideo).map((b, bi) => {
                         const x = pct(b.ngayLenVideo!);
-                        // stagger vertically when multiple KOC have close dates
                         const topOffset = 28 + bi * 22;
                         return (
                           <div key={b.id} className="absolute z-20 flex flex-col items-center" style={{ left: `${x}%`, top: `${topOffset}%`, transform: "translate(-50%, -50%)" }}>
-                            {/* Dot */}
                             <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" title={`${b.koc.ten} — ${new Date(b.ngayLenVideo!).toLocaleDateString("vi-VN")}`} />
-                            {/* KOC name */}
-                            <span className="absolute top-4 text-[9px] text-blue-700 whitespace-nowrap font-medium max-w-[80px] truncate" title={b.koc.ten}>
-                              {b.koc.ten}
-                            </span>
+                            <span className="absolute top-4 text-[9px] text-blue-700 whitespace-nowrap font-medium max-w-[80px] truncate" title={b.koc.ten}>{b.koc.ten}</span>
                           </div>
                         );
                       })}
@@ -2932,15 +2951,22 @@ export default function KocPage() {
                 </div>
               </div>
 
-              {/* Thời gian */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Ngày bắt đầu *</label>
-                  <input required type="date" value={formBooking.ngayBat} onChange={(e) => setFormBooking({ ...formBooking, ngayBat: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Ngày kết thúc</label>
-                  <input type="date" value={formBooking.ngayKet} onChange={(e) => setFormBooking({ ...formBooking, ngayKet: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              {/* Lịch trình */}
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-semibold text-rose-700 flex items-center gap-1">📅 Lịch trình</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block font-medium">🚀 Lịch ra hàng</label>
+                    <input type="date" value={formBooking.ngayRaHang} onChange={e => setFormBooking({ ...formBooking, ngayRaHang: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block font-medium">📦 Lịch gửi hàng *</label>
+                    <input required type="date" value={formBooking.ngayBat} onChange={e => setFormBooking({ ...formBooking, ngayBat: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block font-medium">🎬 Lịch air video</label>
+                    <input type="date" value={formBooking.ngayLenVideo} onChange={e => setFormBooking({ ...formBooking, ngayLenVideo: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
+                  </div>
                 </div>
               </div>
 
@@ -3085,18 +3111,27 @@ export default function KocPage() {
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
                   placeholder="0" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Ngày bắt đầu *</label>
-                  <input required type="date" value={formEditBooking.ngayBat}
-                    onChange={e => setFormEditBooking({...formEditBooking, ngayBat: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Ngày kết thúc</label>
-                  <input type="date" value={formEditBooking.ngayKet}
-                    onChange={e => setFormEditBooking({...formEditBooking, ngayKet: e.target.value})}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-rose-700">📅 Lịch trình</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block">🚀 Ra hàng</label>
+                    <input type="date" value={formEditBooking.ngayRaHang}
+                      onChange={e => setFormEditBooking({...formEditBooking, ngayRaHang: e.target.value})}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block">📦 Gửi hàng *</label>
+                    <input required type="date" value={formEditBooking.ngayBat}
+                      onChange={e => setFormEditBooking({...formEditBooking, ngayBat: e.target.value})}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-500 mb-1 block">🎬 Air video</label>
+                    <input type="date" value={formEditBooking.ngayLenVideo}
+                      onChange={e => setFormEditBooking({...formEditBooking, ngayLenVideo: e.target.value})}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
+                  </div>
                 </div>
               </div>
               <div>

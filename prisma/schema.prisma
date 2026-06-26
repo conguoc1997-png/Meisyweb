@@ -246,6 +246,7 @@ model KOCBooking {
   donHang      Int       @default(0)
   luotXem      Int       @default(0)
   ghiChu       String?
+  ngayRaHang   DateTime?
   ngayLenVideo DateTime?
   daSent       Boolean   @default(false)
   daRecv       Boolean   @default(false)
