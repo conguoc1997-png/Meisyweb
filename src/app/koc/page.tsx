@@ -2085,7 +2085,7 @@ export default function KocPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block w-3 h-3 rotate-45 rounded-sm" style={{ backgroundColor: "#f43f5e" }} />
-                📦 Lịch gửi hàng
+                📦 Bắt đầu chiến dịch
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block w-3 h-3 rounded-full bg-blue-500" />
@@ -2197,11 +2197,11 @@ export default function KocPage() {
                         const x = pct(nd);
                         return (
                           <div key={si} className="absolute z-20 flex flex-col items-center" style={{ left: `${x}%`, top: "50%", transform: "translate(-50%, -50%)" }}>
-                            <div title={`Gửi hàng: ${new Date(nd).toLocaleDateString("vi-VN")}`} className="w-3.5 h-3.5 rotate-45 rounded-sm shadow-sm" style={{ backgroundColor: trackColor }} />
+                            <div title={`Bắt đầu chiến dịch: ${new Date(nd).toLocaleDateString("vi-VN")}`} className="w-3.5 h-3.5 rotate-45 rounded-sm shadow-sm" style={{ backgroundColor: trackColor }} />
                             <span className="absolute top-5 text-[9px] whitespace-nowrap font-semibold" style={{ color: trackColor }}>
                               {new Date(nd).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
                             </span>
-                            <span className="absolute -top-4 text-[9px] whitespace-nowrap text-slate-500">📦 Gửi hàng</span>
+                            <span className="absolute -top-4 text-[9px] whitespace-nowrap text-slate-500">📦 Bắt đầu chiến dịch</span>
                           </div>
                         );
                       })}
@@ -2362,7 +2362,7 @@ export default function KocPage() {
                   <input type="date" value={launchNgayRaHang} onChange={e => setLaunchNgayRaHang(e.target.value)} className="w-48 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-600 mb-1 block">📦 Ngày bắt đầu booking (gửi hàng) *</label>
+                  <label className="text-xs text-slate-600 mb-1 block">📦 Ngày bắt đầu chiến dịch *</label>
                   <input required type="date" value={launchNgayBat} onChange={e => setLaunchNgayBat(e.target.value)} className="w-48 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
                 </div>
               </div>
@@ -3014,7 +3014,7 @@ export default function KocPage() {
                     <input type="date" value={formBooking.ngayRaHang} onChange={e => setFormBooking({ ...formBooking, ngayRaHang: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-500 mb-1 block font-medium">📦 Lịch gửi hàng *</label>
+                    <label className="text-[11px] text-slate-500 mb-1 block font-medium">📦 Bắt đầu chiến dịch *</label>
                     <input required type="date" value={formBooking.ngayBat} onChange={e => setFormBooking({ ...formBooking, ngayBat: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
                   </div>
                 </div>
@@ -3172,7 +3172,7 @@ export default function KocPage() {
                       className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-500 mb-1 block">📦 Gửi hàng *</label>
+                    <label className="text-[11px] text-slate-500 mb-1 block">📦 Bắt đầu chiến dịch *</label>
                     <input required type="date" value={formEditBooking.ngayBat}
                       onChange={e => setFormEditBooking({...formEditBooking, ngayBat: e.target.value})}
                       className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
