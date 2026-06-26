@@ -1195,6 +1195,15 @@ export default function KocPage() {
                     })()}
                     {/* Summary stats */}
                     <div className="flex items-center gap-6 text-sm">
+                      {(() => {
+                        const raHangDate = group.items.find(b => b.ngayRaHang)?.ngayRaHang;
+                        return raHangDate ? (
+                          <div className="text-right">
+                            <p className="text-xs text-slate-400">🚀 Ra hàng</p>
+                            <p className="font-semibold text-emerald-600">{formatDate(raHangDate)}</p>
+                          </div>
+                        ) : null;
+                      })()}
                       <div className="text-right">
                         <p className="text-xs text-slate-400">Tổng CP</p>
                         <p className="font-semibold text-slate-700">{formatCurrency(totalCP)}</p>
@@ -1275,6 +1284,9 @@ export default function KocPage() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-xs text-slate-500">
+                                  {b.ngayRaHang && (
+                                    <p className="text-emerald-600 font-medium mb-0.5">🚀 {formatDate(b.ngayRaHang)}</p>
+                                  )}
                                   {formatDate(b.ngayBat)}{b.ngayKet ? ` → ${formatDate(b.ngayKet)}` : " → ..."}
                                 </td>
                                 {/* Số lượng gửi — inline edit (uncontrolled, nhanh) */}
