@@ -2951,10 +2951,10 @@ export default function KocPage() {
                 </div>
               </div>
 
-              {/* Lịch trình */}
+              {/* Lịch trình — Air video không điền ở đây, nhân viên tự cập nhật sau theo từng KOC */}
               <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 space-y-3">
                 <p className="text-xs font-semibold text-rose-700 flex items-center gap-1">📅 Lịch trình</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[11px] text-slate-500 mb-1 block font-medium">🚀 Lịch ra hàng</label>
                     <input type="date" value={formBooking.ngayRaHang} onChange={e => setFormBooking({ ...formBooking, ngayRaHang: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
@@ -2963,11 +2963,8 @@ export default function KocPage() {
                     <label className="text-[11px] text-slate-500 mb-1 block font-medium">📦 Lịch gửi hàng *</label>
                     <input required type="date" value={formBooking.ngayBat} onChange={e => setFormBooking({ ...formBooking, ngayBat: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
                   </div>
-                  <div>
-                    <label className="text-[11px] text-slate-500 mb-1 block font-medium">🎬 Lịch air video</label>
-                    <input type="date" value={formBooking.ngayLenVideo} onChange={e => setFormBooking({ ...formBooking, ngayLenVideo: e.target.value })} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white" />
-                  </div>
                 </div>
+                <p className="text-[11px] text-rose-400">🎬 Lịch air video sẽ do nhân viên cập nhật riêng cho từng KOC sau, trong bảng booking hoặc tab Lịch trình.</p>
               </div>
 
               <div>
