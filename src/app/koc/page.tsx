@@ -45,6 +45,7 @@ export default function KocPage() {
   const [modalLaunch, setModalLaunch] = useState<SanPham | null>(null);
   const [launchKOCs, setLaunchKOCs] = useState<Record<string, { checked: boolean; soLuong: string }>>({});
   const [launchNgayBat, setLaunchNgayBat] = useState("");
+  const [launchNgayRaHang, setLaunchNgayRaHang] = useState("");
   const [launchSearch, setLaunchSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDeXuat, setShowDeXuat] = useState(false);
@@ -598,6 +599,7 @@ export default function KocPage() {
     kocs.forEach(k => { init[k.id] = { checked: false, soLuong: "1" }; });
     setLaunchKOCs(init);
     setLaunchNgayBat(new Date().toISOString().slice(0, 10));
+    setLaunchNgayRaHang("");
     setLaunchSearch("");
     setModalLaunch(sp);
   };
@@ -697,6 +699,7 @@ export default function KocPage() {
             chiPhiCast,
             chiPhiSP,
             ngayBat: launchNgayBat,
+            ngayRaHang: launchNgayRaHang || null,
           }),
         });
       }));
@@ -2307,10 +2310,16 @@ export default function KocPage() {
             </div>
 
             <form onSubmit={handleLaunchSubmit} className="flex flex-col flex-1 overflow-hidden">
-              {/* Ngày bắt đầu */}
-              <div className="px-5 pt-4 pb-2">
-                <label className="text-xs text-slate-600 mb-1 block">Ngày bắt đầu booking *</label>
-                <input required type="date" value={launchNgayBat} onChange={e => setLaunchNgayBat(e.target.value)} className="w-48 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+              {/* Lịch trình chung cho cả lô — Air video điền riêng theo từng KOC ở bảng sau khi tạo */}
+              <div className="px-5 pt-4 pb-2 flex gap-3">
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">🚀 Lịch ra hàng</label>
+                  <input type="date" value={launchNgayRaHang} onChange={e => setLaunchNgayRaHang(e.target.value)} className="w-48 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">📦 Ngày bắt đầu booking (gửi hàng) *</label>
+                  <input required type="date" value={launchNgayBat} onChange={e => setLaunchNgayBat(e.target.value)} className="w-48 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                </div>
               </div>
 
               {/* Tìm kiếm + Chọn tất cả */}
