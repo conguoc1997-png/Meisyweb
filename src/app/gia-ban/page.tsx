@@ -653,6 +653,7 @@ function QuanTriGiaTab() {
   const [fields, setFields] = useState<QuanTriField[]>(
     () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct }))
   );
+  const [newLabel, setNewLabel] = useState("");
 
   const giaVonNum = Number(giaVon) || 0;
   const rows = fields.map(f => ({ ...f, amount: giaVonNum * (Number(f.pct) || 0) / 100 }));
@@ -661,6 +662,17 @@ function QuanTriGiaTab() {
 
   const updatePct = (key: string, val: string) =>
     setFields(prev => prev.map(f => f.key === key ? { ...f, pct: val } : f));
+
+  const removeField = (key: string) =>
+    setFields(prev => prev.filter(f => f.key !== key));
+
+  const addField = () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    const key = "custom_" + Date.now();
+    setFields(prev => [...prev, { key, label, pct: "0" }]);
+    setNewLabel("");
+  };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -681,6 +693,7 @@ function QuanTriGiaTab() {
               <th className="text-left py-2 text-slate-500 font-medium">Khoản mục</th>
               <th className="text-right py-2 text-slate-500 font-medium w-32">% / Giá vốn</th>
               <th className="text-right py-2 text-slate-500 font-medium w-40">Số tiền (đ)</th>
+              <th className="w-8"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -688,9 +701,10 @@ function QuanTriGiaTab() {
               <td className="py-2.5 font-medium text-slate-700">Giá vốn</td>
               <td className="py-2.5 text-right text-slate-400">—</td>
               <td className="py-2.5 text-right font-semibold text-slate-800">{fmtVnd(giaVonNum)}đ</td>
+              <td></td>
             </tr>
             {rows.map(r => (
-              <tr key={r.key}>
+              <tr key={r.key} className="group">
                 <td className="py-2.5 text-slate-600">{r.label}</td>
                 <td className="py-2.5 text-right">
                   <input
@@ -700,12 +714,34 @@ function QuanTriGiaTab() {
                   /> %
                 </td>
                 <td className="py-2.5 text-right font-medium text-slate-700">{fmtVnd(r.amount)}đ</td>
+                <td className="py-2.5 text-right">
+                  <button onClick={() => removeField(r.key)} title="Xoá khoản mục"
+                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
+                </td>
               </tr>
             ))}
+            <tr>
+              <td colSpan={4} className="py-2.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" value={newLabel}
+                    onChange={e => setNewLabel(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addField(); } }}
+                    placeholder="Tên khoản mục mới..."
+                    className="flex-1 max-w-xs border border-dashed border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
+                  />
+                  <button onClick={addField}
+                    className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-sm rounded-lg transition font-medium">
+                    + Thêm mục
+                  </button>
+                </div>
+              </td>
+            </tr>
             <tr className="border-t-2 border-slate-200">
               <td className="py-3 font-bold text-slate-800">Giá niêm yết</td>
               <td></td>
               <td className="py-3 text-right font-bold text-rose-600 text-lg">{fmtVnd(giaNiemYet)}đ</td>
+              <td></td>
             </tr>
           </tbody>
         </table>
