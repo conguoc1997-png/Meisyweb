@@ -1106,6 +1106,12 @@ export default function ChamCongPage() {
                   const thucLinhKhoan    = isKhoan    ? luongKhoan    + tongPhuCap : thucLinh;
                   const thucLinhCoBanMay = isCoBanMay ? luongCoBanMay + tongPhuCap : thucLinh;
 
+                  // Thời vụ: không chấm công hàng ngày (chưa có lcb, không có công) nhưng có giờ TC
+                  // → lương = số giờ TC × Hệ số TC (dùng Hệ số TC như đơn giá/giờ)
+                  const isThoiVu      = !isKhoan && !isCoBanMay && lcb === 0 && congTinhLuong === 0 && tongTC > 0;
+                  const luongThoiVu   = isThoiVu ? heSoTC * tongTC : 0;
+                  const thucLinhThoiVu = isThoiVu ? luongThoiVu + tongPhuCap : thucLinh;
+
                   return (
                     <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
                       <td className="px-3 py-2 text-center text-slate-400 text-xs">{idx + 1}</td>
@@ -1133,7 +1139,7 @@ export default function ChamCongPage() {
                               {isKhoan ? "Khoán" : "Tiếng"}
                             </button>
                           )
-                          : lcb > 0 ? fmt(lcb) + "₫" : <span className="text-slate-300 text-xs">Chưa có</span>}
+                          : lcb > 0 ? fmt(lcb) + "₫" : isThoiVu ? <span className="text-xs px-1.5 py-0.5 rounded font-semibold bg-teal-100 text-teal-700">Thời vụ</span> : <span className="text-slate-300 text-xs">Chưa có</span>}
                       </td>
                       <td className="px-3 py-2 text-center font-semibold text-emerald-700">{congTinhLuong || "—"}</td>
                       <td className="px-3 py-2 text-center text-blue-600">{congPhep || ""}</td>
@@ -1167,11 +1173,13 @@ export default function ChamCongPage() {
                             ? (gioNV > 0
                               ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
                               : <span className="text-slate-300 text-xs">—</span>)
-                            : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
+                            : isThoiVu
+                              ? <span className="text-teal-600 font-semibold">{fmt(Math.round(luongThoiVu))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(tongTC)}h × {fmt(heSoTC)}₫/h</span></span>
+                              : (lcb > 0 && congTinhLuong > 0 ? fmt(Math.round(luongCong)) + "₫" : <span className="text-slate-300">—</span>)
                         }
                       </td>
                       <td className="px-3 py-2 text-right text-orange-600">
-                        {(isKhoan || isCoBanMay) ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
+                        {(isKhoan || isCoBanMay || isThoiVu) ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
                       </td>
                       {/* Phụ cấp — 2 ô: Chuyên cần + Ăn/ngày */}
                       <td className="px-2 py-1">
@@ -1243,7 +1251,9 @@ export default function ChamCongPage() {
                           ? (thucLinhKhoan > 0 ? fmt(Math.round(thucLinhKhoan)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
                           : isCoBanMay
                             ? (thucLinhCoBanMay > 0 ? fmt(Math.round(thucLinhCoBanMay)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
-                            : (lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
+                            : isThoiVu
+                              ? (thucLinhThoiVu > 0 ? fmt(Math.round(thucLinhThoiVu)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
+                              : (lcb > 0 && thucLinh > 0 ? fmt(Math.round(thucLinh)) + "₫" : <span className="text-slate-300 font-normal">—</span>)
                         }
                       </td>
                       <td className="px-1 py-2 text-center">
