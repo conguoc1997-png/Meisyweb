@@ -407,16 +407,27 @@ export default function ChamCongPage() {
     const counts: Record<string, number> = {};
     days.forEach(d => {
       const tt = ccMap[getKey(nvId, d)] ?? "";
-      // Chủ nhật/ngày lễ mặc định không tính công, nhưng nếu đã chấm công
+      if (isHoliday(d) && !isSunday(d)) {
+        // Ngày lễ luôn được trả lương (mặc định +1 công), dù không chấm công.
+        // Nếu thực tế đi làm ngày lễ (tick đi làm/đi muộn) → +1 công nữa (tổng 2 công).
+        counts["nghi_le"] = (counts["nghi_le"] ?? 0) + 1;
+        if (tt === "di_lam" || tt === "di_muon") {
+          counts["nghi_le"] += 1;
+        } else if (tt === "nua_ngay") {
+          counts["nghi_le"] += 0.5;
+        }
+        return;
+      }
+      // Chủ nhật mặc định không tính công, nhưng nếu đã chấm công
       // (đi làm/½ ngày...) cho ngày đó thì vẫn tính bình thường.
-      if (!tt && isDayOff(d)) return;
+      if (!tt && isSunday(d)) return;
       if (tt) counts[tt] = (counts[tt] ?? 0) + (tt === "nua_ngay" ? 0.5 : 1);
     });
     return counts;
   };
 
-  // Working days in month (excluding weekends)
-  const soNgayLamViec = days.filter(d => !isDayOff(d)).length;
+  // Working days in month — chỉ trừ Chủ nhật, KHÔNG trừ ngày lễ (ngày lễ vẫn được trả lương)
+  const soNgayLamViec = days.filter(d => !isSunday(d)).length;
 
   // Auto-generate maNV: NV001, NV002...
   const genMaNV = (list: NhanVien[]) => {
@@ -1108,7 +1119,9 @@ export default function ChamCongPage() {
 
                   // Thời vụ: không chấm công hàng ngày (chưa có lcb, không có công) nhưng có giờ TC
                   // → lương = số giờ TC × Hệ số TC (dùng Hệ số TC như đơn giá/giờ)
-                  const isThoiVu      = !isKhoan && !isCoBanMay && lcb === 0 && congTinhLuong === 0 && tongTC > 0;
+                  // Không tính nghỉ lễ (tự động +1) vào điều kiện "không chấm công" của thời vụ
+                  const isThoiVu      = !isKhoan && !isCoBanMay && lcb === 0
+                    && (congCoMat + congMuon + congNuaNgay + congPhep) === 0 && tongTC > 0;
                   const luongThoiVu   = isThoiVu ? heSoTC * tongTC : 0;
                   const thucLinhThoiVu = isThoiVu ? luongThoiVu + tongPhuCap : thucLinh;
 
