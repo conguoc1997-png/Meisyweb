@@ -338,6 +338,23 @@ export default function KocPage() {
     }).catch(() => {/* ignore */});
   };
 
+  // Điền nhanh Ngày ra hàng cho tất cả booking trong 1 nhóm sản phẩm chưa có ngày
+  const [bulkRaHangGroup, setBulkRaHangGroup] = useState<string | null>(null);
+  const [bulkRaHangVal, setBulkRaHangVal] = useState("");
+  const applyBulkRaHang = async (items: Booking[]) => {
+    const targets = items.filter(b => !b.ngayRaHang);
+    if (!bulkRaHangVal || targets.length === 0) { setBulkRaHangGroup(null); return; }
+    setBookings(prev => prev.map(b => targets.find(t => t.id === b.id) ? { ...b, ngayRaHang: bulkRaHangVal } : b));
+    await Promise.all(targets.map(b =>
+      fetch(`/api/koc/booking/${b.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ngayRaHang: bulkRaHangVal }),
+      })
+    ));
+    setBulkRaHangGroup(null);
+    setBulkRaHangVal("");
+  };
+
   const saveSoLuong = (b: Booking) => {
     const val = parseInt(slRef.current?.value ?? "") || b.soLuongGui;
     setEditingSLId(null);
@@ -1197,12 +1214,28 @@ export default function KocPage() {
                     <div className="flex items-center gap-6 text-sm">
                       {(() => {
                         const raHangDate = group.items.find(b => b.ngayRaHang)?.ngayRaHang;
-                        return raHangDate ? (
+                        const missingCount = group.items.filter(b => !b.ngayRaHang).length;
+                        return (
                           <div className="text-right">
                             <p className="text-xs text-slate-400">🚀 Ra hàng</p>
-                            <p className="font-semibold text-emerald-600">{formatDate(raHangDate)}</p>
+                            {raHangDate ? (
+                              <p className="font-semibold text-emerald-600">{formatDate(raHangDate)}</p>
+                            ) : bulkRaHangGroup === group.key ? (
+                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <input type="date" autoFocus value={bulkRaHangVal}
+                                  onChange={e => setBulkRaHangVal(e.target.value)}
+                                  className="border border-emerald-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-300" />
+                                <button onClick={() => applyBulkRaHang(group.items)}
+                                  className="text-emerald-600 hover:underline text-xs font-medium">OK</button>
+                              </div>
+                            ) : (
+                              <button onClick={e => { e.stopPropagation(); setBulkRaHangGroup(group.key); setBulkRaHangVal(""); }}
+                                className="text-xs text-emerald-500 border border-dashed border-emerald-300 rounded px-2 py-0.5 hover:bg-emerald-50 transition">
+                                + Điền cho {missingCount} KOC
+                              </button>
+                            )}
                           </div>
-                        ) : null;
+                        );
                       })()}
                       <div className="text-right">
                         <p className="text-xs text-slate-400">Tổng CP</p>
