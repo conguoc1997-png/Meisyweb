@@ -5,7 +5,7 @@ import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, U
 import * as XLSX from "xlsx";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
-type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null };
+type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null; mauSac?: string | null };
 type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null; trangThaiHopTac: string; createdAt: string };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
@@ -26,7 +26,7 @@ export default function KocPage() {
   const [kocs, setKocs] = useState<KOC[]>([]);
   const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [tab, setTab] = useState<"bookings" | "kocs" | "thanhTich">("bookings");
+  const [tab, setTab] = useState<"bookings" | "kocs" | "thanhTich" | "schedule">("bookings");
   const [expandedSP, setExpandedSP] = useState<string | null>(null);
   const [spSubTab, setSpSubTab] = useState<Record<string, "chiphi" | "koc" | "hieugua">>({});
   const [modalPickSP, setModalPickSP] = useState(false);
@@ -997,9 +997,9 @@ export default function KocPage() {
       {/* Actions */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-1">
-          {(["bookings", "kocs", "thanhTich"] as const).map((t) => (
+          {(["bookings", "kocs", "thanhTich", "schedule"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 text-sm rounded-lg font-medium transition ${tab === t ? "bg-rose-500 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
-              {t === "bookings" ? "Danh sách Booking" : t === "kocs" ? "Danh sách KOC" : "Thành tích KOC"}
+              {t === "bookings" ? "Danh sách Booking" : t === "kocs" ? "Danh sách KOC" : t === "thanhTich" ? "Thành tích KOC" : "📅 Schedule"}
             </button>
           ))}
         </div>
@@ -1952,6 +1952,229 @@ export default function KocPage() {
             </table>
           </div>
         </div>
+        );
+      })()}
+
+      {/* ═══ TAB SCHEDULE ═══ */}
+      {tab === "schedule" && (() => {
+        // Tất cả bookings (không lọc theo tháng để thấy full timeline)
+        const allB = bookings.filter(b => b.ngayBat || b.ngayLenVideo);
+
+        if (allB.length === 0) {
+          return (
+            <div className="text-center py-20 text-slate-400">
+              <CalendarDays size={40} className="mx-auto mb-3 opacity-30" />
+              <p>Chưa có booking nào có ngày</p>
+            </div>
+          );
+        }
+
+        // ── Tính khung ngày (min/max) ──
+        const allMs: number[] = [];
+        allB.forEach(b => {
+          if (b.ngayBat)      allMs.push(new Date(b.ngayBat).getTime());
+          if (b.ngayLenVideo) allMs.push(new Date(b.ngayLenVideo).getTime());
+        });
+        const rawMin = new Date(Math.min(...allMs));
+        const rawMax = new Date(Math.max(...allMs));
+        rawMin.setDate(rawMin.getDate() - 4);
+        rawMax.setDate(rawMax.getDate() + 7);
+        const totalMs  = rawMax.getTime() - rawMin.getTime();
+        const totalDays = totalMs / 86400000;
+
+        function pct(dateStr: string): number {
+          const t = new Date(dateStr).getTime();
+          return Math.max(0, Math.min(100, ((t - rawMin.getTime()) / totalMs) * 100));
+        }
+
+        // ── Nhãn ngày trên trục ──
+        const axisLabels: { d: Date; x: number }[] = [];
+        for (let i = 0; i <= totalDays; i++) {
+          const d = new Date(rawMin.getTime() + i * 86400000);
+          if (d.getDate() % (totalDays > 30 ? 5 : totalDays > 14 ? 3 : 1) === 0) {
+            axisLabels.push({ d, x: (i / totalDays) * 100 });
+          }
+        }
+
+        const todayX = ((Date.now() - rawMin.getTime()) / totalMs) * 100;
+        const showToday = todayX >= 0 && todayX <= 100;
+
+        // ── Nhóm theo sản phẩm ──
+        const groups: {
+          spId: string | null; label: string; sku: string; mauSac: string | null;
+          items: Booking[];
+        }[] = [];
+        const seenSP = new Set<string>();
+        allB.forEach(b => {
+          const key = b.sanPhamId ?? "__none__";
+          if (!seenSP.has(key)) {
+            seenSP.add(key);
+            groups.push({
+              spId: b.sanPhamId,
+              label: b.sanPham?.ten ?? "Không có SP",
+              sku: b.sanPham?.sku ?? "—",
+              mauSac: b.sanPham?.mauSac ?? null,
+              items: [],
+            });
+          }
+          groups.find(g => (g.spId ?? "__none__") === key)!.items.push(b);
+        });
+
+        // Màu dải cho từng product row
+        const TRACK_COLORS = ["#f43f5e","#8b5cf6","#0ea5e9","#10b981","#f59e0b","#ec4899","#14b8a6","#6366f1"];
+
+        return (
+          <div className="mt-2 space-y-4">
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-5 bg-white border rounded-xl px-5 py-3 text-xs text-slate-600">
+              <span className="font-semibold text-slate-700 mr-1">Chú thích:</span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm bg-rose-500" />
+                Lịch gửi KOC
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-full bg-blue-500" />
+                Ngày lên video
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3.5 h-0.5 bg-amber-400" style={{ borderTop: "2px dashed #f59e0b" }} />
+                Hôm nay
+              </span>
+            </div>
+
+            {/* Timeline container */}
+            <div className="bg-white border rounded-xl overflow-x-auto">
+              {/* Axis header */}
+              <div className="flex">
+                <div className="w-52 flex-shrink-0 border-r border-b bg-slate-50 h-8" />
+                <div className="flex-1 relative h-8 border-b bg-slate-50 min-w-[600px]">
+                  {axisLabels.map((al, i) => (
+                    <div key={i} className="absolute top-0 bottom-0" style={{ left: `${al.x}%` }}>
+                      <div className="absolute top-0 bottom-0 w-px bg-slate-200" />
+                      <span className="absolute top-1 left-1 text-[10px] text-slate-400 whitespace-nowrap">
+                        {al.d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                    </div>
+                  ))}
+                  {showToday && (
+                    <div className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10" style={{ left: `${todayX}%` }}>
+                      <span className="absolute -top-0 left-1 text-[9px] text-amber-600 font-semibold whitespace-nowrap">hôm nay</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rows per product */}
+              {groups.map((g, gi) => {
+                const trackColor = TRACK_COLORS[gi % TRACK_COLORS.length];
+                // unique send dates
+                const sendDates = Array.from(new Set(g.items.map(b => b.ngayBat).filter(Boolean))) as string[];
+
+                return (
+                  <div key={g.spId ?? "none"} className="flex border-b last:border-0">
+                    {/* Left label */}
+                    <div className="w-52 flex-shrink-0 px-4 py-4 border-r bg-slate-50 flex flex-col justify-center gap-0.5">
+                      <p className="text-sm font-semibold text-slate-800 leading-tight truncate" title={g.label}>{g.label}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{g.sku}</p>
+                      {g.mauSac && (
+                        <span className="inline-flex items-center gap-1 mt-0.5 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 w-fit">
+                          <span className="w-2 h-2 rounded-full border border-slate-300 inline-block" style={{ background: /^#/.test(g.mauSac) ? g.mauSac : "currentColor" }} />
+                          {g.mauSac}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400">{g.items.length} KOC</span>
+                    </div>
+
+                    {/* Timeline area */}
+                    <div className="flex-1 relative min-w-[600px]" style={{ minHeight: Math.max(72, 48 + g.items.filter(b => b.ngayLenVideo).length * 22) }}>
+                      {/* Grid lines */}
+                      {axisLabels.map((al, i) => (
+                        <div key={i} className="absolute top-0 bottom-0 w-px bg-slate-100" style={{ left: `${al.x}%` }} />
+                      ))}
+                      {/* Today */}
+                      {showToday && (
+                        <div className="absolute top-0 bottom-0 w-0.5 bg-amber-200 z-10" style={{ left: `${todayX}%` }} />
+                      )}
+
+                      {/* Track bar spanning send → latest video */}
+                      {(() => {
+                        const xs = [
+                          ...g.items.filter(b => b.ngayBat).map(b => pct(b.ngayBat!)),
+                          ...g.items.filter(b => b.ngayLenVideo).map(b => pct(b.ngayLenVideo!)),
+                        ];
+                        if (xs.length < 2) return null;
+                        const xMin = Math.min(...xs);
+                        const xMax = Math.max(...xs);
+                        return (
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full opacity-20"
+                            style={{ left: `${xMin}%`, width: `${xMax - xMin}%`, backgroundColor: trackColor }}
+                          />
+                        );
+                      })()}
+
+                      {/* ── Lịch gửi KOC (ngayBat) — diamond marker ── */}
+                      {sendDates.map((nd, si) => {
+                        const x = pct(nd);
+                        return (
+                          <div key={si} className="absolute z-20 flex flex-col items-center" style={{ left: `${x}%`, top: "50%", transform: "translate(-50%, -50%)" }}>
+                            {/* Diamond shape */}
+                            <div
+                              title={`Gửi KOC: ${new Date(nd).toLocaleDateString("vi-VN")}`}
+                              className="w-3.5 h-3.5 rotate-45 rounded-sm shadow-sm"
+                              style={{ backgroundColor: trackColor }}
+                            />
+                            <span className="absolute top-5 text-[9px] whitespace-nowrap font-semibold" style={{ color: trackColor }}>
+                              {new Date(nd).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                            </span>
+                            <span className="absolute -top-4 text-[9px] whitespace-nowrap text-slate-500">
+                              📦 Gửi KOC
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                      {/* ── Ngày lên video — circle + KOC name ── */}
+                      {g.items.filter(b => b.ngayLenVideo).map((b, bi) => {
+                        const x = pct(b.ngayLenVideo!);
+                        // stagger vertically when multiple KOC have close dates
+                        const topOffset = 28 + bi * 22;
+                        return (
+                          <div key={b.id} className="absolute z-20 flex flex-col items-center" style={{ left: `${x}%`, top: `${topOffset}%`, transform: "translate(-50%, -50%)" }}>
+                            {/* Dot */}
+                            <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" title={`${b.koc.ten} — ${new Date(b.ngayLenVideo!).toLocaleDateString("vi-VN")}`} />
+                            {/* KOC name */}
+                            <span className="absolute top-4 text-[9px] text-blue-700 whitespace-nowrap font-medium max-w-[80px] truncate" title={b.koc.ten}>
+                              {b.koc.ten}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Summary: KOC nào chưa có ngày lên video ── */}
+            {(() => {
+              const missing = allB.filter(b => !b.ngayLenVideo);
+              if (!missing.length) return null;
+              return (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+                  <p className="text-xs font-semibold text-amber-700 mb-2">⚠ {missing.length} KOC chưa điền ngày lên video:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {missing.map(b => (
+                      <span key={b.id} className="text-xs bg-white border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
+                        {b.koc.ten}
+                        {b.sanPham ? ` · ${b.sanPham.ten}` : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         );
       })()}
 
