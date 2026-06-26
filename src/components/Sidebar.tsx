@@ -84,7 +84,7 @@ const MODULES: NavModule[] = [
   },
   {
     key: "gia-ban", moduleKey: "gia-ban",
-    label: "Giá bán SP", icon: Calculator,
+    label: "Cấu trúc chi phí", icon: Calculator,
     bg: "bg-emerald-50", text: "text-emerald-500",
     href: "/gia-ban",
   },
