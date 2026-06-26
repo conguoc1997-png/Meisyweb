@@ -2128,8 +2128,12 @@ export default function KocPage() {
               {/* Rows per product */}
               {groups.map((g, gi) => {
                 const trackColor = TRACK_COLORS[gi % TRACK_COLORS.length];
-                // unique send dates
-                const sendDates = Array.from(new Set(g.items.map(b => b.ngayBat).filter(Boolean))) as string[];
+                // Chỉ lấy ngày bắt đầu chiến dịch sớm nhất — tránh nhiều điểm đè chữ khi KOC được thêm rải rác
+                const allSendDates = g.items.map(b => b.ngayBat).filter(Boolean) as string[];
+                const earliestSendDate = allSendDates.length > 0
+                  ? allSendDates.reduce((min, d) => d < min ? d : min)
+                  : null;
+                const sendDates = earliestSendDate ? [earliestSendDate] : [];
 
                 return (
                   <div key={g.spId ?? "none"} className="flex border-b last:border-0">
