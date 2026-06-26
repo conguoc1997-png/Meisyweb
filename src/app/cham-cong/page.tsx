@@ -409,10 +409,12 @@ export default function ChamCongPage() {
       const tt = ccMap[getKey(nvId, d)] ?? "";
       if (isHoliday(d) && !isSunday(d)) {
         // Ngày lễ luôn được trả lương (mặc định +1 công), dù không chấm công.
-        // Nếu thực tế đi làm ngày lễ (tick đi làm/đi muộn) → +1 công nữa (tổng 2 công).
+        // Nếu thực tế đi làm ngày lễ (tick đi làm/đi muộn) → +1 công nữa (tổng 2 công),
+        // và vẫn tính là 1 ngày đi làm thật (để cộng phụ cấp ăn/ngày đúng).
         counts["nghi_le"] = (counts["nghi_le"] ?? 0) + 1;
         if (tt === "di_lam" || tt === "di_muon") {
           counts["nghi_le"] += 1;
+          counts["le_di_lam"] = (counts["le_di_lam"] ?? 0) + 1;
         } else if (tt === "nua_ngay") {
           counts["nghi_le"] += 0.5;
         }
@@ -1100,8 +1102,9 @@ export default function ChamCongPage() {
                   const phuCapCC      = nv.phuCapChuyenCan ?? 0;
                   const phuCapAnNgay  = nv.phuCapAn ?? 0;
                   const phuCapDB      = nv.phuCapDacBiet ?? 0;
-                  // Ngày đủ công cho PC ăn = chỉ di_lam + di_muon (đủ 1 ngày)
-                  const ngayAnDuCong  = congCoMat + congMuon;
+                  // Ngày đủ công cho PC ăn = di_lam + di_muon + ngày lễ có đi làm thật
+                  const congLeDiLam   = summary["le_di_lam"] ?? 0;
+                  const ngayAnDuCong  = congCoMat + congMuon + congLeDiLam;
                   const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong + phuCapDB;
                   const luongNgay     = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
                   const luongCong     = luongNgay * congTinhLuong;
