@@ -18,7 +18,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sku, tenSanPham, sanPhamId, ngayNhap, soLuongNhap, ngayRaHang, soLuongRa, ghiChu } = body;
+    const { sku, tenSanPham, sanPhamId, size, ngayNhap, soLuongNhap, ngayRaHang, soLuongRa, ghiChu } = body;
 
     if (!sku || !ngayNhap || !soLuongNhap) {
       return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 });
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         sku,
         tenSanPham: tenSanPham || null,
         sanPhamId:  sanPhamId  || null,
+        size:        size       || null,
         ngayNhap:   new Date(ngayNhap),
         soLuongNhap: Number(soLuongNhap) || 0,
         ngayRaHang:  ngayRaHang ? new Date(ngayRaHang) : null,

@@ -670,6 +670,7 @@ model FakeKho {
   sku           String
   tenSanPham    String?
   sanPhamId     String?
+  size          String?
   ngayNhap      DateTime
   soLuongNhap   Int       @default(0)
   ngayRaHang    DateTime?

@@ -27,6 +27,8 @@ export async function GET() {
     return NextResponse.json({ ok: false, results });
   }
 
+  await run("FakeKho: add size", `ALTER TABLE "FakeKho" ADD COLUMN IF NOT EXISTS "size" TEXT`);
+
   await run("CREATE TABLE FakeKho", `
     CREATE TABLE IF NOT EXISTS "FakeKho" (
       "id"            TEXT NOT NULL,

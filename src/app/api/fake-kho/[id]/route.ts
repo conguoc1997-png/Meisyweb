@@ -15,6 +15,7 @@ export async function PATCH(
       data: {
         ...(body.sku          !== undefined && { sku:          body.sku }),
         ...(body.tenSanPham   !== undefined && { tenSanPham:   body.tenSanPham || null }),
+        ...(body.size         !== undefined && { size:         body.size || null }),
         ...(body.ngayNhap     !== undefined && { ngayNhap:     new Date(body.ngayNhap) }),
         ...(body.soLuongNhap  !== undefined && { soLuongNhap:  Number(body.soLuongNhap) }),
         ...(body.ngayRaHang   !== undefined && { ngayRaHang:   body.ngayRaHang ? new Date(body.ngayRaHang) : null }),

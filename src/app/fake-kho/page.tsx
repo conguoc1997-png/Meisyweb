@@ -9,6 +9,7 @@ type FakeKhoRecord = {
   sku: string;
   tenSanPham: string | null;
   sanPhamId: string | null;
+  size: string | null;
   ngayNhap: string;
   soLuongNhap: number;
   ngayRaHang: string | null;
@@ -23,6 +24,7 @@ type FormState = {
   sku: string;
   tenSanPham: string;
   sanPhamId: string;
+  size: string;
   ngayNhap: string;
   soLuongNhap: string;
   ngayRaHang: string;
@@ -31,7 +33,7 @@ type FormState = {
 };
 
 const EMPTY_FORM: FormState = {
-  sku: "", tenSanPham: "", sanPhamId: "",
+  sku: "", tenSanPham: "", sanPhamId: "", size: "",
   ngayNhap: new Date().toISOString().slice(0, 10),
   soLuongNhap: "",
   ngayRaHang: "",
@@ -99,6 +101,7 @@ export default function FakeKhoPage() {
       sku:          r.sku,
       tenSanPham:   r.tenSanPham || "",
       sanPhamId:    r.sanPhamId  || "",
+      size:         r.size       || "",
       ngayNhap:     r.ngayNhap.slice(0, 10),
       soLuongNhap:  String(r.soLuongNhap),
       ngayRaHang:   r.ngayRaHang ? r.ngayRaHang.slice(0, 10) : "",
@@ -245,6 +248,7 @@ export default function FakeKhoPage() {
             <tr>
               <th className="px-4 py-3 text-left">Mã SKU</th>
               <th className="px-4 py-3 text-left">Tên sản phẩm</th>
+              <th className="px-4 py-3 text-center">Size</th>
               <th className="px-4 py-3 text-center">Ngày nhập</th>
               <th className="px-4 py-3 text-right">SL nhập</th>
               <th className="px-4 py-3 text-center">Ngày ra hàng</th>
@@ -256,10 +260,10 @@ export default function FakeKhoPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="text-center py-10 text-slate-400">Đang tải...</td></tr>
+              <tr><td colSpan={10} className="text-center py-10 text-slate-400">Đang tải...</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-10 text-slate-400">Chưa có dữ liệu</td></tr>
+              <tr><td colSpan={10} className="text-center py-10 text-slate-400">Chưa có dữ liệu</td></tr>
             )}
             {filtered.map(r => {
               const no = r.soLuongNhap - r.soLuongRa;
@@ -268,6 +272,11 @@ export default function FakeKhoPage() {
                 <tr key={r.id} className="border-t hover:bg-slate-50">
                   <td className="px-4 py-3 font-mono font-semibold text-amber-700">{r.sku}</td>
                   <td className="px-4 py-3 text-slate-700">{r.tenSanPham || <span className="text-slate-300">—</span>}</td>
+                  <td className="px-4 py-3 text-center">
+                    {r.size ? (
+                      <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">{r.size}</span>
+                    ) : <span className="text-slate-300">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-center text-slate-500">{fmtDate(r.ngayNhap)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-slate-800">{r.soLuongNhap.toLocaleString("vi-VN")}</td>
                   <td className="px-4 py-3 text-center text-slate-500">
@@ -346,15 +355,26 @@ export default function FakeKhoPage() {
                 />
               </div>
 
-              {/* Tên SP */}
-              <div>
-                <label className="text-xs text-slate-500 mb-1 block">Tên sản phẩm</label>
-                <input
-                  value={form.tenSanPham}
-                  onChange={e => setForm(f => ({ ...f, tenSanPham: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
-                  placeholder="Tự điền khi chọn SKU..."
-                />
+              {/* Tên SP + Size */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-500 mb-1 block">Tên sản phẩm</label>
+                  <input
+                    value={form.tenSanPham}
+                    onChange={e => setForm(f => ({ ...f, tenSanPham: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Tự điền khi chọn SKU..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Size</label>
+                  <input
+                    value={form.size}
+                    onChange={e => setForm(f => ({ ...f, size: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="S, M, L, XL..."
+                  />
+                </div>
               </div>
 
               {/* Ngày nhập + SL nhập */}
