@@ -657,12 +657,19 @@ function QuanTriGiaTab() {
     () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct }))
   );
   const [newLabel, setNewLabel] = useState("");
+  const [showDoanhThuTest, setShowDoanhThuTest] = useState(false);
+  const [doanhThuTest, setDoanhThuTest] = useState("");
 
   const giaVonNum = Number(giaVon) || 0;
   const giaNiemYetNum = Number(giaNiemYetInput) || 0;
   const baseNum = mode === "von" ? giaVonNum : giaNiemYetNum;
+  const doanhThuTestNum = Number(doanhThuTest) || 0;
 
-  const rows = fields.map(f => ({ ...f, amount: baseNum * (Number(f.pct) || 0) / 100 }));
+  const rows = fields.map(f => ({
+    ...f,
+    amount: baseNum * (Number(f.pct) || 0) / 100,
+    amountTest: doanhThuTestNum * (Number(f.pct) || 0) / 100,
+  }));
   const tongChiPhi = rows.reduce((s, r) => s + r.amount, 0);
 
   // Chế độ "von": Giá niêm yết = Giá vốn + tổng chi phí (cộng dồn)
@@ -670,9 +677,11 @@ function QuanTriGiaTab() {
 
   // Chế độ "ban": Giá niêm yết cố định = 100%, Giá vốn cũng là 1 dòng %, phần dư tự cân đối
   const giaVonAmount = giaNiemYetNum * (Number(giaVonPct) || 0) / 100;
+  const giaVonAmountTest = doanhThuTestNum * (Number(giaVonPct) || 0) / 100;
   const tongPct = (Number(giaVonPct) || 0) + rows.reduce((s, r) => s + (Number(r.pct) || 0), 0);
   const conLaiPct = 100 - tongPct;
   const conLaiAmount = giaNiemYetNum * conLaiPct / 100;
+  const conLaiAmountTest = doanhThuTestNum * conLaiPct / 100;
 
   const updatePct = (key: string, val: string) =>
     setFields(prev => prev.map(f => f.key === key ? { ...f, pct: val } : f));
@@ -695,6 +704,8 @@ function QuanTriGiaTab() {
     setGiaVonPct("50");
     setFields(QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct })));
     setNewLabel("");
+    setShowDoanhThuTest(false);
+    setDoanhThuTest("");
   };
 
   return (
@@ -730,6 +741,32 @@ function QuanTriGiaTab() {
         </button>
       </div>
 
+      {mode === "ban" && (
+        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+          {!showDoanhThuTest ? (
+            <button onClick={() => setShowDoanhThuTest(true)}
+              className="text-sm text-rose-500 hover:underline font-medium">
+              + Test theo doanh thu thực tế khác
+            </button>
+          ) : (
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="text-sm font-medium text-slate-600 mb-1.5 block">Doanh thu test (đ)</label>
+                <input
+                  type="number" min={0} value={doanhThuTest}
+                  onChange={e => setDoanhThuTest(e.target.value)}
+                  placeholder="0"
+                  className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+              <button onClick={() => { setShowDoanhThuTest(false); setDoanhThuTest(""); }}
+                className="text-sm text-slate-400 hover:text-red-500 px-2 py-2.5">Bỏ</button>
+              <p className="text-xs text-slate-400 pb-3">Áp dụng cùng % cấu trúc bên dưới vào số doanh thu này, để xem từng khoản tốn bao nhiêu mà không đổi Giá niêm yết chính.</p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="p-5">
         <table className="w-full text-sm">
           <thead>
@@ -737,6 +774,9 @@ function QuanTriGiaTab() {
               <th className="text-left py-2 text-slate-500 font-medium">Khoản mục</th>
               <th className="text-right py-2 text-slate-500 font-medium w-32">{mode === "von" ? "% / Giá vốn" : "% / Giá niêm yết"}</th>
               <th className="text-right py-2 text-slate-500 font-medium w-40">Số tiền (đ)</th>
+              {mode === "ban" && showDoanhThuTest && (
+                <th className="text-right py-2 text-amber-600 font-medium w-40">Theo DT test (đ)</th>
+              )}
               <th className="w-8"></th>
             </tr>
           </thead>
@@ -759,6 +799,9 @@ function QuanTriGiaTab() {
               <td className="py-2.5 text-right font-semibold text-slate-800">
                 {fmtVnd(mode === "von" ? giaVonNum : giaVonAmount)}đ
               </td>
+              {mode === "ban" && showDoanhThuTest && (
+                <td className="py-2.5 text-right font-semibold text-amber-600">{fmtVnd(giaVonAmountTest)}đ</td>
+              )}
               <td></td>
             </tr>
             {rows.map(r => (
@@ -772,6 +815,9 @@ function QuanTriGiaTab() {
                   /> %
                 </td>
                 <td className="py-2.5 text-right font-medium text-slate-700">{fmtVnd(r.amount)}đ</td>
+                {mode === "ban" && showDoanhThuTest && (
+                  <td className="py-2.5 text-right font-medium text-amber-600">{fmtVnd(r.amountTest)}đ</td>
+                )}
                 <td className="py-2.5 text-right">
                   <button onClick={() => removeField(r.key)} title="Xoá khoản mục"
                     className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
@@ -779,7 +825,7 @@ function QuanTriGiaTab() {
               </tr>
             ))}
             <tr>
-              <td colSpan={4} className="py-2.5">
+              <td colSpan={mode === "ban" && showDoanhThuTest ? 5 : 4} className="py-2.5">
                 <div className="flex items-center gap-2">
                   <input
                     type="text" value={newLabel}
@@ -800,6 +846,9 @@ function QuanTriGiaTab() {
                 <td className={`py-2.5 font-medium ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>Còn lại (chưa phân bổ)</td>
                 <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{conLaiPct.toFixed(1)}%</td>
                 <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{fmtVnd(conLaiAmount)}đ</td>
+                {showDoanhThuTest && (
+                  <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{fmtVnd(conLaiAmountTest)}đ</td>
+                )}
                 <td></td>
               </tr>
             )}
@@ -809,6 +858,9 @@ function QuanTriGiaTab() {
               <td className="py-3 text-right font-bold text-rose-600 text-lg">
                 {fmtVnd(mode === "von" ? giaNiemYetTinh : giaNiemYetNum)}đ
               </td>
+              {mode === "ban" && showDoanhThuTest && (
+                <td className="py-3 text-right font-bold text-amber-600 text-lg">{fmtVnd(doanhThuTestNum)}đ</td>
+              )}
               <td></td>
             </tr>
           </tbody>
