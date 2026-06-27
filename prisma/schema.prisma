@@ -662,3 +662,19 @@ model DonHoanTra {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+// ===================== MODULE FAKE KHO =====================
+
+model FakeKho {
+  id            String    @id @default(cuid())
+  sku           String
+  tenSanPham    String?
+  sanPhamId     String?
+  ngayNhap      DateTime
+  soLuongNhap   Int       @default(0)
+  ngayRaHang    DateTime?
+  soLuongRa     Int       @default(0)
+  ghiChu        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
