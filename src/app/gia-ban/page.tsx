@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
 import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
@@ -637,7 +637,8 @@ export default function GiaBanPage() {
 }
 
 // ─── TAB: Quản trị giá — cấu trúc giá niêm yết theo cộng dồn chi phí ─────────
-type QuanTriField = { key: string; label: string; pct: string };
+type QuanTriChild = { key: string; label: string; pct: string }; // pct = % trong phạm vi % của mục cha
+type QuanTriField = { key: string; label: string; pct: string; children: QuanTriChild[] };
 
 const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
   { key: "loiNhuan",  label: "Lợi nhuận mong muốn",        defaultPct: "20" },
@@ -654,22 +655,56 @@ function QuanTriGiaTab() {
   const [giaNiemYetInput, setGiaNiemYetInput] = useState("");
   const [giaVonPct, setGiaVonPct] = useState("50");
   const [fields, setFields] = useState<QuanTriField[]>(
-    () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct }))
+    () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct, children: [] }))
   );
   const [newLabel, setNewLabel] = useState("");
   const [showDoanhThuTest, setShowDoanhThuTest] = useState(false);
   const [doanhThuTest, setDoanhThuTest] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [newChildLabel, setNewChildLabel] = useState<Record<string, string>>({});
+
+  const toggleExpand = (key: string) =>
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  const addChild = (parentKey: string) => {
+    const label = (newChildLabel[parentKey] ?? "").trim();
+    if (!label) return;
+    const key = "child_" + Date.now();
+    setFields(prev => prev.map(f => f.key === parentKey ? { ...f, children: [...f.children, { key, label, pct: "0" }] } : f));
+    setNewChildLabel(prev => ({ ...prev, [parentKey]: "" }));
+    setExpanded(prev => new Set(prev).add(parentKey));
+  };
+
+  const updateChildPct = (parentKey: string, childKey: string, val: string) =>
+    setFields(prev => prev.map(f => f.key === parentKey
+      ? { ...f, children: f.children.map(c => c.key === childKey ? { ...c, pct: val } : c) }
+      : f));
+
+  const removeChild = (parentKey: string, childKey: string) =>
+    setFields(prev => prev.map(f => f.key === parentKey
+      ? { ...f, children: f.children.filter(c => c.key !== childKey) }
+      : f));
 
   const giaVonNum = Number(giaVon) || 0;
   const giaNiemYetNum = Number(giaNiemYetInput) || 0;
   const baseNum = mode === "von" ? giaVonNum : giaNiemYetNum;
   const doanhThuTestNum = Number(doanhThuTest) || 0;
 
-  const rows = fields.map(f => ({
-    ...f,
-    amount: baseNum * (Number(f.pct) || 0) / 100,
-    amountTest: doanhThuTestNum * (Number(f.pct) || 0) / 100,
-  }));
+  const rows = fields.map(f => {
+    const amount = baseNum * (Number(f.pct) || 0) / 100;
+    const amountTest = doanhThuTestNum * (Number(f.pct) || 0) / 100;
+    const childrenRows = f.children.map(c => ({
+      ...c,
+      amount: amount * (Number(c.pct) || 0) / 100,
+      amountTest: amountTest * (Number(c.pct) || 0) / 100,
+    }));
+    const tongPctCon = f.children.reduce((s, c) => s + (Number(c.pct) || 0), 0);
+    return { ...f, amount, amountTest, childrenRows, tongPctCon, conLaiPctCon: 100 - tongPctCon };
+  });
   const tongChiPhi = rows.reduce((s, r) => s + r.amount, 0);
 
   // Chế độ "von": Giá niêm yết = Giá vốn + tổng chi phí (cộng dồn)
@@ -693,7 +728,7 @@ function QuanTriGiaTab() {
     const label = newLabel.trim();
     if (!label) return;
     const key = "custom_" + Date.now();
-    setFields(prev => [...prev, { key, label, pct: "0" }]);
+    setFields(prev => [...prev, { key, label, pct: "0", children: [] }]);
     setNewLabel("");
   };
 
@@ -702,10 +737,12 @@ function QuanTriGiaTab() {
     setGiaVon("");
     setGiaNiemYetInput("");
     setGiaVonPct("50");
-    setFields(QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct })));
+    setFields(QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct, children: [] })));
     setNewLabel("");
     setShowDoanhThuTest(false);
     setDoanhThuTest("");
+    setExpanded(new Set());
+    setNewChildLabel({});
   };
 
   return (
@@ -804,9 +841,21 @@ function QuanTriGiaTab() {
               )}
               <td></td>
             </tr>
-            {rows.map(r => (
-              <tr key={r.key} className="group">
-                <td className="py-2.5 text-slate-600">{r.label}</td>
+            {rows.map(r => {
+              const isOpen = expanded.has(r.key);
+              const extraCols = mode === "ban" && showDoanhThuTest;
+              return (
+              <Fragment key={r.key}>
+              <tr className="group">
+                <td className="py-2.5 text-slate-600">
+                  <span className="text-slate-300 mr-1.5">─</span>
+                  {r.label}
+                  <button onClick={() => toggleExpand(r.key)} title="Thêm/xem mục con"
+                    className="ml-1.5 text-rose-400 hover:text-rose-600 font-bold opacity-0 group-hover:opacity-100 transition">
+                    {isOpen ? "−" : "+"}
+                  </button>
+                  {r.children.length > 0 && <span className="text-[11px] text-slate-400 ml-1">({r.children.length} mục con)</span>}
+                </td>
                 <td className="py-2.5 text-right">
                   <input
                     type="number" min={0} value={r.pct}
@@ -815,7 +864,7 @@ function QuanTriGiaTab() {
                   /> %
                 </td>
                 <td className="py-2.5 text-right font-medium text-slate-700">{fmtVnd(r.amount)}đ</td>
-                {mode === "ban" && showDoanhThuTest && (
+                {extraCols && (
                   <td className="py-2.5 text-right font-medium text-amber-600">{fmtVnd(r.amountTest)}đ</td>
                 )}
                 <td className="py-2.5 text-right">
@@ -823,7 +872,55 @@ function QuanTriGiaTab() {
                     className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
                 </td>
               </tr>
-            ))}
+              {isOpen && (
+                <>
+                  {r.childrenRows.map(c => (
+                    <tr key={c.key} className="bg-slate-50/60 group">
+                      <td className="py-2 pl-8 text-slate-500 text-[13px]">
+                        <span className="text-slate-300 mr-1.5">+</span>{c.label}
+                      </td>
+                      <td className="py-2 text-right">
+                        <input
+                          type="number" min={0} value={c.pct}
+                          onChange={e => updateChildPct(r.key, c.key, e.target.value)}
+                          className="w-16 text-right border border-slate-200 rounded-lg px-1.5 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        /> <span className="text-[11px] text-slate-400">% của mục</span>
+                      </td>
+                      <td className="py-2 text-right text-[13px] text-slate-600">{fmtVnd(c.amount)}đ</td>
+                      {extraCols && <td className="py-2 text-right text-[13px] text-amber-500">{fmtVnd(c.amountTest)}đ</td>}
+                      <td className="py-2 text-right">
+                        <button onClick={() => removeChild(r.key, c.key)} title="Xoá mục con"
+                          className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1 text-[13px]">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-50/60">
+                    <td colSpan={extraCols ? 5 : 4} className="py-1.5 pl-8">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text" value={newChildLabel[r.key] ?? ""}
+                          onChange={e => setNewChildLabel(prev => ({ ...prev, [r.key]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addChild(r.key); } }}
+                          placeholder="Tên mục con..."
+                          className="flex-1 max-w-[200px] border border-dashed border-slate-300 rounded-lg px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white"
+                        />
+                        <button onClick={() => addChild(r.key)}
+                          className="px-2.5 py-1 bg-rose-400 hover:bg-rose-500 text-white text-[13px] rounded-lg transition font-medium">
+                          + Mục con
+                        </button>
+                        {r.children.length > 0 && (
+                          <span className={`text-[12px] font-medium ${r.conLaiPctCon < 0 ? "text-red-500" : r.conLaiPctCon === 0 ? "text-emerald-500" : "text-amber-500"}`}>
+                            Đã chia {r.tongPctCon}% / 100% mục — còn lại {r.conLaiPctCon}%
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                </>
+              )}
+              </Fragment>
+              );
+            })}
             <tr>
               <td colSpan={mode === "ban" && showDoanhThuTest ? 5 : 4} className="py-2.5">
                 <div className="flex items-center gap-2">
