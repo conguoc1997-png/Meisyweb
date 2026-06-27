@@ -647,7 +647,11 @@ const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
   { key: "vanChuyen", label: "Chi phí vận chuyển",          defaultPct: "0" },
   { key: "banHang",   label: "Chi phí bán hàng",            defaultPct: "0" },
   { key: "mkt",       label: "Chi phí MKT",                 defaultPct: "0" },
+  { key: "thue",      label: "Thuế",                        defaultPct: "0" }, // cố định — không xóa được
 ];
+
+// Set các key mặc định (không cho phép xóa)
+const QUANTRI_FIXED_KEYS = new Set(QUANTRI_DEFS.map(d => d.key));
 
 function QuanTriGiaTab() {
   const [mode, setMode] = useState<"von" | "ban">("von");
@@ -867,8 +871,10 @@ function QuanTriGiaTab() {
                   <td className="py-2.5 text-right font-medium text-amber-600">{fmtVnd(r.amountTest)}đ</td>
                 )}
                 <td className="py-2.5 text-right">
-                  <button onClick={() => removeField(r.key)} title="Xoá khoản mục"
-                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
+                  {!QUANTRI_FIXED_KEYS.has(r.key) && (
+                    <button onClick={() => removeField(r.key)} title="Xoá khoản mục"
+                      className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
+                  )}
                 </td>
               </tr>
               {isOpen && (
