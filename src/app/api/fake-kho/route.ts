@@ -9,8 +9,22 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(data);
-  } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });
+  } catch {
+    // Fallback: cột size chưa tồn tại trong DB
+    try {
+      const data = await prisma.$queryRaw`
+        SELECT id, sku, "tenSanPham", "sanPhamId",
+               NULL as size,
+               "ngayNhap"::text, "soLuongNhap",
+               "ngayRaHang"::text, "soLuongRa",
+               "ghiChu", "createdAt"::text, "updatedAt"::text
+        FROM "FakeKho"
+        ORDER BY "createdAt" DESC
+      `;
+      return NextResponse.json(data);
+    } catch (e2: unknown) {
+      return NextResponse.json({ error: e2 instanceof Error ? e2.message : "Lỗi server" }, { status: 500 });
+    }
   }
 }
 
