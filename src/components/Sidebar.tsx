@@ -86,7 +86,10 @@ const MODULES: NavModule[] = [
     key: "gia-ban", moduleKey: "gia-ban",
     label: "Cấu trúc chi phí", icon: Calculator,
     bg: "bg-emerald-50", text: "text-emerald-500",
-    href: "/gia-ban",
+    children: [
+      { href: "/gia-ban",         label: "Tính giá bán",     icon: Calculator, moduleKey: "gia-ban" },
+      { href: "/cau-truc-gia",    label: "Cấu trúc giá",     icon: Calculator, moduleKey: "gia-ban" },
+    ],
   },
   {
     key: "ke-toan", moduleKey: "ke-toan",
