@@ -650,8 +650,8 @@ const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
   { key: "thue",      label: "Thuế",                        defaultPct: "0" }, // cố định — không xóa được
 ];
 
-// Set các key mặc định (không cho phép xóa)
-const QUANTRI_FIXED_KEYS = new Set(QUANTRI_DEFS.map(d => d.key));
+// Chỉ Thuế là không cho xóa — các mục mặc định khác vẫn có thể xóa
+const QUANTRI_FIXED_KEYS = new Set(["thue"]);
 
 function QuanTriGiaTab() {
   const [mode, setMode] = useState<"von" | "ban">("von");
