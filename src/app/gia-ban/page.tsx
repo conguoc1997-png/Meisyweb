@@ -848,12 +848,11 @@ function QuanTriGiaTab() {
               <Fragment key={r.key}>
               <tr className="group">
                 <td className="py-2.5 text-slate-600">
-                  <span className="text-slate-300 mr-1.5">─</span>
-                  {r.label}
                   <button onClick={() => toggleExpand(r.key)} title="Thêm/xem mục con"
-                    className="ml-1.5 text-rose-400 hover:text-rose-600 font-bold opacity-0 group-hover:opacity-100 transition">
+                    className="inline-flex items-center justify-center w-5 h-5 mr-1.5 rounded text-rose-500 hover:bg-rose-50 font-bold text-[13px] align-middle">
                     {isOpen ? "−" : "+"}
                   </button>
+                  {r.label}
                   {r.children.length > 0 && <span className="text-[11px] text-slate-400 ml-1">({r.children.length} mục con)</span>}
                 </td>
                 <td className="py-2.5 text-right">
@@ -877,7 +876,7 @@ function QuanTriGiaTab() {
                   {r.childrenRows.map(c => (
                     <tr key={c.key} className="bg-slate-50/60 group">
                       <td className="py-2 pl-8 text-slate-500 text-[13px]">
-                        <span className="text-slate-300 mr-1.5">+</span>{c.label}
+                        <span className="text-slate-300 mr-1.5">-</span>{c.label}
                       </td>
                       <td className="py-2 text-right">
                         <input
