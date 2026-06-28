@@ -46,17 +46,27 @@ export async function POST(req: NextRequest) {
   const date = new Date(ngay);
   date.setUTCHours(0, 0, 0, 0);
 
-  if (!trangThai && (tangCa === null || tangCa === undefined)) {
+  // Xóa tăng ca: tangCa gửi null tường minh → update về null
+  if (tangCa === null && trangThai === undefined) {
     const existing = await prisma.chamCong.findUnique({ where: { nhanVienId_ngay: { nhanVienId, ngay: date } } });
-    if (!existing || (!existing.tangCa && existing.tangCa !== 0)) {
+    if (!existing) return NextResponse.json({ ok: true });
+    // Nếu record chỉ có tangCa (không có trangThai) → xóa luôn record
+    if (!existing.trangThai) {
       await prisma.chamCong.deleteMany({ where: { nhanVienId, ngay: date } });
       return NextResponse.json({ ok: true });
     }
+    // Còn trangThai → chỉ clear tangCa
     const record = await prisma.chamCong.update({
       where: { nhanVienId_ngay: { nhanVienId, ngay: date } },
-      data: { trangThai: "" },
+      data: { tangCa: null },
     });
     return NextResponse.json(record);
+  }
+
+  // Xóa cả ô (trangThai null, không có tangCa)
+  if (!trangThai && tangCa === undefined) {
+    await prisma.chamCong.deleteMany({ where: { nhanVienId, ngay: date } });
+    return NextResponse.json({ ok: true });
   }
 
   const updateData: Record<string, unknown> = { ghiChu: ghiChu ?? null };

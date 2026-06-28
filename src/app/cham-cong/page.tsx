@@ -720,7 +720,7 @@ export default function ChamCongPage() {
 
         {/* Legend */}
         <div className="flex items-center gap-2 flex-wrap">
-          {TRANG_THAI.map(tt => (
+          {TRANG_THAI.filter(tt => !["nghi_phep", "vang", "di_muon"].includes(tt.key)).map(tt => (
             <span key={tt.key} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${tt.bg} ${tt.text}`}>
               <span className="font-bold">{tt.label}</span> {tt.title}
             </span>
