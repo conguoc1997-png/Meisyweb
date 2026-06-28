@@ -1,5 +1,45 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+
+// Module-level cache: tránh double-query mỗi request khi cột chưa có
+let columnReady: boolean | null = null;
+
+async function getNhanViens() {
+  // Đã biết cột tồn tại → dùng Prisma trực tiếp
+  if (columnReady === true) {
+    return prisma.nhanVien.findMany({
+      where: { active: true },
+      orderBy: { ten: "asc" },
+      include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
+    });
+  }
+
+  // Chưa biết hoặc đã biết chưa có → thử Prisma
+  if (columnReady !== false) {
+    try {
+      const result = await prisma.nhanVien.findMany({
+        where: { active: true },
+        orderBy: { ten: "asc" },
+        include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
+      });
+      columnReady = true;
+      return result;
+    } catch {
+      columnReady = false;
+    }
+  }
+
+  // Fallback raw SQL (cột soChNhatHopDong chưa có trong DB)
+  return prisma.$queryRaw`
+    SELECT id, "maNV", ten, "chucVu", "phongBan", "loaiLuong",
+           "luongCB", "phuCapChuyenCan", "phuCapAn", "phuCapDacBiet",
+           "heSoTC", 0 as "soChNhatHopDong", "ngaySinh", active, "createdAt"
+    FROM "NhanVien"
+    WHERE active = true
+    ORDER BY ten ASC
+  `;
+}
 
 // GET /api/cham-cong?thang=2026-06
 export async function GET(req: NextRequest) {
@@ -7,35 +47,20 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const thang = searchParams.get("thang"); // YYYY-MM
 
-    let nhanViens: object[];
-    try {
-      nhanViens = await prisma.nhanVien.findMany({
-        where: { active: true },
-        orderBy: { ten: "asc" },
-        include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
-      });
-    } catch {
-      // Fallback: cột soChNhatHopDong chưa có trong DB
-      nhanViens = await prisma.$queryRaw`
-        SELECT id, "maNV", ten, "chucVu", "phongBan", "loaiLuong",
-               "luongCB", "phuCapChuyenCan", "phuCapAn", "phuCapDacBiet",
-               "heSoTC", 0 as "soChNhatHopDong", "ngaySinh", active,
-               "createdAt"
-        FROM "NhanVien"
-        WHERE active = true
-        ORDER BY ten ASC
-      `;
-    }
+    // Fetch NV + ChamCong song song
+    const nhanViensPromise = getNhanViens();
 
-    let chamCongs: object[] = [];
+    let chamCongsPromise: Promise<object[]> = Promise.resolve([]);
     if (thang) {
       const [y, m] = thang.split("-").map(Number);
       const start = new Date(y, m - 1, 1);
       const end   = new Date(y, m, 1);
-      chamCongs = await prisma.chamCong.findMany({
+      chamCongsPromise = prisma.chamCong.findMany({
         where: { ngay: { gte: start, lt: end } },
       });
     }
+
+    const [nhanViens, chamCongs] = await Promise.all([nhanViensPromise, chamCongsPromise]);
 
     return NextResponse.json({ nhanViens, chamCongs });
   } catch (e) {
