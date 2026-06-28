@@ -460,15 +460,20 @@ export default function ChamCongPage() {
     return `NV${String(next).padStart(3, "0")}`;
   };
 
-  // Open NV modal
-  const openNVModal = async () => {
-    const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-    const list = Array.isArray(data) ? data : [];
-    setAllNVs(list);
-    // Tự điền maNV tiếp theo
-    setNvForm(f => ({ ...f, maNV: genMaNV(list) }));
+  // Open NV modal — hiển thị ngay với data đã có, fetch refresh ngầm
+  const openNVModal = () => {
+    // Dùng nhanViensAll đã load sẵn để mở modal tức thì
+    const current = nhanViensAll.length > 0 ? nhanViensAll : allNVs;
+    setAllNVs(current);
+    setNvForm(f => ({ ...f, maNV: genMaNV(current) }));
     setNvError("");
     setShowNVModal(true);
+    // Fetch fresh data ngầm
+    fetch("/api/cham-cong/nhan-vien").then(r => r.json()).then(data => {
+      const list = Array.isArray(data) ? data : [];
+      setAllNVs(list);
+      setNvForm(f => ({ ...f, maNV: genMaNV(list) }));
+    }).catch(() => {});
   };
 
   const saveNV = async () => {
