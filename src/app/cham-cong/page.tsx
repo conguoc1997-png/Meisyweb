@@ -414,19 +414,27 @@ export default function ChamCongPage() {
     });
 
     savingSetRef.current.add(key);
+    const payload = JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null });
     try {
-      const res = await fetch("/api/cham-cong", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null }),
-      });
+      let res = await fetch("/api/cham-cong", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      // Retry 1 lần nếu lỗi thoáng qua (Vercel cold start)
+      if (!res.ok) {
+        await new Promise(r => setTimeout(r, 800));
+        res = await fetch("/api/cham-cong", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      }
       if (!res.ok) {
         await fetchCC();
-        alert("Lưu chấm công thất bại, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+        alert("Lưu chấm công thất bại, đã tải lại dữ liệu mới nhất.");
       }
     } catch {
-      await fetchCC();
-      alert("Mất kết nối khi lưu chấm công, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+      // Retry 1 lần
+      try {
+        await new Promise(r => setTimeout(r, 800));
+        await fetch("/api/cham-cong", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      } catch {
+        await fetchCC();
+        alert("Mất kết nối, đã tải lại dữ liệu.");
+      }
     } finally {
       savingSetRef.current.delete(key);
     }
@@ -464,7 +472,7 @@ export default function ChamCongPage() {
       return fetch("/api/cham-cong", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: null, tangCa: null }),
+        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: null }),
       });
     })).catch(() => fetchCC());
   };
