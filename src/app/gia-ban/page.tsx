@@ -653,6 +653,10 @@ const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
 // Chỉ Thuế là không cho xóa — các mục mặc định khác vẫn có thể xóa
 const QUANTRI_FIXED_KEYS = new Set(["thue"]);
 
+const LS_QUANTRI_GIA_VON = "quantri-gia-von";
+const LS_QUANTRI_NIEM_YET = "quantri-gia-niem-yet";
+const LS_QUANTRI_FIELDS = "quantri-gia-fields";
+
 function QuanTriGiaTab() {
   const [giaVon, setGiaVon] = useState("");
   const [giaNiemYetInput, setGiaNiemYetInput] = useState("");
@@ -660,6 +664,25 @@ function QuanTriGiaTab() {
     () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct, children: [] }))
   );
   const [newLabel, setNewLabel] = useState("");
+
+  // Tải lại từ localStorage khi mount — giữ dữ liệu qua các lần load lại trang
+  useEffect(() => {
+    try {
+      const gv = localStorage.getItem(LS_QUANTRI_GIA_VON);
+      const ny = localStorage.getItem(LS_QUANTRI_NIEM_YET);
+      const fl = localStorage.getItem(LS_QUANTRI_FIELDS);
+      if (gv) setGiaVon(gv);
+      if (ny) setGiaNiemYetInput(ny);
+      if (fl) {
+        const parsed = JSON.parse(fl);
+        if (Array.isArray(parsed) && parsed.length > 0) setFields(parsed);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { localStorage.setItem(LS_QUANTRI_GIA_VON, giaVon); }, [giaVon]);
+  useEffect(() => { localStorage.setItem(LS_QUANTRI_NIEM_YET, giaNiemYetInput); }, [giaNiemYetInput]);
+  useEffect(() => { localStorage.setItem(LS_QUANTRI_FIELDS, JSON.stringify(fields)); }, [fields]);
   const [showDoanhThuTest, setShowDoanhThuTest] = useState(false);
   const [doanhThuTest, setDoanhThuTest] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -740,6 +763,9 @@ function QuanTriGiaTab() {
     setDoanhThuTest("");
     setExpanded(new Set());
     setNewChildLabel({});
+    localStorage.removeItem(LS_QUANTRI_GIA_VON);
+    localStorage.removeItem(LS_QUANTRI_NIEM_YET);
+    localStorage.removeItem(LS_QUANTRI_FIELDS);
   };
 
   return (
