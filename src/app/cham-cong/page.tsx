@@ -9,6 +9,7 @@ type NhanVien = {
   chucVu: string | null; phongBan: string | null;
   loaiLuong: string | null;
   luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; phuCapDacBiet: number | null; heSoTC: number;
+  soChNhatHopDong: number;
   ngaySinh: string | null;
   active: boolean;
   luongCBHistory?: LuongCBHistory[];
@@ -89,7 +90,8 @@ export default function ChamCongPage() {
   const [nhanViensAll, setNhanViens] = useState<NhanVien[]>([]);
   const [chamCongs, setChamCongs] = useState<ChamCong[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null); // "nvId_ngay"
+  // savingSet: dùng Set để track ô đang save — chỉ block double-click trên cùng 1 ô
+  const savingSetRef = React.useRef(new Set<string>());
 
   // Ngày lễ — lưu vào localStorage theo năm
   const [holidays, setHolidaysRaw] = useState<string[]>(() => {
@@ -233,10 +235,22 @@ export default function ChamCongPage() {
   // Modal quản lý NV
   const [showNVModal, setShowNVModal] = useState(false);
   const [allNVs, setAllNVs] = useState<NhanVien[]>([]);
-  const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang });
+  const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang });
   const [editingNV, setEditingNV] = useState<NhanVien | null>(null);
   const [savingNV, setSavingNV] = useState(false);
   const [nvError, setNvError] = useState("");
+
+  // Phụ cấp theo tháng: { [nvId]: { phuCapCC, phuCapAn, phuCapDB } }
+  type PhuCapMap = Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }>;
+  const [phuCapMap, setPhuCapMap] = useState<PhuCapMap>({});
+
+  const fetchPhuCap = useCallback(async () => {
+    setPhuCapMap({}); // clear ngay lập tức, tránh hiện data tháng cũ
+    try {
+      const data = await fetch(`/api/cham-cong/phu-cap?thang=${thang}`).then(r => r.json());
+      setPhuCapMap(data && typeof data === "object" ? data : {});
+    } catch { setPhuCapMap({}); }
+  }, [thang]);
 
   // Khoán May
   const [locatStats, setLocatStats] = useState<LocatStats>({ dai_thuong: 0, dai_kieu: 0, short: 0 });
@@ -266,23 +280,55 @@ export default function ChamCongPage() {
   const isDayOff = (day: number) => isSunday(day) || isHoliday(day);
   const getDayLabel = (day: number) => DAY_OF_WEEK[new Date(year, month - 1, day).getDay()];
 
-  const fetchData = useCallback(async () => {
+  // Fetch NhanVien — chỉ gọi 1 lần khi mount hoặc sau khi sửa NV
+  const fetchNV = useCallback(async (withHistory = false) => {
+    try {
+      const url = withHistory ? "/api/cham-cong/nhan-vien?h=1" : "/api/cham-cong/nhan-vien";
+      const data = await fetch(url).then(r => r.json());
+      const list = Array.isArray(data) ? data as NhanVien[] : [];
+      setNhanViens(list);
+      setAllNVs(list); // sync allNVs (modal quản lý NV)
+    } catch (e) { console.error("fetchNV error:", e); }
+  }, []);
+
+  // Fetch ChamCong + PhuCap — gọi mỗi khi đổi tháng
+  const fetchCC = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/cham-cong?thang=${thang}`);
-      const text = await res.text();
-      let data: { nhanViens?: unknown[]; chamCongs?: unknown[]; error?: string } = {};
-      try { data = JSON.parse(text); } catch { console.error("API không trả JSON:", text.slice(0, 500)); }
-      if (data.error) console.error("API error:", data.error);
-      setNhanViens(Array.isArray(data.nhanViens) ? data.nhanViens as NhanVien[] : []);
-      setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
-    } catch (e) {
-      console.error("fetchData error:", e);
-    }
+      const [ccData] = await Promise.all([
+        fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json()),
+        fetchPhuCap(),
+      ]);
+      setChamCongs(Array.isArray(ccData.chamCongs) ? ccData.chamCongs as ChamCong[] : []);
+    } catch (e) { console.error("fetchCC error:", e); }
     setLoading(false);
-  }, [thang]);
+  }, [thang, fetchPhuCap]);
+
+  // Gọi song song khi mount — sau đó chỉ fetchCC khi đổi tháng
+  const nvLoadedRef = React.useRef(false);
+  const fetchData = useCallback(async () => {
+    if (!nvLoadedRef.current) {
+      // Mount lần đầu: fetch NV + CC song song
+      nvLoadedRef.current = true;
+      setLoading(true);
+      await Promise.all([fetchNV(), fetchCC().then(() => {})]);
+      setLoading(false);
+    } else {
+      // Đổi tháng: chỉ fetch CC
+      await fetchCC();
+    }
+  }, [fetchNV, fetchCC]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Khi bảng lương tab được mở → load NV với history để tính lương đúng
+  const historyLoadedRef = React.useRef(false);
+  useEffect(() => {
+    if (activeTab === "luong" && !historyLoadedRef.current) {
+      historyLoadedRef.current = true;
+      fetchNV(true);
+    }
+  }, [activeTab, fetchNV]);
 
   // Load khoán prices + SL từ localStorage khi đổi tháng
   useEffect(() => {
@@ -367,23 +413,31 @@ export default function ChamCongPage() {
       return [...prev, { id: "tmp", nhanVienId: nvId, ngay: ngay + "T00:00:00.000Z", trangThai: next, tangCa: null, ghiChu: null }];
     });
 
-    setSaving(key);
+    savingSetRef.current.add(key);
+    const payload = JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null });
     try {
-      const res = await fetch("/api/cham-cong", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null }),
-      });
+      let res = await fetch("/api/cham-cong", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      // Retry 1 lần nếu lỗi thoáng qua (Vercel cold start)
       if (!res.ok) {
-        // Lưu thất bại — đồng bộ lại từ server để tránh hiển thị sai (optimistic không khớp dữ liệu thật)
-        await fetchData();
-        alert("Lưu chấm công thất bại, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+        await new Promise(r => setTimeout(r, 800));
+        res = await fetch("/api/cham-cong", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      }
+      if (!res.ok) {
+        await fetchCC();
+        alert("Lưu chấm công thất bại, đã tải lại dữ liệu mới nhất.");
       }
     } catch {
-      await fetchData();
-      alert("Mất kết nối khi lưu chấm công, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+      // Retry 1 lần
+      try {
+        await new Promise(r => setTimeout(r, 800));
+        await fetch("/api/cham-cong", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      } catch {
+        await fetchCC();
+        alert("Mất kết nối, đã tải lại dữ liệu.");
+      }
+    } finally {
+      savingSetRef.current.delete(key);
     }
-    setSaving(null);
   };
 
   // Tăng ca: lưu số giờ
@@ -401,7 +455,7 @@ export default function ChamCongPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nhanVienId: nvId, ngay, tangCa }),
-    }).catch(() => fetchData());
+    }).catch(() => fetchCC());
   };
 
   // Reset toàn bộ chấm công 1 nhân viên trong tháng
@@ -418,9 +472,9 @@ export default function ChamCongPage() {
       return fetch("/api/cham-cong", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: null, tangCa: null }),
+        body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: null }),
       });
-    })).catch(() => fetchData());
+    })).catch(() => fetchCC());
   };
 
   // Summary per employee
@@ -459,15 +513,20 @@ export default function ChamCongPage() {
     return `NV${String(next).padStart(3, "0")}`;
   };
 
-  // Open NV modal
-  const openNVModal = async () => {
-    const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-    const list = Array.isArray(data) ? data : [];
-    setAllNVs(list);
-    // Tự điền maNV tiếp theo
-    setNvForm(f => ({ ...f, maNV: genMaNV(list) }));
+  // Open NV modal — hiển thị ngay với data đã có, fetch refresh ngầm
+  const openNVModal = () => {
+    // Dùng nhanViensAll đã load sẵn để mở modal tức thì
+    const current = nhanViensAll.length > 0 ? nhanViensAll : allNVs;
+    setAllNVs(current);
+    setNvForm(f => ({ ...f, maNV: genMaNV(current) }));
     setNvError("");
     setShowNVModal(true);
+    // Fetch fresh data ngầm
+    fetch("/api/cham-cong/nhan-vien").then(r => r.json()).then(data => {
+      const list = Array.isArray(data) ? data : [];
+      setAllNVs(list);
+      setNvForm(f => ({ ...f, maNV: genMaNV(list) }));
+    }).catch(() => {});
   };
 
   const saveNV = async () => {
@@ -482,7 +541,8 @@ export default function ChamCongPage() {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ten: nvForm.ten, chucVu: nvForm.chucVu, phongBan: nvForm.phongBan, loaiLuong: nvForm.loaiLuong,
-            luongCB: nvForm.luongCB, ngaySinh: nvForm.ngaySinh || null,
+            luongCB: nvForm.luongCB, soChNhatHopDong: Number(nvForm.soChNhatHopDong),
+            ngaySinh: nvForm.ngaySinh || null,
             thangApDung: lcbDaThayDoi ? nvForm.thangApDung : undefined,
           }),
         });
@@ -494,12 +554,10 @@ export default function ChamCongPage() {
         });
         if (!res.ok) { const e = await res.json(); setNvError(e.error ?? "Lỗi thêm nhân viên"); return; }
       }
-      const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-      const list = Array.isArray(data) ? data : [];
-      setAllNVs(list);
-      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang });
+      await fetchNV(); // refresh NV sau khi sửa (cập nhật cả nhanViensAll + allNVs)
+      // Dùng nhanViensAll (sau khi fetchNV) để gen maNV tiếp theo
+      setNvForm(f => ({ ...f, maNV: genMaNV(nhanViensAll), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang }));
       setEditingNV(null);
-      fetchData();
     } finally {
       setSavingNV(false);
     }
@@ -510,9 +568,7 @@ export default function ChamCongPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !nv.active }),
     });
-    const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-    setAllNVs(Array.isArray(data) ? data : []);
-    fetchData();
+    fetchNV(); // refresh NV sau khi toggle
   };
 
 
@@ -673,7 +729,7 @@ export default function ChamCongPage() {
 
         {/* Legend */}
         <div className="flex items-center gap-2 flex-wrap">
-          {TRANG_THAI.map(tt => (
+          {TRANG_THAI.filter(tt => !["nghi_phep", "vang", "di_muon"].includes(tt.key)).map(tt => (
             <span key={tt.key} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${tt.bg} ${tt.text}`}>
               <span className="font-bold">{tt.label}</span> {tt.title}
             </span>
@@ -779,26 +835,25 @@ export default function ChamCongPage() {
                         const key = getKey(nv.id, d);
                         const tt = ccMap[key] ?? "";
                         const info = TT_MAP[tt];
-                        const isSaving = saving === key;
                         const sun = isSunday(d);
                         const holiday = isHoliday(d);
                         const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
                         return (
                           <td key={d}
-                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition hover:brightness-95 ${defaultBg} ${isSaving ? "opacity-50" : ""}`}
-                            onClick={() => { if (!isSaving) handleCellClick(nv.id, d); }}
+                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition-colors ${defaultBg} hover:bg-slate-200/40 active:bg-slate-300/50`}
+                            onClick={() => handleCellClick(nv.id, d)}
                             title={info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
-                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-[11px] font-bold ${info.bg} ${info.text}`}>
+                              <div className={`flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text}`}>
                                 {info.label}
-                              </span>
+                              </div>
                             ) : sun ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-slate-300">CN</span>
+                              <div className="flex items-center justify-center w-full h-8 text-[10px] text-slate-300">CN</div>
                             ) : holiday ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-purple-300">L</span>
+                              <div className="flex items-center justify-center w-full h-8 text-[10px] text-purple-300">L</div>
                             ) : (
-                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-slate-200 hover:text-slate-400"></span>
+                              <div className="flex items-center justify-center w-full h-8 text-[10px] text-slate-200 hover:text-slate-400" />
                             )}
                           </td>
                         );
@@ -821,7 +876,7 @@ export default function ChamCongPage() {
                         const tc = tcMap[key];
                         const sun = isSunday(d);
                         return (
-                          <td key={d} className={`p-px border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/40"}`}>
+                          <td key={d} className={`p-0 border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/40"}`}>
                             <input
                               type="number"
                               min="0"
@@ -842,8 +897,8 @@ export default function ChamCongPage() {
                               onBlur={e => handleTCChange(nv.id, d, e.target.value)}
                               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               placeholder=""
-                              className={`w-full h-7 text-center text-xs font-bold bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                ${sun ? "text-slate-500 border-slate-300" : "text-orange-700 border-orange-300"}`}
+                              className={`w-full h-8 text-center text-xs font-bold bg-transparent border-0 border-t focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                ${sun ? "text-slate-500 border-slate-200" : "text-orange-700 border-orange-200"}`}
                               title="Số giờ tăng ca"
                             />
                           </td>
@@ -1125,14 +1180,18 @@ export default function ChamCongPage() {
                   const congTinhLuong = congCoMat + congMuon + congNuaNgay + congPhep + congLe;
 
                   const heSoTC        = nv.heSoTC ?? 1.5;
-                  const phuCapCC      = nv.phuCapChuyenCan ?? 0;
-                  const phuCapAnNgay  = nv.phuCapAn ?? 0;
-                  const phuCapDB      = nv.phuCapDacBiet ?? 0;
+                  // Phụ cấp theo tháng (ưu tiên) → fallback về NV default
+                  const pcThang       = phuCapMap[nv.id];
+                  const phuCapCC      = pcThang?.phuCapCC   ?? 0;
+                  const phuCapAnNgay  = pcThang?.phuCapAn   ?? 0;
+                  const phuCapDB      = pcThang?.phuCapDB   ?? 0;
                   // Ngày đủ công cho PC ăn = di_lam + di_muon + ngày lễ có đi làm thật
                   const congLeDiLam   = summary["le_di_lam"] ?? 0;
                   const ngayAnDuCong  = congCoMat + congMuon + congLeDiLam;
                   const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong + phuCapDB;
-                  const luongNgay     = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
+                  // congChuan = T2-T7 trong tháng + số CN theo HĐ
+                  const congChuan     = soNgayLamViec + (nv.soChNhatHopDong ?? 0);
+                  const luongNgay     = congChuan > 0 ? lcb / congChuan : 0;
                   const luongCong     = luongNgay * congTinhLuong;
                   const luongTC       = heSoTC * tongTC; // đơn giá/giờ × số giờ TC
                   const thucLinh      = luongCong + luongTC + tongPhuCap;
@@ -1173,7 +1232,7 @@ export default function ChamCongPage() {
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ loaiLuong: next }),
                                 });
-                                fetchData();
+                                fetchNV();
                               }}
                               className={`text-xs px-1.5 py-0.5 rounded font-semibold cursor-pointer hover:opacity-70 transition-opacity
                                 ${isKhoan ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
@@ -1200,7 +1259,7 @@ export default function ChamCongPage() {
                               method: "PATCH", headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ heSoTC: val }),
                             });
-                            fetchData();
+                            fetchNV();
                           }}
                           onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                           className="w-14 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1223,64 +1282,38 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right text-orange-600">
                         {(isKhoan || isCoBanMay || isThoiVu) ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
                       </td>
-                      {/* Phụ cấp — 2 ô: Chuyên cần + Ăn/ngày */}
+                      {/* Phụ cấp — theo tháng (CC, Ăn, ĐB) */}
                       <td className="px-2 py-1">
                         <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-400 w-7 shrink-0">CC</span>
-                            <input
-                              type="number" step="50000" min="0"
-                              defaultValue={phuCapCC || ""}
-                              placeholder="0"
-                              onBlur={async e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                                  method: "PATCH", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ phuCapChuyenCan: val || null }),
-                                });
-                                fetchData();
-                              }}
-                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-400 w-7 shrink-0">Ăn</span>
-                            <input
-                              type="number" step="10000" min="0"
-                              defaultValue={phuCapAnNgay || ""}
-                              placeholder="0"
-                              onBlur={async e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                                  method: "PATCH", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ phuCapAn: val || null }),
-                                });
-                                fetchData();
-                              }}
-                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                            {phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-400 w-7 shrink-0">ĐB</span>
-                            <input
-                              type="number" step="50000" min="0"
-                              defaultValue={phuCapDB || ""}
-                              placeholder="0"
-                              onBlur={async e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                                  method: "PATCH", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ phuCapDacBiet: val || null }),
-                                });
-                                fetchData();
-                              }}
-                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                          </div>
+                          {([
+                            { key: "CC",  field: "phuCapCC",  val: phuCapCC,     step: 50000,  label: "CC" },
+                            { key: "An",  field: "phuCapAn",  val: phuCapAnNgay, step: 10000,  label: "Ăn" },
+                            { key: "DB",  field: "phuCapDB",  val: phuCapDB,     step: 50000,  label: "ĐB" },
+                          ] as const).map(({ key, field, val, step, label }) => (
+                            <div key={key} className="flex items-center gap-1">
+                              <span className="text-[10px] text-slate-400 w-7 shrink-0">{label}</span>
+                              <input
+                                key={`${thang}_${nv.id}_${field}_${val}`}
+                                type="number" step={step} min="0"
+                                defaultValue={val || ""}
+                                placeholder="0"
+                                onBlur={async e => {
+                                  const newVal = parseFloat(e.target.value) || 0;
+                                  const cur = phuCapMap[nv.id] ?? { phuCapCC, phuCapAn: phuCapAnNgay, phuCapDB };
+                                  const updated = { ...cur, [field]: newVal };
+                                  // Optimistic update
+                                  setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
+                                  await fetch("/api/cham-cong/phu-cap", {
+                                    method: "POST", headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
+                                  }).catch(() => fetchPhuCap());
+                                }}
+                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              />
+                              {label === "Ăn" && phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
+                            </div>
+                          ))}
                           {tongPhuCap > 0 && (
                             <div className="text-[11px] font-bold text-teal-700 text-right pr-1">
                               = {fmt(Math.round(tongPhuCap))}₫
@@ -1302,7 +1335,7 @@ export default function ChamCongPage() {
                         <button
                           title="In phiếu lương"
                           onClick={() => setPhieuLuong({
-                            nv, lcb, soNgayLamViec, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC,
+                            nv, lcb, soNgayLamViec: congChuan, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC,
                             luongCong: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : Math.round(luongCong),
                             luongTC: (isKhoan || isCoBanMay) ? 0 : Math.round(luongTC),
                             phuCapCC, phuCapAnNgay, ngayAnDuCong, phuCapDB, tongPhuCap: Math.round(tongPhuCap),
@@ -1345,8 +1378,9 @@ export default function ChamCongPage() {
                         const tongTC = days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                         const lcb = getLcbForMonth(nv, thang);
                         const cong = (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0) + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
-                        const luongCong = soNgayLamViec > 0 ? (lcb / soNgayLamViec) * cong : 0;
-                        const luongTC = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * 1.5 * tongTC : 0;
+                        const cc = soNgayLamViec + (nv.soChNhatHopDong ?? 0);
+                        const luongCong = cc > 0 ? (lcb / cc) * cong : 0;
+                        const luongTC = cc > 0 ? (lcb / (cc * 8)) * 1.5 * tongTC : 0;
                         return s + luongCong + luongTC;
                       }, 0)))}₫
                     </td>
@@ -1458,7 +1492,7 @@ export default function ChamCongPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-800">Quản lý Nhân viên</h2>
-              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang }); }}
+              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang }); }}
                 className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-5">
@@ -1561,6 +1595,35 @@ export default function ChamCongPage() {
                     )}
                   </div>
                   <div>
+                    <label className="text-xs text-slate-500 block mb-1">📅 Số CN phải làm / tháng (theo HĐ)</label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: "0", label: "0 CN", desc: "Chỉ T2–T7" },
+                        { value: "2", label: "+ 2 CN", desc: "T2–T7 + 2CN" },
+                        { value: "4", label: "+ 4 CN", desc: "T2–T7 + 4CN" },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setNvForm(f => ({ ...f, soChNhatHopDong: opt.value }))}
+                          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
+                            nvForm.soChNhatHopDong === opt.value
+                              ? "border-violet-400 bg-violet-50 text-violet-700"
+                              : "border-slate-200 text-slate-500 hover:border-slate-300"
+                          }`}
+                        >
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] opacity-60">{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Công chuẩn = số ngày T2–T7 trong tháng + số CN theo HĐ
+                      <br/>
+                      <span className="text-violet-500">VD: tháng 28 ngày có 24 ngày T2-T7 → NV "0 CN" = 24 công chuẩn</span>
+                    </p>
+                  </div>
+                  <div>
                     <label className="text-xs text-slate-500 block mb-1">🎂 Ngày sinh</label>
                     <input type="date" value={nvForm.ngaySinh} onChange={e => setNvForm(f => ({ ...f, ngaySinh: e.target.value }))}
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-200" />
@@ -1568,7 +1631,7 @@ export default function ChamCongPage() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   {editingNV && (
-                    <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang }); }}
+                    <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang }); }}
                       className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-100 transition">Huỷ</button>
                   )}
                   <button onClick={saveNV} disabled={savingNV}
@@ -1588,10 +1651,11 @@ export default function ChamCongPage() {
                       <span className="font-medium text-slate-800 text-sm">{nv.ten}</span>
                       {nv.chucVu && <span className="text-xs text-slate-400 ml-2">{nv.chucVu}</span>}
                       {nv.luongCB && <span className="text-xs text-emerald-600 ml-2">{fmt(nv.luongCB)}₫</span>}
+                      {(nv.soChNhatHopDong ?? 0) > 0 && <span className="text-xs text-violet-600 ml-2">+{nv.soChNhatHopDong}CN</span>}
                       {nv.ngaySinh && <span className="text-xs text-pink-500 ml-2">🎂 {new Date(nv.ngaySinh).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit" })}</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", loaiLuong: (nv as {loaiLuong?: string}).loaiLuong ?? "co_ban", luongCB: String(getLcbForMonth(nv, thang) || ""), ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "", thangApDung: thang }); }}
+                      <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", loaiLuong: (nv as {loaiLuong?: string}).loaiLuong ?? "co_ban", luongCB: String(getLcbForMonth(nv, thang) || ""), soChNhatHopDong: String(nv.soChNhatHopDong ?? 0), ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "", thangApDung: thang }); }}
                         className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50 transition">Sửa</button>
                       <button onClick={() => toggleActiveNV(nv)}
                         className={`text-xs px-2 py-1 rounded transition ${nv.active ? "text-slate-400 hover:bg-red-50 hover:text-red-500" : "text-green-600 hover:bg-green-50"}`}>

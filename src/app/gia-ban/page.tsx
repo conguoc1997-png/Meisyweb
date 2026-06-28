@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
-import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw, FileSpreadsheet, Calculator, TrendingUp, TrendingDown, List, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from "lucide-react";
 
 const CATEGORIES: { label: string; thuong: number; mall: number }[] = [
   { label: "Thời trang nữ", thuong: 16.5, mall: 17.0 },
@@ -647,7 +647,11 @@ const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
   { key: "vanChuyen", label: "Chi phí vận chuyển",          defaultPct: "0" },
   { key: "banHang",   label: "Chi phí bán hàng",            defaultPct: "0" },
   { key: "mkt",       label: "Chi phí MKT",                 defaultPct: "0" },
+  { key: "thue",      label: "Thuế",                        defaultPct: "0" }, // cố định — không xóa được
 ];
+
+// Chỉ Thuế là không cho xóa — các mục mặc định khác vẫn có thể xóa
+const QUANTRI_FIXED_KEYS = new Set(["thue"]);
 
 function QuanTriGiaTab() {
   const [giaVon, setGiaVon] = useState("");
@@ -844,9 +848,13 @@ function QuanTriGiaTab() {
                 {extraCols && (
                   <td className="py-2.5 text-right font-medium text-amber-600">{fmtVnd(r.amountTest)}đ</td>
                 )}
-                <td className="py-2.5 text-right">
-                  <button onClick={() => removeField(r.key)} title="Xoá khoản mục"
-                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
+                <td className="py-2.5 text-right w-10">
+                  {!QUANTRI_FIXED_KEYS.has(r.key) && (
+                    <button onClick={() => removeField(r.key)} title="Xoá khoản mục"
+                      className="text-slate-300 hover:text-red-500 transition p-1 rounded hover:bg-red-50">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </td>
               </tr>
               {isOpen && (
@@ -865,9 +873,11 @@ function QuanTriGiaTab() {
                       </td>
                       <td className="py-2 text-right text-[13px] text-slate-600">{fmtVnd(c.amount)}đ</td>
                       {extraCols && <td className="py-2 text-right text-[13px] text-amber-500">{fmtVnd(c.amountTest)}đ</td>}
-                      <td className="py-2 text-right">
+                      <td className="py-2 text-right w-10">
                         <button onClick={() => removeChild(r.key, c.key)} title="Xoá mục con"
-                          className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition px-1 text-[13px]">✕</button>
+                          className="text-slate-300 hover:text-red-500 transition p-1 rounded hover:bg-red-50">
+                          <Trash2 size={13} />
+                        </button>
                       </td>
                     </tr>
                   ))}

@@ -10,7 +10,7 @@ export type SessionUser = {
 // Tất cả module keys có thể phân quyền
 export const ALL_MODULES = [
   { key: "tong-quan", label: "Tổng quan",       routes: ["/tong-quan", "/api/dashboard"] },
-  { key: "kho",       label: "Quản lý Kho",      routes: ["/kho", "/api/kho", "/doi-soat", "/api/doi-soat"] },
+  { key: "kho",       label: "Quản lý Kho",      routes: ["/kho", "/api/kho", "/doi-soat", "/api/doi-soat", "/fake-kho", "/api/fake-kho"] },
   { key: "san-xuat",  label: "Sản xuất",          routes: ["/san-xuat", "/api/san-xuat"] },
   { key: "doi-tra",   label: "Chăm sóc KH",      routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
   { key: "koc",       label: "KOC Booking",       routes: ["/koc", "/api/koc"] },

@@ -56,8 +56,9 @@ const MODULES: NavModule[] = [
     label: "Quản lý Kho", icon: Package,
     bg: "bg-amber-50", text: "text-amber-500",
     children: [
-      { href: "/kho",      label: "Kho hàng",           icon: Package,       moduleKey: "kho" },
-      { href: "/doi-soat", label: "Đối soát hoàn trả",  icon: ClipboardList, moduleKey: "kho" },
+      { href: "/kho",       label: "Kho hàng",           icon: Package,       moduleKey: "kho" },
+      { href: "/fake-kho",  label: "Fake Kho",           icon: Package,       moduleKey: "kho" },
+      { href: "/doi-soat",  label: "Đối soát hoàn trả",  icon: ClipboardList, moduleKey: "kho" },
     ],
   },
   {
@@ -86,7 +87,10 @@ const MODULES: NavModule[] = [
     key: "gia-ban", moduleKey: "gia-ban",
     label: "Cấu trúc chi phí", icon: Calculator,
     bg: "bg-emerald-50", text: "text-emerald-500",
-    href: "/gia-ban",
+    children: [
+      { href: "/gia-ban",         label: "Tính giá bán",     icon: Calculator, moduleKey: "gia-ban" },
+      { href: "/cau-truc-gia",    label: "Cấu trúc giá",     icon: Calculator, moduleKey: "gia-ban" },
+    ],
   },
   {
     key: "ke-toan", moduleKey: "ke-toan",
