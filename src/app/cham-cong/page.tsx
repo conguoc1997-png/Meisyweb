@@ -90,7 +90,8 @@ export default function ChamCongPage() {
   const [nhanViensAll, setNhanViens] = useState<NhanVien[]>([]);
   const [chamCongs, setChamCongs] = useState<ChamCong[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null); // "nvId_ngay"
+  // savingSet: dùng Set để track ô đang save — chỉ block double-click trên cùng 1 ô
+  const savingSetRef = React.useRef(new Set<string>());
 
   // Ngày lễ — lưu vào localStorage theo năm
   const [holidays, setHolidaysRaw] = useState<string[]>(() => {
@@ -411,7 +412,7 @@ export default function ChamCongPage() {
       return [...prev, { id: "tmp", nhanVienId: nvId, ngay: ngay + "T00:00:00.000Z", trangThai: next, tangCa: null, ghiChu: null }];
     });
 
-    setSaving(key);
+    savingSetRef.current.add(key);
     try {
       const res = await fetch("/api/cham-cong", {
         method: "POST",
@@ -425,8 +426,9 @@ export default function ChamCongPage() {
     } catch {
       await fetchCC();
       alert("Mất kết nối khi lưu chấm công, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
+    } finally {
+      savingSetRef.current.delete(key);
     }
-    setSaving(null);
   };
 
   // Tăng ca: lưu số giờ
@@ -824,14 +826,13 @@ export default function ChamCongPage() {
                         const key = getKey(nv.id, d);
                         const tt = ccMap[key] ?? "";
                         const info = TT_MAP[tt];
-                        const isSaving = saving === key;
                         const sun = isSunday(d);
                         const holiday = isHoliday(d);
                         const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
                         return (
                           <td key={d}
-                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition-colors ${defaultBg} ${isSaving ? "opacity-40 pointer-events-none" : "hover:bg-slate-200/40 active:bg-slate-300/50"}`}
-                            onClick={() => { if (!isSaving) handleCellClick(nv.id, d); }}
+                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition-colors ${defaultBg} hover:bg-slate-200/40 active:bg-slate-300/50`}
+                            onClick={() => handleCellClick(nv.id, d)}
                             title={info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
