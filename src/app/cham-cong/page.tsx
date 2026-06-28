@@ -267,23 +267,52 @@ export default function ChamCongPage() {
   const isDayOff = (day: number) => isSunday(day) || isHoliday(day);
   const getDayLabel = (day: number) => DAY_OF_WEEK[new Date(year, month - 1, day).getDay()];
 
-  const fetchData = useCallback(async () => {
+  // Fetch NhanVien — chỉ gọi 1 lần khi mount hoặc sau khi sửa NV
+  const fetchNV = useCallback(async (withHistory = false) => {
+    try {
+      const url = withHistory ? "/api/cham-cong/nhan-vien?h=1" : "/api/cham-cong/nhan-vien";
+      const data = await fetch(url).then(r => r.json());
+      const list = Array.isArray(data) ? data as NhanVien[] : [];
+      setNhanViens(list);
+      setAllNVs(list); // sync allNVs (modal quản lý NV)
+    } catch (e) { console.error("fetchNV error:", e); }
+  }, []);
+
+  // Fetch ChamCong — gọi mỗi khi đổi tháng (nhẹ hơn nhiều)
+  const fetchCC = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/cham-cong?thang=${thang}`);
-      const text = await res.text();
-      let data: { nhanViens?: unknown[]; chamCongs?: unknown[]; error?: string } = {};
-      try { data = JSON.parse(text); } catch { console.error("API không trả JSON:", text.slice(0, 500)); }
-      if (data.error) console.error("API error:", data.error);
-      setNhanViens(Array.isArray(data.nhanViens) ? data.nhanViens as NhanVien[] : []);
+      const data = await fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json());
       setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
-    } catch (e) {
-      console.error("fetchData error:", e);
-    }
+    } catch (e) { console.error("fetchCC error:", e); }
     setLoading(false);
   }, [thang]);
 
+  // Gọi song song khi mount — sau đó chỉ fetchCC khi đổi tháng
+  const nvLoadedRef = React.useRef(false);
+  const fetchData = useCallback(async () => {
+    if (!nvLoadedRef.current) {
+      // Mount lần đầu: fetch NV + CC song song
+      nvLoadedRef.current = true;
+      setLoading(true);
+      await Promise.all([fetchNV(), fetchCC().then(() => {})]);
+      setLoading(false);
+    } else {
+      // Đổi tháng: chỉ fetch CC
+      await fetchCC();
+    }
+  }, [fetchNV, fetchCC]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Khi bảng lương tab được mở → load NV với history để tính lương đúng
+  const historyLoadedRef = React.useRef(false);
+  useEffect(() => {
+    if (activeTab === "luong" && !historyLoadedRef.current) {
+      historyLoadedRef.current = true;
+      fetchNV(true);
+    }
+  }, [activeTab, fetchNV]);
 
   // Load khoán prices + SL từ localStorage khi đổi tháng
   useEffect(() => {
@@ -376,12 +405,11 @@ export default function ChamCongPage() {
         body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: next || null }),
       });
       if (!res.ok) {
-        // Lưu thất bại — đồng bộ lại từ server để tránh hiển thị sai (optimistic không khớp dữ liệu thật)
-        await fetchData();
+        await fetchCC();
         alert("Lưu chấm công thất bại, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
       }
     } catch {
-      await fetchData();
+      await fetchCC();
       alert("Mất kết nối khi lưu chấm công, đã tải lại dữ liệu mới nhất. Vui lòng thử lại.");
     }
     setSaving(null);
@@ -402,7 +430,7 @@ export default function ChamCongPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nhanVienId: nvId, ngay, tangCa }),
-    }).catch(() => fetchData());
+    }).catch(() => fetchCC());
   };
 
   // Reset toàn bộ chấm công 1 nhân viên trong tháng
@@ -421,7 +449,7 @@ export default function ChamCongPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai: null, tangCa: null }),
       });
-    })).catch(() => fetchData());
+    })).catch(() => fetchCC());
   };
 
   // Summary per employee
@@ -501,12 +529,10 @@ export default function ChamCongPage() {
         });
         if (!res.ok) { const e = await res.json(); setNvError(e.error ?? "Lỗi thêm nhân viên"); return; }
       }
-      const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-      const list = Array.isArray(data) ? data : [];
-      setAllNVs(list);
-      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang });
+      await fetchNV(); // refresh NV sau khi sửa (cập nhật cả nhanViensAll + allNVs)
+      // Dùng nhanViensAll (sau khi fetchNV) để gen maNV tiếp theo
+      setNvForm(f => ({ ...f, maNV: genMaNV(nhanViensAll), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang }));
       setEditingNV(null);
-      fetchData();
     } finally {
       setSavingNV(false);
     }
@@ -517,9 +543,7 @@ export default function ChamCongPage() {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !nv.active }),
     });
-    const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
-    setAllNVs(Array.isArray(data) ? data : []);
-    fetchData();
+    fetchNV(); // refresh NV sau khi toggle
   };
 
 
@@ -1182,7 +1206,7 @@ export default function ChamCongPage() {
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ loaiLuong: next }),
                                 });
-                                fetchData();
+                                fetchNV();
                               }}
                               className={`text-xs px-1.5 py-0.5 rounded font-semibold cursor-pointer hover:opacity-70 transition-opacity
                                 ${isKhoan ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
@@ -1209,7 +1233,7 @@ export default function ChamCongPage() {
                               method: "PATCH", headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ heSoTC: val }),
                             });
-                            fetchData();
+                            fetchNV();
                           }}
                           onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                           className="w-14 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1247,7 +1271,7 @@ export default function ChamCongPage() {
                                   method: "PATCH", headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ phuCapChuyenCan: val || null }),
                                 });
-                                fetchData();
+                                fetchNV();
                               }}
                               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1265,7 +1289,7 @@ export default function ChamCongPage() {
                                   method: "PATCH", headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ phuCapAn: val || null }),
                                 });
-                                fetchData();
+                                fetchNV();
                               }}
                               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1284,7 +1308,7 @@ export default function ChamCongPage() {
                                   method: "PATCH", headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ phuCapDacBiet: val || null }),
                                 });
-                                fetchData();
+                                fetchNV();
                               }}
                               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"

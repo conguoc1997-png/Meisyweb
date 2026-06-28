@@ -2,31 +2,28 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Cache trạng thái cột — tránh double-query trong cùng 1 instance
-let columnReady: boolean | null = null;
+// Auto-migrate: chạy 1 lần per cold-start
+let migrated = false;
+async function autoMigrate() {
+  if (migrated) return;
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`
+    );
+  } catch { /* ignore — column already exists */ }
+  migrated = true;
+}
 
-export async function GET() {
-  let list: object[];
-  if (columnReady !== false) {
-    try {
-      list = await prisma.nhanVien.findMany({
-        orderBy: { ten: "asc" },
-        include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
-      });
-      columnReady = true;
-      return NextResponse.json(list);
-    } catch {
-      columnReady = false;
-    }
-  }
-  // Fallback: cột soChNhatHopDong chưa có trong DB
-  list = await prisma.$queryRaw`
-    SELECT id, "maNV", ten, "chucVu", "phongBan", "loaiLuong",
-           "luongCB", "phuCapChuyenCan", "phuCapAn", "phuCapDacBiet",
-           "heSoTC", 0 as "soChNhatHopDong", "ngaySinh", active, "createdAt"
-    FROM "NhanVien"
-    ORDER BY ten ASC
-  `;
+// GET /api/cham-cong/nhan-vien?h=1 → include luongCBHistory (cho bảng lương)
+// GET /api/cham-cong/nhan-vien     → không include history (cho chấm công, nhanh hơn)
+export async function GET(req: NextRequest) {
+  await autoMigrate();
+  const withHistory = new URL(req.url).searchParams.get("h") === "1";
+
+  const list = await prisma.nhanVien.findMany({
+    orderBy: { ten: "asc" },
+    ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
+  });
   return NextResponse.json(list);
 }
 
