@@ -7,11 +7,25 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const thang = searchParams.get("thang"); // YYYY-MM
 
-    const nhanViens = await prisma.nhanVien.findMany({
-      where: { active: true },
-      orderBy: { ten: "asc" },
-      include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
-    });
+    let nhanViens: object[];
+    try {
+      nhanViens = await prisma.nhanVien.findMany({
+        where: { active: true },
+        orderBy: { ten: "asc" },
+        include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
+      });
+    } catch {
+      // Fallback: cột soChNhatHopDong chưa có trong DB
+      nhanViens = await prisma.$queryRaw`
+        SELECT id, "maNV", ten, "chucVu", "phongBan", "loaiLuong",
+               "luongCB", "phuCapChuyenCan", "phuCapAn", "phuCapDacBiet",
+               "heSoTC", 0 as "soChNhatHopDong", "ngaySinh", active,
+               "createdAt"
+        FROM "NhanVien"
+        WHERE active = true
+        ORDER BY ten ASC
+      `;
+    }
 
     let chamCongs: object[] = [];
     if (thang) {

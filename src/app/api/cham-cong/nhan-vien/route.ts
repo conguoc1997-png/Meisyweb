@@ -2,10 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const list = await prisma.nhanVien.findMany({
-    orderBy: { ten: "asc" },
-    include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
-  });
+  let list: object[];
+  try {
+    list = await prisma.nhanVien.findMany({
+      orderBy: { ten: "asc" },
+      include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } },
+    });
+  } catch {
+    // Fallback: cột soChNhatHopDong chưa có trong DB
+    list = await prisma.$queryRaw`
+      SELECT id, "maNV", ten, "chucVu", "phongBan", "loaiLuong",
+             "luongCB", "phuCapChuyenCan", "phuCapAn", "phuCapDacBiet",
+             "heSoTC", 0 as "soChNhatHopDong", "ngaySinh", active, "createdAt"
+      FROM "NhanVien"
+      ORDER BY ten ASC
+    `;
+  }
   return NextResponse.json(list);
 }
 
