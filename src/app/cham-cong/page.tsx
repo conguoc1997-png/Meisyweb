@@ -816,20 +816,20 @@ export default function ChamCongPage() {
                         const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
                         return (
                           <td key={d}
-                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition hover:brightness-95 ${defaultBg} ${isSaving ? "opacity-50" : ""}`}
+                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition-colors ${defaultBg} ${isSaving ? "opacity-40 pointer-events-none" : "hover:bg-slate-200/40 active:bg-slate-300/50"}`}
                             onClick={() => { if (!isSaving) handleCellClick(nv.id, d); }}
                             title={info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
-                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded text-[11px] font-bold ${info.bg} ${info.text}`}>
+                              <div className={`flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text}`}>
                                 {info.label}
-                              </span>
+                              </div>
                             ) : sun ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-slate-300">CN</span>
+                              <div className="flex items-center justify-center w-full h-8 text-[10px] text-slate-300">CN</div>
                             ) : holiday ? (
-                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-purple-300">L</span>
+                              <div className="flex items-center justify-center w-full h-8 text-[10px] text-purple-300">L</div>
                             ) : (
-                              <span className="inline-flex items-center justify-center w-7 h-7 text-[10px] text-slate-200 hover:text-slate-400"></span>
+                              <div className="flex items-center justify-center w-full h-8 text-[10px] text-slate-200 hover:text-slate-400" />
                             )}
                           </td>
                         );
@@ -852,7 +852,7 @@ export default function ChamCongPage() {
                         const tc = tcMap[key];
                         const sun = isSunday(d);
                         return (
-                          <td key={d} className={`p-px border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/40"}`}>
+                          <td key={d} className={`p-0 border-x border-slate-100 ${sun ? "bg-slate-100/60" : "bg-orange-50/40"}`}>
                             <input
                               type="number"
                               min="0"
@@ -873,8 +873,8 @@ export default function ChamCongPage() {
                               onBlur={e => handleTCChange(nv.id, d, e.target.value)}
                               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               placeholder=""
-                              className={`w-full h-7 text-center text-xs font-bold bg-transparent border rounded focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                ${sun ? "text-slate-500 border-slate-300" : "text-orange-700 border-orange-300"}`}
+                              className={`w-full h-8 text-center text-xs font-bold bg-transparent border-0 border-t focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                ${sun ? "text-slate-500 border-slate-200" : "text-orange-700 border-orange-200"}`}
                               title="Số giờ tăng ca"
                             />
                           </td>
