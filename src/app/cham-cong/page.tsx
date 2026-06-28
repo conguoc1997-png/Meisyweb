@@ -1284,6 +1284,7 @@ export default function ChamCongPage() {
                             <div key={key} className="flex items-center gap-1">
                               <span className="text-[10px] text-slate-400 w-7 shrink-0">{label}</span>
                               <input
+                                key={`${thang}_${nv.id}_${field}`}
                                 type="number" step={step} min="0"
                                 defaultValue={val || ""}
                                 placeholder="0"
