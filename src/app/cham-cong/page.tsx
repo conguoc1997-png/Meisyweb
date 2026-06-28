@@ -9,6 +9,7 @@ type NhanVien = {
   chucVu: string | null; phongBan: string | null;
   loaiLuong: string | null;
   luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; phuCapDacBiet: number | null; heSoTC: number;
+  soChNhatHopDong: number;
   ngaySinh: string | null;
   active: boolean;
   luongCBHistory?: LuongCBHistory[];
@@ -233,7 +234,7 @@ export default function ChamCongPage() {
   // Modal quản lý NV
   const [showNVModal, setShowNVModal] = useState(false);
   const [allNVs, setAllNVs] = useState<NhanVien[]>([]);
-  const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang });
+  const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang });
   const [editingNV, setEditingNV] = useState<NhanVien | null>(null);
   const [savingNV, setSavingNV] = useState(false);
   const [nvError, setNvError] = useState("");
@@ -482,7 +483,8 @@ export default function ChamCongPage() {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ten: nvForm.ten, chucVu: nvForm.chucVu, phongBan: nvForm.phongBan, loaiLuong: nvForm.loaiLuong,
-            luongCB: nvForm.luongCB, ngaySinh: nvForm.ngaySinh || null,
+            luongCB: nvForm.luongCB, soChNhatHopDong: Number(nvForm.soChNhatHopDong),
+            ngaySinh: nvForm.ngaySinh || null,
             thangApDung: lcbDaThayDoi ? nvForm.thangApDung : undefined,
           }),
         });
@@ -497,7 +499,7 @@ export default function ChamCongPage() {
       const data = await fetch("/api/cham-cong/nhan-vien").then(r => r.json());
       const list = Array.isArray(data) ? data : [];
       setAllNVs(list);
-      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang });
+      setNvForm({ maNV: genMaNV(list), ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang });
       setEditingNV(null);
       fetchData();
     } finally {
@@ -1132,7 +1134,9 @@ export default function ChamCongPage() {
                   const congLeDiLam   = summary["le_di_lam"] ?? 0;
                   const ngayAnDuCong  = congCoMat + congMuon + congLeDiLam;
                   const tongPhuCap    = phuCapCC + phuCapAnNgay * ngayAnDuCong + phuCapDB;
-                  const luongNgay     = soNgayLamViec > 0 ? lcb / soNgayLamViec : 0;
+                  // congChuan = T2-T7 trong tháng + số CN theo HĐ
+                  const congChuan     = soNgayLamViec + (nv.soChNhatHopDong ?? 0);
+                  const luongNgay     = congChuan > 0 ? lcb / congChuan : 0;
                   const luongCong     = luongNgay * congTinhLuong;
                   const luongTC       = heSoTC * tongTC; // đơn giá/giờ × số giờ TC
                   const thucLinh      = luongCong + luongTC + tongPhuCap;
@@ -1302,7 +1306,7 @@ export default function ChamCongPage() {
                         <button
                           title="In phiếu lương"
                           onClick={() => setPhieuLuong({
-                            nv, lcb, soNgayLamViec, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC,
+                            nv, lcb, soNgayLamViec: congChuan, congCoMat, congMuon, congNuaNgay, congPhep, congLe, congVang, congTinhLuong, tongTC, heSoTC,
                             luongCong: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : Math.round(luongCong),
                             luongTC: (isKhoan || isCoBanMay) ? 0 : Math.round(luongTC),
                             phuCapCC, phuCapAnNgay, ngayAnDuCong, phuCapDB, tongPhuCap: Math.round(tongPhuCap),
@@ -1345,8 +1349,9 @@ export default function ChamCongPage() {
                         const tongTC = days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0);
                         const lcb = getLcbForMonth(nv, thang);
                         const cong = (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0) + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
-                        const luongCong = soNgayLamViec > 0 ? (lcb / soNgayLamViec) * cong : 0;
-                        const luongTC = soNgayLamViec > 0 ? (lcb / (soNgayLamViec * 8)) * 1.5 * tongTC : 0;
+                        const cc = soNgayLamViec + (nv.soChNhatHopDong ?? 0);
+                        const luongCong = cc > 0 ? (lcb / cc) * cong : 0;
+                        const luongTC = cc > 0 ? (lcb / (cc * 8)) * 1.5 * tongTC : 0;
                         return s + luongCong + luongTC;
                       }, 0)))}₫
                     </td>
@@ -1458,7 +1463,7 @@ export default function ChamCongPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-800">Quản lý Nhân viên</h2>
-              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang }); }}
+              <button onClick={() => { setShowNVModal(false); setEditingNV(null); setNvError(""); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang }); }}
                 className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-5">
@@ -1561,6 +1566,31 @@ export default function ChamCongPage() {
                     )}
                   </div>
                   <div>
+                    <label className="text-xs text-slate-500 block mb-1">📅 Số CN phải làm / tháng (theo HĐ)</label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: "0", label: "0 CN", desc: "26 công" },
+                        { value: "2", label: "2 CN", desc: "28 công" },
+                        { value: "4", label: "4 CN", desc: "30 công" },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setNvForm(f => ({ ...f, soChNhatHopDong: opt.value }))}
+                          className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
+                            nvForm.soChNhatHopDong === opt.value
+                              ? "border-violet-400 bg-violet-50 text-violet-700"
+                              : "border-slate-200 text-slate-500 hover:border-slate-300"
+                          }`}
+                        >
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] opacity-60">{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">Số CN theo hợp đồng cộng vào công chuẩn tháng</p>
+                  </div>
+                  <div>
                     <label className="text-xs text-slate-500 block mb-1">🎂 Ngày sinh</label>
                     <input type="date" value={nvForm.ngaySinh} onChange={e => setNvForm(f => ({ ...f, ngaySinh: e.target.value }))}
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-200" />
@@ -1568,7 +1598,7 @@ export default function ChamCongPage() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   {editingNV && (
-                    <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", ngaySinh: "", thangApDung: thang }); }}
+                    <button onClick={() => { setEditingNV(null); setNvForm({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang }); }}
                       className="px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-100 transition">Huỷ</button>
                   )}
                   <button onClick={saveNV} disabled={savingNV}
@@ -1588,10 +1618,11 @@ export default function ChamCongPage() {
                       <span className="font-medium text-slate-800 text-sm">{nv.ten}</span>
                       {nv.chucVu && <span className="text-xs text-slate-400 ml-2">{nv.chucVu}</span>}
                       {nv.luongCB && <span className="text-xs text-emerald-600 ml-2">{fmt(nv.luongCB)}₫</span>}
+                      {(nv.soChNhatHopDong ?? 0) > 0 && <span className="text-xs text-violet-600 ml-2">+{nv.soChNhatHopDong}CN</span>}
                       {nv.ngaySinh && <span className="text-xs text-pink-500 ml-2">🎂 {new Date(nv.ngaySinh).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit" })}</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", loaiLuong: (nv as {loaiLuong?: string}).loaiLuong ?? "co_ban", luongCB: String(getLcbForMonth(nv, thang) || ""), ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "", thangApDung: thang }); }}
+                      <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", loaiLuong: (nv as {loaiLuong?: string}).loaiLuong ?? "co_ban", luongCB: String(getLcbForMonth(nv, thang) || ""), soChNhatHopDong: String(nv.soChNhatHopDong ?? 0), ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "", thangApDung: thang }); }}
                         className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50 transition">Sửa</button>
                       <button onClick={() => toggleActiveNV(nv)}
                         className={`text-xs px-2 py-1 rounded transition ${nv.active ? "text-slate-400 hover:bg-red-50 hover:text-red-500" : "text-green-600 hover:bg-green-50"}`}>

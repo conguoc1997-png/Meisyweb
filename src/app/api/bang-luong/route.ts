@@ -2,8 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Số ngày công chuẩn / tháng (cố định 26)
-const NGAY_CHUAN = 26;
+// Số ngày T2-T7 trong tháng (không tính CN)
+// congChuan per-employee = soNgayT2T7 + soChNhatHopDong
 
 // Trạng thái chấm công → ngày công quy đổi
 const NGAY_CONG_QUY_DOI: Record<string, number> = {
@@ -38,12 +38,14 @@ export async function GET(req: NextRequest) {
     const start = new Date(y, m - 1, 1);
     const end   = new Date(y, m, 1);
 
-    // Số ngày làm việc trong tháng (bỏ thứ 7, CN)
-    let soNgayLvThang = 0;
+    // Số ngày T2-T7 trong tháng (không tính CN — Meisy làm T2 đến T7)
+    let soNgayT2T7 = 0;
     for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
       const dow = d.getDay();
-      if (dow !== 0 && dow !== 6) soNgayLvThang++;
+      if (dow !== 0) soNgayT2T7++; // 1=T2 ... 6=T7, 0=CN
     }
+    // soNgayLvThang giữ lại để hiển thị (= soNgayT2T7, đổi tên để tương thích response cũ)
+    const soNgayLvThang = soNgayT2T7;
 
     const nhanViens = await prisma.nhanVien.findMany({
       where: { active: true },
@@ -91,7 +93,9 @@ export async function GET(req: NextRequest) {
       // Ngày chưa chấm công = mặc định di_lam (theo ngày làm việc trong tháng)
       // (Không cộng tự động — chỉ tính theo dữ liệu đã nhập)
 
-      const luongNgay  = luongCB / NGAY_CHUAN;
+      // congChuan = số ngày T2-T7 + số CN phải làm theo hợp đồng
+      const congChuan  = soNgayT2T7 + (nv.soChNhatHopDong ?? 0);
+      const luongNgay  = congChuan > 0 ? luongCB / congChuan : 0;
       const luongChinh = luongNgay * ngayCong;
       const pcAn       = phuCapAn * ngayDiLam;
       const pcChuyenCan = ngayVang === 0 ? phuCapCC : 0; // mất chuyên cần nếu có ngày vắng
@@ -107,6 +111,8 @@ export async function GET(req: NextRequest) {
         loaiLuong:    nv.loaiLuong ?? "co_ban",
         luongCB,
         heSoTC,
+        soChNhatHopDong: nv.soChNhatHopDong ?? 0,
+        congChuan,
         // Ngày
         soNgayLvThang,
         ngayCong:      Math.round(ngayCong * 2) / 2, // làm tròn 0.5

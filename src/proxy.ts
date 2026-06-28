@@ -14,6 +14,7 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/api/run-migration-booking-schedule") ||
     pathname.startsWith("/api/run-migration-fake-kho") ||
     pathname.startsWith("/api/run-add-size-fakekho") ||
+    pathname.startsWith("/api/run-migration-so-ch-nhat") ||
     pathname.startsWith("/_next")
   ) {
     return NextResponse.next();

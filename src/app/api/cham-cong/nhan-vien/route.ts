@@ -17,16 +17,16 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.nhanVien.findUnique({ where: { maNV } });
   if (existing) return NextResponse.json({ error: "Mã NV đã tồn tại" }, { status: 400 });
 
-  const { ngaySinh, thangApDung } = data;
+  const { ngaySinh, thangApDung, soChNhatHopDong } = data;
   const nv = await prisma.nhanVien.create({
     data: {
       maNV, ten,
-      chucVu:       chucVu       || null,
-      phongBan:     phongBan     || null,
-
-      loaiLuong:    loaiLuong    || "co_ban",
-      luongCB:      luongCB      ? Number(luongCB) : null,
-      ngaySinh:     ngaySinh     ? new Date(ngaySinh) : null,
+      chucVu:          chucVu          || null,
+      phongBan:        phongBan        || null,
+      loaiLuong:       loaiLuong       || "co_ban",
+      luongCB:         luongCB         ? Number(luongCB) : null,
+      soChNhatHopDong: soChNhatHopDong !== undefined ? Number(soChNhatHopDong) : 0,
+      ngaySinh:        ngaySinh        ? new Date(ngaySinh) : null,
     },
   });
 
