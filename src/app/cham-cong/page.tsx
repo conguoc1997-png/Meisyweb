@@ -1173,9 +1173,9 @@ export default function ChamCongPage() {
                   const heSoTC        = nv.heSoTC ?? 1.5;
                   // Phụ cấp theo tháng (ưu tiên) → fallback về NV default
                   const pcThang       = phuCapMap[nv.id];
-                  const phuCapCC      = pcThang?.phuCapCC   ?? nv.phuCapChuyenCan ?? 0;
-                  const phuCapAnNgay  = pcThang?.phuCapAn   ?? nv.phuCapAn        ?? 0;
-                  const phuCapDB      = pcThang?.phuCapDB   ?? nv.phuCapDacBiet   ?? 0;
+                  const phuCapCC      = pcThang?.phuCapCC   ?? 0;
+                  const phuCapAnNgay  = pcThang?.phuCapAn   ?? 0;
+                  const phuCapDB      = pcThang?.phuCapDB   ?? 0;
                   // Ngày đủ công cho PC ăn = di_lam + di_muon + ngày lễ có đi làm thật
                   const congLeDiLam   = summary["le_di_lam"] ?? 0;
                   const ngayAnDuCong  = congCoMat + congMuon + congLeDiLam;
