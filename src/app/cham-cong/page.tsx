@@ -245,6 +245,7 @@ export default function ChamCongPage() {
   const [phuCapMap, setPhuCapMap] = useState<PhuCapMap>({});
 
   const fetchPhuCap = useCallback(async () => {
+    setPhuCapMap({}); // clear ngay lập tức, tránh hiện data tháng cũ
     try {
       const data = await fetch(`/api/cham-cong/phu-cap?thang=${thang}`).then(r => r.json());
       setPhuCapMap(data && typeof data === "object" ? data : {});
@@ -1284,7 +1285,7 @@ export default function ChamCongPage() {
                             <div key={key} className="flex items-center gap-1">
                               <span className="text-[10px] text-slate-400 w-7 shrink-0">{label}</span>
                               <input
-                                key={`${thang}_${nv.id}_${field}`}
+                                key={`${thang}_${nv.id}_${field}_${val}`}
                                 type="number" step={step} min="0"
                                 defaultValue={val || ""}
                                 placeholder="0"
