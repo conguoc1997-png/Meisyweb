@@ -512,8 +512,9 @@ model NhanVien {
   ngaySinh        DateTime? // ngày sinh nhật
   active     Boolean    @default(true)
   createdAt  DateTime   @default(now())
-  chamCongs  ChamCong[]
+  chamCongs      ChamCong[]
   luongCBHistory LuongCBHistory[]
+  phuCapThang    PhuCapThang[]
 }
 
 // Lịch sử thay đổi Lương CB — áp dụng từ 1 tháng cụ thể, không ảnh hưởng các tháng trước
@@ -527,6 +528,22 @@ model LuongCBHistory {
   nhanVien NhanVien @relation(fields: [nhanVienId], references: [id], onDelete: Cascade)
 
   @@unique([nhanVienId, thangApDung])
+}
+
+// Phụ cấp theo từng tháng — CC, Ăn, ĐB độc lập mỗi tháng
+model PhuCapThang {
+  id         String   @id @default(cuid())
+  nhanVienId String
+  thang      String   // "2026-01"
+  phuCapCC   Float    @default(0)
+  phuCapAn   Float    @default(0)
+  phuCapDB   Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  nhanVien NhanVien @relation(fields: [nhanVienId], references: [id], onDelete: Cascade)
+
+  @@unique([nhanVienId, thang])
 }
 
 model ChamCong {

@@ -239,6 +239,17 @@ export default function ChamCongPage() {
   const [savingNV, setSavingNV] = useState(false);
   const [nvError, setNvError] = useState("");
 
+  // Phụ cấp theo tháng: { [nvId]: { phuCapCC, phuCapAn, phuCapDB } }
+  type PhuCapMap = Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }>;
+  const [phuCapMap, setPhuCapMap] = useState<PhuCapMap>({});
+
+  const fetchPhuCap = useCallback(async () => {
+    try {
+      const data = await fetch(`/api/cham-cong/phu-cap?thang=${thang}`).then(r => r.json());
+      setPhuCapMap(data && typeof data === "object" ? data : {});
+    } catch { setPhuCapMap({}); }
+  }, [thang]);
+
   // Khoán May
   const [locatStats, setLocatStats] = useState<LocatStats>({ dai_thuong: 0, dai_kieu: 0, short: 0 });
   const [khoanPrices, setKhoanPrices] = useState<Record<string, string>>({ dai_thuong: "", dai_kieu: "", short: "" });
@@ -278,15 +289,18 @@ export default function ChamCongPage() {
     } catch (e) { console.error("fetchNV error:", e); }
   }, []);
 
-  // Fetch ChamCong — gọi mỗi khi đổi tháng (nhẹ hơn nhiều)
+  // Fetch ChamCong + PhuCap — gọi mỗi khi đổi tháng
   const fetchCC = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json());
-      setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
+      const [ccData] = await Promise.all([
+        fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json()),
+        fetchPhuCap(),
+      ]);
+      setChamCongs(Array.isArray(ccData.chamCongs) ? ccData.chamCongs as ChamCong[] : []);
     } catch (e) { console.error("fetchCC error:", e); }
     setLoading(false);
-  }, [thang]);
+  }, [thang, fetchPhuCap]);
 
   // Gọi song song khi mount — sau đó chỉ fetchCC khi đổi tháng
   const nvLoadedRef = React.useRef(false);
@@ -1156,9 +1170,11 @@ export default function ChamCongPage() {
                   const congTinhLuong = congCoMat + congMuon + congNuaNgay + congPhep + congLe;
 
                   const heSoTC        = nv.heSoTC ?? 1.5;
-                  const phuCapCC      = nv.phuCapChuyenCan ?? 0;
-                  const phuCapAnNgay  = nv.phuCapAn ?? 0;
-                  const phuCapDB      = nv.phuCapDacBiet ?? 0;
+                  // Phụ cấp theo tháng (ưu tiên) → fallback về NV default
+                  const pcThang       = phuCapMap[nv.id];
+                  const phuCapCC      = pcThang?.phuCapCC   ?? nv.phuCapChuyenCan ?? 0;
+                  const phuCapAnNgay  = pcThang?.phuCapAn   ?? nv.phuCapAn        ?? 0;
+                  const phuCapDB      = pcThang?.phuCapDB   ?? nv.phuCapDacBiet   ?? 0;
                   // Ngày đủ công cho PC ăn = di_lam + di_muon + ngày lễ có đi làm thật
                   const congLeDiLam   = summary["le_di_lam"] ?? 0;
                   const ngayAnDuCong  = congCoMat + congMuon + congLeDiLam;
@@ -1256,64 +1272,37 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-right text-orange-600">
                         {(isKhoan || isCoBanMay || isThoiVu) ? "" : (lcb > 0 && tongTC > 0 ? fmt(Math.round(luongTC)) + "₫" : "")}
                       </td>
-                      {/* Phụ cấp — 2 ô: Chuyên cần + Ăn/ngày */}
+                      {/* Phụ cấp — theo tháng (CC, Ăn, ĐB) */}
                       <td className="px-2 py-1">
                         <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-400 w-7 shrink-0">CC</span>
-                            <input
-                              type="number" step="50000" min="0"
-                              defaultValue={phuCapCC || ""}
-                              placeholder="0"
-                              onBlur={async e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                                  method: "PATCH", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ phuCapChuyenCan: val || null }),
-                                });
-                                fetchNV();
-                              }}
-                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-400 w-7 shrink-0">Ăn</span>
-                            <input
-                              type="number" step="10000" min="0"
-                              defaultValue={phuCapAnNgay || ""}
-                              placeholder="0"
-                              onBlur={async e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                                  method: "PATCH", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ phuCapAn: val || null }),
-                                });
-                                fetchNV();
-                              }}
-                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                            {phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-400 w-7 shrink-0">ĐB</span>
-                            <input
-                              type="number" step="50000" min="0"
-                              defaultValue={phuCapDB || ""}
-                              placeholder="0"
-                              onBlur={async e => {
-                                const val = parseFloat(e.target.value) || 0;
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                                  method: "PATCH", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ phuCapDacBiet: val || null }),
-                                });
-                                fetchNV();
-                              }}
-                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                              className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                          </div>
+                          {([
+                            { key: "CC",  field: "phuCapCC",  val: phuCapCC,     step: 50000,  label: "CC" },
+                            { key: "An",  field: "phuCapAn",  val: phuCapAnNgay, step: 10000,  label: "Ăn" },
+                            { key: "DB",  field: "phuCapDB",  val: phuCapDB,     step: 50000,  label: "ĐB" },
+                          ] as const).map(({ key, field, val, step, label }) => (
+                            <div key={key} className="flex items-center gap-1">
+                              <span className="text-[10px] text-slate-400 w-7 shrink-0">{label}</span>
+                              <input
+                                type="number" step={step} min="0"
+                                defaultValue={val || ""}
+                                placeholder="0"
+                                onBlur={async e => {
+                                  const newVal = parseFloat(e.target.value) || 0;
+                                  const cur = phuCapMap[nv.id] ?? { phuCapCC, phuCapAn: phuCapAnNgay, phuCapDB };
+                                  const updated = { ...cur, [field]: newVal };
+                                  // Optimistic update
+                                  setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
+                                  await fetch("/api/cham-cong/phu-cap", {
+                                    method: "POST", headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
+                                  }).catch(() => fetchPhuCap());
+                                }}
+                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              />
+                              {label === "Ăn" && phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
+                            </div>
+                          ))}
                           {tongPhuCap > 0 && (
                             <div className="text-[11px] font-bold text-teal-700 text-right pr-1">
                               = {fmt(Math.round(tongPhuCap))}₫
