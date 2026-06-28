@@ -650,10 +650,8 @@ const QUANTRI_DEFS: { key: string; label: string; defaultPct: string }[] = [
 ];
 
 function QuanTriGiaTab() {
-  const [mode, setMode] = useState<"von" | "ban">("von");
   const [giaVon, setGiaVon] = useState("");
   const [giaNiemYetInput, setGiaNiemYetInput] = useState("");
-  const [giaVonPct, setGiaVonPct] = useState("50");
   const [fields, setFields] = useState<QuanTriField[]>(
     () => QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct, children: [] }))
   );
@@ -691,11 +689,14 @@ function QuanTriGiaTab() {
 
   const giaVonNum = Number(giaVon) || 0;
   const giaNiemYetNum = Number(giaNiemYetInput) || 0;
-  const baseNum = mode === "von" ? giaVonNum : giaNiemYetNum;
   const doanhThuTestNum = Number(doanhThuTest) || 0;
 
+  // Mốc 100% luôn là Giá niêm yết — mọi khoản chi phí (% nhập tay) tính theo mốc này.
+  // Giá vốn là số tiền nhập trực tiếp, % của nó so với Giá niêm yết tự suy ra (không cần nhập tay).
+  const giaVonPctComputed = giaNiemYetNum > 0 ? (giaVonNum / giaNiemYetNum) * 100 : 0;
+
   const rows = fields.map(f => {
-    const amount = baseNum * (Number(f.pct) || 0) / 100;
+    const amount = giaNiemYetNum * (Number(f.pct) || 0) / 100;
     const amountTest = doanhThuTestNum * (Number(f.pct) || 0) / 100;
     const childrenRows = f.children.map(c => ({
       ...c,
@@ -705,15 +706,8 @@ function QuanTriGiaTab() {
     const tongPctCon = f.children.reduce((s, c) => s + (Number(c.pct) || 0), 0);
     return { ...f, amount, amountTest, childrenRows, tongPctCon, conLaiPctCon: 100 - tongPctCon };
   });
-  const tongChiPhi = rows.reduce((s, r) => s + r.amount, 0);
 
-  // Chế độ "von": Giá niêm yết = Giá vốn + tổng chi phí (cộng dồn)
-  const giaNiemYetTinh = giaVonNum + tongChiPhi;
-
-  // Chế độ "ban": Giá niêm yết cố định = 100%, Giá vốn cũng là 1 dòng %, phần dư tự cân đối
-  const giaVonAmount = giaNiemYetNum * (Number(giaVonPct) || 0) / 100;
-  const giaVonAmountTest = doanhThuTestNum * (Number(giaVonPct) || 0) / 100;
-  const tongPct = (Number(giaVonPct) || 0) + rows.reduce((s, r) => s + (Number(r.pct) || 0), 0);
+  const tongPct = giaVonPctComputed + rows.reduce((s, r) => s + (Number(r.pct) || 0), 0);
   const conLaiPct = 100 - tongPct;
   const conLaiAmount = giaNiemYetNum * conLaiPct / 100;
   const conLaiAmountTest = doanhThuTestNum * conLaiPct / 100;
@@ -736,7 +730,6 @@ function QuanTriGiaTab() {
     if (!confirm("Đặt lại toàn bộ về mặc định?")) return;
     setGiaVon("");
     setGiaNiemYetInput("");
-    setGiaVonPct("50");
     setFields(QUANTRI_DEFS.map(d => ({ key: d.key, label: d.label, pct: d.defaultPct, children: [] })));
     setNewLabel("");
     setShowDoanhThuTest(false);
@@ -748,29 +741,28 @@ function QuanTriGiaTab() {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-end gap-4">
+        <div className="flex items-end gap-4 flex-wrap">
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1.5 block">
-              {mode === "von" ? "Giá vốn (đ)" : "Giá niêm yết (đ) — cố định 100%"}
-            </label>
+            <label className="text-sm font-medium text-slate-600 mb-1.5 block">Giá vốn (đ)</label>
             <input
-              type="number" min={0}
-              value={mode === "von" ? giaVon : giaNiemYetInput}
-              onChange={e => mode === "von" ? setGiaVon(e.target.value) : setGiaNiemYetInput(e.target.value)}
+              type="number" min={0} value={giaVon}
+              onChange={e => setGiaVon(e.target.value)}
               placeholder="0"
-              className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-52 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
-          <div className="flex bg-slate-100 rounded-lg p-1">
-            <button onClick={() => setMode("von")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${mode === "von" ? "bg-white text-rose-600 shadow-sm" : "text-slate-500"}`}>
-              Cố định Giá vốn
-            </button>
-            <button onClick={() => setMode("ban")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${mode === "ban" ? "bg-white text-rose-600 shadow-sm" : "text-slate-500"}`}>
-              Cố định Giá niêm yết (100%)
-            </button>
+          <div>
+            <label className="text-sm font-medium text-slate-600 mb-1.5 block">Giá niêm yết (đ) — mốc 100%</label>
+            <input
+              type="number" min={0} value={giaNiemYetInput}
+              onChange={e => setGiaNiemYetInput(e.target.value)}
+              placeholder="0"
+              className="w-52 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
           </div>
+          {giaNiemYetNum > 0 && giaVonNum > 0 && (
+            <span className="text-xs text-slate-400 pb-3">→ Giá vốn = {giaVonPctComputed.toFixed(1)}% giá niêm yết</span>
+          )}
         </div>
         <button onClick={resetAll}
           className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition">
@@ -778,40 +770,38 @@ function QuanTriGiaTab() {
         </button>
       </div>
 
-      {mode === "ban" && (
-        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60">
-          {!showDoanhThuTest ? (
-            <button onClick={() => setShowDoanhThuTest(true)}
-              className="text-sm text-rose-500 hover:underline font-medium">
-              + Test theo doanh thu thực tế khác
-            </button>
-          ) : (
-            <div className="flex items-end gap-3">
-              <div>
-                <label className="text-sm font-medium text-slate-600 mb-1.5 block">Doanh thu test (đ)</label>
-                <input
-                  type="number" min={0} value={doanhThuTest}
-                  onChange={e => setDoanhThuTest(e.target.value)}
-                  placeholder="0"
-                  className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-              </div>
-              <button onClick={() => { setShowDoanhThuTest(false); setDoanhThuTest(""); }}
-                className="text-sm text-slate-400 hover:text-red-500 px-2 py-2.5">Bỏ</button>
-              <p className="text-xs text-slate-400 pb-3">Áp dụng cùng % cấu trúc bên dưới vào số doanh thu này, để xem từng khoản tốn bao nhiêu mà không đổi Giá niêm yết chính.</p>
+      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+        {!showDoanhThuTest ? (
+          <button onClick={() => setShowDoanhThuTest(true)}
+            className="text-sm text-rose-500 hover:underline font-medium">
+            + Test theo doanh thu thực tế khác
+          </button>
+        ) : (
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1.5 block">Doanh thu test (đ)</label>
+              <input
+                type="number" min={0} value={doanhThuTest}
+                onChange={e => setDoanhThuTest(e.target.value)}
+                placeholder="0"
+                className="w-64 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
             </div>
-          )}
-        </div>
-      )}
+            <button onClick={() => { setShowDoanhThuTest(false); setDoanhThuTest(""); }}
+              className="text-sm text-slate-400 hover:text-red-500 px-2 py-2.5">Bỏ</button>
+            <p className="text-xs text-slate-400 pb-3">Áp dụng cùng % cấu trúc bên dưới vào số doanh thu này, để xem từng khoản tốn bao nhiêu mà không đổi Giá niêm yết chính.</p>
+          </div>
+        )}
+      </div>
 
       <div className="p-5">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200">
               <th className="text-left py-2 text-slate-500 font-medium">Khoản mục</th>
-              <th className="text-right py-2 text-slate-500 font-medium w-32">{mode === "von" ? "% / Giá vốn" : "% / Giá niêm yết"}</th>
+              <th className="text-right py-2 text-slate-500 font-medium w-32">% / Giá niêm yết</th>
               <th className="text-right py-2 text-slate-500 font-medium w-40">Số tiền (đ)</th>
-              {mode === "ban" && showDoanhThuTest && (
+              {showDoanhThuTest && (
                 <th className="text-right py-2 text-amber-600 font-medium w-40">Theo DT test (đ)</th>
               )}
               <th className="w-8"></th>
@@ -821,29 +811,17 @@ function QuanTriGiaTab() {
             <tr>
               <td className="py-2.5 font-medium text-slate-700">Giá vốn</td>
               <td className="py-2.5 text-right">
-                {mode === "von" ? (
-                  <span className="text-slate-400">—</span>
-                ) : (
-                  <>
-                    <input
-                      type="number" min={0} value={giaVonPct}
-                      onChange={e => setGiaVonPct(e.target.value)}
-                      className="w-20 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    /> %
-                  </>
-                )}
+                <span className="text-slate-400">{giaNiemYetNum > 0 ? `${giaVonPctComputed.toFixed(1)}%` : "—"}</span>
               </td>
               <td className="py-2.5 text-right font-semibold text-slate-800">
-                {fmtVnd(mode === "von" ? giaVonNum : giaVonAmount)}đ
+                {fmtVnd(giaVonNum)}đ
               </td>
-              {mode === "ban" && showDoanhThuTest && (
-                <td className="py-2.5 text-right font-semibold text-amber-600">{fmtVnd(giaVonAmountTest)}đ</td>
-              )}
+              {showDoanhThuTest && <td></td>}
               <td></td>
             </tr>
             {rows.map(r => {
               const isOpen = expanded.has(r.key);
-              const extraCols = mode === "ban" && showDoanhThuTest;
+              const extraCols = showDoanhThuTest;
               return (
               <Fragment key={r.key}>
               <tr className="group">
@@ -921,7 +899,7 @@ function QuanTriGiaTab() {
               );
             })}
             <tr>
-              <td colSpan={mode === "ban" && showDoanhThuTest ? 5 : 4} className="py-2.5">
+              <td colSpan={showDoanhThuTest ? 5 : 4} className="py-2.5">
                 <div className="flex items-center gap-2">
                   <input
                     type="text" value={newLabel}
@@ -937,24 +915,22 @@ function QuanTriGiaTab() {
                 </div>
               </td>
             </tr>
-            {mode === "ban" && (
-              <tr>
-                <td className={`py-2.5 font-medium ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>Còn lại (chưa phân bổ)</td>
-                <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{conLaiPct.toFixed(1)}%</td>
-                <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{fmtVnd(conLaiAmount)}đ</td>
-                {showDoanhThuTest && (
-                  <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{fmtVnd(conLaiAmountTest)}đ</td>
-                )}
-                <td></td>
-              </tr>
-            )}
+            <tr>
+              <td className={`py-2.5 font-medium ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>Còn lại (chưa phân bổ)</td>
+              <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{conLaiPct.toFixed(1)}%</td>
+              <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{fmtVnd(conLaiAmount)}đ</td>
+              {showDoanhThuTest && (
+                <td className={`py-2.5 text-right font-semibold ${conLaiPct < 0 ? "text-red-600" : "text-amber-600"}`}>{fmtVnd(conLaiAmountTest)}đ</td>
+              )}
+              <td></td>
+            </tr>
             <tr className="border-t-2 border-slate-200">
               <td className="py-3 font-bold text-slate-800">Giá niêm yết</td>
               <td></td>
               <td className="py-3 text-right font-bold text-rose-600 text-lg">
-                {fmtVnd(mode === "von" ? giaNiemYetTinh : giaNiemYetNum)}đ
+                {fmtVnd(giaNiemYetNum)}đ
               </td>
-              {mode === "ban" && showDoanhThuTest && (
+              {showDoanhThuTest && (
                 <td className="py-3 text-right font-bold text-amber-600 text-lg">{fmtVnd(doanhThuTestNum)}đ</td>
               )}
               <td></td>
@@ -962,9 +938,7 @@ function QuanTriGiaTab() {
           </tbody>
         </table>
         <p className="text-xs text-slate-400 mt-3">
-          {mode === "von"
-            ? "Giá niêm yết = Giá vốn + tổng các khoản chi phí (mỗi khoản tính theo % của Giá vốn)."
-            : "Giá niêm yết cố định = 100%. Mỗi khoản (gồm Giá vốn) là % của Giá niêm yết — \"Còn lại\" tự cân đối khi tổng % chưa đủ 100%."}
+          Giá niêm yết cố định = 100%. Mỗi khoản (gồm Giá vốn) là % của Giá niêm yết — &quot;Còn lại&quot; tự cân đối khi tổng % chưa đủ 100%.
         </p>
       </div>
     </div>
