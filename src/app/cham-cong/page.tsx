@@ -1574,9 +1574,9 @@ export default function ChamCongPage() {
                     <label className="text-xs text-slate-500 block mb-1">📅 Số CN phải làm / tháng (theo HĐ)</label>
                     <div className="flex gap-2">
                       {[
-                        { value: "0", label: "0 CN", desc: "26 công" },
-                        { value: "2", label: "2 CN", desc: "28 công" },
-                        { value: "4", label: "4 CN", desc: "30 công" },
+                        { value: "0", label: "0 CN", desc: "Chỉ T2–T7" },
+                        { value: "2", label: "+ 2 CN", desc: "T2–T7 + 2CN" },
+                        { value: "4", label: "+ 4 CN", desc: "T2–T7 + 4CN" },
                       ].map(opt => (
                         <button
                           key={opt.value}
@@ -1593,7 +1593,11 @@ export default function ChamCongPage() {
                         </button>
                       ))}
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1">Số CN theo hợp đồng cộng vào công chuẩn tháng</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Công chuẩn = số ngày T2–T7 trong tháng + số CN theo HĐ
+                      <br/>
+                      <span className="text-violet-500">VD: tháng 28 ngày có 24 ngày T2-T7 → NV "0 CN" = 24 công chuẩn</span>
+                    </p>
                   </div>
                   <div>
                     <label className="text-xs text-slate-500 block mb-1">🎂 Ngày sinh</label>
