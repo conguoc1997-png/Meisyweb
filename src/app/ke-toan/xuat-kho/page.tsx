@@ -160,6 +160,20 @@ export default function XuatKhoPage() {
     return !s || p.soPhieu.toLowerCase().includes(s) || (p.hangCat || "").toLowerCase().includes(s);
   }), [phieus, search]);
 
+  function exportDanhSachExcel() {
+    const header = ["STT", "Số phiếu", "Ngày", "Loại hàng", "Số SP", "Giá trị xuất (đ)", "Ghi chú"];
+    const dataRows = filtered.map((p, i) => [
+      i + 1, p.soPhieu, new Date(p.ngay).toLocaleDateString("vi-VN"), p.hangCat || "",
+      p.soSanPham ?? "", p.chiTiet.reduce((s, c) => s + c.thanhTien, 0), p.ghiChu || "",
+    ]);
+    const totalRow = ["", "", "", "TỔNG", "", filtered.reduce((s, p) => s + p.chiTiet.reduce((s2, c) => s2 + c.thanhTien, 0), 0), ""];
+    const ws = XLSX.utils.aoa_to_sheet([["Danh sách phiếu xuất kho NPL"], [], header, ...dataRows, [], totalRow]);
+    ws["!cols"] = [{ wch: 5 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Danh sach");
+    XLSX.writeFile(wb, `danh-sach-xuat-kho-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   // Chọn lô cắt → gọi suggest API
   async function onSelectLo(loCatId: string) {
     setForm(f => ({ ...f, loCatId }));
@@ -553,11 +567,17 @@ export default function XuatKhoPage() {
 
       {tab === "list" && <>
       {/* Filter */}
-      <div className="relative w-56">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Tìm số phiếu, loại hàng..."
-          className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+      <div className="flex items-center gap-3">
+        <div className="relative w-56">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm số phiếu, loại hàng..."
+            className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <button onClick={exportDanhSachExcel} disabled={filtered.length === 0}
+          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed">
+          <Download size={15} /> Xuất Excel
+        </button>
       </div>
 
       {/* Table */}
