@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, Plus, X, Pencil, PackageCheck, RefreshCw } from "lucide-react";
+import { Search, Plus, X, Pencil, PackageCheck, RefreshCw, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 type TonKho = {
   id: string;
@@ -148,6 +149,20 @@ export default function TonKhoPage() {
     const matchN = !filterNhom || t.vatTu.nhom === filterNhom;
     return matchS && matchL && matchN;
   }), [items, search, filterLoai, filterNhom]);
+
+  function exportExcel() {
+    const header = ["Tên vật tư", "Loại", "Nhóm", "Tồn kho", "Đơn vị", "SL quy đổi", "Đơn vị QĐ", "Giá TB (đ)", "Giá trị tồn (đ)"];
+    const dataRows = filtered.map(t => [
+      t.vatTu.ten, t.vatTu.loai, t.vatTu.nhom || "", t.soLuong, t.donViMua || t.vatTu.donVi,
+      t.soLuongQD, t.donViQuyDoi || t.vatTu.donVi, Math.round(t.giaTrungBinh), Math.round(t.giaTriTon),
+    ]);
+    const totalRow = ["", "", "", "", "", "", "", "TỔNG GIÁ TRỊ TỒN KHO", Math.round(filtered.reduce((s, t) => s + t.giaTriTon, 0))];
+    const ws = XLSX.utils.aoa_to_sheet([["Tồn kho Nguyên Phụ Liệu"], [], header, ...dataRows, [], totalRow]);
+    ws["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ton kho");
+    XLSX.writeFile(wb, `ton-kho-npl-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -363,6 +378,10 @@ export default function TonKhoPage() {
               Bỏ chọn
             </button>
           )}
+          <button onClick={exportExcel} disabled={filtered.length === 0}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <Download size={15} /> Xuất Excel
+          </button>
           <button onClick={handleRecalc} disabled={recalcing}
             title="Tính lại tồn kho từ lịch sử nhập/xuất"
             className="flex items-center gap-2 border border-slate-200 bg-white text-slate-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50">
