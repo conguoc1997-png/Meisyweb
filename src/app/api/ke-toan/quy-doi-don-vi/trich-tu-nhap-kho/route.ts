@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // POST — quét toàn bộ ChiTietNhapKho, gom các cặp (donViMua → donViQuyDoi, hệ số quyDoi)
-// đã từng nhập, tự tạo vào bảng QuyDoiDonVi nếu chưa có (không ghi đè dòng đã tồn tại).
+// đã từng nhập: tạo dòng mới nếu chưa có, hoặc bổ sung tên vật tư vào dòng đã tồn tại
+// (không ghi đè hệ số/ghi chú đã có, chỉ thêm tên vật tư còn thiếu vào Vật tư mẫu).
 export async function POST() {
   try {
     const chiTiets = await prisma.chiTietNhapKho.findMany({
@@ -22,24 +23,34 @@ export async function POST() {
       if (c.vatTu?.ten) map.get(key)!.vatTuTens.add(c.vatTu.ten);
     }
 
-    const existing = await prisma.quyDoiDonVi.findMany({ select: { tuDonVi: true, veDonVi: true, heSo: true } });
-    const existingKeys = new Set(existing.map(e => `${e.tuDonVi}|${e.veDonVi}|${e.heSo}`));
+    const existing = await prisma.quyDoiDonVi.findMany();
+    const existingByKey = new Map(existing.map(e => [`${e.tuDonVi}|${e.veDonVi}|${e.heSo}`, e]));
 
-    const toCreate = [...map.values()].filter(v => !existingKeys.has(`${v.tuDonVi}|${v.veDonVi}|${v.heSo}`));
+    const toCreate: { tuDonVi: string; veDonVi: string; heSo: number; vatTuVD: string | null; ghiChu: null }[] = [];
+    let soDongCapNhat = 0;
 
-    if (toCreate.length > 0) {
-      await prisma.quyDoiDonVi.createMany({
-        data: toCreate.map(v => ({
-          tuDonVi: v.tuDonVi,
-          veDonVi: v.veDonVi,
-          heSo: v.heSo,
-          vatTuVD: [...v.vatTuTens].join(", ") || null,
-          ghiChu: null,
-        })),
-      });
+    for (const v of map.values()) {
+      const key = `${v.tuDonVi}|${v.veDonVi}|${v.heSo}`;
+      const found = existingByKey.get(key);
+      if (!found) {
+        toCreate.push({ tuDonVi: v.tuDonVi, veDonVi: v.veDonVi, heSo: v.heSo, vatTuVD: [...v.vatTuTens].join(", ") || null, ghiChu: null });
+        continue;
+      }
+      // Đã có dòng này — bổ sung tên vật tư còn thiếu vào vatTuVD (không trùng lặp)
+      const daCo = new Set((found.vatTuVD || "").split(",").map(s => s.trim()).filter(Boolean));
+      const thieu = [...v.vatTuTens].filter(t => !daCo.has(t));
+      if (thieu.length > 0) {
+        const merged = [...daCo, ...thieu].join(", ");
+        await prisma.quyDoiDonVi.update({ where: { id: found.id }, data: { vatTuVD: merged } });
+        soDongCapNhat++;
+      }
     }
 
-    return NextResponse.json({ ok: true, soDongMoi: toCreate.length, tongQuet: map.size });
+    if (toCreate.length > 0) {
+      await prisma.quyDoiDonVi.createMany({ data: toCreate });
+    }
+
+    return NextResponse.json({ ok: true, soDongMoi: toCreate.length, soDongCapNhat, tongQuet: map.size });
   } catch (e: unknown) {
     console.error("[trich-tu-nhap-kho POST]", e);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });

@@ -82,7 +82,7 @@ export default function QuyDoiDonViPage() {
       const res = await fetch("/api/ke-toan/quy-doi-don-vi/trich-tu-nhap-kho", { method: "POST" });
       const data = await res.json();
       if (!res.ok) { alert("❌ Lỗi: " + (data.error || "không xác định")); return; }
-      alert(`✅ Đã quét ${data.tongQuet} cặp quy đổi từng dùng trong phiếu nhập — thêm mới ${data.soDongMoi} dòng (bỏ qua dòng đã có sẵn).`);
+      alert(`✅ Đã quét ${data.tongQuet} cặp quy đổi từng dùng trong phiếu nhập — thêm mới ${data.soDongMoi} dòng, bổ sung tên vật tư cho ${data.soDongCapNhat} dòng đã có sẵn.`);
       fetchAll();
     } finally {
       setTrichLoading(false);
