@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2, RotateCcw } from "lucide-react";
 
 type LuongCBHistory = { thangApDung: string; luongCB: number };
@@ -77,6 +77,8 @@ const getHo = (nv: { phongBan?: string | null }): HoKey =>
 export default function ChamCongPage() {
   const now = new Date();
   const [thang, setThang] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  // Tích lũy tổng Thực lĩnh khi render bảng lương — reset đầu mỗi lần build bảng, đọc lại ở dòng Tổng
+  const tongThucLinhRef = useRef(0);
 
   // Hộ kinh doanh đang chọn — lưu localStorage
   const [selectedHo, setSelectedHoRaw] = useState<HoKey | null>(() => {
@@ -1024,6 +1026,7 @@ export default function ChamCongPage() {
                   <tr><td colSpan={12} className="text-center py-10 text-slate-400">Chưa có nhân viên</td></tr>
                 )}
                 {(() => {
+                  tongThucLinhRef.current = 0;
                   const isAdmin = blAuth === "ADMIN";
                   const visibleNV = isAdmin
                     ? nhanViens
@@ -1213,6 +1216,10 @@ export default function ChamCongPage() {
                   const luongThoiVu   = isThoiVu ? heSoTC * tongTC : 0;
                   const thucLinhThoiVu = isThoiVu ? luongThoiVu + tongPhuCap : thucLinh;
 
+                  // Cộng dồn vào tổng Thực lĩnh toàn bảng — đúng theo giá trị hiển thị từng dòng
+                  const thucLinhFinal = isKhoan ? thucLinhKhoan : isCoBanMay ? thucLinhCoBanMay : isThoiVu ? thucLinhThoiVu : (lcb > 0 ? thucLinh : 0);
+                  tongThucLinhRef.current += thucLinhFinal;
+
                   return (
                     <tr key={nv.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? "" : "bg-slate-50/40"}`}>
                       <td className="px-3 py-2 text-center text-slate-400 text-xs">{idx + 1}</td>
@@ -1373,16 +1380,7 @@ export default function ChamCongPage() {
                     </td>
                     <td colSpan={4}></td>
                     <td className="px-3 py-2 text-right text-indigo-700 bg-indigo-50/50 border-l border-indigo-100">
-                      {fmt(Math.round(nhanViens.reduce((s, nv) => {
-                        const sum = getSummary(nv.id);
-                        const tongTC = days.reduce((ds, d) => ds + (tcMap[getKey(nv.id, d)] ?? 0), 0);
-                        const lcb = getLcbForMonth(nv, thang);
-                        const cong = (sum["di_lam"]??0) + (sum["di_muon"]??0) + (sum["nua_ngay"]??0) + (sum["nghi_phep"]??0) + (sum["nghi_le"]??0);
-                        const cc = soNgayLamViec + (nv.soChNhatHopDong ?? 0);
-                        const luongCong = cc > 0 ? (lcb / cc) * cong : 0;
-                        const luongTC = cc > 0 ? (lcb / (cc * 8)) * 1.5 * tongTC : 0;
-                        return s + luongCong + luongTC;
-                      }, 0)))}₫
+                      {fmt(Math.round(tongThucLinhRef.current))}₫
                     </td>
                   </tr>
                 </tfoot>
