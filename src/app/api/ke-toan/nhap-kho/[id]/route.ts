@@ -69,10 +69,17 @@ export async function PATCH(
         // Xoá chi tiết cũ
         await tx.chiTietNhapKho.deleteMany({ where: { phieuId: id } });
 
-        // Cập nhật header (không đổi soPhieu để tránh unique conflict)
+        // Kiểm tra trùng số phiếu nếu người dùng đổi số phiếu
+        if (body.soPhieu && body.soPhieu !== soPhieuCu) {
+          const trung = await tx.phieuNhapKho.findUnique({ where: { soPhieu: body.soPhieu } });
+          if (trung && trung.id !== id) throw new Error(`Số phiếu "${body.soPhieu}" đã tồn tại`);
+        }
+
+        // Cập nhật header
         await tx.phieuNhapKho.update({
           where: { id },
           data: {
+            soPhieu:    body.soPhieu    || undefined,
             ngay:       body.ngay       ? new Date(body.ngay) : undefined,
             nhaCC:      body.nhaCC      ?? undefined,
             tenNhaCC:   body.tenNhaCC   ?? undefined,
@@ -147,9 +154,16 @@ export async function PATCH(
     }
 
     // ── Chỉ sửa header (trangThai, ghiChu, soHoaDon…) ──
+    if (body.soPhieu) {
+      const trung = await prisma.phieuNhapKho.findUnique({ where: { soPhieu: body.soPhieu } });
+      if (trung && trung.id !== id) {
+        return NextResponse.json({ error: `Số phiếu "${body.soPhieu}" đã tồn tại` }, { status: 400 });
+      }
+    }
     const phieu = await prisma.phieuNhapKho.update({
       where: { id },
       data: {
+        ...(body.soPhieu     !== undefined && { soPhieu: body.soPhieu }),
         ...(body.trangThai  !== undefined && { trangThai: body.trangThai }),
         ...(body.ghiChu     !== undefined && { ghiChu: body.ghiChu || null }),
         ...(body.soHoaDon   !== undefined && { soHoaDon: body.soHoaDon || null }),
