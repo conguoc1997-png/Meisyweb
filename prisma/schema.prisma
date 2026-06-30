@@ -339,6 +339,7 @@ model QuyDoiDonVi {
   tuDonVi   String   // đơn vị nguồn (goi, cuon, hop...)
   veDonVi   String   // đơn vị đích (chiec, m, cai...)
   heSo      Float    // 1 tuDonVi = heSo veDonVi
+  vatTuVD   String?  // tên vật tư mẫu — nguồn gốc của hệ số này (khi trích từ phiếu nhập)
   ghiChu    String?
   createdAt DateTime @default(now())
 }

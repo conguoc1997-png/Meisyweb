@@ -11,16 +11,15 @@ export async function POST() {
       select: { donViMua: true, donViQuyDoi: true, quyDoi: true, vatTu: { select: { ten: true } } },
     });
 
-    // Gom theo key (donViMua|donViQuyDoi) — lấy hệ số + 1 tên vật tư ví dụ xuất hiện gần nhất
-    const map = new Map<string, { tuDonVi: string; veDonVi: string; heSo: number; vatTuTen: string }>();
+    // Gom theo key (donViMua|donViQuyDoi|heSo) — gom TẤT CẢ tên vật tư dùng chung hệ số này
+    const map = new Map<string, { tuDonVi: string; veDonVi: string; heSo: number; vatTuTens: Set<string> }>();
     for (const c of chiTiets) {
       const tuDonVi = (c.donViMua || "").trim();
       const veDonVi = (c.donViQuyDoi || "").trim();
       if (!tuDonVi || !veDonVi || tuDonVi === veDonVi) continue;
       const key = `${tuDonVi}|${veDonVi}|${c.quyDoi}`;
-      if (!map.has(key)) {
-        map.set(key, { tuDonVi, veDonVi, heSo: c.quyDoi, vatTuTen: c.vatTu?.ten || "" });
-      }
+      if (!map.has(key)) map.set(key, { tuDonVi, veDonVi, heSo: c.quyDoi, vatTuTens: new Set() });
+      if (c.vatTu?.ten) map.get(key)!.vatTuTens.add(c.vatTu.ten);
     }
 
     const existing = await prisma.quyDoiDonVi.findMany({ select: { tuDonVi: true, veDonVi: true, heSo: true } });
@@ -34,7 +33,8 @@ export async function POST() {
           tuDonVi: v.tuDonVi,
           veDonVi: v.veDonVi,
           heSo: v.heSo,
-          ghiChu: v.vatTuTen ? `Trích tự động từ phiếu nhập — VD: ${v.vatTuTen}` : "Trích tự động từ phiếu nhập",
+          vatTuVD: [...v.vatTuTens].join(", ") || null,
+          ghiChu: null,
         })),
       });
     }

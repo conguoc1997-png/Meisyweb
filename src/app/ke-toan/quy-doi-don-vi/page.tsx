@@ -9,6 +9,7 @@ type QuyDoi = {
   tuDonVi: string;
   veDonVi: string;
   heSo: number;
+  vatTuVD: string | null;
   ghiChu: string | null;
   createdAt: string;
 };
@@ -36,7 +37,8 @@ export default function QuyDoiDonViPage() {
 
   const filtered = items.filter(it => {
     const s = search.toLowerCase();
-    return !s || it.tuDonVi.toLowerCase().includes(s) || it.veDonVi.toLowerCase().includes(s) || (it.ghiChu || "").toLowerCase().includes(s);
+    return !s || it.tuDonVi.toLowerCase().includes(s) || it.veDonVi.toLowerCase().includes(s)
+      || (it.ghiChu || "").toLowerCase().includes(s) || (it.vatTuVD || "").toLowerCase().includes(s);
   });
 
   function openCreate() {
@@ -88,10 +90,10 @@ export default function QuyDoiDonViPage() {
   }
 
   function exportExcel() {
-    const header = ["Đơn vị nguồn", "Đơn vị đích", "Hệ số", "Ghi chú (tên khác đối chiếu)"];
-    const dataRows = filtered.map(it => [it.tuDonVi, it.veDonVi, it.heSo, it.ghiChu || ""]);
+    const header = ["Đơn vị nguồn", "Đơn vị đích", "Hệ số", "Vật tư mẫu", "Ghi chú (tên khác đối chiếu)"];
+    const dataRows = filtered.map(it => [it.tuDonVi, it.veDonVi, it.heSo, it.vatTuVD || "", it.ghiChu || ""]);
     const ws = XLSX.utils.aoa_to_sheet([["Bảng quy đổi đơn vị"], [], header, ...dataRows]);
-    ws["!cols"] = [{ wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 30 }];
+    ws["!cols"] = [{ wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 24 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Quy doi");
     XLSX.writeFile(wb, `bang-quy-doi-don-vi-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -131,16 +133,17 @@ export default function QuyDoiDonViPage() {
             <tr className="border-b border-slate-100 bg-slate-50 text-left">
               <th className="px-4 py-3 font-semibold text-slate-600">Quy đổi</th>
               <th className="px-4 py-3 font-semibold text-slate-600 text-right">Hệ số</th>
+              <th className="px-4 py-3 font-semibold text-slate-600">Vật tư mẫu</th>
               <th className="px-4 py-3 font-semibold text-slate-600">Ghi chú (tên khác đối chiếu)</th>
               <th className="px-4 py-3 w-20"></th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={4} className="text-center py-12 text-slate-400">Đang tải...</td></tr>
+              <tr><td colSpan={5} className="text-center py-12 text-slate-400">Đang tải...</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-12 text-slate-400">Chưa có quy đổi nào — bấm &quot;Thêm quy đổi&quot;</td></tr>
+              <tr><td colSpan={5} className="text-center py-12 text-slate-400">Chưa có quy đổi nào — bấm &quot;Thêm quy đổi&quot;</td></tr>
             )}
             {filtered.map(it => (
               <tr key={it.id} className="border-b border-slate-50 hover:bg-slate-50">
@@ -150,6 +153,7 @@ export default function QuyDoiDonViPage() {
                   <span className="text-slate-600">{it.veDonVi}</span>
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-slate-700">{it.heSo}</td>
+                <td className="px-4 py-2.5 text-teal-700">{it.vatTuVD || "—"}</td>
                 <td className="px-4 py-2.5 text-slate-500 italic">{it.ghiChu || "—"}</td>
                 <td className="px-2 py-2.5">
                   <div className="flex items-center justify-end gap-1">
