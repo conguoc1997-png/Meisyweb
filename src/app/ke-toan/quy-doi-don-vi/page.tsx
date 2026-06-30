@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, X, Download, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Download, ArrowRight, Sparkles } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type QuyDoi = {
@@ -23,6 +23,7 @@ export default function QuyDoiDonViPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [trichLoading, setTrichLoading] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -73,6 +74,19 @@ export default function QuyDoiDonViPage() {
     fetchAll();
   }
 
+  async function handleTrich() {
+    setTrichLoading(true);
+    try {
+      const res = await fetch("/api/ke-toan/quy-doi-don-vi/trich-tu-nhap-kho", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { alert("❌ Lỗi: " + (data.error || "không xác định")); return; }
+      alert(`✅ Đã quét ${data.tongQuet} cặp quy đổi từng dùng trong phiếu nhập — thêm mới ${data.soDongMoi} dòng (bỏ qua dòng đã có sẵn).`);
+      fetchAll();
+    } finally {
+      setTrichLoading(false);
+    }
+  }
+
   function exportExcel() {
     const header = ["Đơn vị nguồn", "Đơn vị đích", "Hệ số", "Ghi chú (tên khác đối chiếu)"];
     const dataRows = filtered.map(it => [it.tuDonVi, it.veDonVi, it.heSo, it.ghiChu || ""]);
@@ -91,6 +105,11 @@ export default function QuyDoiDonViPage() {
           <p className="text-sm text-slate-500 mt-0.5">Quy đổi đơn vị mua ↔ đơn vị cơ bản — kèm ghi chú tên khác để kế toán đối chiếu khớp tên</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={handleTrich} disabled={trichLoading}
+            title="Quét toàn bộ phiếu nhập kho đã có, tự thêm các cặp quy đổi chưa có trong bảng"
+            className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <Sparkles size={15} /> {trichLoading ? "Đang quét..." : "Trích từ phiếu nhập"}
+          </button>
           <button onClick={exportExcel} disabled={filtered.length === 0}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             <Download size={15} /> Xuất Excel
