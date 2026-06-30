@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, X, ChevronDown, Trash2, Eye, Pencil, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Plus, Search, X, ChevronDown, Trash2, Eye, Pencil, CheckCircle, Clock, AlertCircle, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 type VatTu = {
   id: string; ma: string; ten: string; loai: string; nhom: string | null; donVi: string;
@@ -179,6 +180,25 @@ export default function NhapKhoPage() {
     const matchNhaCC = !filterNhaCC || p.nhaCC === filterNhaCC;
     return matchSearch && matchNhaCC;
   }), [phieus, search, filterNhaCC]);
+
+  function exportExcel() {
+    const header = ["Số phiếu", "Ngày", "Nhà CC", "Số HĐ", "Nguyên phụ liệu", "Tổng tiền (đ)", "Trạng thái"];
+    const dataRows = filtered.map(p => [
+      p.soPhieu,
+      new Date(p.ngay).toLocaleDateString("vi-VN"),
+      p.tenNhaCC || NHA_CC.find(n => n.value === p.nhaCC)?.label || p.nhaCC,
+      p.soHoaDon || "",
+      [...new Set(p.chiTiet.map(c => c.vatTu?.ten).filter(Boolean))].join(", "),
+      Math.round(p.tongTien),
+      TRANG_THAI_MAP[p.trangThai]?.label || p.trangThai,
+    ]);
+    const totalRow = ["", "", "", "", "TỔNG", Math.round(filtered.reduce((s, p) => s + p.tongTien, 0)), ""];
+    const ws = XLSX.utils.aoa_to_sheet([["Phiếu nhập kho NPL"], [], header, ...dataRows, [], totalRow]);
+    ws["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 18 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Nhap kho");
+    XLSX.writeFile(wb, `phieu-nhap-kho-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
 
   const tongTienHang = chiTiet.reduce((s, r) => s + r.soLuongMua * r.donGia, 0);
   const tongVAT = chiTiet.reduce((s, r) => s + r.soLuongMua * r.donGia * (r.vat / 100), 0);
@@ -388,10 +408,16 @@ export default function NhapKhoPage() {
           <h1 className="text-2xl font-bold text-slate-800">Phiếu Nhập Kho NPL</h1>
           <p className="text-sm text-slate-500 mt-0.5">Quản lý nhập kho nguyên phụ liệu — tự động cập nhật tồn kho & công nợ</p>
         </div>
-        <button onClick={() => { setEditingId(null); setForm(f => ({ ...f, soPhieu: genSoPhieu() })); setModal("create"); }}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-          <Plus size={16} /> Tạo phiếu nhập
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportExcel} disabled={filtered.length === 0}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <Download size={15} /> Xuất Excel
+          </button>
+          <button onClick={() => { setEditingId(null); setForm(f => ({ ...f, soPhieu: genSoPhieu() })); setModal("create"); }}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
+            <Plus size={16} /> Tạo phiếu nhập
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
