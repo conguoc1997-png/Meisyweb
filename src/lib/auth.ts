@@ -21,6 +21,7 @@ export const ALL_MODULES = [
   { key: "cong-no",    label: "Công Nợ & DT",       routes: ["/cong-no", "/api/cong-no-ncc", "/api/cong-no-khach-hang", "/api/doanh-thu"] },
   { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
   { key: "backup",    label: "Backup & Restore",  routes: ["/backup", "/api/backup"] },
+  { key: "hoi-dap",  label: "Hỏi đáp AI",        routes: ["/hoi-dap", "/api/chat"] },
 ] as const;
 
 // Chuyển đổi role cũ sang module keys mới (backward compat)
