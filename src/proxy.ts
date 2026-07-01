@@ -28,11 +28,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // Hỏi đáp AI — tất cả user đã đăng nhập đều được truy cập
-  if (pathname.startsWith("/hoi-dap") || pathname.startsWith("/api/chat")) {
-    return NextResponse.next();
-  }
-
   // Admin-only routes
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     if (user.role !== "admin") {

@@ -21,7 +21,6 @@ import {
   DatabaseBackup,
   Banknote,
   Landmark,
-  MessageCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -126,12 +125,6 @@ const MODULES: NavModule[] = [
     href: "/cong-no",
   },
   {
-    key: "hoi-dap", moduleKey: "hoi-dap",
-    label: "Hỏi đáp AI", icon: MessageCircle,
-    bg: "bg-violet-50", text: "text-violet-500",
-    href: "/hoi-dap",
-  },
-  {
     key: "backup", moduleKey: "users",
     label: "Backup & Restore", icon: DatabaseBackup,
     bg: "bg-emerald-50", text: "text-emerald-500",
@@ -183,7 +176,6 @@ export default function Sidebar() {
 
   const userModules = user ? parseModules(user.role) : [];
   const visible = (moduleKey: string) =>
-    moduleKey === "hoi-dap" || // Hỏi đáp AI: mọi user đều thấy
     !user || user.role === "admin" || userModules.includes(moduleKey);
 
   return (
