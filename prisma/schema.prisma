@@ -497,25 +497,41 @@ model CongNo {
 
 // ===================== MODULE CHẤM CÔNG =====================
 
+// Lịch làm việc — set theo bộ phận hoặc từng người
+model CaLamViec {
+  id        String   @id @default(cuid())
+  ten       String   // "Ca hành chính", "Ca kho", "Ca CSKH"
+  gioVao    String   // "07:30"
+  gioRa     String   // "17:30"
+  nghiTrua  Int      @default(90) // phút nghỉ trưa
+  ghiChu    String?
+  createdAt DateTime @default(now())
+
+  nhanViens NhanVien[]
+}
+
 model NhanVien {
   id         String     @id @default(cuid())
   maNV       String     @unique
   ten        String
   chucVu     String?
   phongBan   String?
-  loaiLuong       String  @default("co_ban") // co_ban | khoan
+  loaiLuong       String  @default("co_ban") // co_ban | khoan | gio
   luongCB         Float?
+  luongGio        Float?  // đơn giá / giờ (cho loaiLuong = "gio")
   phuCapChuyenCan Float?  // phụ cấp chuyên cần cố định/tháng
   phuCapAn        Float?  // phụ cấp ăn mỗi ngày (chỉ tính ngày đi làm đủ)
   phuCapDacBiet   Float?  // phụ cấp đặc biệt cố định/tháng
   heSoTC          Float   @default(1.5) // hệ số tăng ca
   soChNhatHopDong Int     @default(0)  // số CN/tháng theo HĐ: 0, 2, hoặc 4
   ngaySinh        DateTime? // ngày sinh nhật
+  caLamViecId     String?   // lịch làm việc riêng (null = không có ca cố định)
   active     Boolean    @default(true)
   createdAt  DateTime   @default(now())
   chamCongs      ChamCong[]
   luongCBHistory LuongCBHistory[]
   phuCapThang    PhuCapThang[]
+  caLamViec      CaLamViec? @relation(fields: [caLamViecId], references: [id])
 }
 
 // Lịch sử thay đổi Lương CB — áp dụng từ 1 tháng cụ thể, không ảnh hưởng các tháng trước
@@ -554,6 +570,9 @@ model ChamCong {
   trangThai  String   @default("di_lam")
   // di_lam | nghi_phep | vang | di_muon | nua_ngay | nghi_le
   tangCa     Float?   // số giờ tăng ca (null = không TC)
+  gioVao     String?  // "07:30" — giờ chấm vào (QR/GPS)
+  gioRa      String?  // "17:30" — giờ chấm ra (QR/GPS)
+  tongGio    Float?   // tổng giờ làm thực tế (làm tròn 30p, cho lương theo giờ)
   ghiChu     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

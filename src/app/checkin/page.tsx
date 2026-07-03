@@ -1,15 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
-import { MapPin, CheckCircle, XCircle, Loader2, User } from "lucide-react";
+import { MapPin, CheckCircle, XCircle, Loader2, User, Clock, LogIn, LogOut, Timer } from "lucide-react";
 
-type NhanVien = { id: string; ten: string; maNV: string; phongBan?: string };
+type NhanVien = {
+  id: string; ten: string; maNV: string; phongBan?: string;
+  loaiLuong: string;
+  caLamViec?: { gioVao: string; gioRa: string; nghiTrua: number } | null;
+  homNay?: { gioVao?: string; gioRa?: string; trangThai?: string } | null;
+};
+
 type Step = "chon-nv" | "dang-lay-gps" | "dang-gui" | "thanh-cong" | "loi";
+type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string };
 
 export default function CheckInPage() {
   const [dsNV, setDsNV]         = useState<NhanVien[]>([]);
   const [selected, setSelected] = useState<NhanVien | null>(null);
   const [step, setStep]         = useState<Step>("chon-nv");
-  const [result, setResult]     = useState<{ action: string; time: string; location: string } | null>(null);
+  const [result, setResult]     = useState<ResultData | null>(null);
   const [errMsg, setErrMsg]     = useState("");
   const [search, setSearch]     = useState("");
 
@@ -24,6 +31,15 @@ export default function CheckInPage() {
     nv.maNV.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Badge trạng thái hôm nay
+  function StatusBadge({ nv }: { nv: NhanVien }) {
+    const h = nv.homNay;
+    if (!h?.gioVao) return null;
+    if (h.gioVao && h.gioRa)
+      return <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Vào {h.gioVao} · Ra {h.gioRa}</span>;
+    return <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Vào {h.gioVao}</span>;
+  }
+
   async function handleCheckin(nv: NhanVien) {
     setSelected(nv);
     setStep("dang-lay-gps");
@@ -31,8 +47,7 @@ export default function CheckInPage() {
 
     if (!navigator.geolocation) {
       setErrMsg("Điện thoại không hỗ trợ GPS");
-      setStep("loi");
-      return;
+      setStep("loi"); return;
     }
 
     navigator.geolocation.getCurrentPosition(
@@ -64,7 +79,7 @@ export default function CheckInPage() {
       (err) => {
         setErrMsg(
           err.code === 1
-            ? "Bạn chưa cho phép truy cập vị trí. Vào Cài đặt → trình duyệt → bật Vị trí."
+            ? "Chưa cho phép vị trí. Vào Cài đặt → Trình duyệt → bật Vị trí."
             : "Không lấy được GPS. Vui lòng thử lại."
         );
         setStep("loi");
@@ -74,28 +89,24 @@ export default function CheckInPage() {
   }
 
   function reset() {
-    setStep("chon-nv");
-    setSelected(null);
-    setResult(null);
-    setErrMsg("");
-    setSearch("");
+    setStep("chon-nv"); setSelected(null); setResult(null); setErrMsg(""); setSearch("");
+    // Refresh danh sách
+    fetch("/api/checkin").then(r => r.json()).then(data => setDsNV(Array.isArray(data) ? data : []));
   }
 
-  // ── Màn hình chọn nhân viên ──────────────────────────────────────
+  // ── Chọn nhân viên ───────────────────────────────────────────────
   if (step === "chon-nv") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex flex-col items-center px-4 py-8">
         <div className="w-full max-w-sm">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <MapPin size={32} className="text-rose-500" />
             </div>
             <h1 className="text-2xl font-bold text-stone-800">Chấm công</h1>
-            <p className="text-stone-400 text-sm mt-1">Chọn tên của bạn để chấm công</p>
+            <p className="text-stone-400 text-sm mt-1">Chọn tên của bạn</p>
           </div>
 
-          {/* Search */}
           <input
             type="text"
             placeholder="🔍 Tìm tên..."
@@ -105,35 +116,54 @@ export default function CheckInPage() {
               placeholder-stone-300 focus:outline-none focus:ring-2 focus:ring-rose-300 mb-3 text-base"
           />
 
-          {/* Danh sách NV */}
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-2 max-h-[65vh] overflow-y-auto pb-4">
             {filtered.length === 0 && (
               <p className="text-center text-stone-400 py-8">Không tìm thấy</p>
             )}
-            {filtered.map(nv => (
-              <button
-                key={nv.id}
-                onClick={() => handleCheckin(nv)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 bg-white rounded-xl
-                  border border-stone-100 hover:border-rose-300 hover:bg-rose-50/50
-                  active:scale-[0.98] transition-all text-left shadow-sm"
-              >
-                <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <User size={18} className="text-rose-500" />
-                </div>
-                <div>
-                  <p className="font-semibold text-stone-700 text-[15px]">{nv.ten}</p>
-                  <p className="text-[12px] text-stone-400">{nv.maNV}{nv.phongBan ? ` · ${nv.phongBan}` : ""}</p>
-                </div>
-              </button>
-            ))}
+            {filtered.map(nv => {
+              const h = nv.homNay;
+              const daDu = !!(h?.gioVao && h?.gioRa);
+              return (
+                <button
+                  key={nv.id}
+                  onClick={() => !daDu && handleCheckin(nv)}
+                  disabled={daDu}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 bg-white rounded-xl
+                    border transition-all text-left shadow-sm
+                    ${daDu
+                      ? "border-emerald-100 bg-emerald-50/50 opacity-70 cursor-default"
+                      : "border-stone-100 hover:border-rose-300 hover:bg-rose-50/50 active:scale-[0.98]"
+                    }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+                    ${daDu ? "bg-emerald-100" : "bg-rose-100"}`}>
+                    <User size={18} className={daDu ? "text-emerald-500" : "text-rose-500"} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-stone-700 text-[15px] truncate">{nv.ten}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-[11px] text-stone-400">{nv.maNV}{nv.phongBan ? ` · ${nv.phongBan}` : ""}</span>
+                      <StatusBadge nv={nv} />
+                    </div>
+                  </div>
+                  {nv.caLamViec && !daDu && (
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[11px] text-stone-400">{nv.caLamViec.gioVao}–{nv.caLamViec.gioRa}</p>
+                      <p className="text-[10px] text-stone-300">
+                        {nv.loaiLuong === "gio" ? "Theo giờ" : "Cố định"}
+                      </p>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Đang lấy GPS ──────────────────────────────────────────────────
+  // ── Đang xử lý ───────────────────────────────────────────────────
   if (step === "dang-lay-gps" || step === "dang-gui") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex flex-col items-center justify-center px-4">
@@ -153,34 +183,46 @@ export default function CheckInPage() {
   // ── Thành công ────────────────────────────────────────────────────
   if (step === "thanh-cong" && result) {
     const isVao = result.action === "vao";
+    const isRa  = result.action === "ra";
+    const isTC  = result.action === "tang_ca";
+
+    const bgColor = isTC ? "from-amber-50" : isVao ? "from-blue-50" : "from-emerald-50";
+    const icon    = isTC
+      ? <Timer size={64} className="text-amber-500 mx-auto mb-4" />
+      : isVao
+      ? <LogIn size={64} className="text-blue-500 mx-auto mb-4" />
+      : <LogOut size={64} className="text-emerald-500 mx-auto mb-4" />;
+    const title   = isTC ? "Đã ghi tăng ca!" : isVao ? "Chấm VÀO thành công!" : "Chấm RA thành công!";
+    const color   = isTC ? "text-amber-600" : isVao ? "text-blue-600" : "text-emerald-600";
+
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex flex-col items-center justify-center px-4">
+      <div className={`min-h-screen bg-gradient-to-b ${bgColor} to-white flex flex-col items-center justify-center px-4`}>
         <div className="text-center max-w-sm">
-          <CheckCircle size={64} className="text-emerald-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-stone-800 mb-1">
-            {isVao ? "Chấm vào thành công!" : "Chấm ra thành công!"}
-          </h2>
+          {icon}
+          <h2 className="text-2xl font-bold text-stone-800 mb-1">{title}</h2>
           <p className="text-stone-500 text-lg mb-1">{selected?.ten}</p>
-          <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm px-6 py-5 mt-6 space-y-2">
-            <div className="flex justify-between text-[15px]">
-              <span className="text-stone-400">Thời gian</span>
-              <span className="font-semibold text-stone-700">{result.time}</span>
-            </div>
-            <div className="flex justify-between text-[15px]">
-              <span className="text-stone-400">Địa điểm</span>
-              <span className="font-semibold text-stone-700">{result.location}</span>
-            </div>
-            <div className="flex justify-between text-[15px]">
-              <span className="text-stone-400">Trạng thái</span>
-              <span className={`font-semibold ${isVao ? "text-emerald-600" : "text-rose-500"}`}>
-                {isVao ? "✅ Vào làm" : "🏠 Tan ca"}
-              </span>
-            </div>
+
+          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm px-6 py-5 mt-5 space-y-3 text-left">
+            <Row label="Thời gian" value={result.time} />
+            <Row label="Địa điểm"  value={result.location} />
+            {isRa && result.gioVao && (
+              <Row label="Vào lúc" value={result.gioVao} />
+            )}
+            {isRa && result.tongGio != null && (
+              <Row label="Tổng giờ làm" value={`${result.tongGio}h`} highlight={color} />
+            )}
+            {isTC && result.tangCa != null && (
+              <Row label="Tăng ca" value={`${result.tangCa}h`} highlight="text-amber-600" />
+            )}
+            <Row label="Trạng thái"
+              value={isTC ? "⏰ Tăng ca" : isVao ? "🟢 Vào làm" : "🏠 Tan ca"}
+              highlight={color} />
           </div>
+
           <button
             onClick={reset}
-            className="mt-8 px-8 py-3 bg-emerald-500 text-white rounded-xl font-medium
-              hover:bg-emerald-600 active:scale-95 transition-all"
+            className={`mt-8 px-8 py-3 rounded-xl font-medium active:scale-95 transition-all text-white
+              ${isTC ? "bg-amber-500 hover:bg-amber-600" : isVao ? "bg-blue-500 hover:bg-blue-600" : "bg-emerald-500 hover:bg-emerald-600"}`}
           >
             Xong
           </button>
@@ -189,23 +231,31 @@ export default function CheckInPage() {
     );
   }
 
-  // ── Lỗi ───────────────────────────────────────────────────────────
+  // ── Lỗi ──────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-sm">
         <XCircle size={64} className="text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-stone-800 mb-2">Chấm công thất bại</h2>
+        <h2 className="text-xl font-bold text-stone-800 mb-3">Chấm công thất bại</h2>
         <p className="text-stone-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3">
           {errMsg}
         </p>
         <button
           onClick={reset}
-          className="mt-8 px-8 py-3 bg-rose-500 text-white rounded-xl font-medium
-            hover:bg-rose-600 active:scale-95 transition-all"
+          className="mt-8 px-8 py-3 bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 active:scale-95 transition-all"
         >
           Thử lại
         </button>
       </div>
+    </div>
+  );
+}
+
+function Row({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
+  return (
+    <div className="flex justify-between text-[14px]">
+      <span className="text-stone-400">{label}</span>
+      <span className={`font-semibold ${highlight || "text-stone-700"}`}>{value}</span>
     </div>
   );
 }
