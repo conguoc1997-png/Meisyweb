@@ -16,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="h-full">
-      <body className="min-h-full flex bg-slate-50">
+      <body className="min-h-full flex flex-col bg-slate-50">
         <UserProvider>
           <Sidebar />
           <main className="flex-1 overflow-auto">
