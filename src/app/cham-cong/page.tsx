@@ -413,6 +413,44 @@ export default function ChamCongPage() {
     return m;
   }, [chamCongs]);
 
+  // Map ghiChu: "nvId_ngayISO" → ghi chú (giờ muộn, lý do...)
+  const ghiChuMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    chamCongs.forEach(c => { if (c.ghiChu) m[`${c.nhanVienId}_${c.ngay.slice(0, 10)}`] = c.ghiChu; });
+    return m;
+  }, [chamCongs]);
+
+  // Popover ghi chú ô chấm công
+  const [notePopover, setNotePopover] = useState<{
+    key: string; nvId: string; day: number; ngay: string;
+    pos: { top: number; left: number };
+  } | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+
+  // Đóng popover khi click ra ngoài
+  useEffect(() => {
+    if (!notePopover) return;
+    const handler = (e: MouseEvent) => {
+      const el = document.getElementById("cc-note-popover");
+      if (el && !el.contains(e.target as Node)) setNotePopover(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notePopover]);
+
+  const saveNote = async (nvId: string, ngay: string, ghiChu: string, trangThai: string) => {
+    // Optimistic
+    setChamCongs(prev => prev.map(c =>
+      c.nhanVienId === nvId && c.ngay.slice(0, 10) === ngay ? { ...c, ghiChu: ghiChu || null } : c
+    ));
+    setNotePopover(null);
+    await fetch("/api/cham-cong", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nhanVienId: nvId, ngay, trangThai, ghiChu: ghiChu || null }),
+    });
+  };
+
   // Map tăng ca: "nvId_ngayISO" → số giờ TC
   const tcMap = useMemo(() => {
     const m: Record<string, number> = {};
@@ -948,10 +986,30 @@ export default function ChamCongPage() {
                             title={locked ? "🔒 Bảng đang khoá" : chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
-                              <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text}`}>
+                              <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text} group/cell`}>
                                 {info.label}
                                 {chuaRa && (
                                   <span className="absolute top-0 right-0 w-2 h-2 bg-orange-400 rounded-full border border-white" title="Chưa chấm ra" />
+                                )}
+                                {/* Chấm xanh nếu có ghi chú */}
+                                {ghiChuMap[key] && !chuaRa && (
+                                  <span className="absolute top-0 left-0 w-1.5 h-1.5 bg-sky-400 rounded-full" title={ghiChuMap[key]} />
+                                )}
+                                {/* Icon ghi chú — chỉ hiện khi hover, không khoá */}
+                                {!locked && (
+                                  <button
+                                    className="absolute bottom-0 right-0 w-4 h-4 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity bg-white/70 rounded-tl text-[9px] text-slate-500 hover:text-slate-700 hover:bg-white"
+                                    title={ghiChuMap[key] ? `Ghi chú: ${ghiChuMap[key]}` : "Thêm ghi chú (giờ muộn...)"}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      const r = e.currentTarget.getBoundingClientRect();
+                                      const ngay = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                                      setNotePopover({ key, nvId: nv.id, day: d, ngay, pos: { top: r.bottom + 4, left: r.left } });
+                                      setNoteDraft(ghiChuMap[key] || "");
+                                    }}
+                                  >
+                                    ✏
+                                  </button>
                                 )}
                               </div>
                             ) : sun ? (
@@ -2048,6 +2106,54 @@ export default function ChamCongPage() {
           </div>
         );
       })()}
+
+      {/* ═══ POPOVER GHI CHÚ Ô CHẤM CÔNG ═══ */}
+      {notePopover && (
+        <div
+          id="cc-note-popover"
+          style={{ position: "fixed", top: notePopover.pos.top, left: notePopover.pos.left, zIndex: 9999 }}
+          className="bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-64"
+        >
+          <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
+            ✏️ Ghi chú ngày {notePopover.day}/{month}
+            <span className="ml-1 text-amber-600">{TT_MAP[ccMap[notePopover.key] ?? ""]?.title ?? ""}</span>
+          </p>
+          <input
+            autoFocus
+            value={noteDraft}
+            onChange={e => setNoteDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") saveNote(notePopover.nvId, notePopover.ngay, noteDraft, ccMap[notePopover.key] ?? "di_muon");
+              if (e.key === "Escape") setNotePopover(null);
+            }}
+            placeholder="VD: đến 8:45, muộn 15 phút..."
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-300 mb-2"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => saveNote(notePopover.nvId, notePopover.ngay, noteDraft, ccMap[notePopover.key] ?? "di_muon")}
+              className="flex-1 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition"
+            >
+              Lưu
+            </button>
+            {ghiChuMap[notePopover.key] && (
+              <button
+                onClick={() => saveNote(notePopover.nvId, notePopover.ngay, "", ccMap[notePopover.key] ?? "di_muon")}
+                className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs hover:bg-red-100 transition"
+                title="Xoá ghi chú"
+              >
+                Xoá
+              </button>
+            )}
+            <button
+              onClick={() => setNotePopover(null)}
+              className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-xs hover:bg-slate-200 transition"
+            >
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
