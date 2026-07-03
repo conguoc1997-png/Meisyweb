@@ -12,12 +12,14 @@ export default function BackupReminder() {
   const router = useRouter();
 
   useEffect(() => {
-    const lastBackup = localStorage.getItem(STORAGE_KEY);
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0=CN, 1=T2
 
+    // Chỉ hiện vào thứ 2
+    if (dayOfWeek !== 1) return;
+
+    const lastBackup = localStorage.getItem(STORAGE_KEY);
     if (!lastBackup) {
-      // Chưa backup lần nào → hiện ngay
       setDaysSince(999);
       setShow(true);
       return;
@@ -27,10 +29,8 @@ export default function BackupReminder() {
     const diff = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
     setDaysSince(diff);
 
-    // Hiện banner nếu: đã quá 7 ngày HOẶC hôm nay là thứ 2 và chưa backup tuần này
-    if (diff >= REMIND_DAYS || (dayOfWeek === 1 && diff >= 5)) {
-      setShow(true);
-    }
+    // Thứ 2 + chưa backup tuần này (>= 5 ngày)
+    if (diff >= 5) setShow(true);
   }, []);
 
   function handleGoBackup() {
