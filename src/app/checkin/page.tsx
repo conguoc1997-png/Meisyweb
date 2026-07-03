@@ -9,22 +9,46 @@ type NhanVien = {
   homNay?: { gioVao?: string; gioRa?: string; trangThai?: string } | null;
 };
 
-type Step = "chon-nv" | "dang-lay-gps" | "dang-gui" | "thanh-cong" | "loi";
+type Step = "xin-vitri" | "lay-vitri" | "chon-nv" | "dang-gui" | "thanh-cong" | "loi";
 type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string };
 
 export default function CheckInPage() {
   const [dsNV, setDsNV]         = useState<NhanVien[]>([]);
   const [selected, setSelected] = useState<NhanVien | null>(null);
-  const [step, setStep]         = useState<Step>("chon-nv");
+  const [step, setStep]         = useState<Step>("xin-vitri");
   const [result, setResult]     = useState<ResultData | null>(null);
   const [errMsg, setErrMsg]     = useState("");
   const [search, setSearch]     = useState("");
+  const [coords, setCoords]     = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/checkin")
       .then(r => r.json())
       .then(data => setDsNV(Array.isArray(data) ? data : []));
   }, []);
+
+  function xinViTri() {
+    if (!navigator.geolocation) {
+      setErrMsg("Điện thoại không hỗ trợ GPS. Hãy mở bằng Safari hoặc Chrome.");
+      setStep("loi"); return;
+    }
+    setStep("lay-vitri");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setStep("chon-nv");
+      },
+      (err) => {
+        setErrMsg(
+          err.code === 1
+            ? "Bạn chưa cho phép truy cập vị trí.\n\niPhone: Cài đặt → Safari → Vị trí → Cho phép\nAndroid: Cài đặt → Ứng dụng → Chrome → Quyền → Vị trí"
+            : "Không lấy được GPS. Hãy bật Vị trí trong Cài đặt và thử lại."
+        );
+        setStep("loi");
+      },
+      { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
+    );
+  }
 
   const filtered = dsNV.filter(nv =>
     nv.ten.toLowerCase().includes(search.toLowerCase()) ||
@@ -41,57 +65,69 @@ export default function CheckInPage() {
   }
 
   async function handleCheckin(nv: NhanVien) {
+    if (!coords) return;
     setSelected(nv);
-    setStep("dang-lay-gps");
+    setStep("dang-gui");
     setErrMsg("");
-
-    if (!navigator.geolocation) {
-      setErrMsg("Điện thoại không hỗ trợ GPS");
-      setStep("loi"); return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        setStep("dang-gui");
-        try {
-          const res = await fetch("/api/checkin", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              nhanVienId: nv.id,
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok || data.error) {
-            setErrMsg(data.error || "Lỗi không xác định");
-            setStep("loi");
-          } else {
-            setResult(data);
-            setStep("thanh-cong");
-          }
-        } catch {
-          setErrMsg("Không thể kết nối máy chủ");
-          setStep("loi");
-        }
-      },
-      (err) => {
-        setErrMsg(
-          err.code === 1
-            ? "Chưa cho phép vị trí. Vào Cài đặt → Trình duyệt → bật Vị trí."
-            : "Không lấy được GPS. Vui lòng thử lại."
-        );
+    try {
+      const res = await fetch("/api/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nhanVienId: nv.id, lat: coords.lat, lng: coords.lng }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setErrMsg(data.error || "Lỗi không xác định");
         setStep("loi");
-      },
-      { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
-    );
+      } else {
+        setResult(data);
+        setStep("thanh-cong");
+      }
+    } catch {
+      setErrMsg("Không thể kết nối máy chủ");
+      setStep("loi");
+    }
   }
 
   function reset() {
-    setStep("chon-nv"); setSelected(null); setResult(null); setErrMsg(""); setSearch("");
-    // Refresh danh sách
+    setStep("xin-vitri"); setSelected(null); setResult(null); setErrMsg(""); setSearch(""); setCoords(null);
     fetch("/api/checkin").then(r => r.json()).then(data => setDsNV(Array.isArray(data) ? data : []));
+  }
+
+  // ── Xin vị trí ───────────────────────────────────────────────────
+  if (step === "xin-vitri") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex flex-col items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <div className="w-20 h-20 bg-rose-100 rounded-3xl flex items-center justify-center mx-auto mb-5">
+            <MapPin size={40} className="text-rose-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-stone-800 mb-2">Chấm công</h1>
+          <p className="text-stone-400 text-sm mb-8">Hệ thống cần xác nhận bạn đang ở<br/>trong khu vực làm việc</p>
+          <button
+            onClick={xinViTri}
+            className="w-full py-4 bg-rose-500 text-white rounded-2xl font-semibold text-lg
+              hover:bg-rose-600 active:scale-[0.98] transition-all shadow-lg shadow-rose-200"
+          >
+            📍 Cho phép truy cập vị trí
+          </button>
+          <p className="text-stone-300 text-xs mt-4">Khi popup hiện ra → bấm "Cho phép"</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Đang lấy vị trí ──────────────────────────────────────────────
+  if (step === "lay-vitri") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex flex-col items-center justify-center px-4">
+        <div className="text-center">
+          <Loader2 size={48} className="text-rose-400 animate-spin mx-auto mb-4" />
+          <p className="text-stone-600 font-medium text-lg">Đang lấy vị trí GPS...</p>
+          <p className="text-stone-400 text-sm mt-2">Vui lòng chờ trong giây lát</p>
+        </div>
+      </div>
+    );
   }
 
   // ── Chọn nhân viên ───────────────────────────────────────────────
@@ -163,18 +199,14 @@ export default function CheckInPage() {
     );
   }
 
-  // ── Đang xử lý ───────────────────────────────────────────────────
-  if (step === "dang-lay-gps" || step === "dang-gui") {
+  // ── Đang gửi ─────────────────────────────────────────────────────
+  if (step === "dang-gui") {
     return (
       <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex flex-col items-center justify-center px-4">
         <div className="text-center">
           <Loader2 size={48} className="text-rose-400 animate-spin mx-auto mb-4" />
-          <p className="text-stone-600 font-medium text-lg">
-            {step === "dang-lay-gps" ? "Đang lấy vị trí GPS..." : "Đang xác nhận..."}
-          </p>
-          <p className="text-stone-400 text-sm mt-2">
-            {step === "dang-lay-gps" ? "Vui lòng cho phép truy cập vị trí" : selected?.ten}
-          </p>
+          <p className="text-stone-600 font-medium text-lg">Đang xác nhận...</p>
+          <p className="text-stone-400 text-sm mt-2">{selected?.ten}</p>
         </div>
       </div>
     );
