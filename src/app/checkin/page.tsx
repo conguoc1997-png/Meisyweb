@@ -12,6 +12,20 @@ type NhanVien = {
 type Step = "xin-vitri" | "lay-vitri" | "chon-nv" | "dang-gui" | "thanh-cong" | "loi";
 type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string };
 
+// Phát hiện webview (camera app mở link — không có quyền GPS)
+function isWebView() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  // iOS webview: có AppleWebKit nhưng KHÔNG có Safari/
+  const iosWebView = /iPhone|iPad|iPod/.test(ua) && /AppleWebKit/.test(ua) && !/Safari\//.test(ua);
+  // Android webview
+  const androidWebView = /Android/.test(ua) && /wv/.test(ua);
+  return iosWebView || androidWebView;
+}
+function isIOS() {
+  return typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+}
+
 export default function CheckInPage() {
   const [dsNV, setDsNV]         = useState<NhanVien[]>([]);
   const [selected, setSelected] = useState<NhanVien | null>(null);
@@ -20,16 +34,29 @@ export default function CheckInPage() {
   const [errMsg, setErrMsg]     = useState("");
   const [search, setSearch]     = useState("");
   const [coords, setCoords]     = useState<{ lat: number; lng: number } | null>(null);
+  const [inWebView, setInWebView] = useState(false);
 
   useEffect(() => {
+    setInWebView(isWebView());
     fetch("/api/checkin")
       .then(r => r.json())
       .then(data => setDsNV(Array.isArray(data) ? data : []));
   }, []);
 
+  function moTrongTrinh() {
+    // Mở lại trang trong trình duyệt thật
+    const url = window.location.href;
+    if (isIOS()) {
+      window.location.href = url; // iOS Safari sẽ hỏi "Mở trong Safari?"
+    } else {
+      // Android: thử intent
+      window.location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
+    }
+  }
+
   function xinViTri() {
     if (!navigator.geolocation) {
-      setErrMsg("Điện thoại không hỗ trợ GPS. Hãy mở bằng Safari hoặc Chrome.");
+      setErrMsg("no-geo");
       setStep("loi"); return;
     }
     setStep("lay-vitri");
@@ -39,11 +66,7 @@ export default function CheckInPage() {
         setStep("chon-nv");
       },
       (err) => {
-        setErrMsg(
-          err.code === 1
-            ? "Bạn chưa cho phép truy cập vị trí.\n\niPhone: Cài đặt → Safari → Vị trí → Cho phép\nAndroid: Cài đặt → Ứng dụng → Chrome → Quyền → Vị trí"
-            : "Không lấy được GPS. Hãy bật Vị trí trong Cài đặt và thử lại."
-        );
+        setErrMsg(err.code === 1 ? "denied" : "fail");
         setStep("loi");
       },
       { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
@@ -96,6 +119,43 @@ export default function CheckInPage() {
 
   // ── Xin vị trí ───────────────────────────────────────────────────
   if (step === "xin-vitri") {
+    // Đang trong webview (camera app) → không lấy được GPS → bảo mở Safari/Chrome
+    if (inWebView) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex flex-col items-center justify-center px-4">
+          <div className="text-center max-w-sm">
+            <div className="text-5xl mb-5">📱</div>
+            <h1 className="text-xl font-bold text-stone-800 mb-2">Mở bằng trình duyệt</h1>
+            <p className="text-stone-500 text-sm mb-6">
+              Camera app không hỗ trợ GPS.<br/>
+              Hãy mở trang này trong{" "}
+              <strong>{isIOS() ? "Safari" : "Chrome"}</strong> để chấm công.
+            </p>
+            <div className="bg-white border border-amber-200 rounded-2xl px-5 py-4 mb-6 text-left space-y-2">
+              {isIOS() ? (
+                <>
+                  <p className="text-sm text-stone-600">1. Bấm nút <strong>Chia sẻ</strong> (⬜↑) ở góc màn hình</p>
+                  <p className="text-sm text-stone-600">2. Chọn <strong>"Mở trong Safari"</strong></p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-stone-600">1. Bấm <strong>⋮</strong> góc trên phải</p>
+                  <p className="text-sm text-stone-600">2. Chọn <strong>"Mở trong Chrome"</strong></p>
+                </>
+              )}
+            </div>
+            <p className="text-stone-300 text-xs">hoặc copy link và dán vào trình duyệt</p>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(window.location.href).catch(()=>{}); }}
+              className="mt-3 px-4 py-2 bg-stone-100 text-stone-600 rounded-xl text-sm"
+            >
+              📋 Copy link
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-rose-50 to-white flex flex-col items-center justify-center px-4">
         <div className="text-center max-w-sm">
@@ -109,9 +169,9 @@ export default function CheckInPage() {
             className="w-full py-4 bg-rose-500 text-white rounded-2xl font-semibold text-lg
               hover:bg-rose-600 active:scale-[0.98] transition-all shadow-lg shadow-rose-200"
           >
-            📍 Cho phép truy cập vị trí
+            📍 Xác định vị trí của tôi
           </button>
-          <p className="text-stone-300 text-xs mt-4">Khi popup hiện ra → bấm "Cho phép"</p>
+          <p className="text-stone-300 text-xs mt-4">Khi hỏi quyền vị trí → bấm "Cho phép"</p>
         </div>
       </div>
     );
@@ -264,17 +324,48 @@ export default function CheckInPage() {
   }
 
   // ── Lỗi ──────────────────────────────────────────────────────────
+  const isDenied = errMsg === "denied" || errMsg === "no-geo";
   return (
     <div className="min-h-screen bg-gradient-to-b from-red-50 to-white flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-sm">
-        <XCircle size={64} className="text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-stone-800 mb-3">Chấm công thất bại</h2>
-        <p className="text-stone-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-          {errMsg}
-        </p>
+        <div className="text-5xl mb-4">{isDenied ? "🔒" : "❌"}</div>
+        <h2 className="text-xl font-bold text-stone-800 mb-3">
+          {isDenied ? "Chưa bật vị trí" : "Chấm công thất bại"}
+        </h2>
+
+        {errMsg === "denied" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-5 text-left space-y-2">
+            {isIOS() ? (
+              <>
+                <p className="text-sm font-semibold text-amber-800">Cách bật trên iPhone:</p>
+                <p className="text-sm text-stone-600">Cài đặt → Safari → Vị trí → <strong>Cho phép</strong></p>
+                <p className="text-xs text-stone-400">Sau đó quay lại và thử lại</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-amber-800">Cách bật trên Android:</p>
+                <p className="text-sm text-stone-600">Cài đặt → Ứng dụng → Chrome → Quyền → Vị trí → <strong>Cho phép</strong></p>
+                <p className="text-xs text-stone-400">Sau đó quay lại và thử lại</p>
+              </>
+            )}
+          </div>
+        )}
+
+        {errMsg === "no-geo" && (
+          <p className="text-stone-500 text-sm bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-5">
+            Trình duyệt không hỗ trợ GPS.<br/>Hãy dùng Safari (iPhone) hoặc Chrome (Android).
+          </p>
+        )}
+
+        {errMsg !== "denied" && errMsg !== "no-geo" && (
+          <p className="text-stone-500 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5">
+            {errMsg}
+          </p>
+        )}
+
         <button
           onClick={reset}
-          className="mt-8 px-8 py-3 bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 active:scale-95 transition-all"
+          className="w-full py-3 bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 active:scale-95 transition-all"
         >
           Thử lại
         </button>
