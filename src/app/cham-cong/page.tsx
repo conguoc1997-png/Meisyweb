@@ -94,6 +94,7 @@ export default function ChamCongPage() {
   const [nhanViensAll, setNhanViens] = useState<NhanVien[]>([]);
   const [chamCongs, setChamCongs] = useState<ChamCong[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ccLoading, setCcLoading] = useState(false); // spinner nhẹ khi đổi tháng
   // savingSet: dùng Set để track ô đang save — chỉ block double-click trên cùng 1 ô
   const savingSetRef = React.useRef(new Set<string>());
 
@@ -320,19 +321,39 @@ export default function ChamCongPage() {
 
   // ★ Fetch tất cả 1 lần — NV + CC + PhuCap gộp 1 request
   const nvLoadedRef = React.useRef(false);
+  const abortRef = React.useRef<AbortController | null>(null);
+
   const fetchData = useCallback(async (withHistory = false) => {
-    setLoading(true);
+    // Hủy request trước nếu đang bay
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    const nvAlreadyLoaded = nvLoadedRef.current && !withHistory;
+    if (!nvAlreadyLoaded) setLoading(true);
+    else setCcLoading(true);
+
     try {
-      const h = withHistory ? "&h=1" : "";
-      const data = await fetch(`/api/cham-cong/load?thang=${thang}${h}`).then(r => r.json());
+      const h   = withHistory ? "&h=1" : "";
+      const nv  = nvAlreadyLoaded ? "&nv=0" : ""; // bỏ qua query NV khi đổi tháng
+      const res = await fetch(`/api/cham-cong/load?thang=${thang}${h}${nv}`, { signal: ctrl.signal });
+      const data = await res.json();
       if (data.error) { console.error("fetchData error:", data.error); }
-      const list = Array.isArray(data.nhanViens) ? data.nhanViens as NhanVien[] : [];
-      setNhanViens(list);
-      if (!nvLoadedRef.current) { setAllNVs(list); nvLoadedRef.current = true; }
+
+      if (!nvAlreadyLoaded) {
+        const list = Array.isArray(data.nhanViens) ? data.nhanViens as NhanVien[] : [];
+        setNhanViens(list);
+        setAllNVs(list);
+        nvLoadedRef.current = true;
+      }
       setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
       setPhuCapMap(data.phuCaps && typeof data.phuCaps === "object" ? data.phuCaps : {});
-    } catch (e) { console.error("fetchData error:", e); }
-    setLoading(false);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === "AbortError") return; // request bị hủy bình thường
+      console.error("fetchData error:", e);
+    } finally {
+      if (!ctrl.signal.aborted) { setLoading(false); setCcLoading(false); }
+    }
   }, [thang]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -778,8 +799,9 @@ export default function ChamCongPage() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 shadow-sm">
           <button onClick={prevMonth} className="p-1 rounded hover:bg-slate-100 transition"><ChevronLeft size={16} /></button>
-          <span className="text-base font-bold text-slate-800 min-w-[140px] text-center">
+          <span className="text-base font-bold text-slate-800 min-w-[140px] text-center flex items-center justify-center gap-1.5">
             Tháng {month}/{year}
+            {ccLoading && <span className="inline-block w-3.5 h-3.5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />}
           </span>
           <button onClick={nextMonth} className="p-1 rounded hover:bg-slate-100 transition"><ChevronRight size={16} /></button>
         </div>
@@ -1017,37 +1039,60 @@ export default function ChamCongPage() {
 
       {/* ─── TAB BẢNG LƯƠNG ─── */}
       {activeTab === "luong" && !blAuth && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 max-w-sm mx-auto mt-8">
-          <div className="text-center mb-5">
-            <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">💰</div>
-            <h2 className="font-bold text-slate-800">Xem bảng lương</h2>
-            <p className="text-xs text-slate-400 mt-1">Nhập mã nhân viên để xem lương của bạn</p>
+        <div className="max-w-sm mx-auto mt-8 space-y-4">
+          {/* Xem lương cá nhân */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-xl">💰</div>
+              <div>
+                <h2 className="font-bold text-slate-800 text-sm">Xem lương cá nhân</h2>
+                <p className="text-xs text-slate-400">Nhập mã nhân viên của bạn</p>
+              </div>
+            </div>
+            <form onSubmit={e => {
+              e.preventDefault();
+              const val = blInput.trim().toUpperCase();
+              if (!val) return;
+              setBlAuth(val);
+              setBlError("");
+            }} className="space-y-3">
+              <input autoFocus value={blInput}
+                onChange={e => { setBlInput(e.target.value); setBlError(""); }}
+                placeholder="Mã nhân viên (VD: NV01)"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono" />
+              {blError && !blPass && <p className="text-xs text-red-500">{blError}</p>}
+              <button type="submit" className="w-full bg-violet-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700">
+                Xem lương
+              </button>
+            </form>
           </div>
-          <form onSubmit={e => {
-            e.preventDefault();
-            const val = blInput.trim().toUpperCase();
-            if (!val) return;
-            if (val === "ADMIN") {
-              if (blPass !== getAdminPin()) { setBlError("Sai mật khẩu ADMIN"); setBlPass(""); return; }
-            }
-            setBlAuth(val);
-            setBlError("");
-          }} className="space-y-3">
-            <input autoFocus value={blInput}
-              onChange={e => { setBlInput(e.target.value); setBlError(""); }}
-              placeholder="Mã nhân viên hoặc ADMIN"
-              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono" />
-            {blInput.trim().toUpperCase() === "ADMIN" && (
+
+          {/* Đăng nhập ADMIN */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">🔐</div>
+              <div>
+                <h2 className="font-bold text-slate-800 text-sm">Quản trị viên</h2>
+                <p className="text-xs text-slate-400">Nhập mật khẩu để xem toàn bộ bảng lương</p>
+              </div>
+            </div>
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (!blPass) return;
+              if (blPass !== getAdminPin()) { setBlError("admin-wrong"); setBlPass(""); return; }
+              setBlAuth("ADMIN");
+              setBlError("");
+            }} className="space-y-3">
               <input type="password" value={blPass}
                 onChange={e => { setBlPass(e.target.value); setBlError(""); }}
                 placeholder="Mật khẩu ADMIN"
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
-            )}
-            {blError && <p className="text-xs text-red-500">{blError}</p>}
-            <button type="submit" className="w-full bg-violet-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700">
-              Xem lương
-            </button>
-          </form>
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300" />
+              {blError === "admin-wrong" && <p className="text-xs text-red-500">Sai mật khẩu ADMIN</p>}
+              <button type="submit" className="w-full bg-amber-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-amber-600">
+                Đăng nhập ADMIN
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
