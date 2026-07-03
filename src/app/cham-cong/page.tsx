@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2, RotateCcw, Lock, Unlock } from "lucide-react";
 
 type LuongCBHistory = { thangApDung: string; luongCB: number };
 type NhanVien = {
@@ -95,6 +95,15 @@ export default function ChamCongPage() {
   const [chamCongs, setChamCongs] = useState<ChamCong[]>([]);
   const [loading, setLoading] = useState(true);
   const [ccLoading, setCcLoading] = useState(false); // spinner nhẹ khi đổi tháng
+  // Khoá bảng chấm công — tránh bấm nhầm
+  const [locked, setLocked] = useState<boolean>(() => {
+    try { return localStorage.getItem("meisy_cc_locked") === "1"; } catch { return false; }
+  });
+  const toggleLock = () => setLocked(v => {
+    const next = !v;
+    try { localStorage.setItem("meisy_cc_locked", next ? "1" : "0"); } catch {}
+    return next;
+  });
   // savingSet: dùng Set để track ô đang save — chỉ block double-click trên cùng 1 ô
   const savingSetRef = React.useRef(new Set<string>());
 
@@ -448,6 +457,7 @@ export default function ChamCongPage() {
   }, [nhanViens, allNVs]);
 
   const handleCellClick = async (nvId: string, day: number) => {
+    if (locked) return; // bảng đang khoá
     // Xác nhận khi bấm vào ngày CN (chưa có dữ liệu)
     const key = getKey(nvId, day);
     const cur = ccMap[key] ?? "";
@@ -736,6 +746,19 @@ export default function ChamCongPage() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-purple-200 text-sm text-purple-600 hover:bg-purple-50 transition">
             <CalendarDays size={14} /> Ngày lễ
           </button>
+          {/* Nút khoá/mở khoá bảng */}
+          <button
+            onClick={toggleLock}
+            title={locked ? "Đang khoá — nhấn để mở khoá chấm công" : "Đang mở — nhấn để khoá tránh bấm nhầm"}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition
+              ${locked
+                ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+                : "border-slate-200 text-slate-500 hover:bg-slate-50"
+              }`}
+          >
+            {locked ? <Lock size={14} /> : <Unlock size={14} />}
+            {locked ? "Đã khoá" : "Khoá"}
+          </button>
           <button onClick={openNVModal}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition">
             <Users size={14} /> Nhân viên
@@ -920,9 +943,9 @@ export default function ChamCongPage() {
                         const chuaRa = chuaRaMap[key]; // có vào nhưng chưa ra
                         return (
                           <td key={d}
-                            className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition-colors ${defaultBg} hover:bg-slate-200/40 active:bg-slate-300/50`}
+                            className={`p-0 text-center select-none border-x border-slate-100 transition-colors ${defaultBg} ${locked ? "cursor-default" : "cursor-pointer hover:bg-slate-200/40 active:bg-slate-300/50"}`}
                             onClick={() => handleCellClick(nv.id, d)}
-                            title={chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
+                            title={locked ? "🔒 Bảng đang khoá" : chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
                               <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text}`}>
