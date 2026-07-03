@@ -11,23 +11,25 @@ async function run(sql: string) {
 }
 async function autoMigrate() {
   if (migrated) return;
-  await run(`
-    CREATE TABLE IF NOT EXISTS "CaLamViec" (
-      "id"        TEXT NOT NULL,
-      "ten"       TEXT NOT NULL,
-      "gioVao"    TEXT NOT NULL DEFAULT '07:30',
-      "gioRa"     TEXT NOT NULL DEFAULT '17:30',
-      "nghiTrua"  INTEGER NOT NULL DEFAULT 90,
-      "ghiChu"    TEXT,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY ("id")
-    )
-  `);
-  await run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`);
-  await run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`);
-  await run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`);
-  await run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`);
-  await run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`);
+  await Promise.all([
+    run(`
+      CREATE TABLE IF NOT EXISTS "CaLamViec" (
+        "id"        TEXT NOT NULL,
+        "ten"       TEXT NOT NULL,
+        "gioVao"    TEXT NOT NULL DEFAULT '07:30',
+        "gioRa"     TEXT NOT NULL DEFAULT '17:30',
+        "nghiTrua"  INTEGER NOT NULL DEFAULT 90,
+        "ghiChu"    TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY ("id")
+      )
+    `),
+    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`),
+    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`),
+    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`),
+    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`),
+    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`),
+  ]);
   migrated = true;
 }
 
@@ -43,19 +45,19 @@ export async function GET() {
 // Helper: gán ca cho NV sau khi tạo/cập nhật
 async function assignCa(caId: string, apDung: string, boPhanList: string[], nhanVienIds: string[]) {
   if (apDung === "bo_phan" && boPhanList.length > 0) {
-    for (const bp of boPhanList) {
-      await prisma.$executeRawUnsafe(
+    await Promise.all(boPhanList.map(bp =>
+      prisma.$executeRawUnsafe(
         `UPDATE "NhanVien" SET "caLamViecId"=$1 WHERE "phongBan" ILIKE $2 AND "active"=true`,
         caId, bp
-      );
-    }
+      )
+    ));
   } else if (apDung === "nhan_vien" && nhanVienIds.length > 0) {
-    for (const nvId of nhanVienIds) {
-      await prisma.$executeRawUnsafe(
+    await Promise.all(nhanVienIds.map(nvId =>
+      prisma.$executeRawUnsafe(
         `UPDATE "NhanVien" SET "caLamViecId"=$1 WHERE "id"=$2`,
         caId, nvId
-      );
-    }
+      )
+    ));
   }
 }
 
