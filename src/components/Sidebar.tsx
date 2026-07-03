@@ -21,6 +21,7 @@ import {
   DatabaseBackup,
   Banknote,
   Landmark,
+  QrCode,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -108,8 +109,9 @@ const MODULES: NavModule[] = [
     label: "Nhân sự", icon: CalendarCheck,
     bg: "bg-orange-50", text: "text-orange-400",
     children: [
-      { href: "/cham-cong",   label: "Chấm công",   icon: CalendarCheck, moduleKey: "cham-cong" },
-      { href: "/bang-luong",  label: "Bảng lương",   icon: Banknote,      moduleKey: "cham-cong" },
+      { href: "/cham-cong",     label: "Chấm công",    icon: CalendarCheck, moduleKey: "cham-cong" },
+      { href: "/bang-luong",    label: "Bảng lương",   icon: Banknote,      moduleKey: "cham-cong" },
+      { href: "/cham-cong/qr", label: "Mã QR chấm công", icon: QrCode,    moduleKey: "cham-cong" },
     ],
   },
   {

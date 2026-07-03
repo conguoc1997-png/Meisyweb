@@ -6,6 +6,8 @@ export async function proxy(req: NextRequest) {
 
   // Always allow auth and static routes
   if (
+    pathname.startsWith("/checkin") ||
+    pathname.startsWith("/api/checkin") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/run-migration-hao-hui") ||
