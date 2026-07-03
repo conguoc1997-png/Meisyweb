@@ -106,6 +106,13 @@ export async function POST(req: NextRequest) {
     const hourNow = vnNow.getHours() + vnNow.getMinutes() / 60;
     const gioRaCa = ca ? timeToMin(ca.gioRa) / 60 : 17;
 
+    // Phát hiện đi muộn: so với gioVao ca + 15 phút biên độ tha
+    const BIEN_DO_MUON = 15; // phút
+    const phutMuon = ca
+      ? timeToMin(timeStr) - timeToMin(ca.gioVao) - BIEN_DO_MUON
+      : 0;
+    const diMuon = phutMuon > 0;
+
     // Lấy bản ghi hôm nay qua raw SQL
     type CCRow = { gioVao: string | null; gioRa: string | null; tongGio: number | null; trangThai: string };
     const ccRows = await prisma.$queryRawUnsafe<CCRow[]>(
@@ -117,6 +124,7 @@ export async function POST(req: NextRequest) {
     // ── LƯƠNG THEO GIỜ ──────────────────────────────────────────────
     if (nv.loaiLuong === "gio") {
       if (!existing?.gioVao) {
+        // Theo giờ: không đánh muộn, chỉ ghi giờ vào thực tế
         await upsertCC(nhanVienId, today, { trangThai: "di_lam", gioVao: timeStr });
         return NextResponse.json({ ok: true, action: "vao", time: timeStr, location: matched.name });
       }
@@ -135,8 +143,13 @@ export async function POST(req: NextRequest) {
 
     // ── LƯƠNG CỐ ĐỊNH ────────────────────────────────────────────────
     if (!existing?.gioVao) {
-      await upsertCC(nhanVienId, today, { trangThai: "di_lam", gioVao: timeStr });
-      return NextResponse.json({ ok: true, action: "vao", time: timeStr, location: matched.name });
+      const trangThai = diMuon ? "di_muon" : "di_lam";
+      await upsertCC(nhanVienId, today, { trangThai, gioVao: timeStr });
+      return NextResponse.json({
+        ok: true, action: "vao", time: timeStr, location: matched.name,
+        diMuon, phutMuon: diMuon ? phutMuon + BIEN_DO_MUON : 0,
+        gioVaoCa: ca?.gioVao,
+      });
     }
     if (existing.gioVao && !existing.gioRa) {
       if (hourNow < 12) return NextResponse.json({ error: `Đã chấm vào lúc ${existing.gioVao}. Chấm ra sau 12:00.` }, { status: 400 });

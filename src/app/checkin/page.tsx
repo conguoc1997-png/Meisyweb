@@ -9,7 +9,7 @@ type NhanVien = {
   homNay?: { gioVao?: string; gioRa?: string; trangThai?: string } | null;
 };
 type Step = "xin-vitri" | "lay-vitri" | "chon-nv" | "dang-gui" | "thanh-cong" | "loi";
-type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string };
+type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string; diMuon?: boolean; phutMuon?: number; gioVaoCa?: string };
 
 function isWebView() {
   if (typeof navigator === "undefined") return false;
@@ -325,16 +325,18 @@ export default function CheckInPage() {
     const isRa  = result.action === "ra";
     const isTC  = result.action === "tang_ca";
 
-    const accent = isTC ? "amber" : isVao ? "blue" : "emerald";
+    const isMuon = isVao && result.diMuon;
+    const accent = isTC ? "amber" : isMuon ? "orange" : isVao ? "blue" : "emerald";
     const accentMap: Record<string, string> = {
       amber:   "bg-amber-500 text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-amber-500/20",
+      orange:  "bg-orange-500 text-orange-400 bg-orange-500/10 border-orange-500/30 shadow-orange-500/20",
       blue:    "bg-blue-500 text-blue-400 bg-blue-500/10 border-blue-500/30 shadow-blue-500/20",
       emerald: "bg-emerald-500 text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-emerald-500/20",
     };
     const [btnBg, textColor, iconBg, iconBorder, shadowColor] = accentMap[accent].split(" ");
 
-    const icon  = isTC ? "⏰" : isVao ? "🟢" : "🏁";
-    const title = isTC ? "Đã ghi tăng ca!" : isVao ? "Chấm VÀO thành công!" : "Chấm RA thành công!";
+    const icon  = isTC ? "⏰" : isMuon ? "⚠️" : isVao ? "🟢" : "🏁";
+    const title = isTC ? "Đã ghi tăng ca!" : isMuon ? "Vào muộn!" : isVao ? "Chấm VÀO thành công!" : "Chấm RA thành công!";
 
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-5 pb-10">
@@ -349,8 +351,18 @@ export default function CheckInPage() {
           <p className={`text-lg font-semibold mb-1 ${textColor}`}>{selected?.ten}</p>
           <p className="text-slate-500 text-sm">{todayLabel()}</p>
 
+          {/* Banner muộn */}
+          {isMuon && (
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-2.5 mt-4">
+              <p className="text-orange-400 text-sm font-semibold">
+                Muộn {result.phutMuon} phút so với ca ({result.gioVaoCa})
+              </p>
+              <p className="text-slate-400 text-xs mt-0.5">Đã tự động ghi trạng thái "Đi muộn"</p>
+            </div>
+          )}
+
           {/* Info card */}
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 mt-6 space-y-3 text-left">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 mt-4 space-y-3 text-left">
             <InfoRow label="Thời gian" value={result.time} valueClass="text-white font-bold" />
             <InfoRow label="Địa điểm"  value={result.location} valueClass="text-slate-300" />
             {isRa && result.gioVao && (
