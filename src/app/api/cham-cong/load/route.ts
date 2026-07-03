@@ -38,13 +38,13 @@ export async function GET(req: NextRequest) {
       // 2. Chấm công tháng — dùng raw SQL để lấy cả gioVao/gioRa
       thang ? (async () => {
         const [y, m] = thang.split("-").map(Number);
-        const start = new Date(y, m - 1, 1).toISOString();
-        const end   = new Date(y, m, 1).toISOString();
+        const start = new Date(Date.UTC(y, m - 1, 1));
+        const end   = new Date(Date.UTC(y, m, 1));
         return prisma.$queryRawUnsafe<object[]>(
           `SELECT "id","nhanVienId","ngay","trangThai","tangCa","ghiChu","gioVao","gioRa","tongGio"
            FROM "ChamCong" WHERE "ngay" >= $1 AND "ngay" < $2`,
           start, end
-        ).catch(() => []);
+        ).catch((e) => { console.error("CC query error:", e); return []; });
       })() : Promise.resolve([]),
 
       // 3. Phụ cấp tháng
