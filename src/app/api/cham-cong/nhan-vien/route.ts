@@ -10,6 +10,33 @@ async function autoMigrate() {
     await prisma.$executeRawUnsafe(
       `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`
     );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`
+    );
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "CaLamViec" (
+        "id"        TEXT NOT NULL,
+        "ten"       TEXT NOT NULL,
+        "gioVao"    TEXT NOT NULL DEFAULT '07:30',
+        "gioRa"     TEXT NOT NULL DEFAULT '17:30',
+        "nghiTrua"  INTEGER NOT NULL DEFAULT 90,
+        "ghiChu"    TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY ("id")
+      )
+    `);
   } catch { /* ignore — column already exists */ }
   migrated = true;
 }
