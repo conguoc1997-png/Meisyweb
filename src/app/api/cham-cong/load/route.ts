@@ -26,14 +26,21 @@ export async function GET(req: NextRequest) {
     const thang = url.searchParams.get("thang");
     const withHistory = url.searchParams.get("h") === "1";
 
+    // Ngày đầu tháng để lọc NV nghỉ việc
+    const monthStart = thang ? `${thang}-01` : null;
+
     // Chạy song song: NV + CC + PhuCap
-    const [nhanViens, ccRows, phuCapRows] = await Promise.all([
-      // 1. Nhân viên
+    const [nvPrisma, nvExtra, ccRows, phuCapRows] = await Promise.all([
+      // 1a. Nhân viên qua Prisma (không lọc active để lấy cả người đã nghỉ trong tháng)
       prisma.nhanVien.findMany({
-        where: { active: true },
         orderBy: { ten: "asc" },
         ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
       }),
+
+      // 1b. Lấy ngayNghiViec (cột ngoài schema) qua raw SQL
+      prisma.$queryRawUnsafe<{ id: string; ngayNghiViec: string | null }[]>(
+        `SELECT "id","ngayNghiViec" FROM "NhanVien"`
+      ).catch(() => [] as { id: string; ngayNghiViec: string | null }[]),
 
       // 2. Chấm công tháng — dùng raw SQL để lấy cả gioVao/gioRa
       thang ? (async () => {
@@ -52,6 +59,17 @@ export async function GET(req: NextRequest) {
         ? prisma.phuCapThang.findMany({ where: { thang } }).catch(() => [])
         : Promise.resolve([]),
     ]);
+
+    // Merge ngayNghiViec vào danh sách NV, lọc theo tháng
+    const nghiMap = Object.fromEntries(nvExtra.map(r => [r.id, r.ngayNghiViec ?? null]));
+    const nhanViens = nvPrisma
+      .map(nv => ({ ...nv, ngayNghiViec: nghiMap[nv.id] ?? null }))
+      .filter(nv => {
+        if (nv.active) return true; // đang làm → luôn hiện
+        if (!monthStart) return false;
+        // Đã nghỉ: chỉ hiện nếu nghỉ SAU ngày đầu tháng đang xem
+        return nv.ngayNghiViec != null && nv.ngayNghiViec >= monthStart;
+      });
 
     // Chuyển phuCap thành map { [nvId]: {...} }
     const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }> = {};
