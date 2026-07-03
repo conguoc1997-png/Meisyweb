@@ -6,11 +6,10 @@ import { prisma } from "@/lib/prisma";
 let migrated = false;
 async function autoMigrate() {
   if (migrated) return;
-  try {
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`
-    );
-  } catch { /* ignore — column already exists */ }
+  await Promise.all([
+    prisma.$executeRawUnsafe(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "ngayNghiViec" TEXT`).catch(() => {}),
+  ]);
   migrated = true;
 }
 
@@ -37,6 +36,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         active:   data.active   !== undefined ? data.active : undefined,
       },
     });
+
+    // Lưu ngayNghiViec qua raw SQL (cột ngoài schema)
+    if (data.ngayNghiViec !== undefined) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "NhanVien" SET "ngayNghiViec"=$1 WHERE "id"=$2`,
+        data.ngayNghiViec || null, id
+      ).catch(() => {});
+    }
 
     // Đổi Lương CB kèm tháng áp dụng → lưu lịch sử
     if (data.luongCB !== undefined && data.thangApDung) {

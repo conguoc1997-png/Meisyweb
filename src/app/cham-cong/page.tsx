@@ -11,6 +11,7 @@ type NhanVien = {
   luongCB: number | null; phuCapChuyenCan: number | null; phuCapAn: number | null; phuCapDacBiet: number | null; heSoTC: number;
   soChNhatHopDong: number;
   ngaySinh: string | null;
+  ngayNghiViec?: string | null;
   active: boolean;
   luongCBHistory?: LuongCBHistory[];
 };
@@ -241,6 +242,7 @@ export default function ChamCongPage() {
   const [nvForm, setNvForm] = useState({ maNV: "", ten: "", chucVu: "", phongBan: "", loaiLuong: "co_ban", luongCB: "", soChNhatHopDong: "0", ngaySinh: "", thangApDung: thang });
   const [editingNV, setEditingNV] = useState<NhanVien | null>(null);
   const [savingNV, setSavingNV] = useState(false);
+  const [nghiViecModal, setNghiViecModal] = useState<{ nv: NhanVien; date: string } | null>(null);
   const [nvError, setNvError] = useState("");
 
   // Phụ cấp theo tháng: { [nvId]: { phuCapCC, phuCapAn, phuCapDB } }
@@ -576,12 +578,28 @@ export default function ChamCongPage() {
     }
   };
 
-  const toggleActiveNV = async (nv: NhanVien) => {
-    await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+  const toggleActiveNV = (nv: NhanVien) => {
+    if (nv.active) {
+      // Hiện dialog hỏi ngày nghỉ việc
+      const today = new Date().toISOString().slice(0, 10);
+      setNghiViecModal({ nv, date: today });
+    } else {
+      // Kích hoạt lại → không cần hỏi
+      fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: true, ngayNghiViec: null }),
+      }).then(() => fetchNV());
+    }
+  };
+
+  const confirmNghiViec = async () => {
+    if (!nghiViecModal) return;
+    await fetch(`/api/cham-cong/nhan-vien/${nghiViecModal.nv.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: !nv.active }),
+      body: JSON.stringify({ active: false, ngayNghiViec: nghiViecModal.date }),
     });
-    fetchNV(); // refresh NV sau khi toggle
+    setNghiViecModal(null);
+    fetchNV();
   };
 
 
@@ -1658,14 +1676,15 @@ export default function ChamCongPage() {
               <div className="space-y-1 max-h-72 overflow-y-auto">
                 {allNVs.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Chưa có nhân viên</p>}
                 {allNVs.map(nv => (
-                  <div key={nv.id} className={`flex items-center justify-between px-3 py-2 rounded-lg ${nv.active ? "bg-white border border-slate-100" : "bg-slate-50 opacity-60"}`}>
+                  <div key={nv.id} className={`flex items-center justify-between px-3 py-2 rounded-lg ${nv.active ? "bg-white border border-slate-100" : "bg-red-50 border border-red-100"}`}>
                     <div>
                       <span className="font-mono text-xs text-slate-400 mr-2">{nv.maNV}</span>
-                      <span className="font-medium text-slate-800 text-sm">{nv.ten}</span>
+                      <span className={`font-medium text-sm ${nv.active ? "text-slate-800" : "text-slate-400 line-through"}`}>{nv.ten}</span>
                       {nv.chucVu && <span className="text-xs text-slate-400 ml-2">{nv.chucVu}</span>}
                       {nv.luongCB && <span className="text-xs text-emerald-600 ml-2">{fmt(nv.luongCB)}₫</span>}
                       {(nv.soChNhatHopDong ?? 0) > 0 && <span className="text-xs text-violet-600 ml-2">+{nv.soChNhatHopDong}CN</span>}
                       {nv.ngaySinh && <span className="text-xs text-pink-500 ml-2">🎂 {new Date(nv.ngaySinh).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit" })}</span>}
+                      {!nv.active && nv.ngayNghiViec && <span className="text-xs text-red-400 ml-2">Nghỉ {new Date(nv.ngayNghiViec).toLocaleDateString("vi-VN")}</span>}
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => { setEditingNV(nv); setNvForm({ maNV: nv.maNV, ten: nv.ten, chucVu: nv.chucVu ?? "", phongBan: nv.phongBan ?? "", loaiLuong: (nv as {loaiLuong?: string}).loaiLuong ?? "co_ban", luongCB: String(getLcbForMonth(nv, thang) || ""), soChNhatHopDong: String(nv.soChNhatHopDong ?? 0), ngaySinh: nv.ngaySinh ? nv.ngaySinh.slice(0,10) : "", thangApDung: thang }); }}
@@ -1678,6 +1697,37 @@ export default function ChamCongPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ DIALOG XÁC NHẬN NGHỈ VIỆC ═══ */}
+      {nghiViecModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-1">Xác nhận nghỉ việc</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              <span className="font-semibold text-slate-700">{nghiViecModal.nv.ten}</span> nghỉ việc từ ngày nào?
+            </p>
+            <div className="mb-5">
+              <label className="text-xs text-slate-500 mb-1 block">Ngày nghỉ việc</label>
+              <input
+                type="date"
+                value={nghiViecModal.date}
+                onChange={e => setNghiViecModal(m => m && ({ ...m, date: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={confirmNghiViec}
+                className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition">
+                Xác nhận nghỉ việc
+              </button>
+              <button onClick={() => setNghiViecModal(null)}
+                className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm hover:bg-slate-200 transition">
+                Huỷ
+              </button>
             </div>
           </div>
         </div>
