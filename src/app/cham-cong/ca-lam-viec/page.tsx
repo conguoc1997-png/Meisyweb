@@ -36,12 +36,9 @@ export default function CaLamViecPage() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const [caRes, nvRes] = await Promise.all([
-      fetch("/api/ca-lam-viec").then(r => r.json()),
-      fetch("/api/cham-cong/nhan-vien").then(r => r.json()),
-    ]);
-    setList(Array.isArray(caRes) ? caRes : []);
-    setNvList(Array.isArray(nvRes) ? nvRes : []);
+    const data = await fetch("/api/ca-lam-viec/load").then(r => r.json());
+    setList(Array.isArray(data.caList) ? data.caList : []);
+    setNvList(Array.isArray(data.nvList) ? data.nvList : []);
   }
   useEffect(() => { load(); }, []);
 
