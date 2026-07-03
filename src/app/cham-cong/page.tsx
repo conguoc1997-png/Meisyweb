@@ -247,12 +247,8 @@ export default function ChamCongPage() {
   const [phuCapMap, setPhuCapMap] = useState<PhuCapMap>({});
 
   const fetchPhuCap = useCallback(async () => {
-    setPhuCapMap({}); // clear ngay lập tức, tránh hiện data tháng cũ
-    try {
-      const data = await fetch(`/api/cham-cong/phu-cap?thang=${thang}`).then(r => r.json());
-      setPhuCapMap(data && typeof data === "object" ? data : {});
-    } catch { setPhuCapMap({}); }
-  }, [thang]);
+    // Giữ lại cho POST (lưu phụ cấp) — GET đã gộp vào fetchData
+  }, []);
 
   // Khoán May
   const [locatStats, setLocatStats] = useState<LocatStats>({ dai_thuong: 0, dai_kieu: 0, short: 0 });
@@ -282,61 +278,54 @@ export default function ChamCongPage() {
   const isDayOff = (day: number) => isSunday(day) || isHoliday(day);
   const getDayLabel = (day: number) => DAY_OF_WEEK[new Date(year, month - 1, day).getDay()];
 
-  // Fetch NhanVien — chỉ gọi 1 lần khi mount hoặc sau khi sửa NV
+  // Fetch NhanVien riêng — dùng sau khi sửa NV (thêm/xóa)
   const fetchNV = useCallback(async (withHistory = false) => {
     try {
       const url = withHistory ? "/api/cham-cong/nhan-vien?h=1" : "/api/cham-cong/nhan-vien";
       const res  = await fetch(url);
       const data = await res.json();
-      if (!res.ok) {
-        console.error("fetchNV API error:", data);
-        alert("Lỗi tải nhân viên: " + (data?.error || res.status));
-        return;
-      }
+      if (!res.ok) { console.error("fetchNV error:", data); return; }
       const list = Array.isArray(data) ? data as NhanVien[] : [];
       setNhanViens(list);
       setAllNVs(list);
     } catch (e) { console.error("fetchNV error:", e); }
   }, []);
 
-  // Fetch ChamCong + PhuCap — gọi mỗi khi đổi tháng
+  // Fetch CC riêng — dùng sau khi click ô chấm công
   const fetchCC = useCallback(async () => {
+    try {
+      const data = await fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json());
+      setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
+    } catch (e) { console.error("fetchCC error:", e); }
+  }, [thang]);
+
+  // ★ Fetch tất cả 1 lần — NV + CC + PhuCap gộp 1 request
+  const nvLoadedRef = React.useRef(false);
+  const fetchData = useCallback(async (withHistory = false) => {
     setLoading(true);
     try {
-      const [ccData] = await Promise.all([
-        fetch(`/api/cham-cong?thang=${thang}`).then(r => r.json()),
-        fetchPhuCap(),
-      ]);
-      setChamCongs(Array.isArray(ccData.chamCongs) ? ccData.chamCongs as ChamCong[] : []);
-    } catch (e) { console.error("fetchCC error:", e); }
+      const h = withHistory ? "&h=1" : "";
+      const data = await fetch(`/api/cham-cong/load?thang=${thang}${h}`).then(r => r.json());
+      if (data.error) { console.error("fetchData error:", data.error); }
+      const list = Array.isArray(data.nhanViens) ? data.nhanViens as NhanVien[] : [];
+      setNhanViens(list);
+      if (!nvLoadedRef.current) { setAllNVs(list); nvLoadedRef.current = true; }
+      setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
+      setPhuCapMap(data.phuCaps && typeof data.phuCaps === "object" ? data.phuCaps : {});
+    } catch (e) { console.error("fetchData error:", e); }
     setLoading(false);
-  }, [thang, fetchPhuCap]);
-
-  // Gọi song song khi mount — sau đó chỉ fetchCC khi đổi tháng
-  const nvLoadedRef = React.useRef(false);
-  const fetchData = useCallback(async () => {
-    if (!nvLoadedRef.current) {
-      // Mount lần đầu: fetch NV + CC song song
-      nvLoadedRef.current = true;
-      setLoading(true);
-      await Promise.all([fetchNV(), fetchCC().then(() => {})]);
-      setLoading(false);
-    } else {
-      // Đổi tháng: chỉ fetch CC
-      await fetchCC();
-    }
-  }, [fetchNV, fetchCC]);
+  }, [thang]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Khi bảng lương tab được mở → load NV với history để tính lương đúng
+  // Khi bảng lương tab được mở → load lại với history để tính lương đúng
   const historyLoadedRef = React.useRef(false);
   useEffect(() => {
     if (activeTab === "luong" && !historyLoadedRef.current) {
       historyLoadedRef.current = true;
-      fetchNV(true);
+      fetchData(true); // withHistory=true
     }
-  }, [activeTab, fetchNV]);
+  }, [activeTab, fetchData]);
 
   // Load khoán prices + SL từ localStorage khi đổi tháng
   useEffect(() => {
