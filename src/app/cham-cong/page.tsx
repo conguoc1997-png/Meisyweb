@@ -289,8 +289,8 @@ export default function ChamCongPage() {
       const data = await res.json();
       if (!res.ok) { console.error("fetchNV error:", data); return; }
       const list = Array.isArray(data) ? data as NhanVien[] : [];
-      setNhanViens(list);
-      setAllNVs(list);
+      setNhanViens(list.filter(nv => nv.active)); // bảng chấm công chỉ hiện NV active
+      setAllNVs(list); // modal NV hiện tất cả (kể cả đã nghỉ)
     } catch (e) { console.error("fetchNV error:", e); }
   }, []);
 
@@ -592,14 +592,24 @@ export default function ChamCongPage() {
     }
   };
 
+  const [savingNghiViec, setSavingNghiViec] = useState(false);
   const confirmNghiViec = async () => {
     if (!nghiViecModal) return;
-    await fetch(`/api/cham-cong/nhan-vien/${nghiViecModal.nv.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: false, ngayNghiViec: nghiViecModal.date }),
-    });
-    setNghiViecModal(null);
-    fetchNV();
+    setSavingNghiViec(true);
+    try {
+      const res = await fetch(`/api/cham-cong/nhan-vien/${nghiViecModal.nv.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false, ngayNghiViec: nghiViecModal.date }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert("Lỗi: " + (data?.error || res.status)); return; }
+      setNghiViecModal(null);
+      await fetchNV();
+    } catch (e) {
+      alert("Lỗi kết nối: " + String(e));
+    } finally {
+      setSavingNghiViec(false);
+    }
   };
 
 
@@ -1720,9 +1730,9 @@ export default function ChamCongPage() {
               />
             </div>
             <div className="flex gap-2">
-              <button onClick={confirmNghiViec}
-                className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition">
-                Xác nhận nghỉ việc
+              <button onClick={confirmNghiViec} disabled={savingNghiViec}
+                className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition disabled:opacity-50">
+                {savingNghiViec ? "Đang lưu..." : "Xác nhận nghỉ việc"}
               </button>
               <button onClick={() => setNghiViecModal(null)}
                 className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm hover:bg-slate-200 transition">
