@@ -40,6 +40,7 @@ const LOAI_HANG_KEYS = ["dai_thuong", "dai_kieu", "short"] as const;
 type ChamCong = {
   id: string; nhanVienId: string; ngay: string; trangThai: string;
   tangCa: number | null; ghiChu: string | null;
+  gioVao?: string | null; gioRa?: string | null; tongGio?: number | null;
 };
 
 // Trạng thái chấm công
@@ -345,6 +346,21 @@ export default function ChamCongPage() {
     chamCongs.forEach(c => {
       const dateKey = c.ngay.slice(0, 10);
       m[`${c.nhanVienId}_${dateKey}`] = c.trangThai;
+    });
+    return m;
+  }, [chamCongs]);
+
+  // Map "chưa ra": nvId_ngay → true nếu có gioVao nhưng không có gioRa (hôm nay, đã qua 13h)
+  const chuaRaMap = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const nowH = new Date().getHours() + new Date().getMinutes() / 60;
+    if (nowH < 13) return {}; // trước 13h chưa cần cảnh báo
+    const m: Record<string, boolean> = {};
+    chamCongs.forEach(c => {
+      const dateKey = c.ngay.slice(0, 10);
+      if (dateKey === todayStr && c.gioVao && !c.gioRa) {
+        m[`${c.nhanVienId}_${dateKey}`] = true;
+      }
     });
     return m;
   }, [chamCongs]);
@@ -835,15 +851,19 @@ export default function ChamCongPage() {
                         const sun = isSunday(d);
                         const holiday = isHoliday(d);
                         const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
+                        const chuaRa = chuaRaMap[key]; // có vào nhưng chưa ra
                         return (
                           <td key={d}
                             className={`p-0 text-center cursor-pointer select-none border-x border-slate-100 transition-colors ${defaultBg} hover:bg-slate-200/40 active:bg-slate-300/50`}
                             onClick={() => handleCellClick(nv.id, d)}
-                            title={info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
+                            title={chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
-                              <div className={`flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text}`}>
+                              <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text}`}>
                                 {info.label}
+                                {chuaRa && (
+                                  <span className="absolute top-0 right-0 w-2 h-2 bg-orange-400 rounded-full border border-white" title="Chưa chấm ra" />
+                                )}
                               </div>
                             ) : sun ? (
                               <div className="flex items-center justify-center w-full h-8 text-[10px] text-slate-300">CN</div>

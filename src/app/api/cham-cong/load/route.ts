@@ -51,12 +51,16 @@ export async function GET(req: NextRequest) {
         ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
       }),
 
-      // 2. Chấm công tháng
+      // 2. Chấm công tháng — dùng raw SQL để lấy cả gioVao/gioRa
       thang ? (async () => {
         const [y, m] = thang.split("-").map(Number);
-        return prisma.chamCong.findMany({
-          where: { ngay: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } },
-        });
+        const start = new Date(y, m - 1, 1).toISOString();
+        const end   = new Date(y, m, 1).toISOString();
+        return prisma.$queryRawUnsafe<object[]>(
+          `SELECT "id","nhanVienId","ngay","trangThai","tangCa","ghiChu","gioVao","gioRa","tongGio"
+           FROM "ChamCong" WHERE "ngay" >= $1 AND "ngay" < $2`,
+          start, end
+        ).catch(() => []);
       })() : Promise.resolve([]),
 
       // 3. Phụ cấp tháng
