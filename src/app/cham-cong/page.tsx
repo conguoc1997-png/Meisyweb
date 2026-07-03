@@ -1353,12 +1353,21 @@ export default function ChamCongPage() {
                               title="Nhấn để đổi Khoán ↔ Tiếng"
                               onClick={async () => {
                                 const next = nv.loaiLuong === "khoan" ? "co_ban" : "khoan";
-                                await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
+                                // Cập nhật state ngay (optimistic) — UI đổi tức thì
+                                setNhanViens(prev => prev.map(n =>
+                                  n.id === nv.id ? { ...n, loaiLuong: next } : n
+                                ));
+                                const res = await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
                                   method: "PATCH",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ loaiLuong: next }),
                                 });
-                                fetchNV();
+                                if (!res.ok) {
+                                  // Rollback nếu lưu thất bại
+                                  setNhanViens(prev => prev.map(n =>
+                                    n.id === nv.id ? { ...n, loaiLuong: nv.loaiLuong } : n
+                                  ));
+                                }
                               }}
                               className={`text-xs px-1.5 py-0.5 rounded font-semibold cursor-pointer hover:opacity-70 transition-opacity
                                 ${isKhoan ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
