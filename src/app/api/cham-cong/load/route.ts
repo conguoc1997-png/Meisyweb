@@ -2,30 +2,14 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// Chỉ thêm các cột KHÔNG có trong Prisma schema — chạy 1 lần per cold-start
 let migrated = false;
-async function run(sql: string) {
-  try { await prisma.$executeRawUnsafe(sql); } catch { /* ignore */ }
-}
-async function autoMigrate() {
+async function ensureColumns() {
   if (migrated) return;
   await Promise.all([
-    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`),
-    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`),
-    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`),
-    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`),
-    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`),
-    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`),
-    run(`CREATE TABLE IF NOT EXISTS "PhuCapThang" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "nhanVienId" TEXT NOT NULL,
-      "thang" TEXT NOT NULL,
-      "phuCapCC" DOUBLE PRECISION NOT NULL DEFAULT 0,
-      "phuCapAn" DOUBLE PRECISION NOT NULL DEFAULT 0,
-      "phuCapDB" DOUBLE PRECISION NOT NULL DEFAULT 0,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "PhuCapThang_nhanVienId_thang_key" UNIQUE ("nhanVienId","thang")
-    )`),
+    prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`).catch(() => {}),
   ]);
   migrated = true;
 }
@@ -37,7 +21,7 @@ async function autoMigrate() {
  */
 export async function GET(req: NextRequest) {
   try {
-    await autoMigrate();
+    await ensureColumns();
     const url   = new URL(req.url);
     const thang = url.searchParams.get("thang");
     const withHistory = url.searchParams.get("h") === "1";

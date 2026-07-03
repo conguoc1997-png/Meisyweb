@@ -30,15 +30,18 @@ function soGioChuẩn(gioVao: string, gioRa: string, nghiTrua: number) {
 }
 
 export default function CaLamViecPage() {
-  const [list, setList]     = useState<Ca[]>([]);
-  const [nvList, setNvList] = useState<NhanVien[]>([]);
-  const [form, setForm]     = useState<Form | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [list, setList]       = useState<Ca[]>([]);
+  const [nvList, setNvList]   = useState<NhanVien[]>([]);
+  const [form, setForm]       = useState<Form | null>(null);
+  const [saving, setSaving]   = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
+    setLoading(true);
     const data = await fetch("/api/ca-lam-viec/load").then(r => r.json());
-    setList(Array.isArray(data.caList) ? data.caList : []);
+    setList(Array.isArray(data.caList) ? data.caList.map((c: Ca) => ({ ...c, nghiTrua: Number(c.nghiTrua) })) : []);
     setNvList(Array.isArray(data.nvList) ? data.nvList : []);
+    setLoading(false);
   }
   useEffect(() => { load(); }, []);
 
@@ -49,7 +52,7 @@ export default function CaLamViecPage() {
       const res  = await fetch("/api/ca-lam-viec", {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, nghiTrua: Number(form.nghiTrua) }),
       });
       const data = await res.json();
       if (!res.ok || data?.error) {
@@ -261,7 +264,19 @@ export default function CaLamViecPage() {
       )}
 
       {/* Danh sách ca */}
-      {list.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2].map(i => (
+            <div key={i} className="bg-white border border-stone-100 rounded-2xl px-5 py-4 shadow-sm flex items-center gap-4 animate-pulse">
+              <div className="w-11 h-11 bg-stone-100 rounded-xl flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-stone-100 rounded w-1/3" />
+                <div className="h-3 bg-stone-100 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : list.length === 0 ? (
         <div className="text-center py-16 text-stone-400">
           <Clock size={40} className="mx-auto mb-3 opacity-40" />
           <p>Chưa có ca làm việc nào</p>
