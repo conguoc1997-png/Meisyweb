@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Clock, Save, X, Users, Building2 } from "lucide-react";
+import { Plus, Trash2, Clock, Save, X, Users, Building2, Check } from "lucide-react";
 
 type Ca = {
   id: string; ten: string; gioVao: string; gioRa: string;
@@ -9,18 +9,7 @@ type Ca = {
 type NhanVien = { id: string; ten: string; maNV: string; phongBan?: string | null; caLamViecId?: string | null };
 type ApDung = "khong" | "bo_phan" | "nhan_vien";
 
-type Form = Omit<Ca, "id"> & {
-  id?: string;
-  apDung: ApDung;
-  boPhanList: string[];
-  nhanVienIds: string[];
-};
-
 const PHONG_BAN = ["Kho", "May", "CSKH", "Livestream", "Văn phòng"];
-const EMPTY: Form = {
-  ten: "", gioVao: "07:30", gioRa: "17:30", nghiTrua: 90, ghiChu: "",
-  apDung: "khong", boPhanList: [], nhanVienIds: [],
-};
 
 function soGioChuẩn(gioVao: string, gioRa: string, nghiTrua: number) {
   const [h1, m1] = gioVao.split(":").map(Number);
@@ -32,9 +21,15 @@ function soGioChuẩn(gioVao: string, gioRa: string, nghiTrua: number) {
 export default function CaLamViecPage() {
   const [list, setList]       = useState<Ca[]>([]);
   const [nvList, setNvList]   = useState<NhanVien[]>([]);
-  const [form, setForm]       = useState<Form | null>(null);
-  const [saving, setSaving]   = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Inline edit state
+  const [editingId, setEditingId] = useState<string | null>(null); // null = không sửa, "new" = thêm mới
+  const [draft, setDraft]     = useState<Ca & { apDung: ApDung; boPhanList: string[]; nhanVienIds: string[] }>({
+    id: "", ten: "", gioVao: "07:30", gioRa: "17:30", nghiTrua: 90, ghiChu: "",
+    apDung: "khong", boPhanList: [], nhanVienIds: [],
+  });
+  const [saving, setSaving]   = useState(false);
 
   async function load() {
     setLoading(true);
@@ -45,14 +40,26 @@ export default function CaLamViecPage() {
   }
   useEffect(() => { load(); }, []);
 
+  function startEdit(ca: Ca) {
+    setEditingId(ca.id);
+    setDraft({ ...ca, apDung: "khong", boPhanList: [], nhanVienIds: [] });
+  }
+  function startNew() {
+    setEditingId("new");
+    setDraft({ id: "", ten: "", gioVao: "07:30", gioRa: "17:30", nghiTrua: 90, ghiChu: "",
+      apDung: "khong", boPhanList: [], nhanVienIds: [] });
+  }
+  function cancelEdit() { setEditingId(null); }
+
   async function save() {
-    if (!form?.ten || !form.gioVao || !form.gioRa) return;
+    if (!draft.ten || !draft.gioVao || !draft.gioRa) return;
     setSaving(true);
     try {
-      const res  = await fetch("/api/ca-lam-viec", {
-        method: form.id ? "PUT" : "POST",
+      const isNew = editingId === "new";
+      const res = await fetch("/api/ca-lam-viec", {
+        method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, nghiTrua: Number(form.nghiTrua) }),
+        body: JSON.stringify({ ...draft, nghiTrua: Number(draft.nghiTrua) }),
       });
       const data = await res.json();
       if (!res.ok || data?.error) {
@@ -60,11 +67,9 @@ export default function CaLamViecPage() {
         setSaving(false);
         return;
       }
-      setForm(null);
+      setEditingId(null);
       await load();
-    } catch (e) {
-      alert("Lỗi kết nối: " + String(e));
-    }
+    } catch (e) { alert("Lỗi kết nối: " + String(e)); }
     setSaving(false);
   }
 
@@ -74,27 +79,133 @@ export default function CaLamViecPage() {
     load();
   }
 
-  function toggleBP(bp: string) {
-    setForm(f => f && ({
-      ...f,
-      boPhanList: f.boPhanList.includes(bp)
-        ? f.boPhanList.filter(b => b !== bp)
-        : [...f.boPhanList, bp],
-    }));
-  }
-
-  function toggleNV(id: string) {
-    setForm(f => f && ({
-      ...f,
-      nhanVienIds: f.nhanVienIds.includes(id)
-        ? f.nhanVienIds.filter(i => i !== id)
-        : [...f.nhanVienIds, id],
-    }));
-  }
-
-  // Đếm NV theo ca
   function countNV(caId: string) {
     return nvList.filter(nv => nv.caLamViecId === caId).length;
+  }
+
+  // Card ở chế độ sửa
+  function EditCard({ ca }: { ca?: Ca }) {
+    const soGio = soGioChuẩn(draft.gioVao, draft.gioRa, draft.nghiTrua);
+    return (
+      <div className="bg-white border-2 border-rose-200 rounded-2xl px-5 py-4 shadow-sm">
+        {/* Dòng 1: tên + giờ */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-11 h-11 bg-rose-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Clock size={20} className="text-rose-400" />
+          </div>
+          <input
+            autoFocus
+            value={draft.ten}
+            onChange={e => setDraft(d => ({ ...d, ten: e.target.value }))}
+            placeholder="Tên ca..."
+            className="flex-1 font-semibold text-stone-700 bg-transparent border-b-2 border-rose-200 focus:border-rose-400 outline-none py-0.5 text-sm"
+          />
+        </div>
+
+        {/* Dòng 2: giờ vào / ra / nghỉ trưa */}
+        <div className="flex items-center gap-3 ml-14 mb-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-stone-400">Vào</span>
+            <input type="time" value={draft.gioVao}
+              onChange={e => setDraft(d => ({ ...d, gioVao: e.target.value }))}
+              className="text-sm font-medium text-stone-700 border border-stone-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200"
+            />
+          </div>
+          <span className="text-stone-300">→</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-stone-400">Ra</span>
+            <input type="time" value={draft.gioRa}
+              onChange={e => setDraft(d => ({ ...d, gioRa: e.target.value }))}
+              className="text-sm font-medium text-stone-700 border border-stone-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-stone-400">Nghỉ trưa</span>
+            <input type="number" value={draft.nghiTrua} min={0} max={180}
+              onChange={e => setDraft(d => ({ ...d, nghiTrua: Number(e.target.value) }))}
+              className="w-16 text-sm font-medium text-stone-700 border border-stone-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-rose-200 text-center"
+            />
+            <span className="text-xs text-stone-400">p</span>
+          </div>
+          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{soGio}h/ngày</span>
+        </div>
+
+        {/* Ghi chú */}
+        <div className="ml-14 mb-3">
+          <input value={draft.ghiChu || ""}
+            onChange={e => setDraft(d => ({ ...d, ghiChu: e.target.value }))}
+            placeholder="Ghi chú (tuỳ chọn)..."
+            className="w-full text-xs text-stone-400 bg-transparent border-b border-stone-100 focus:border-stone-300 outline-none py-0.5"
+          />
+        </div>
+
+        {/* Áp dụng cho (chỉ hiện khi thêm mới) */}
+        {editingId === "new" && (
+          <div className="ml-14 mb-3">
+            <p className="text-xs text-stone-400 mb-2 font-medium">Gán ca cho</p>
+            <div className="flex gap-2 mb-2">
+              {([
+                { key: "khong",     label: "Không gán ngay" },
+                { key: "bo_phan",   label: "Bộ phận", icon: <Building2 size={12}/> },
+                { key: "nhan_vien", label: "Nhân viên", icon: <Users size={12}/> },
+              ] as { key: ApDung; label: string; icon?: React.ReactNode }[]).map(opt => (
+                <button key={opt.key} type="button"
+                  onClick={() => setDraft(d => ({ ...d, apDung: opt.key as ApDung, boPhanList: [], nhanVienIds: [] }))}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                    ${draft.apDung === opt.key ? "bg-rose-500 text-white border-rose-500" : "bg-white text-stone-500 border-stone-200 hover:border-rose-300"}`}
+                >
+                  {opt.icon}{opt.label}
+                </button>
+              ))}
+            </div>
+            {draft.apDung === "bo_phan" && (
+              <div className="flex flex-wrap gap-1.5">
+                {PHONG_BAN.map(bp => (
+                  <button key={bp} type="button"
+                    onClick={() => setDraft(d => ({ ...d, boPhanList: d.boPhanList.includes(bp) ? d.boPhanList.filter(b => b !== bp) : [...d.boPhanList, bp] }))}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                      ${draft.boPhanList.includes(bp) ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-stone-500 border-stone-200 hover:border-emerald-300"}`}
+                  >
+                    {bp}
+                  </button>
+                ))}
+              </div>
+            )}
+            {draft.apDung === "nhan_vien" && (
+              <div className="max-h-40 overflow-y-auto space-y-1 border border-stone-100 rounded-xl p-2">
+                {nvList.map(nv => (
+                  <button key={nv.id} type="button"
+                    onClick={() => setDraft(d => ({ ...d, nhanVienIds: d.nhanVienIds.includes(nv.id) ? d.nhanVienIds.filter(i => i !== nv.id) : [...d.nhanVienIds, nv.id] }))}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all
+                      ${draft.nhanVienIds.includes(nv.id) ? "bg-emerald-50 border border-emerald-200" : "hover:bg-stone-50"}`}
+                  >
+                    <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center
+                      ${draft.nhanVienIds.includes(nv.id) ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300"}`}>
+                      {draft.nhanVienIds.includes(nv.id) && <Check size={8}/>}
+                    </span>
+                    <span className="font-medium text-stone-700">{nv.ten}</span>
+                    <span className="text-stone-400">{nv.maNV}</span>
+                    {nv.phongBan && <span className="text-stone-300 ml-auto">{nv.phongBan}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Nút lưu / huỷ */}
+        <div className="ml-14 flex gap-2">
+          <button onClick={save} disabled={saving || !draft.ten}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500 text-white rounded-lg text-xs font-medium hover:bg-rose-600 disabled:opacity-40 transition-all">
+            <Save size={12} /> {saving ? "Đang lưu..." : "Lưu"}
+          </button>
+          <button onClick={cancelEdit}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 text-stone-500 rounded-lg text-xs hover:bg-stone-200 transition-all">
+            <X size={12} /> Huỷ
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -105,165 +216,14 @@ export default function CaLamViecPage() {
           <p className="text-stone-400 text-sm mt-0.5">Cài ca theo bộ phận hoặc từng người</p>
         </div>
         <button
-          onClick={() => setForm({ ...EMPTY })}
-          className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-medium hover:bg-rose-600 transition-all"
+          onClick={startNew}
+          disabled={editingId !== null}
+          className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-medium hover:bg-rose-600 disabled:opacity-40 transition-all"
         >
           <Plus size={16} /> Thêm ca
         </button>
       </div>
 
-      {/* Form thêm/sửa */}
-      {form && (
-        <div className="bg-white border border-stone-200 rounded-2xl p-5 mb-5 shadow-sm">
-          <h2 className="font-semibold text-stone-700 mb-4">{form.id ? "Sửa ca" : "Thêm ca mới"}</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {/* Tên ca */}
-            <div className="col-span-2">
-              <label className="text-xs text-stone-500 mb-1 block">Tên ca *</label>
-              <input
-                value={form.ten}
-                onChange={e => setForm(f => f && ({ ...f, ten: e.target.value }))}
-                placeholder="VD: Ca hành chính, Ca kho..."
-                className="w-full px-3 py-2 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              />
-            </div>
-
-            {/* Giờ vào / ra */}
-            <div>
-              <label className="text-xs text-stone-500 mb-1 block">Giờ vào *</label>
-              <input type="time" value={form.gioVao}
-                onChange={e => setForm(f => f && ({ ...f, gioVao: e.target.value }))}
-                className="w-full px-3 py-2 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-stone-500 mb-1 block">Giờ ra *</label>
-              <input type="time" value={form.gioRa}
-                onChange={e => setForm(f => f && ({ ...f, gioRa: e.target.value }))}
-                className="w-full px-3 py-2 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              />
-            </div>
-
-            {/* Nghỉ trưa / Giờ chuẩn */}
-            <div>
-              <label className="text-xs text-stone-500 mb-1 block">Nghỉ trưa (phút)</label>
-              <input type="number" value={form.nghiTrua} min={0} max={180}
-                onChange={e => setForm(f => f && ({ ...f, nghiTrua: Number(e.target.value) }))}
-                className="w-full px-3 py-2 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              />
-            </div>
-            <div className="flex items-end">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-sm w-full text-center">
-                <span className="text-stone-400 text-xs block">Giờ làm chuẩn</span>
-                <span className="font-bold text-emerald-600 text-lg">
-                  {soGioChuẩn(form.gioVao, form.gioRa, form.nghiTrua)}h
-                </span>
-              </div>
-            </div>
-
-            {/* Ghi chú */}
-            <div className="col-span-2">
-              <label className="text-xs text-stone-500 mb-1 block">Ghi chú</label>
-              <input value={form.ghiChu || ""}
-                onChange={e => setForm(f => f && ({ ...f, ghiChu: e.target.value }))}
-                placeholder="VD: Áp dụng cho bộ phận kho..."
-                className="w-full px-3 py-2 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              />
-            </div>
-
-            {/* ── Áp dụng cho ── */}
-            <div className="col-span-2 pt-1">
-              <label className="text-xs text-stone-500 mb-2 block font-medium">Áp dụng cho</label>
-              <div className="flex gap-2 mb-3">
-                {([
-                  { key: "khong",      label: "Không gán ngay", icon: null },
-                  { key: "bo_phan",    label: "Bộ phận",        icon: <Building2 size={13}/> },
-                  { key: "nhan_vien",  label: "Nhân viên cụ thể", icon: <Users size={13}/> },
-                ] as { key: ApDung; label: string; icon: React.ReactNode }[]).map(opt => (
-                  <button key={opt.key}
-                    type="button"
-                    onClick={() => setForm(f => f && ({ ...f, apDung: opt.key, boPhanList: [], nhanVienIds: [] }))}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                      ${form.apDung === opt.key
-                        ? "bg-rose-500 text-white border-rose-500"
-                        : "bg-white text-stone-500 border-stone-200 hover:border-rose-300"
-                      }`}
-                  >
-                    {opt.icon}{opt.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Chọn bộ phận */}
-              {form.apDung === "bo_phan" && (
-                <div className="flex flex-wrap gap-2">
-                  {PHONG_BAN.map(bp => (
-                    <button key={bp} type="button" onClick={() => toggleBP(bp)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                        ${form.boPhanList.includes(bp)
-                          ? "bg-emerald-500 text-white border-emerald-500"
-                          : "bg-white text-stone-500 border-stone-200 hover:border-emerald-300"
-                        }`}
-                    >
-                      {bp}
-                      {nvList.filter(nv => nv.phongBan?.toLowerCase() === bp.toLowerCase()).length > 0 && (
-                        <span className="ml-1 opacity-60">
-                          ({nvList.filter(nv => nv.phongBan?.toLowerCase() === bp.toLowerCase()).length})
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Chọn nhân viên */}
-              {form.apDung === "nhan_vien" && (
-                <div className="max-h-48 overflow-y-auto space-y-1 border border-stone-100 rounded-xl p-2">
-                  {nvList.filter(nv => nv).map(nv => (
-                    <button key={nv.id} type="button" onClick={() => toggleNV(nv.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-all
-                        ${form.nhanVienIds.includes(nv.id)
-                          ? "bg-emerald-50 border border-emerald-200"
-                          : "hover:bg-stone-50"
-                        }`}
-                    >
-                      <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px]
-                        ${form.nhanVienIds.includes(nv.id) ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300"}`}>
-                        {form.nhanVienIds.includes(nv.id) ? "✓" : ""}
-                      </span>
-                      <span className="font-medium text-stone-700">{nv.ten}</span>
-                      <span className="text-stone-400 text-xs">{nv.maNV}</span>
-                      {nv.phongBan && <span className="text-stone-300 text-xs ml-auto">{nv.phongBan}</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {form.apDung !== "khong" && (
-                <p className="text-xs text-stone-400 mt-2">
-                  {form.apDung === "bo_phan"
-                    ? `Đã chọn ${form.boPhanList.length} bộ phận`
-                    : `Đã chọn ${form.nhanVienIds.length} nhân viên`
-                  }
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2 mt-4">
-            <button onClick={save} disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-medium hover:bg-rose-600 disabled:opacity-50">
-              <Save size={14} /> {saving ? "Đang lưu..." : "Lưu"}
-            </button>
-            <button onClick={() => setForm(null)}
-              className="flex items-center gap-2 px-4 py-2 bg-stone-100 text-stone-600 rounded-xl text-sm hover:bg-stone-200">
-              <X size={14} /> Huỷ
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Danh sách ca */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2].map(i => (
@@ -276,18 +236,27 @@ export default function CaLamViecPage() {
             </div>
           ))}
         </div>
-      ) : list.length === 0 ? (
-        <div className="text-center py-16 text-stone-400">
-          <Clock size={40} className="mx-auto mb-3 opacity-40" />
-          <p>Chưa có ca làm việc nào</p>
-          <p className="text-sm mt-1">Bấm "Thêm ca" để tạo lịch làm việc</p>
-        </div>
       ) : (
         <div className="space-y-3">
+          {/* Card thêm mới */}
+          {editingId === "new" && <EditCard />}
+
+          {list.length === 0 && editingId !== "new" && (
+            <div className="text-center py-16 text-stone-400">
+              <Clock size={40} className="mx-auto mb-3 opacity-40" />
+              <p>Chưa có ca làm việc nào</p>
+              <p className="text-sm mt-1">Bấm "Thêm ca" để tạo lịch làm việc</p>
+            </div>
+          )}
+
           {list.map(ca => {
             const soNV = countNV(ca.id);
+            const isEditing = editingId === ca.id;
+
+            if (isEditing) return <EditCard key={ca.id} ca={ca} />;
+
             return (
-              <div key={ca.id} className="bg-white border border-stone-100 rounded-2xl px-5 py-4 shadow-sm flex items-center gap-4">
+              <div key={ca.id} className="bg-white border border-stone-100 rounded-2xl px-5 py-4 shadow-sm flex items-center gap-4 group hover:border-stone-200 transition-all">
                 <div className="w-11 h-11 bg-rose-50 rounded-xl flex items-center justify-center flex-shrink-0">
                   <Clock size={20} className="text-rose-400" />
                 </div>
@@ -308,13 +277,21 @@ export default function CaLamViecPage() {
                   </p>
                   {ca.ghiChu && <p className="text-xs text-stone-300 mt-0.5">{ca.ghiChu}</p>}
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button onClick={() => setForm({ ...ca, apDung: "khong", boPhanList: [], nhanVienIds: [] })}
-                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 rounded-lg">
-                    <Pencil size={15} />
+                <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => startEdit(ca)}
+                    disabled={editingId !== null}
+                    className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-50 rounded-lg disabled:opacity-30 transition-all"
+                    title="Sửa"
+                  >
+                    ✏️
                   </button>
-                  <button onClick={() => del(ca.id, ca.ten)}
-                    className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                  <button
+                    onClick={() => del(ca.id, ca.ten)}
+                    disabled={editingId !== null}
+                    className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 transition-all"
+                    title="Xoá"
+                  >
                     <Trash2 size={15} />
                   </button>
                 </div>
