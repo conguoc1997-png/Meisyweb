@@ -144,10 +144,14 @@ export async function POST(req: NextRequest) {
     // ── LƯƠNG CỐ ĐỊNH ────────────────────────────────────────────────
     if (!existing?.gioVao) {
       const trangThai = diMuon ? "di_muon" : "di_lam";
-      await upsertCC(nhanVienId, today, { trangThai, gioVao: timeStr });
+      const realPhutMuon = diMuon ? phutMuon + BIEN_DO_MUON : 0;
+      const ghiChu = diMuon
+        ? `Đến ${timeStr}, muộn ${realPhutMuon} phút (ca ${ca?.gioVao})`
+        : null;
+      await upsertCC(nhanVienId, today, { trangThai, gioVao: timeStr, ghiChu });
       return NextResponse.json({
         ok: true, action: "vao", time: timeStr, location: matched.name,
-        diMuon, phutMuon: diMuon ? phutMuon + BIEN_DO_MUON : 0,
+        diMuon, phutMuon: realPhutMuon,
         gioVaoCa: ca?.gioVao,
       });
     }
@@ -176,18 +180,18 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function upsertCC(nhanVienId: string, today: Date, data: { trangThai: string; gioVao: string }) {
+async function upsertCC(nhanVienId: string, today: Date, data: { trangThai: string; gioVao: string; ghiChu?: string | null }) {
   const existing = await prisma.chamCong.findUnique({
     where: { nhanVienId_ngay: { nhanVienId, ngay: today } },
   });
   if (existing) {
     await prisma.$executeRawUnsafe(
-      `UPDATE "ChamCong" SET "gioVao"=$3,"trangThai"=$4 WHERE "nhanVienId"=$1 AND "ngay"=$2`,
-      nhanVienId, today, data.gioVao, data.trangThai
+      `UPDATE "ChamCong" SET "gioVao"=$3,"trangThai"=$4,"ghiChu"=$5 WHERE "nhanVienId"=$1 AND "ngay"=$2`,
+      nhanVienId, today, data.gioVao, data.trangThai, data.ghiChu ?? null
     );
   } else {
     await prisma.chamCong.create({
-      data: { nhanVienId, ngay: today, trangThai: data.trangThai },
+      data: { nhanVienId, ngay: today, trangThai: data.trangThai, ghiChu: data.ghiChu ?? null },
     });
     await prisma.$executeRawUnsafe(
       `UPDATE "ChamCong" SET "gioVao"=$3 WHERE "nhanVienId"=$1 AND "ngay"=$2`,
