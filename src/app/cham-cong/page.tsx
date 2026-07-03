@@ -112,6 +112,7 @@ export default function ChamCongPage() {
   const [activeTab, setActiveTab] = useState<"chamcong" | "luong">("chamcong");
   const [blAuth, setBlAuth] = useState<string>("");
   const [blInput, setBlInput] = useState("");
+  const [blPass, setBlPass] = useState("");
   const [blError, setBlError] = useState("");
   // Danh sách phòng ban — lưu localStorage
   const DEFAULT_PHONG_BAN = ["Kho", "May", "CSKH", "Livestream"];
@@ -234,6 +235,21 @@ export default function ChamCongPage() {
     const win = window.open("", "_blank", "width=480,height=750");
     win?.document.write(html);
     win?.document.close();
+  };
+
+  // Đổi mật khẩu ADMIN bảng lương
+  const ADMIN_PIN_KEY = "luong-admin-pin";
+  const getAdminPin = () => typeof window !== "undefined" ? (localStorage.getItem(ADMIN_PIN_KEY) || "1234") : "1234";
+  const [showChangePinModal, setShowChangePinModal] = useState(false);
+  const [changePinForm, setChangePinForm] = useState({ oldPin: "", newPin: "", confirm: "" });
+  const [changePinError, setChangePinError] = useState("");
+  const submitChangePin = () => {
+    if (changePinForm.oldPin !== getAdminPin()) { setChangePinError("Mật khẩu cũ không đúng"); return; }
+    if (changePinForm.newPin.length < 4) { setChangePinError("Mật khẩu mới tối thiểu 4 ký tự"); return; }
+    if (changePinForm.newPin !== changePinForm.confirm) { setChangePinError("Xác nhận không khớp"); return; }
+    localStorage.setItem(ADMIN_PIN_KEY, changePinForm.newPin);
+    setShowChangePinModal(false); setChangePinForm({ oldPin: "", newPin: "", confirm: "" }); setChangePinError("");
+    alert("Đã đổi mật khẩu thành công!");
   };
 
   // Modal quản lý NV
@@ -1011,13 +1027,22 @@ export default function ChamCongPage() {
             e.preventDefault();
             const val = blInput.trim().toUpperCase();
             if (!val) return;
+            if (val === "ADMIN") {
+              if (blPass !== getAdminPin()) { setBlError("Sai mật khẩu ADMIN"); setBlPass(""); return; }
+            }
             setBlAuth(val);
             setBlError("");
           }} className="space-y-3">
             <input autoFocus value={blInput}
               onChange={e => { setBlInput(e.target.value); setBlError(""); }}
-              placeholder="VD: NV001 hoặc ADMIN"
+              placeholder="Mã nhân viên hoặc ADMIN"
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono" />
+            {blInput.trim().toUpperCase() === "ADMIN" && (
+              <input type="password" value={blPass}
+                onChange={e => { setBlPass(e.target.value); setBlError(""); }}
+                placeholder="Mật khẩu ADMIN"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+            )}
             {blError && <p className="text-xs text-red-500">{blError}</p>}
             <button type="submit" className="w-full bg-violet-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700">
               Xem lương
@@ -1033,14 +1058,20 @@ export default function ChamCongPage() {
               <h2 className="font-bold text-slate-800">Bảng Lương — Tháng {month}/{year}</h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 {blAuth === "ADMIN" ? "Xem toàn bộ" : `Đang xem: ${blAuth}`}
-                <button onClick={() => { setBlAuth(""); setBlInput(""); }} className="ml-2 text-violet-500 hover:underline">Đăng xuất</button>
+                <button onClick={() => { setBlAuth(""); setBlInput(""); setBlPass(""); }} className="ml-2 text-violet-500 hover:underline">Đăng xuất</button>
               </p>
             </div>
             {blAuth === "ADMIN" && (
-              <button onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition print:hidden">
-                <Printer size={14} /> In bảng lương
-              </button>
+              <div className="flex gap-2 print:hidden">
+                <button onClick={() => { setShowChangePinModal(true); setChangePinForm({ oldPin: "", newPin: "", confirm: "" }); setChangePinError(""); }}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-500 text-sm rounded-xl hover:bg-slate-50 transition">
+                  🔑 Đổi mật khẩu
+                </button>
+                <button onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-xl hover:bg-violet-700 transition">
+                  <Printer size={14} /> In bảng lương
+                </button>
+              </div>
             )}
           </div>
           <div className="overflow-x-auto">
@@ -1707,6 +1738,46 @@ export default function ChamCongPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL ĐỔI MẬT KHẨU ADMIN ═══ */}
+      {showChangePinModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold text-slate-800 text-base mb-4">Đổi mật khẩu ADMIN</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Mật khẩu hiện tại</label>
+                <input type="password" value={changePinForm.oldPin}
+                  onChange={e => { setChangePinForm(f => ({ ...f, oldPin: e.target.value })); setChangePinError(""); }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Mật khẩu mới</label>
+                <input type="password" value={changePinForm.newPin}
+                  onChange={e => { setChangePinForm(f => ({ ...f, newPin: e.target.value })); setChangePinError(""); }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Xác nhận mật khẩu mới</label>
+                <input type="password" value={changePinForm.confirm}
+                  onChange={e => { setChangePinForm(f => ({ ...f, confirm: e.target.value })); setChangePinError(""); }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300" />
+              </div>
+              {changePinError && <p className="text-xs text-red-500">{changePinError}</p>}
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={submitChangePin}
+                className="flex-1 py-2 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition">
+                Lưu mật khẩu
+              </button>
+              <button onClick={() => setShowChangePinModal(false)}
+                className="flex-1 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm hover:bg-slate-200 transition">
+                Huỷ
+              </button>
             </div>
           </div>
         </div>
