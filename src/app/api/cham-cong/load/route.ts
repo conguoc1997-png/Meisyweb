@@ -10,6 +10,7 @@ async function ensureColumns() {
     prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`).catch(() => {}),
     prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`).catch(() => {}),
     prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "ngayNghiViec" TEXT`).catch(() => {}),
   ]);
   migrated = true;
 }
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     const monthStart = thang ? `${thang}-01` : null;
 
     // Chạy song song: NV + CC + PhuCap
-    const [nvPrisma, nvExtra, ccRows, phuCapRows] = await Promise.all([
+    const [nvPrisma, nvExtraRaw, ccRows, phuCapRows] = await Promise.all([
       // 1a. Nhân viên qua Prisma (không lọc active để lấy cả người đã nghỉ trong tháng)
       prisma.nhanVien.findMany({
         orderBy: { ten: "asc" },
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
       // 1b. Lấy ngayNghiViec (cột ngoài schema) qua raw SQL
       prisma.$queryRawUnsafe<{ id: string; ngayNghiViec: string | null }[]>(
         `SELECT "id","ngayNghiViec" FROM "NhanVien"`
-      ).catch(() => [] as { id: string; ngayNghiViec: string | null }[]),
+      ).catch(() => null), // null = cột chưa tồn tại → fallback hiện all active
 
       // 2. Chấm công tháng — dùng raw SQL để lấy cả gioVao/gioRa
       thang ? (async () => {
@@ -61,11 +62,15 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Merge ngayNghiViec vào danh sách NV, lọc theo tháng
+    // nvExtraRaw = null nghĩa là cột chưa tồn tại → fallback: chỉ hiện active
+    const nvExtra = nvExtraRaw ?? [];
+    const nghiColExists = nvExtraRaw !== null;
     const nghiMap = Object.fromEntries(nvExtra.map(r => [r.id, r.ngayNghiViec ?? null]));
     const nhanViens = nvPrisma
       .map(nv => ({ ...nv, ngayNghiViec: nghiMap[nv.id] ?? null }))
       .filter(nv => {
         if (nv.active) return true; // đang làm → luôn hiện
+        if (!nghiColExists) return false; // cột chưa có → ẩn NV inactive (an toàn)
         if (!monthStart) return false;
         // Đã nghỉ: chỉ hiện nếu nghỉ SAU ngày đầu tháng đang xem
         return nv.ngayNghiViec != null && nv.ngayNghiViec >= monthStart;
