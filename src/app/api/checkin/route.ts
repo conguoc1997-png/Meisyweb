@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     const gioRaCa = ca ? timeToMin(ca.gioRa) / 60 : 17;
 
     // Phát hiện đi muộn: so với gioVao ca + 15 phút biên độ tha
-    const BIEN_DO_MUON = 15; // phút
+    const BIEN_DO_MUON = 5; // phút — muộn từ 5p trở lên mới đánh M
     const phutMuon = ca
       ? timeToMin(timeStr) - timeToMin(ca.gioVao) - BIEN_DO_MUON
       : 0;
