@@ -286,10 +286,16 @@ export default function ChamCongPage() {
   const fetchNV = useCallback(async (withHistory = false) => {
     try {
       const url = withHistory ? "/api/cham-cong/nhan-vien?h=1" : "/api/cham-cong/nhan-vien";
-      const data = await fetch(url).then(r => r.json());
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("fetchNV API error:", data);
+        alert("Lỗi tải nhân viên: " + (data?.error || res.status));
+        return;
+      }
       const list = Array.isArray(data) ? data as NhanVien[] : [];
       setNhanViens(list);
-      setAllNVs(list); // sync allNVs (modal quản lý NV)
+      setAllNVs(list);
     } catch (e) { console.error("fetchNV error:", e); }
   }, []);
 

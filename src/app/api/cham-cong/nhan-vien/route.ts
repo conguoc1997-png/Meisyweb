@@ -33,14 +33,18 @@ async function autoMigrate() {
 // GET /api/cham-cong/nhan-vien?h=1 → include luongCBHistory (cho bảng lương)
 // GET /api/cham-cong/nhan-vien     → không include history (cho chấm công, nhanh hơn)
 export async function GET(req: NextRequest) {
-  await autoMigrate();
-  const withHistory = new URL(req.url).searchParams.get("h") === "1";
-
-  const list = await prisma.nhanVien.findMany({
-    orderBy: { ten: "asc" },
-    ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
-  });
-  return NextResponse.json(list);
+  try {
+    await autoMigrate();
+    const withHistory = new URL(req.url).searchParams.get("h") === "1";
+    const list = await prisma.nhanVien.findMany({
+      orderBy: { ten: "asc" },
+      ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
+    });
+    return NextResponse.json(list);
+  } catch (e) {
+    console.error("GET /api/cham-cong/nhan-vien error:", e);
+    return NextResponse.json({ error: String(e), list: [] }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
