@@ -2,42 +2,31 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Auto-migrate: chạy 1 lần per cold-start
+// Auto-migrate: tách riêng từng câu SQL để 1 câu lỗi không ảnh hưởng câu khác
 let migrated = false;
+async function run(sql: string) {
+  try { await prisma.$executeRawUnsafe(sql); } catch { /* ignore */ }
+}
 async function autoMigrate() {
   if (migrated) return;
-  try {
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`
-    );
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`
-    );
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`
-    );
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`
-    );
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`
-    );
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`
-    );
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "CaLamViec" (
-        "id"        TEXT NOT NULL,
-        "ten"       TEXT NOT NULL,
-        "gioVao"    TEXT NOT NULL DEFAULT '07:30',
-        "gioRa"     TEXT NOT NULL DEFAULT '17:30',
-        "nghiTrua"  INTEGER NOT NULL DEFAULT 90,
-        "ghiChu"    TEXT,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY ("id")
-      )
-    `);
-  } catch { /* ignore — column already exists */ }
+  await run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`);
+  await run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`);
+  await run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`);
+  await run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`);
+  await run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`);
+  await run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`);
+  await run(`
+    CREATE TABLE IF NOT EXISTS "CaLamViec" (
+      "id"        TEXT NOT NULL,
+      "ten"       TEXT NOT NULL,
+      "gioVao"    TEXT NOT NULL DEFAULT '07:30',
+      "gioRa"     TEXT NOT NULL DEFAULT '17:30',
+      "nghiTrua"  INTEGER NOT NULL DEFAULT 90,
+      "ghiChu"    TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY ("id")
+    )
+  `);
   migrated = true;
 }
 
