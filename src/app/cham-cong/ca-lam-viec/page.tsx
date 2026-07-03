@@ -139,59 +139,72 @@ export default function CaLamViecPage() {
           />
         </div>
 
-        {/* Áp dụng cho (chỉ hiện khi thêm mới) */}
-        {editingId === "new" && (
-          <div className="ml-14 mb-3">
-            <p className="text-xs text-stone-400 mb-2 font-medium">Gán ca cho</p>
-            <div className="flex gap-2 mb-2">
-              {([
-                { key: "khong",     label: "Không gán ngay" },
-                { key: "bo_phan",   label: "Bộ phận", icon: <Building2 size={12}/> },
-                { key: "nhan_vien", label: "Nhân viên", icon: <Users size={12}/> },
-              ] as { key: ApDung; label: string; icon?: React.ReactNode }[]).map(opt => (
-                <button key={opt.key} type="button"
-                  onClick={() => setDraft(d => ({ ...d, apDung: opt.key as ApDung, boPhanList: [], nhanVienIds: [] }))}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
-                    ${draft.apDung === opt.key ? "bg-rose-500 text-white border-rose-500" : "bg-white text-stone-500 border-stone-200 hover:border-rose-300"}`}
-                >
-                  {opt.icon}{opt.label}
-                </button>
-              ))}
-            </div>
-            {draft.apDung === "bo_phan" && (
-              <div className="flex flex-wrap gap-1.5">
-                {PHONG_BAN.map(bp => (
+        {/* Áp dụng cho — hiện cả khi thêm mới và khi sửa */}
+        <div className="ml-14 mb-3">
+          <p className="text-xs text-stone-400 mb-2 font-medium">Gán ca cho</p>
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {([
+              { key: "khong",     label: "Không thay đổi" },
+              { key: "bo_phan",   label: "Bộ phận", icon: <Building2 size={12}/> },
+              { key: "nhan_vien", label: "Nhân viên", icon: <Users size={12}/> },
+            ] as { key: ApDung; label: string; icon?: React.ReactNode }[]).map(opt => (
+              <button key={opt.key} type="button"
+                onClick={() => setDraft(d => ({ ...d, apDung: opt.key as ApDung, boPhanList: [], nhanVienIds: [] }))}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+                  ${draft.apDung === opt.key ? "bg-rose-500 text-white border-rose-500" : "bg-white text-stone-500 border-stone-200 hover:border-rose-300"}`}
+              >
+                {opt.icon}{opt.label}
+              </button>
+            ))}
+          </div>
+          {draft.apDung === "bo_phan" && (
+            <div className="flex flex-wrap gap-1.5">
+              {PHONG_BAN.map(bp => {
+                const soNVInBP = nvList.filter(nv => nv.phongBan?.toLowerCase() === bp.toLowerCase()).length;
+                return (
                   <button key={bp} type="button"
                     onClick={() => setDraft(d => ({ ...d, boPhanList: d.boPhanList.includes(bp) ? d.boPhanList.filter(b => b !== bp) : [...d.boPhanList, bp] }))}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
                       ${draft.boPhanList.includes(bp) ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-stone-500 border-stone-200 hover:border-emerald-300"}`}
                   >
-                    {bp}
+                    {bp}{soNVInBP > 0 && <span className="ml-1 opacity-60">({soNVInBP})</span>}
                   </button>
-                ))}
-              </div>
-            )}
-            {draft.apDung === "nhan_vien" && (
-              <div className="max-h-40 overflow-y-auto space-y-1 border border-stone-100 rounded-xl p-2">
-                {nvList.map(nv => (
+                );
+              })}
+            </div>
+          )}
+          {draft.apDung === "nhan_vien" && (
+            <div className="max-h-48 overflow-y-auto space-y-1 border border-stone-100 rounded-xl p-2">
+              {nvList.map(nv => {
+                const selected = draft.nhanVienIds.includes(nv.id);
+                const currentCa = nv.caLamViecId === draft.id ? "• Ca này" : nv.caLamViecId ? "• Ca khác" : "";
+                return (
                   <button key={nv.id} type="button"
                     onClick={() => setDraft(d => ({ ...d, nhanVienIds: d.nhanVienIds.includes(nv.id) ? d.nhanVienIds.filter(i => i !== nv.id) : [...d.nhanVienIds, nv.id] }))}
                     className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left transition-all
-                      ${draft.nhanVienIds.includes(nv.id) ? "bg-emerald-50 border border-emerald-200" : "hover:bg-stone-50"}`}
+                      ${selected ? "bg-emerald-50 border border-emerald-200" : "hover:bg-stone-50"}`}
                   >
                     <span className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center
-                      ${draft.nhanVienIds.includes(nv.id) ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300"}`}>
-                      {draft.nhanVienIds.includes(nv.id) && <Check size={8}/>}
+                      ${selected ? "bg-emerald-500 border-emerald-500 text-white" : "border-stone-300"}`}>
+                      {selected && <Check size={8}/>}
                     </span>
                     <span className="font-medium text-stone-700">{nv.ten}</span>
                     <span className="text-stone-400">{nv.maNV}</span>
-                    {nv.phongBan && <span className="text-stone-300 ml-auto">{nv.phongBan}</span>}
+                    {nv.phongBan && <span className="text-stone-300">{nv.phongBan}</span>}
+                    {currentCa && <span className="ml-auto text-[10px] text-emerald-500">{currentCa}</span>}
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+          {draft.apDung !== "khong" && (
+            <p className="text-[11px] text-stone-400 mt-1.5">
+              {draft.apDung === "bo_phan"
+                ? `${draft.boPhanList.length} bộ phận được chọn`
+                : `${draft.nhanVienIds.length} nhân viên được chọn`}
+            </p>
+          )}
+        </div>
 
         {/* Nút lưu / huỷ */}
         <div className="ml-14 flex gap-2">

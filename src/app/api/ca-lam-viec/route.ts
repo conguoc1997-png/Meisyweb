@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 // PUT — cập nhật
 export async function PUT(req: NextRequest) {
   try {
-    await autoMigrate();
+    autoMigrate(); // fire-and-forget — bảng đã tồn tại khi user đã load được dữ liệu
     const { id, ten, gioVao, gioRa, nghiTrua, ghiChu, apDung, boPhanList, nhanVienIds } = await req.json();
     if (!id) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
     await assignCa(id, apDung || "khong", boPhanList || [], nhanVienIds || []);
@@ -113,7 +113,7 @@ export async function PUT(req: NextRequest) {
 
 // DELETE
 export async function DELETE(req: NextRequest) {
-  await autoMigrate();
+  autoMigrate(); // fire-and-forget
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
   await prisma.$executeRawUnsafe(`DELETE FROM "CaLamViec" WHERE "id" = $1`, id);
