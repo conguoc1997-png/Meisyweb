@@ -48,14 +48,24 @@ export default function CaLamViecPage() {
   async function save() {
     if (!form?.ten || !form.gioVao || !form.gioRa) return;
     setSaving(true);
-    await fetch("/api/ca-lam-viec", {
-      method: form.id ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      const res  = await fetch("/api/ca-lam-viec", {
+        method: form.id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        alert("Lỗi khi lưu: " + (data?.error || res.status));
+        setSaving(false);
+        return;
+      }
+      setForm(null);
+      await load();
+    } catch (e) {
+      alert("Lỗi kết nối: " + String(e));
+    }
     setSaving(false);
-    setForm(null);
-    load();
   }
 
   async function del(id: string, ten: string) {
