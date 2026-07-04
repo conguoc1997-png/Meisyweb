@@ -444,16 +444,21 @@ export default function KocPage() {
   };
 
   const fetchData = async () => {
-    const [k, b, sp, rem] = await Promise.all([
+    const [k, b, sp, rem] = await Promise.allSettled([
       fetch("/api/koc").then((r) => r.json()),
       fetch("/api/koc/booking").then((r) => r.json()),
       fetch("/api/kho/san-pham").then((r) => r.json()),
       fetch("/api/koc/remind").then((r) => r.json()),
     ]);
-    setKocs(Array.isArray(k) ? k : []);
-    setBookings(Array.isArray(b) ? b : []);
-    setSanPhams(Array.isArray(sp) ? sp : sp.data ?? []);
-    if (Array.isArray(rem)) setReminders(rem);
+    const kd = k.status === "fulfilled" ? k.value : null;
+    const bd = b.status === "fulfilled" ? b.value : null;
+    const spd = sp.status === "fulfilled" ? sp.value : null;
+    const remd = rem.status === "fulfilled" ? rem.value : null;
+    if (Array.isArray(kd)) setKocs(kd);
+    else if (kd?.error) console.error("KOC API lỗi:", kd.error);
+    if (Array.isArray(bd)) setBookings(bd);
+    if (spd) setSanPhams(Array.isArray(spd) ? spd : spd.data ?? []);
+    if (Array.isArray(remd)) setReminders(remd);
   };
 
   useEffect(() => { fetchData(); fetchTiktokDoanhthu(); }, []);

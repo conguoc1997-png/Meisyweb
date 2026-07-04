@@ -2,27 +2,53 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// ── Auto-migrate booking columns ──
+let migrated = false;
+async function autoMigrate() {
+  if (migrated) return;
+  migrated = true;
+  const run = (sql: string) => prisma.$executeRawUnsafe(sql).catch(() => {});
+  await Promise.all([
+    run(`ALTER TABLE "KOCBooking" ADD COLUMN IF NOT EXISTS "loai" TEXT NOT NULL DEFAULT 'booking'`),
+    run(`ALTER TABLE "KOCBooking" ADD COLUMN IF NOT EXISTS "daSent" BOOLEAN NOT NULL DEFAULT false`),
+    run(`ALTER TABLE "KOCBooking" ADD COLUMN IF NOT EXISTS "daRecv" BOOLEAN NOT NULL DEFAULT false`),
+    run(`ALTER TABLE "KOCBooking" ADD COLUMN IF NOT EXISTS "ngayRaHang" TIMESTAMP(3)`),
+    run(`ALTER TABLE "KOCBooking" ADD COLUMN IF NOT EXISTS "ngayLenVideo" TIMESTAMP(3)`),
+    run(`ALTER TABLE "KOCBooking" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT NOW()`),
+    run(`ALTER TABLE "KOC" ADD COLUMN IF NOT EXISTS "trangThaiHopTac" TEXT NOT NULL DEFAULT 'chua_tra_loi'`),
+  ]);
+}
+
 export async function GET() {
   try {
+    await autoMigrate();
     const bookings = await prisma.kOCBooking.findMany({
       include: { koc: true, sanPham: true },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(bookings);
   } catch {
-    // Fallback: cột ngayRaHang chưa tồn tại trong DB
+    // Fallback: raw SQL với các cột có thể thiếu dùng COALESCE
     try {
-      const bookings = await prisma.$queryRaw`
-        SELECT b.*, b."ngayBat"::text, b."ngayKet"::text,
-               b."ngayLenVideo"::text,
-               NULL::timestamp as "ngayRaHang",
-               row_to_json(k.*) as koc,
-               row_to_json(s.*) as "sanPham"
+      const bookings = await prisma.$queryRawUnsafe<unknown[]>(`
+        SELECT
+          b.id, b."kocId", b."sanPhamId",
+          b."soLuongGui", b."chiPhiCast", b."chiPhiSP", b."chiPhi",
+          b."ngayBat"::text, b."ngayKet"::text,
+          b."trangThai", b."doanhThu", b."donHang", b."luotXem", b."ghiChu",
+          b."createdAt",
+          COALESCE(b."loai", 'booking') as "loai",
+          COALESCE(b."daSent", false) as "daSent",
+          COALESCE(b."daRecv", false) as "daRecv",
+          b."ngayRaHang"::text,
+          b."ngayLenVideo"::text,
+          row_to_json(k.*) as koc,
+          CASE WHEN s.id IS NULL THEN NULL ELSE row_to_json(s.*) END as "sanPham"
         FROM "KOCBooking" b
         JOIN "KOC" k ON k.id = b."kocId"
         LEFT JOIN "SanPham" s ON s.id = b."sanPhamId"
         ORDER BY b."createdAt" DESC
-      `;
+      `);
       return NextResponse.json(bookings);
     } catch (e2: unknown) {
       return NextResponse.json({ error: e2 instanceof Error ? e2.message : "Lỗi server" }, { status: 500 });
