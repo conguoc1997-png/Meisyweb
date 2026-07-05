@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [form, setForm] = useState({ email: "", name: "", password: "", isAdmin: false });
+  const [form, setForm] = useState({ email: "", name: "", password: "", isAdmin: false, logoutOtherDevices: true });
   const [selectedMods, setSelectedMods] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -38,7 +38,7 @@ export default function AdminUsersPage() {
 
   function openAdd() {
     setEditUser(null);
-    setForm({ email: "", name: "", password: "", isAdmin: false });
+    setForm({ email: "", name: "", password: "", isAdmin: false, logoutOtherDevices: true });
     setSelectedMods([]);
     setError("");
     setShowForm(true);
@@ -46,7 +46,7 @@ export default function AdminUsersPage() {
 
   function openEdit(u: User) {
     setEditUser(u);
-    setForm({ email: u.email, name: u.name, password: "", isAdmin: u.role === "admin" });
+    setForm({ email: u.email, name: u.name, password: "", isAdmin: u.role === "admin", logoutOtherDevices: true });
     setSelectedMods(u.role === "admin" ? [] : parseModules(u.role));
     setError("");
     setShowForm(true);
@@ -59,7 +59,10 @@ export default function AdminUsersPage() {
       const role = form.isAdmin ? "admin" : selectedMods.join(",") || "tong-quan";
       if (editUser) {
         const body: Record<string, unknown> = { name: form.name, role };
-        if (form.password) body.password = form.password;
+        if (form.password) {
+          body.password = form.password;
+          body.logoutOtherDevices = form.logoutOtherDevices;
+        }
         const res = await fetch(`/api/admin/users/${editUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (!res.ok) throw new Error((await res.json()).error);
       } else {
@@ -189,6 +192,20 @@ export default function AdminUsersPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">{editUser ? "Mật khẩu mới (bỏ trống nếu không đổi)" : "Mật khẩu"}</label>
                 <input type="password" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-400" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
+                {/* Checkbox đăng xuất thiết bị khác — chỉ hiện khi đang sửa và có nhập mật khẩu mới */}
+                {editUser && form.password && (
+                  <label className="flex items-center gap-2 mt-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.logoutOtherDevices}
+                      onChange={e => setForm({ ...form, logoutOtherDevices: e.target.checked })}
+                      className="accent-amber-500"
+                    />
+                    <span className="text-xs text-amber-800 font-medium">
+                      🔒 Đăng xuất khỏi tất cả thiết bị khác (khuyến nghị)
+                    </span>
+                  </label>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-2">Phân quyền theo module</label>

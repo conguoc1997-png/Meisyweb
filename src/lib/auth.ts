@@ -5,6 +5,7 @@ export type SessionUser = {
   email: string;
   name: string;
   role: string; // "admin" | comma-separated module keys e.g. "kho,san-xuat,doi-tra"
+  sessionVersion?: number;
 };
 
 // Tất cả module keys có thể phân quyền

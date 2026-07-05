@@ -27,12 +27,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.name) data.name = body.name;
   if (body.role !== undefined) data.role = body.role;
   if (typeof body.active === "boolean") data.active = body.active;
-  if (body.password) data.password = await bcrypt.hash(body.password, 10);
+
+  if (body.password) {
+    data.password = await bcrypt.hash(body.password, 10);
+    // Nếu admin chọn "đăng xuất thiết bị khác" → tăng sessionVersion
+    if (body.logoutOtherDevices) {
+      // Lấy version hiện tại rồi tăng lên 1
+      const current = await prisma.user.findUnique({
+        where: { id },
+        select: { sessionVersion: true },
+      });
+      data.sessionVersion = (current?.sessionVersion ?? 0) + 1;
+    }
+  }
 
   const user = await prisma.user.update({
     where: { id },
     data,
-    select: { id: true, email: true, name: true, role: true, active: true, createdAt: true },
+    select: { id: true, email: true, name: true, role: true, active: true, createdAt: true, sessionVersion: true },
   });
   return NextResponse.json(user);
 }

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sai tài khoản hoặc mật khẩu" }, { status: 401 });
     }
 
-    const sessionUser: SessionUser = { id: user.id, email: user.email, name: user.name, role: user.role as SessionUser["role"] };
+    const sessionUser: SessionUser = { id: user.id, email: user.email, name: user.name, role: user.role as SessionUser["role"], sessionVersion: user.sessionVersion ?? 0 };
     const token = await signToken(sessionUser);
 
     const res = NextResponse.json({ ok: true, name: user.name, role: user.role });
