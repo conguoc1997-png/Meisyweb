@@ -287,7 +287,66 @@ export default function LichDiLamPage() {
             </button>
           </div>
 
-          {/* Kết quả submit */}
+          {/* ── PANEL KẾT QUẢ NỔI BẬT ── */}
+          {!loadingLich && lichList.length > 0 && (() => {
+            const daDuyet  = lichList.filter(r => r.trangThai === "da_duyet");
+            const tuChoi   = lichList.filter(r => r.trangThai === "tu_choi");
+            const choDuyet = lichList.filter(r => r.trangThai === "cho_duyet");
+            if (daDuyet.length === 0 && tuChoi.length === 0) return null;
+            return (
+              <div className="rounded-2xl border overflow-hidden shadow-sm">
+                {/* Header */}
+                <div className="bg-slate-700 px-4 py-3 flex items-center gap-2">
+                  <span className="text-base">📋</span>
+                  <p className="text-sm font-bold text-white">Kết quả đăng ký của bạn</p>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {/* Được duyệt */}
+                  {daDuyet.map(r => (
+                    <div key={r.id} className="bg-green-50 px-4 py-3 flex items-start gap-3">
+                      <span className="text-green-500 text-lg mt-0.5">✅</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-green-800">Được duyệt</p>
+                        <p className="text-sm text-green-700">{formatNgay(r.ngay)}</p>
+                        {(r.gioVao || r.gioRa) && (
+                          <p className="text-xs text-green-600 mt-0.5"><Clock size={11} className="inline mr-0.5" />{r.gioVao} – {r.gioRa}</p>
+                        )}
+                        {r.adminNote && (
+                          <p className="text-xs text-green-700 mt-1 bg-green-100 rounded-lg px-2 py-1">💬 Admin: {r.adminNote}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {/* Từ chối */}
+                  {tuChoi.map(r => (
+                    <div key={r.id} className="bg-red-50 px-4 py-3 flex items-start gap-3">
+                      <span className="text-red-500 text-lg mt-0.5">❌</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-red-800">Bị từ chối</p>
+                        <p className="text-sm text-red-700">{formatNgay(r.ngay)}</p>
+                        {(r.gioVao || r.gioRa) && (
+                          <p className="text-xs text-red-500 mt-0.5"><Clock size={11} className="inline mr-0.5" />{r.gioVao} – {r.gioRa}</p>
+                        )}
+                        {r.adminNote
+                          ? <p className="text-xs text-red-700 mt-1 bg-red-100 rounded-lg px-2 py-1">💬 Admin: {r.adminNote}</p>
+                          : <p className="text-xs text-red-400 mt-1 italic">Không có lý do từ admin</p>
+                        }
+                      </div>
+                    </div>
+                  ))}
+                  {/* Chờ duyệt summary */}
+                  {choDuyet.length > 0 && (
+                    <div className="bg-amber-50 px-4 py-2.5 flex items-center gap-2">
+                      <span className="text-amber-500">⏳</span>
+                      <p className="text-xs text-amber-700 font-medium">Còn {choDuyet.length} lịch đang chờ admin duyệt</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Kết quả submit vừa gửi */}
           {submitResult && (
             <div className={`rounded-xl p-4 border flex items-start gap-3 ${submitResult.ok ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
               {submitResult.ok
@@ -396,41 +455,39 @@ export default function LichDiLamPage() {
             </div>
           )}
 
-          {/* Lịch sử */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Lịch đã đăng ký</p>
-            {loadingLich ? (
-              <div className="flex justify-center py-4"><Loader2 size={20} className="animate-spin text-violet-400" /></div>
-            ) : lichList.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-4">Chưa có lịch nào</p>
-            ) : (
-              <div className="space-y-2">
-                {lichList.map(r => {
-                  const tt = TT[r.trangThai] ?? TT.cho_duyet;
-                  return (
-                    <div key={r.id} className={`rounded-xl border p-3 ${tt.bg}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-700">{formatNgay(r.ngay)}</p>
-                          {(r.gioVao || r.gioRa) && (
-                            <p className="text-xs text-slate-500 mt-0.5"><Clock size={11} className="inline mr-0.5" />{r.gioVao} – {r.gioRa}</p>
-                          )}
-                          {r.ghiChu && <p className="text-xs text-slate-400 mt-0.5 italic">"{r.ghiChu}"</p>}
-                          {r.adminNote && <p className="text-xs text-slate-500 mt-1 font-medium">Admin: {r.adminNote}</p>}
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tt.color}`}>{tt.label}</span>
-                          {r.trangThai === "cho_duyet" && (
-                            <button onClick={() => handleHuy(r.id)} className="text-[10px] text-red-400 hover:text-red-600 underline">Hủy</button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Lịch đang chờ duyệt — hiện để NV có thể hủy */}
+          {!loadingLich && lichList.some(r => r.trangThai === "cho_duyet") && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+                <span>⏳</span>
+                <p className="text-xs font-semibold text-amber-800">Đang chờ admin duyệt</p>
               </div>
-            )}
-          </div>
+              <div className="divide-y divide-slate-100">
+                {lichList.filter(r => r.trangThai === "cho_duyet").map(r => (
+                  <div key={r.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">{formatNgay(r.ngay)}</p>
+                      {(r.gioVao || r.gioRa) && (
+                        <p className="text-xs text-slate-400 mt-0.5"><Clock size={11} className="inline mr-0.5" />{r.gioVao} – {r.gioRa}</p>
+                      )}
+                      {r.ghiChu && <p className="text-xs text-slate-400 italic">"{r.ghiChu}"</p>}
+                    </div>
+                    <button onClick={() => handleHuy(r.id)}
+                      className="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1 transition whitespace-nowrap">
+                      Hủy
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Trạng thái loading */}
+          {loadingLich && (
+            <div className="flex justify-center py-4">
+              <Loader2 size={20} className="animate-spin text-violet-400" />
+            </div>
+          )}
         </div>
       )}
     </div>
