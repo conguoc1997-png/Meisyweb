@@ -34,9 +34,23 @@ async function autoMigrate() {
 // GET /api/cham-cong/nhan-vien     → không include history (cho chấm công, nhanh hơn)
 export async function GET(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const maNV = url.searchParams.get("maNV");
+
+    // Fast-path: tìm 1 NV theo mã (không cần autoMigrate)
+    if (maNV) {
+      const nv = await prisma.nhanVien.findUnique({
+        where: { maNV: maNV.toUpperCase().trim() },
+        select: { id: true, ten: true, maNV: true, phongBan: true, loaiLuong: true, active: true },
+      });
+      if (!nv || !nv.active) return NextResponse.json(null);
+      return NextResponse.json(nv);
+    }
+
     await autoMigrate();
-    const withHistory = new URL(req.url).searchParams.get("h") === "1";
+    const withHistory = url.searchParams.get("h") === "1";
     const list = await prisma.nhanVien.findMany({
+      where: { active: true },
       orderBy: { ten: "asc" },
       ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
     });
