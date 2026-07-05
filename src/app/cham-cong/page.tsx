@@ -95,15 +95,38 @@ export default function ChamCongPage() {
   const [chamCongs, setChamCongs] = useState<ChamCong[]>([]);
   const [loading, setLoading] = useState(true);
   const [ccLoading, setCcLoading] = useState(false); // spinner nhẹ khi đổi tháng
-  // Khoá bảng chấm công — tránh bấm nhầm
-  const [locked, setLocked] = useState<boolean>(() => {
-    try { return localStorage.getItem("meisy_cc_locked") === "1"; } catch { return false; }
-  });
-  const toggleLock = () => setLocked(v => {
-    const next = !v;
-    try { localStorage.setItem("meisy_cc_locked", next ? "1" : "0"); } catch {}
-    return next;
-  });
+  // Khoá bảng chấm công — lưu server-side, áp dụng cho mọi người
+  const [locked, setLocked] = useState<boolean>(false);
+  const [lockLoading, setLockLoading] = useState(false);
+
+  // Fetch lock status từ server khi thang thay đổi
+  useEffect(() => {
+    fetch(`/api/cham-cong/lock?thang=${thang}`)
+      .then(r => r.json())
+      .then(d => setLocked(d.locked === true))
+      .catch(() => setLocked(false));
+  }, [thang]);
+
+  const toggleLock = async () => {
+    const next = !locked;
+    // Mở khoá → yêu cầu mật khẩu ADMIN
+    if (next === false) {
+      const pin = prompt("Nhập mật khẩu ADMIN để mở khoá bảng chấm công:");
+      if (!pin) return;
+      if (pin !== getAdminPin()) { alert("Sai mật khẩu ADMIN!"); return; }
+    }
+    setLockLoading(true);
+    try {
+      const res = await fetch("/api/cham-cong/lock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thang, locked: next }),
+      });
+      if (res.ok) setLocked(next);
+      else alert("Lỗi khi cập nhật trạng thái khoá!");
+    } catch { alert("Lỗi kết nối!"); }
+    finally { setLockLoading(false); }
+  };
   // savingSet: dùng Set để track ô đang save — chỉ block double-click trên cùng 1 ô
   const savingSetRef = React.useRef(new Set<string>());
 
@@ -784,17 +807,21 @@ export default function ChamCongPage() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-purple-200 text-sm text-purple-600 hover:bg-purple-50 transition">
             <CalendarDays size={14} /> Ngày lễ
           </button>
-          {/* Nút khoá/mở khoá bảng */}
+          {/* Nút khoá/mở khoá bảng — server-side, áp dụng cho tất cả */}
           <button
             onClick={toggleLock}
-            title={locked ? "Đang khoá — nhấn để mở khoá chấm công" : "Đang mở — nhấn để khoá tránh bấm nhầm"}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition
+            disabled={lockLoading}
+            title={locked ? "Đang khoá (tất cả máy) — nhấn để mở khoá (cần mật khẩu ADMIN)" : "Đang mở — nhấn để khoá bảng cho tất cả nhân viên"}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition disabled:opacity-60
               ${locked
                 ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
                 : "border-slate-200 text-slate-500 hover:bg-slate-50"
               }`}
           >
-            {locked ? <Lock size={14} /> : <Unlock size={14} />}
+            {lockLoading
+              ? <span className="inline-block w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              : locked ? <Lock size={14} /> : <Unlock size={14} />
+            }
             {locked ? "Đã khoá" : "Khoá"}
           </button>
           <button onClick={openNVModal}
