@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, getSessionUser } from "@/lib/auth-server";
 
 async function checkAdmin() {
   try {
@@ -56,7 +56,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   // Không cho xóa chính mình
-  const self = await import("@/lib/auth").then(m => m.getSessionUser());
+  const self = await getSessionUser();
   if (self?.id === id) {
     return NextResponse.json({ error: "Không thể xóa tài khoản đang đăng nhập" }, { status: 400 });
   }

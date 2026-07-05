@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth-server";
 
 export async function GET() {
   try {

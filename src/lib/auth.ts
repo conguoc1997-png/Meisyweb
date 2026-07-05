@@ -68,29 +68,5 @@ export function canAccess(role: string, pathname: string): boolean {
   });
 }
 
-// Helper dùng trong API route để kiểm tra auth server-side
-import { cookies } from "next/headers";
-
-export async function getSessionUser(): Promise<SessionUser | null> {
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("auth_session")?.value;
-    if (!token) return null;
-    return await verifyToken(token);
-  } catch {
-    return null;
-  }
-}
-
-export async function requireAdmin(): Promise<SessionUser> {
-  const user = await getSessionUser();
-  if (!user) throw new Error("UNAUTHORIZED");
-  if (user.role !== "admin") throw new Error("FORBIDDEN");
-  return user;
-}
-
-export async function requireAuth(): Promise<SessionUser> {
-  const user = await getSessionUser();
-  if (!user) throw new Error("UNAUTHORIZED");
-  return user;
-}
+// NOTE: getSessionUser, requireAdmin, requireAuth đã được chuyển sang
+// @/lib/auth-server để tránh import next/headers trong Edge runtime (proxy.ts)
