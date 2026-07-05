@@ -2,8 +2,16 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    return NextResponse.json({ error: msg === "UNAUTHORIZED" ? "Chưa đăng nhập" : "Không có quyền" }, { status: msg === "UNAUTHORIZED" ? 401 : 403 });
+  }
+
   const users = await prisma.user.findMany({
     select: { id: true, email: true, name: true, role: true, active: true, createdAt: true },
     orderBy: { createdAt: "asc" },
@@ -12,6 +20,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    return NextResponse.json({ error: msg === "UNAUTHORIZED" ? "Chưa đăng nhập" : "Không có quyền" }, { status: msg === "UNAUTHORIZED" ? 401 : 403 });
+  }
+
   const { email, name, password, role } = await req.json();
   if (!email || !name || !password || !role) {
     return NextResponse.json({ error: "Thiếu thông tin" }, { status: 400 });

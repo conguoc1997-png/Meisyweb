@@ -9,14 +9,14 @@ export type SessionUser = {
 
 // Tất cả module keys có thể phân quyền
 export const ALL_MODULES = [
-  { key: "tong-quan", label: "Tổng quan",       routes: ["/tong-quan", "/api/dashboard"] },
+  { key: "tong-quan", label: "Tổng quan",       routes: ["/tong-quan", "/api/dashboard", "/"] },
   { key: "kho",       label: "Quản lý Kho",      routes: ["/kho", "/api/kho", "/doi-soat", "/api/doi-soat", "/fake-kho", "/api/fake-kho"] },
   { key: "san-xuat",  label: "Sản xuất",          routes: ["/san-xuat", "/api/san-xuat"] },
   { key: "doi-tra",   label: "Chăm sóc KH",      routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
   { key: "koc",       label: "KOC Booking",       routes: ["/koc", "/api/koc"] },
   { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban", "/api/gia-ban"] },
   { key: "ke-toan",   label: "Kế toán",           routes: ["/ke-toan", "/api/ke-toan"] },
-  { key: "cham-cong", label: "Chấm công",           routes: ["/cham-cong", "/api/cham-cong"] },
+  { key: "cham-cong", label: "Chấm công",           routes: ["/cham-cong", "/bang-luong", "/api/cham-cong", "/api/lich-di-lam", "/cham-cong/ca-lam-viec", "/cham-cong/qr"] },
   { key: "so-thu-chi", label: "Sổ Thu Chi",        routes: ["/so-thu-chi", "/api/so-thu-chi"] },
   { key: "cong-no",    label: "Công Nợ & DT",       routes: ["/cong-no", "/api/cong-no-ncc", "/api/cong-no-khach-hang", "/api/doanh-thu"] },
   { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
@@ -55,12 +55,41 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
 
 export function canAccess(role: string, pathname: string): boolean {
   if (role === "admin") return true;
-  // Launcher + login luôn mở
+  // Launcher + login + public pages luôn mở
   if (pathname === "/" || pathname === "/login") return true;
+  // Admin routes chỉ cho admin
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) return false;
 
   const modules = parseModules(role);
   return modules.some(mk => {
     const mod = ALL_MODULES.find(m => m.key === mk);
     return mod?.routes.some(prefix => pathname.startsWith(prefix)) ?? false;
   });
+}
+
+// Helper dùng trong API route để kiểm tra auth server-side
+import { cookies } from "next/headers";
+
+export async function getSessionUser(): Promise<SessionUser | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_session")?.value;
+    if (!token) return null;
+    return await verifyToken(token);
+  } catch {
+    return null;
+  }
+}
+
+export async function requireAdmin(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new Error("UNAUTHORIZED");
+  if (user.role !== "admin") throw new Error("FORBIDDEN");
+  return user;
+}
+
+export async function requireAuth(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new Error("UNAUTHORIZED");
+  return user;
 }
