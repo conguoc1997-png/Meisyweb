@@ -114,6 +114,7 @@ const MODULES: NavModule[] = [
       { href: "/bang-luong",            label: "Bảng lương",       icon: Banknote,      moduleKey: "cham-cong" },
       { href: "/cham-cong/qr",          label: "Mã QR chấm công",  icon: QrCode,        moduleKey: "cham-cong" },
       { href: "/cham-cong/ca-lam-viec", label: "Lịch làm việc",    icon: Clock,         moduleKey: "cham-cong" },
+      { href: "/lich-di-lam",           label: "Đăng ký lịch NV",  icon: CalendarCheck, moduleKey: "cham-cong" },
     ],
   },
   {
@@ -145,7 +146,7 @@ const MODULES: NavModule[] = [
 ];
 
 // Các route không hiện sidebar (trang công khai, mobile-only)
-const NO_SIDEBAR_ROUTES = ["/checkin", "/login"];
+const NO_SIDEBAR_ROUTES = ["/checkin", "/login", "/lich-di-lam"];
 
 export default function Sidebar() {
   const pathname = usePathname();

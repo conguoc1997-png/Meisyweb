@@ -142,7 +142,48 @@ export default function ChamCongPage() {
     setHolidaysRaw(list);
     try { localStorage.setItem(`meisy_holidays_${year}`, JSON.stringify(list)); } catch {}
   };
-  const [activeTab, setActiveTab] = useState<"chamcong" | "luong">("chamcong");
+  const [activeTab, setActiveTab] = useState<"chamcong" | "luong" | "dang_ky">("chamcong");
+
+  // ── Đăng ký lịch đi làm ──
+  type LichRow = { id: string; ngay: string; gioVao: string | null; gioRa: string | null; ghiChu: string | null; trangThai: string; adminNote: string | null; nhanVien: { ten: string; maNV: string; phongBan: string | null } };
+  const [lichList, setLichList] = useState<LichRow[]>([]);
+  const [lichLoading, setLichLoading] = useState(false);
+  const [lichTT, setLichTT] = useState<"cho_duyet" | "da_duyet" | "tu_choi" | "">("");
+  const [lichCount, setLichCount] = useState(0);
+  const [adminNoteInput, setAdminNoteInput] = useState<Record<string, string>>({});
+
+  const fetchLich = async () => {
+    setLichLoading(true);
+    try {
+      const tt = lichTT ? `&trangThai=${lichTT}` : "";
+      const res = await fetch(`/api/lich-di-lam?thang=${thang}${tt}`);
+      const d = await res.json();
+      const list = Array.isArray(d) ? d : [];
+      setLichList(list);
+      // Count chờ duyệt
+      const all = await fetch(`/api/lich-di-lam?thang=${thang}`).then(r => r.json()).catch(() => []);
+      setLichCount((Array.isArray(all) ? all : []).filter((r: LichRow) => r.trangThai === "cho_duyet").length);
+    } catch { setLichList([]); }
+    finally { setLichLoading(false); }
+  };
+
+  useEffect(() => { if (activeTab === "dang_ky") fetchLich(); }, [activeTab, thang, lichTT]);
+
+  const handleDuyetLich = async (id: string, trangThai: "da_duyet" | "tu_choi") => {
+    const note = adminNoteInput[id] || "";
+    await fetch(`/api/lich-di-lam/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trangThai, adminNote: note }),
+    });
+    fetchLich();
+  };
+
+  const handleXoaLich = async (id: string) => {
+    if (!confirm("Xóa đăng ký này?")) return;
+    await fetch(`/api/lich-di-lam/${id}`, { method: "DELETE" });
+    fetchLich();
+  };
   const [blAuth, setBlAuth] = useState<string>("");
   const [blInput, setBlInput] = useState("");
   const [blPass, setBlPass] = useState("");
@@ -880,6 +921,15 @@ export default function ChamCongPage() {
         <button onClick={() => setActiveTab("luong")}
           className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === "luong" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
           💰 Bảng lương
+        </button>
+        <button onClick={() => setActiveTab("dang_ky")}
+          className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === "dang_ky" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+          📅 Đăng ký lịch
+          {lichCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              {lichCount > 9 ? "9+" : lichCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1626,6 +1676,123 @@ export default function ChamCongPage() {
           <div className="px-5 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-400">
             💡 Lương CB: Lương TC = giờ TC × <b>Hệ số TC</b> &nbsp;|&nbsp; Đội May: Lương theo khoán sản phẩm (không tính TC riêng) &nbsp;|&nbsp; Thực lĩnh = Lương + Phụ cấp &nbsp;|&nbsp; Vắng không tính lương
           </div>
+        </div>
+      )}
+
+      {/* ═══ TAB ĐĂNG KÝ LỊCH ĐI LÀM ═══ */}
+      {activeTab === "dang_ky" && (
+        <div className="space-y-4">
+          {/* Header + filter */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-800">📅 Đăng ký lịch đi làm</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Nhân viên đăng ký tại{" "}
+                <a href="/lich-di-lam" target="_blank" className="text-violet-500 underline font-medium">/lich-di-lam</a>
+                {" "}→ Admin duyệt tại đây
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {(["", "cho_duyet", "da_duyet", "tu_choi"] as const).map(tt => (
+                <button key={tt} onClick={() => setLichTT(tt)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition
+                    ${lichTT === tt
+                      ? "bg-violet-500 text-white border-violet-500"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}>
+                  {tt === "" ? "Tất cả" : tt === "cho_duyet" ? `Chờ duyệt${lichCount > 0 ? ` (${lichCount})` : ""}` : tt === "da_duyet" ? "Đã duyệt" : "Từ chối"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {lichLoading ? (
+            <div className="flex justify-center py-12">
+              <span className="w-6 h-6 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : lichList.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center text-slate-400">
+              <p className="text-2xl mb-2">📭</p>
+              <p className="text-sm">Không có đăng ký nào{lichTT === "cho_duyet" ? " đang chờ duyệt" : ""} tháng này</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-semibold">
+                    <th className="px-4 py-3 text-left">Nhân viên</th>
+                    <th className="px-4 py-3 text-left">Ngày đăng ký</th>
+                    <th className="px-4 py-3 text-left">Ca làm</th>
+                    <th className="px-4 py-3 text-left">Ghi chú</th>
+                    <th className="px-4 py-3 text-left">Trạng thái</th>
+                    <th className="px-4 py-3 text-left">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lichList.map(r => {
+                    const ngayD = new Date(r.ngay + "T00:00:00");
+                    const ngayStr = `${ngayD.getDate()}/${ngayD.getMonth() + 1}`;
+                    const ngayFull = `${["CN","T2","T3","T4","T5","T6","T7"][ngayD.getDay()]} ${ngayStr}`;
+                    return (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-800">{r.nhanVien.ten}</p>
+                          <p className="text-xs text-slate-400">{r.nhanVien.maNV}{r.nhanVien.phongBan ? ` · ${r.nhanVien.phongBan}` : ""}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-700">{ngayFull}</p>
+                          <p className="text-xs text-slate-400">{r.ngay}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {r.gioVao && r.gioRa ? `${r.gioVao} – ${r.gioRa}` : r.gioVao ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs max-w-[180px]">
+                          {r.ghiChu || "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            r.trangThai === "cho_duyet" ? "bg-amber-100 text-amber-700" :
+                            r.trangThai === "da_duyet"  ? "bg-green-100 text-green-700"  :
+                            "bg-red-100 text-red-600"
+                          }`}>
+                            {r.trangThai === "cho_duyet" ? "Chờ duyệt" : r.trangThai === "da_duyet" ? "Đã duyệt" : "Từ chối"}
+                          </span>
+                          {r.adminNote && <p className="text-xs text-slate-400 mt-1 italic">{r.adminNote}</p>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {r.trangThai === "cho_duyet" ? (
+                            <div className="flex flex-col gap-1.5">
+                              <input
+                                placeholder="Ghi chú admin (tuỳ chọn)"
+                                value={adminNoteInput[r.id] ?? ""}
+                                onChange={e => setAdminNoteInput(p => ({ ...p, [r.id]: e.target.value }))}
+                                className="w-40 text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-300"
+                              />
+                              <div className="flex gap-1.5">
+                                <button onClick={() => handleDuyetLich(r.id, "da_duyet")}
+                                  className="flex-1 text-xs bg-green-500 hover:bg-green-600 text-white font-semibold py-1.5 rounded-lg transition">
+                                  ✓ Duyệt
+                                </button>
+                                <button onClick={() => handleDuyetLich(r.id, "tu_choi")}
+                                  className="flex-1 text-xs bg-red-100 hover:bg-red-200 text-red-600 font-semibold py-1.5 rounded-lg transition">
+                                  ✗ Từ chối
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button onClick={() => handleXoaLich(r.id)}
+                              className="text-xs text-slate-400 hover:text-red-500 transition">
+                              Xóa
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
