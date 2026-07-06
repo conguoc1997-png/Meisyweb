@@ -46,6 +46,7 @@ type ChamCong = {
 
 // Trạng thái chấm công
 const TRANG_THAI = [
+  { key: "da_dang_ky", label: "Đ",   title: "Đã đăng ký",   bg: "bg-violet-100",  text: "text-violet-600",  border: "border-violet-200" },
   { key: "di_lam",     label: "✓",   title: "Đi làm",       bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-300" },
   { key: "nghi_phep",  label: "NP",  title: "Nghỉ phép",     bg: "bg-blue-100",    text: "text-blue-700",    border: "border-blue-300" },
   { key: "vang",       label: "V",   title: "Vắng",          bg: "bg-red-100",     text: "text-red-700",     border: "border-red-300" },
@@ -54,6 +55,7 @@ const TRANG_THAI = [
   { key: "nghi_le",    label: "L",   title: "Nghỉ lễ",       bg: "bg-purple-100",  text: "text-purple-700",  border: "border-purple-300" },
 ];
 const TT_MAP = Object.fromEntries(TRANG_THAI.map(t => [t.key, t]));
+// da_dang_ky không nằm trong CYCLE bình thường — click đặc biệt → di_lam
 const CYCLE = ["di_lam", "nghi_phep", "vang", "di_muon", "nua_ngay", "nghi_le", ""];
 
 const fmt = (n: number) => n.toLocaleString("vi-VN");
@@ -576,7 +578,10 @@ export default function ChamCongPage() {
     if (isSunday(day) && !cur) {
       if (!confirm(`Ngày ${day}/${month} là Chủ Nhật.\nBạn có chắc muốn chấm công ngày này không?`)) return;
     }
-    const next = CYCLE[(CYCLE.indexOf(cur) + 1) % CYCLE.length];
+    // Click vào "Đã đăng ký" → xác nhận Đi làm (không chạy CYCLE bình thường)
+    const next = cur === "da_dang_ky"
+      ? "di_lam"
+      : CYCLE[(CYCLE.indexOf(cur) + 1) % CYCLE.length];
     const ngay = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
     // Optimistic update
@@ -1070,7 +1075,7 @@ export default function ChamCongPage() {
                           <td key={d}
                             className={`p-0 text-center select-none border-x border-slate-100 transition-colors ${defaultBg} ${locked ? "cursor-default" : "cursor-pointer hover:bg-slate-200/40 active:bg-slate-300/50"}`}
                             onClick={() => handleCellClick(nv.id, d)}
-                            title={locked ? "🔒 Bảng đang khoá" : chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
+                            title={locked ? "🔒 Bảng đang khoá" : chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : tt === "da_dang_ky" ? `📅 Đã đăng ký${ghiChuMap[key] ? ` — ${ghiChuMap[key]}` : ""} · Click để xác nhận Đi làm` : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
                           >
                             {info ? (
                               <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text} group/cell`}>
