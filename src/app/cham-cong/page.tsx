@@ -158,12 +158,13 @@ export default function ChamCongPage() {
     setLichLoading(true);
     try {
       const tt = lichTT ? `&trangThai=${lichTT}` : "";
-      const res = await fetch(`/api/lich-di-lam?thang=${thang}${tt}`);
+      const bust = `&_t=${Date.now()}`;
+      const res = await fetch(`/api/lich-di-lam?thang=${thang}${tt}${bust}`);
       const d = await res.json();
       const list = Array.isArray(d) ? d : [];
       setLichList(list);
       // Count chờ duyệt
-      const all = await fetch(`/api/lich-di-lam?thang=${thang}`).then(r => r.json()).catch(() => []);
+      const all = await fetch(`/api/lich-di-lam?thang=${thang}${bust}`).then(r => r.json()).catch(() => []);
       setLichCount((Array.isArray(all) ? all : []).filter((r: LichRow) => r.trangThai === "cho_duyet").length);
     } catch { setLichList([]); }
     finally { setLichLoading(false); }
@@ -173,6 +174,13 @@ export default function ChamCongPage() {
 
   const handleDuyetLich = async (id: string, trangThai: "da_duyet" | "tu_choi") => {
     const note = adminNoteInput[id] || "";
+    // Optimistic update: cập nhật UI ngay lập tức
+    setLichList(prev => prev.map(r => r.id === id ? { ...r, trangThai, adminNote: note || r.adminNote } : r));
+    setLichCount(prev => {
+      // Nếu bản ghi đang "cho_duyet" → đã được xử lý → giảm count
+      const wasChoduyet = lichList.find(r => r.id === id)?.trangThai === "cho_duyet";
+      return wasChoduyet ? Math.max(0, prev - 1) : prev;
+    });
     try {
       const res = await fetch(`/api/lich-di-lam/${id}`, {
         method: "PATCH",
@@ -182,12 +190,16 @@ export default function ChamCongPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         alert(`Lỗi: ${err.error || "Không thể cập nhật"}`);
+        // Rollback: tải lại dữ liệu thực
+        fetchLich();
         return;
       }
     } catch (e) {
       alert("Lỗi kết nối, thử lại.");
+      fetchLich(); // Rollback
       return;
     }
+    // Refresh nhẹ để sync dữ liệu thực từ server (background)
     fetchLich();
   };
 

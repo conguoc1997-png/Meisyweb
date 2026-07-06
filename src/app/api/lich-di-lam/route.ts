@@ -126,22 +126,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, id }, { status: 201 });
     }
 
-    // Kiểm tra đã đăng ký ngày này chưa (chỉ áp dụng cho bản ghi dang_ky)
+    // Kiểm tra đã đăng ký ca này ngày này chưa (upsert theo nhanVienId + ngay + ca)
+    const caKey = ca || "khac";
     const existing = await prisma.$queryRawUnsafe<{ id: string; trangThai: string }[]>(
-      `SELECT id, "trangThai" FROM "LichDiLam" WHERE "nhanVienId" = $1 AND "ngay" = $2::date AND "loai" = 'dang_ky'`,
-      nhanVienId, ngay
+      `SELECT id, "trangThai" FROM "LichDiLam" WHERE "nhanVienId" = $1 AND "ngay" = $2::date AND COALESCE("ca",'khac') = $3 AND "loai" = 'dang_ky'`,
+      nhanVienId, ngay, caKey
     );
 
     if (existing.length > 0) {
-      // Nếu đã được duyệt → không cho ghi đè từ client (chỉ qua admin)
+      // Nếu ca này đã được duyệt → không cho ghi đè từ client
       if (existing[0].trangThai === "da_duyet") {
-        return NextResponse.json({ error: "Lịch đã được duyệt, dùng 'Đề xuất thay đổi' nếu muốn thay đổi" }, { status: 409 });
+        return NextResponse.json({ error: "Ca này đã được duyệt, dùng 'Đề xuất thay đổi' nếu muốn thay đổi" }, { status: 409 });
       }
       // Cập nhật lại nếu chưa được duyệt
       await prisma.$executeRawUnsafe(
-        `UPDATE "LichDiLam" SET "gioVao"=$3,"gioRa"=$4,"ghiChu"=$5,"ca"=$6,"trangThai"='cho_duyet',"adminNote"=NULL,"updatedAt"=NOW()
-         WHERE "nhanVienId"=$1 AND "ngay"=$2::date AND "loai"='dang_ky'`,
-        nhanVienId, ngay, gioVao || null, gioRa || null, ghiChu || null, ca || null
+        `UPDATE "LichDiLam" SET "gioVao"=$3,"gioRa"=$4,"ghiChu"=$5,"trangThai"='cho_duyet',"adminNote"=NULL,"updatedAt"=NOW()
+         WHERE id=$6`,
+        nhanVienId, ngay, gioVao || null, gioRa || null, ghiChu || null, existing[0].id
       );
       return NextResponse.json({ ok: true, id: existing[0].id, updated: true });
     }

@@ -71,8 +71,8 @@ export default function LichDiLamPage() {
   const [calMonth, setCalMonth] = useState(now.getMonth());
   const [calYear, setCalYear] = useState(now.getFullYear());
 
-  // Per-date selection: Map<dateStr, CaKey>
-  const [dateSelections, setDateSelections] = useState<Map<string, CaKey>>(new Map());
+  // Per-date selection: Map<dateStr, CaKey[]> — nhiều ca/ngày
+  const [dateSelections, setDateSelections] = useState<Map<string, CaKey[]>>(new Map());
 
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; count: number } | null>(null);
@@ -184,16 +184,28 @@ export default function LichDiLamPage() {
     setDateSelections(prev => {
       const next = new Map(prev);
       if (next.has(dateStr)) {
-        next.delete(dateStr);
+        next.delete(dateStr); // bỏ chọn ngày
       } else {
-        next.set(dateStr, defaultCa(selectedNV));
+        next.set(dateStr, [defaultCa(selectedNV)]); // mặc định 1 ca
       }
       return next;
     });
   };
 
-  const setCaForDate = (dateStr: string, ca: CaKey) => {
-    setDateSelections(prev => { const n = new Map(prev); n.set(dateStr, ca); return n; });
+  // Toggle ca trong ngày: bật/tắt từng ca riêng lẻ
+  const toggleCaForDate = (dateStr: string, ca: CaKey) => {
+    setDateSelections(prev => {
+      const next = new Map(prev);
+      const cas = next.get(dateStr) ?? [];
+      const idx = cas.indexOf(ca);
+      const updated = idx >= 0 ? cas.filter(c => c !== ca) : [...cas, ca];
+      if (updated.length === 0) {
+        next.delete(dateStr); // bỏ ngày khi bỏ hết ca
+      } else {
+        next.set(dateStr, updated);
+      }
+      return next;
+    });
   };
 
   // ── Submit ──
@@ -201,22 +213,26 @@ export default function LichDiLamPage() {
     if (!selectedNV || dateSelections.size === 0) return;
     setSubmitting(true);
     let count = 0;
-    for (const [ngay, ca] of [...dateSelections.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-      const preset = CA_PRESETS.find(p => p.key === ca);
-      try {
-        const res = await fetch("/api/lich-di-lam", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nhanVienId: selectedNV.id, ngay, ca,
-            gioVao: preset?.gioVao || null,
-            gioRa: preset?.gioRa || null,
-            loai: "dang_ky",
-          }),
-        });
-        if (res.ok) count++;
-      } catch { /* skip */ }
+    // Tạo tất cả request song song để nhanh hơn
+    const requests: Promise<void>[] = [];
+    for (const [ngay, cas] of [...dateSelections.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      for (const ca of cas) {
+        const preset = CA_PRESETS.find(p => p.key === ca);
+        requests.push(
+          fetch("/api/lich-di-lam", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nhanVienId: selectedNV.id, ngay, ca,
+              gioVao: preset?.gioVao ?? null,
+              gioRa: preset?.gioRa ?? null,
+              loai: "dang_ky",
+            }),
+          }).then(r => { if (r.ok) count++; }).catch(() => {})
+        );
+      }
     }
+    await Promise.all(requests);
     setSubmitting(false);
     setSubmitResult({ ok: count > 0, count });
     setDateSelections(new Map());
@@ -460,11 +476,15 @@ export default function LichDiLamPage() {
                     className={`aspect-square rounded-xl text-xs font-medium transition flex flex-col items-center justify-center relative ${bgClass}`}
                   >
                     <span>{d.getDate()}</span>
-                    {/* Dot: ca đã chọn */}
+                    {/* Dots: ca đã chọn (nhiều ca) */}
                     {isSelected && (() => {
-                      const ca = dateSelections.get(dateStr);
-                      const p = CA_PRESETS.find(c => c.key === ca);
-                      return p ? <span className="text-[8px] leading-none opacity-80">{p.emoji}</span> : null;
+                      const cas = dateSelections.get(dateStr) ?? [];
+                      if (cas.length === 0) return null;
+                      return (
+                        <span className="text-[8px] leading-none opacity-80">
+                          {cas.map(c => CA_PRESETS.find(p => p.key === c)?.emoji ?? "").join("")}
+                        </span>
+                      );
                     })()}
                     {/* Dot: lịch hiện có */}
                     {!isSelected && existing?.ca && (
@@ -509,7 +529,7 @@ export default function LichDiLamPage() {
                 <button onClick={() => setDateSelections(new Map())} className="text-xs text-slate-400 hover:text-red-500">Xóa hết</button>
               </div>
               <div className="divide-y divide-slate-100">
-                {[...dateSelections.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([dateStr, ca]) => {
+                {[...dateSelections.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([dateStr, cas]) => {
                   const allowed = allowedCas(selectedNV);
                   return (
                     <div key={dateStr} className="px-4 py-3">
@@ -519,31 +539,43 @@ export default function LichDiLamPage() {
                           className="text-slate-300 hover:text-red-400"><X size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {CA_PRESETS.filter(p => allowed.includes(p.key)).map(preset => (
-                          <button key={preset.key} onClick={() => setCaForDate(dateStr, preset.key)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition
-                              ${ca === preset.key
-                                ? "bg-violet-500 text-white border-violet-500 shadow"
-                                : "border-slate-200 text-slate-600 hover:bg-violet-50 hover:border-violet-200"}`}>
-                            <span>{preset.emoji}</span>
-                            <span>
-                              <span className="font-semibold">{preset.label}</span>
-                              <span className="ml-1 opacity-70">{preset.gioVao}–{preset.gioRa}</span>
-                            </span>
-                          </button>
-                        ))}
+                        {CA_PRESETS.filter(p => allowed.includes(p.key)).map(preset => {
+                          const isChecked = cas.includes(preset.key);
+                          return (
+                            <button key={preset.key} onClick={() => toggleCaForDate(dateStr, preset.key)}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition
+                                ${isChecked
+                                  ? "bg-violet-500 text-white border-violet-500 shadow"
+                                  : "border-slate-200 text-slate-600 hover:bg-violet-50 hover:border-violet-200"}`}>
+                              <span>{preset.emoji}</span>
+                              <span className="flex-1 text-left">
+                                <span className="font-semibold">{preset.label}</span>
+                                {preset.gioVao && <span className="ml-1 opacity-70">{preset.gioVao}–{preset.gioRa}</span>}
+                              </span>
+                              {isChecked && <span className="text-[10px]">✓</span>}
+                            </button>
+                          );
+                        })}
                       </div>
+                      {cas.length > 1 && (
+                        <p className="text-[11px] text-violet-600 mt-1.5">✓ {cas.length} ca được chọn cho ngày này</p>
+                      )}
                     </div>
                   );
                 })}
               </div>
               <div className="p-4 pt-0">
-                <button onClick={handleSubmit} disabled={submitting}
-                  className="w-full flex items-center justify-center gap-2 bg-violet-500 hover:bg-violet-600 disabled:bg-violet-300 text-white font-semibold py-3 rounded-xl transition">
-                  {submitting
-                    ? <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>
-                    : <><Send size={15} /> Gửi đăng ký ({dateSelections.size} ngày)</>}
-                </button>
+                {(() => {
+                  const totalCa = [...dateSelections.values()].reduce((s, cas) => s + cas.length, 0);
+                  return (
+                    <button onClick={handleSubmit} disabled={submitting}
+                      className="w-full flex items-center justify-center gap-2 bg-violet-500 hover:bg-violet-600 disabled:bg-violet-300 text-white font-semibold py-3 rounded-xl transition">
+                      {submitting
+                        ? <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>
+                        : <><Send size={15} /> Gửi đăng ký ({dateSelections.size} ngày · {totalCa} ca)</>}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           )}
