@@ -78,13 +78,37 @@ export async function PATCH(
 }
 
 // DELETE /api/lich-di-lam/[id]
+// Nếu lịch đã được duyệt (da_duyet) → xóa luôn ChamCong da_dang_ky đi kèm
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
+    // Lấy thông tin trước khi xóa
+    const rows = await prisma.$queryRawUnsafe<{
+      nhanVienId: string; ngay: Date | string; trangThai: string;
+    }[]>(
+      `SELECT "nhanVienId", "ngay", "trangThai" FROM "LichDiLam" WHERE id=$1`, id
+    );
+
     await prisma.$executeRawUnsafe(`DELETE FROM "LichDiLam" WHERE id=$1`, id);
+
+    // Nếu là lịch đã duyệt → xóa ChamCong da_dang_ky (chưa xác nhận đi làm thực tế)
+    if (rows.length > 0 && rows[0].trangThai === "da_duyet") {
+      try {
+        const { nhanVienId, ngay } = rows[0];
+        const rawDate = typeof ngay === "string" ? ngay : ngay.toISOString();
+        const ngayUTC = new Date(rawDate.slice(0, 10) + "T00:00:00.000Z");
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM "ChamCong" WHERE "nhanVienId"=$1 AND "ngay"=$2 AND "trangThai"='da_dang_ky'`,
+          nhanVienId, ngayUTC
+        );
+      } catch {
+        // Non-fatal: ChamCong cleanup lỗi không block DELETE lịch
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

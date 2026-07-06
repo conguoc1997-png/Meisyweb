@@ -708,19 +708,9 @@ export default function LichDiLamPage() {
                   : <><Send size={14} /> Gửi đề xuất</>}
               </button>
             </div>
-            {/* Nút hủy lịch đã duyệt */}
-            <div className="px-5 pb-5">
-              <button
-                onClick={async () => {
-                  if (!confirm(`Xác nhận HỦY lịch ngày ${formatNgay(changeReq.lich.ngay)}?\nHành động này sẽ xóa lịch đã được duyệt.`)) return;
-                  await fetch(`/api/lich-di-lam/${changeReq.lich.id}`, { method: "DELETE" });
-                  setChangeReq(null);
-                  if (selectedNV) loadLich(selectedNV.id);
-                }}
-                className="w-full border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400 rounded-xl py-2.5 text-sm font-medium transition flex items-center justify-center gap-2">
-                <X size={14} /> Hủy lịch đã đăng ký này
-              </button>
-            </div>
+            <p className="text-[11px] text-slate-400 text-center pb-4 px-5">
+              Muốn hủy lịch đã duyệt → liên hệ admin
+            </p>
           </div>
         </div>
       )}
