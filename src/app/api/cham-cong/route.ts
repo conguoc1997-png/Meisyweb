@@ -2,22 +2,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Auto-migrate: chạy 1 lần per cold-start, thêm cột nếu chưa có
-let migrated = false;
-async function autoMigrate() {
-  if (migrated) return;
-  try {
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "soChNhatHopDong" INTEGER NOT NULL DEFAULT 0`
-    );
-  } catch { /* ignore — column already exists */ }
-  migrated = true;
-}
-
 // GET /api/cham-cong?thang=2026-06 — chỉ trả ChamCong (NV fetch riêng)
 export async function GET(req: NextRequest) {
   try {
-    await autoMigrate();
     const { searchParams } = new URL(req.url);
     const thang = searchParams.get("thang");
 

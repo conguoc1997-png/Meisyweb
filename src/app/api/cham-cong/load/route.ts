@@ -2,19 +2,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Chỉ thêm các cột KHÔNG có trong Prisma schema — chạy 1 lần per cold-start
-let migrated = false;
-async function ensureColumns() {
-  if (migrated) return;
-  await Promise.all([
-    prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "ngayNghiViec" TEXT`).catch(() => {}),
-  ]);
-  migrated = true;
-}
-
 /**
  * GET /api/cham-cong/load?thang=2026-07&h=1
  * Trả về NV + ChamCong tháng + PhuCap tháng trong 1 request duy nhất
@@ -22,7 +9,6 @@ async function ensureColumns() {
  */
 export async function GET(req: NextRequest) {
   try {
-    await ensureColumns();
     const url   = new URL(req.url);
     const thang = url.searchParams.get("thang");
     const withHistory = url.searchParams.get("h") === "1";
