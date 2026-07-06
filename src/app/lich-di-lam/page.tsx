@@ -160,7 +160,7 @@ export default function LichDiLamPage() {
     return m;
   }, [lichList]);
 
-  const toggleDate = (dateStr: string) => {
+  const toggleDate = async (dateStr: string) => {
     if (!selectedNV) return;
     const d = new Date(dateStr + "T00:00:00");
     const isSun = d.getDay() === 0;
@@ -178,8 +178,16 @@ export default function LichDiLamPage() {
       return;
     }
 
-    // Ngày đang chờ duyệt → không cho chọn lại
-    if (existing?.trangThai === "cho_duyet") return;
+    // Ngày đang chờ duyệt → cho phép hủy
+    if (existing?.trangThai === "cho_duyet") {
+      // Tìm tất cả bản ghi cho_duyet của ngày này
+      const pendingRecords = lichList.filter(r => r.ngay.slice(0, 10) === dateStr && r.trangThai === "cho_duyet" && r.loai === "dang_ky");
+      const caInfo = pendingRecords.map(r => r.ca ? caLabel(r.ca) : "Khác").join(", ");
+      if (!confirm(`Hủy đăng ký ngày ${formatNgay(dateStr)}${caInfo ? `\n${caInfo}` : ""}?`)) return;
+      await Promise.all(pendingRecords.map(r => fetch(`/api/lich-di-lam/${r.id}`, { method: "DELETE" })));
+      loadLich(selectedNV.id);
+      return;
+    }
 
     setDateSelections(prev => {
       const next = new Map(prev);
@@ -465,7 +473,7 @@ export default function LichDiLamPage() {
                 else if (existingTT === "da_duyet") bgClass = hasPendingChange
                   ? "bg-amber-100 text-amber-700" // có thay đổi đang chờ
                   : "bg-green-100 text-green-700 ring-1 ring-green-300";
-                else if (existingTT === "cho_duyet") bgClass = "bg-amber-100 text-amber-700";
+                else if (existingTT === "cho_duyet") bgClass = "bg-amber-100 text-amber-700 hover:bg-red-100 hover:text-red-500";
                 else if (existingTT === "tu_choi") bgClass = "bg-red-100 text-red-400";
                 else if (isBlocked) bgClass = "text-slate-300 cursor-default";
                 else bgClass = "hover:bg-violet-50 text-slate-700";
@@ -497,6 +505,10 @@ export default function LichDiLamPage() {
                     {existingTT === "da_duyet" && !hasPendingChange && (
                       <span className="absolute top-0.5 right-0.5 text-[8px]">🔒</span>
                     )}
+                    {/* Hint: click để hủy */}
+                    {existingTT === "cho_duyet" && (
+                      <span className="absolute top-0.5 right-0.5 text-[8px] opacity-60">✕</span>
+                    )}
                   </button>
                 );
               })}
@@ -504,7 +516,7 @@ export default function LichDiLamPage() {
             {/* Legend */}
             <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-slate-100">
               {[
-                ["bg-amber-100","Chờ duyệt"],
+                ["bg-amber-100","Chờ duyệt (click để hủy ✕)"],
                 ["bg-green-100 ring-1 ring-green-300","Đã duyệt 🔒"],
                 ["bg-violet-500","Đang chọn"],
               ].map(([bg, label]) => (
@@ -513,10 +525,9 @@ export default function LichDiLamPage() {
                 </div>
               ))}
             </div>
-            {/* Hint approved date */}
             {lichList.some(r => r.trangThai === "da_duyet" && r.loai === "dang_ky") && (
               <p className="text-[11px] text-slate-400 mt-2 text-center">
-                Nhấn vào ngày 🔒 để đề xuất thay đổi ca
+                Nhấn vào ngày 🔒 để đề xuất thay đổi hoặc hủy lịch
               </p>
             )}
           </div>
@@ -689,12 +700,25 @@ export default function LichDiLamPage() {
             </div>
             <div className="flex gap-2 p-5 pt-0">
               <button onClick={() => setChangeReq(null)}
-                className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm hover:bg-slate-50 transition">Huỷ</button>
+                className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm hover:bg-slate-50 transition">Đóng</button>
               <button onClick={handleSubmitChange} disabled={changeSending}
                 className="flex-1 bg-blue-500 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-600 disabled:opacity-50 transition flex items-center justify-center gap-2">
                 {changeSending
                   ? <><Loader2 size={15} className="animate-spin" /> Đang gửi...</>
                   : <><Send size={14} /> Gửi đề xuất</>}
+              </button>
+            </div>
+            {/* Nút hủy lịch đã duyệt */}
+            <div className="px-5 pb-5">
+              <button
+                onClick={async () => {
+                  if (!confirm(`Xác nhận HỦY lịch ngày ${formatNgay(changeReq.lich.ngay)}?\nHành động này sẽ xóa lịch đã được duyệt.`)) return;
+                  await fetch(`/api/lich-di-lam/${changeReq.lich.id}`, { method: "DELETE" });
+                  setChangeReq(null);
+                  if (selectedNV) loadLich(selectedNV.id);
+                }}
+                className="w-full border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-400 rounded-xl py-2.5 text-sm font-medium transition flex items-center justify-center gap-2">
+                <X size={14} /> Hủy lịch đã đăng ký này
               </button>
             </div>
           </div>
