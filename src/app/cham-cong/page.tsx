@@ -171,11 +171,21 @@ export default function ChamCongPage() {
 
   const handleDuyetLich = async (id: string, trangThai: "da_duyet" | "tu_choi") => {
     const note = adminNoteInput[id] || "";
-    await fetch(`/api/lich-di-lam/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trangThai, adminNote: note }),
-    });
+    try {
+      const res = await fetch(`/api/lich-di-lam/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trangThai, adminNote: note }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        alert(`Lỗi: ${err.error || "Không thể cập nhật"}`);
+        return;
+      }
+    } catch (e) {
+      alert("Lỗi kết nối, thử lại.");
+      return;
+    }
     fetchLich();
   };
 
