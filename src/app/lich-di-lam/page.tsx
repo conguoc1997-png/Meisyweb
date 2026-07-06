@@ -18,38 +18,24 @@ type LichRow = {
 
 // ── Ca làm việc preset ──────────────────────────────────────────────────────
 const CA_PRESETS = [
-  { key: "ca1",        label: "Ca 1",       gioVao: "06:00", gioRa: "14:00", emoji: "🌅", color: "blue" },
-  { key: "ca2",        label: "Ca 2",       gioVao: "14:00", gioRa: "22:00", emoji: "☀️",  color: "orange" },
-  { key: "ca3",        label: "Ca 3",       gioVao: "22:00", gioRa: "06:00", emoji: "🌙", color: "indigo" },
-  { key: "hanh_chinh", label: "Hành chính", gioVao: "08:00", gioRa: "17:30", emoji: "🏢", color: "green" },
+  { key: "ca1",  label: "Ca 1",  gioVao: "06:00", gioRa: "14:00", emoji: "🌅" },
+  { key: "ca2",  label: "Ca 2",  gioVao: "14:00", gioRa: "22:00", emoji: "☀️"  },
+  { key: "ca3",  label: "Ca 3",  gioVao: "22:00", gioRa: "06:00", emoji: "🌙" },
+  { key: "khac", label: "Khác",  gioVao: null,     gioRa: null,    emoji: "✏️" },
 ] as const;
 type CaKey = typeof CA_PRESETS[number]["key"];
 
 function caLabel(ca: string | null) {
   const p = CA_PRESETS.find(c => c.key === ca);
-  return p ? `${p.emoji} ${p.label} (${p.gioVao}–${p.gioRa})` : null;
+  if (!p) return null;
+  return p.gioVao ? `${p.emoji} ${p.label} (${p.gioVao}–${p.gioRa})` : `${p.emoji} ${p.label}`;
 }
 
-// Phát hiện loại NV
-function isLivestream(nv: NhanVien) {
-  const pb = (nv.phongBan ?? "").toLowerCase();
-  return pb.includes("live") || pb.includes("stream") || nv.loaiLuong === "gio";
-}
-function isCskh(nv: NhanVien) {
-  const pb = (nv.phongBan ?? "").toLowerCase();
-  return pb.includes("cskh") || pb.includes("chăm sóc") || pb.includes("cham soc");
-}
-function defaultCa(nv: NhanVien): CaKey {
-  return isLivestream(nv) ? "ca1" : "hanh_chinh";
-}
-function allowedCas(nv: NhanVien): CaKey[] {
-  if (isLivestream(nv)) return ["ca1", "ca2", "ca3", "hanh_chinh"];
-  return ["hanh_chinh", "ca1", "ca2", "ca3"];
-}
-// CSKH được chọn CN
-function allowSunday(nv: NhanVien) {
-  return isCskh(nv);
-}
+// Mặc định Ca 1; tất cả NV đều dùng chung 4 ca
+function defaultCa(_nv: NhanVien): CaKey { return "ca1"; }
+function allowedCas(_nv: NhanVien): CaKey[] { return ["ca1", "ca2", "ca3", "khac"]; }
+// Tất cả đều chọn được mọi ngày kể cả CN
+function allowSunday(_nv: NhanVien) { return true; }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const DAYS_VI = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -360,8 +346,6 @@ export default function LichDiLamPage() {
                 <p className="text-sm font-semibold text-slate-800">{selectedNV.ten}</p>
                 <p className="text-xs text-slate-400">
                   {selectedNV.maNV}{selectedNV.phongBan ? ` · ${selectedNV.phongBan}` : ""}
-                  {isLivestream(selectedNV) && <span className="ml-1 text-orange-500">· 🎥 Livestream</span>}
-                  {isCskh(selectedNV) && <span className="ml-1 text-blue-500">· 💼 CSKH</span>}
                 </p>
               </div>
             </div>
@@ -508,11 +492,6 @@ export default function LichDiLamPage() {
                   <span className={`w-3 h-3 rounded ${bg}`} /> {label}
                 </div>
               ))}
-              {allowSunday(selectedNV) && (
-                <div className="flex items-center gap-1 text-xs text-blue-500">
-                  <span>💼</span> CSKH có thể chọn Chủ nhật
-                </div>
-              )}
             </div>
             {/* Hint approved date */}
             {lichList.some(r => r.trangThai === "da_duyet" && r.loai === "dang_ky") && (
