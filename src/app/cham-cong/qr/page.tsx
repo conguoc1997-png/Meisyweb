@@ -1,16 +1,20 @@
 "use client";
 import QRCode from "react-qr-code";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Printer, MapPin } from "lucide-react";
-
-const CHECKIN_URL = "https://meisyweb.vercel.app/checkin";
 
 export default function QRPage() {
   const [size, setSize] = useState(256);
+  const [checkinUrl, setCheckinUrl] = useState("https://meisyweb.vercel.app/checkin");
+
+  // Lấy URL động theo domain thực tế
+  useEffect(() => {
+    setCheckinUrl(window.location.origin + "/checkin");
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#fdfaf8] flex flex-col items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm qr-print">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-stone-800">Mã QR Chấm công</h1>
@@ -22,7 +26,7 @@ export default function QRPage() {
           <div className="flex justify-center mb-6">
             <div className="p-4 bg-white rounded-2xl border-2 border-stone-100">
               <QRCode
-                value={CHECKIN_URL}
+                value={checkinUrl}
                 size={size}
                 bgColor="#ffffff"
                 fgColor="#1c1917"
@@ -35,7 +39,7 @@ export default function QRPage() {
             <MapPin size={14} className="text-rose-400" />
             <span>Quét để chấm công</span>
           </div>
-          <p className="text-stone-300 text-xs">{CHECKIN_URL}</p>
+          <p className="text-stone-300 text-xs break-all">{checkinUrl}</p>
         </div>
 
         {/* Hướng dẫn */}
@@ -47,7 +51,7 @@ export default function QRPage() {
         </div>
 
         {/* Nút in */}
-        <div className="mt-6 flex gap-3">
+        <div className="mt-6 flex gap-3 no-print">
           <select
             value={size}
             onChange={e => setSize(Number(e.target.value))}
@@ -74,6 +78,8 @@ export default function QRPage() {
         @media print {
           body * { visibility: hidden; }
           .qr-print, .qr-print * { visibility: visible; }
+          .qr-print { position: fixed; top: 0; left: 0; width: 100%; }
+          .no-print { display: none !important; }
         }
       `}</style>
     </div>
