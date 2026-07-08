@@ -93,17 +93,25 @@ const MODULES: NavModule[] = [
     href: "/gia-ban",
   },
   {
-    key: "ke-toan", moduleKey: "ke-toan",
-    label: "Kế toán", icon: BookOpen,
+    key: "kho-npl", moduleKey: "ke-toan",
+    label: "Kho NPL", icon: Package,
     bg: "bg-violet-50", text: "text-violet-400",
     children: [
-      { href: "/ke-toan/nhap-kho",       label: "Nhập kho NPL",      icon: Package,       moduleKey: "ke-toan" },
-      { href: "/ke-toan/xuat-kho",       label: "Xuất kho NPL",      icon: Package,       moduleKey: "ke-toan" },
-      { href: "/ke-toan/ton-kho",        label: "Tồn kho NPL",       icon: ClipboardList, moduleKey: "ke-toan" },
-      { href: "/ke-toan/quy-doi-don-vi", label: "Bảng quy đổi",     icon: ClipboardList, moduleKey: "ke-toan" },
-      { href: "/ke-toan/dinh-muc",       label: "Định mức NPL",      icon: ClipboardList, moduleKey: "ke-toan" },
-      { href: "/ke-toan/cong-no",        label: "Công nợ NCC",       icon: BookOpen,      moduleKey: "ke-toan" },
-      { href: "/ke-toan/so-sach",        label: "Sổ sách thuế HKD",  icon: BookOpen,      moduleKey: "ke-toan" },
+      { href: "/ke-toan/nhap-kho",       label: "Nhập kho NPL",   icon: Package,       moduleKey: "ke-toan" },
+      { href: "/ke-toan/xuat-kho",       label: "Xuất kho NPL",   icon: Package,       moduleKey: "ke-toan" },
+      { href: "/ke-toan/ton-kho",        label: "Tồn kho NPL",    icon: ClipboardList, moduleKey: "ke-toan" },
+      { href: "/ke-toan/quy-doi-don-vi", label: "Bảng quy đổi",  icon: ClipboardList, moduleKey: "ke-toan" },
+      { href: "/ke-toan/dinh-muc",       label: "Định mức NPL",   icon: ClipboardList, moduleKey: "ke-toan" },
+    ],
+  },
+  {
+    key: "ke-toan", moduleKey: "ke-toan",
+    label: "Kế toán", icon: BookOpen,
+    bg: "bg-emerald-50", text: "text-emerald-500",
+    children: [
+      { href: "/so-thu-chi",       label: "Sổ Thu Chi",       icon: Landmark,  moduleKey: "so-thu-chi" },
+      { href: "/ke-toan/cong-no",  label: "Công nợ NCC",      icon: BookOpen,  moduleKey: "ke-toan" },
+      { href: "/ke-toan/so-sach",  label: "Sổ sách thuế HKD", icon: BookOpen,  moduleKey: "ke-toan" },
     ],
   },
   {
@@ -123,12 +131,6 @@ const MODULES: NavModule[] = [
       { href: "/cham-cong/ca-lam-viec", label: "Lịch làm việc",    icon: Clock,         moduleKey: "cham-cong" },
       { href: "/lich-di-lam",           label: "Đăng ký lịch NV",  icon: CalendarCheck, moduleKey: "cham-cong" },
     ],
-  },
-  {
-    key: "so-thu-chi", moduleKey: "so-thu-chi",
-    label: "Sổ Thu Chi", icon: Landmark,
-    bg: "bg-emerald-50", text: "text-emerald-500",
-    href: "/so-thu-chi",
   },
   {
     key: "cong-no", moduleKey: "cong-no",
