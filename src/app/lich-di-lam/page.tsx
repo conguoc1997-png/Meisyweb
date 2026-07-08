@@ -75,7 +75,7 @@ export default function LichDiLamPage() {
   const [dateSelections, setDateSelections] = useState<Map<string, CaKey[]>>(new Map());
 
   const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<{ ok: boolean; count: number } | null>(null);
+  const [submitResult, setSubmitResult] = useState<{ ok: boolean; count: number; errors?: string[] } | null>(null);
 
   // ── Change request modal ──
   type ChangeReq = { lich: LichRow; ca: CaKey; reason: string };
@@ -220,8 +220,10 @@ export default function LichDiLamPage() {
   const handleSubmit = async () => {
     if (!selectedNV || dateSelections.size === 0) return;
     setSubmitting(true);
+    setSubmitResult(null);
     let count = 0;
-    // Tạo tất cả request song song để nhanh hơn
+    const errors: string[] = [];
+
     const requests: Promise<void>[] = [];
     for (const [ngay, cas] of [...dateSelections.entries()].sort(([a], [b]) => a.localeCompare(b))) {
       for (const ca of cas) {
@@ -236,15 +238,24 @@ export default function LichDiLamPage() {
               gioRa: preset?.gioRa ?? null,
               loai: "dang_ky",
             }),
-          }).then(r => { if (r.ok) count++; }).catch(() => {})
+          }).then(async r => {
+            if (r.ok) {
+              count++;
+            } else {
+              const data = await r.json().catch(() => ({}));
+              errors.push(data.error || `Lỗi HTTP ${r.status}`);
+            }
+          }).catch(e => { errors.push("Mất kết nối: " + String(e)); })
         );
       }
     }
     await Promise.all(requests);
     setSubmitting(false);
-    setSubmitResult({ ok: count > 0, count });
-    setDateSelections(new Map());
-    loadLich(selectedNV.id);
+    setSubmitResult({ ok: count > 0, count, errors });
+    if (count > 0) {
+      setDateSelections(new Map()); // chỉ xóa khi ít nhất 1 thành công
+      loadLich(selectedNV.id);
+    }
   };
 
   // ── Change request submit ──
@@ -427,18 +438,36 @@ export default function LichDiLamPage() {
             );
           })()}
 
-          {/* Thông báo gửi thành công */}
+          {/* Thông báo kết quả gửi */}
           {submitResult && (
             <div className={`rounded-xl p-4 border flex items-start gap-3 ${submitResult.ok ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
               {submitResult.ok
                 ? <CheckCircle size={18} className="text-green-500 flex-shrink-0 mt-0.5" />
                 : <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />}
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-semibold text-slate-700">
-                  {submitResult.ok ? `Đã gửi ${submitResult.count} lịch thành công!` : "Có lỗi khi gửi"}
+                  {submitResult.ok
+                    ? `Đã gửi ${submitResult.count} ca thành công!`
+                    : "Gửi thất bại"}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">Admin sẽ xem xét và phê duyệt sớm nhất.</p>
+                {submitResult.ok && (
+                  <p className="text-xs text-slate-500 mt-0.5">Admin sẽ xem xét và phê duyệt sớm nhất.</p>
+                )}
+                {/* Hiển thị lỗi chi tiết */}
+                {submitResult.errors && submitResult.errors.length > 0 && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {submitResult.errors.slice(0, 3).map((e, i) => (
+                      <p key={i} className="text-xs text-red-500">• {e}</p>
+                    ))}
+                    {submitResult.errors.length > 3 && (
+                      <p className="text-xs text-red-400">...và {submitResult.errors.length - 3} lỗi khác</p>
+                    )}
+                  </div>
+                )}
               </div>
+              <button onClick={() => setSubmitResult(null)} className="text-slate-300 hover:text-slate-500 flex-shrink-0">
+                <X size={14} />
+              </button>
             </div>
           )}
 
