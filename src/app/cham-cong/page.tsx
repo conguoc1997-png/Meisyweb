@@ -635,6 +635,7 @@ export default function ChamCongPage() {
 
   // Tăng ca: lưu số giờ
   const handleTCChange = async (nvId: string, day: number, val: string) => {
+    if (locked) return; // bảng đang khoá
     const ngay = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const tangCa = val === "" ? null : parseFloat(val);
     // Optimistic
@@ -1153,7 +1154,9 @@ export default function ChamCongPage() {
                               max="24"
                               step="0.5"
                               value={tc ?? ""}
+                              disabled={locked}
                               onChange={e => {
+                                if (locked) return;
                                 const val = e.target.value;
                                 const tcVal = val === "" ? null : Math.min(24, parseFloat(val));
                                 setChamCongs(prev => {
@@ -1167,9 +1170,14 @@ export default function ChamCongPage() {
                               onBlur={e => handleTCChange(nv.id, d, e.target.value)}
                               onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                               placeholder=""
-                              className={`w-full h-8 text-center text-xs font-bold bg-transparent border-0 border-t focus:outline-none focus:ring-1 focus:ring-orange-400 focus:bg-orange-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                ${sun ? "text-slate-500 border-slate-200" : "text-orange-700 border-orange-200"}`}
-                              title="Số giờ tăng ca"
+                              className={`w-full h-8 text-center text-xs font-bold border-0 border-t focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                ${locked
+                                  ? "bg-slate-100/60 text-slate-400 cursor-not-allowed"
+                                  : sun
+                                    ? "bg-transparent text-slate-500 border-slate-200 focus:ring-1 focus:ring-orange-400 focus:bg-orange-50"
+                                    : "bg-transparent text-orange-700 border-orange-200 focus:ring-1 focus:ring-orange-400 focus:bg-orange-50"
+                                }`}
+                              title={locked ? "🔒 Bảng đang khoá" : "Số giờ tăng ca"}
                             />
                           </td>
                         );
