@@ -5,6 +5,7 @@ import { verifyToken, canAccess } from "@/lib/auth";
 const PUBLIC_PAGES = ["/login", "/checkin", "/lich-di-lam"];
 const PUBLIC_API   = [
   "/api/auth/login", "/api/auth/logout", "/api/auth/me",
+  "/api/checkin",
   "/api/lich-di-lam", "/api/cham-cong/nhan-vien", "/api/cham-cong/lock",
   "/api/run-migration-hao-hui", "/api/run-migration-cong-no",
   "/api/run-migration-vai-ncc", "/api/run-migration-booking-schedule",
