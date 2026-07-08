@@ -24,6 +24,8 @@ import {
   QrCode,
   Clock,
   CalendarDays,
+  Menu,
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -171,14 +173,16 @@ export default function Sidebar() {
     .filter(m => m.children?.some(c => pathname === c.href || pathname.startsWith(c.href + "/")))
     .map(m => m.key);
 
-  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set(defaultOpen));
-  const [expanded, setExpanded] = useState(false);
+  const [openKeys,    setOpenKeys]    = useState<Set<string>>(new Set(defaultOpen));
+  const [expanded,    setExpanded]    = useState(false);   // desktop hover
+  const [mobileOpen,  setMobileOpen]  = useState(false);   // mobile toggle
 
   useEffect(() => {
     const active = MODULES
       .filter(m => m.children?.some(c => pathname === c.href || pathname.startsWith(c.href + "/")))
       .map(m => m.key);
     setOpenKeys(prev => new Set([...prev, ...active]));
+    setMobileOpen(false); // đóng sidebar khi navigate trên mobile
   }, [pathname]);
 
   const toggle = (key: string) =>
@@ -198,145 +202,175 @@ export default function Sidebar() {
   const visible = (moduleKey: string) =>
     !user || user.role === "admin" || userModules.includes(moduleKey);
 
-  return (
-    <>
-    <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
-      className={`min-h-screen flex flex-col flex-shrink-0 transition-all duration-200 ease-in-out z-40
-        bg-[#fdfaf8] border-r border-stone-100 shadow-[1px_0_16px_0_rgba(160,120,100,0.06)]
-        ${expanded ? "w-64" : "w-[84px]"}`}
-    >
-      {/* ── Logo ── */}
-      <div className={`py-5 border-b border-stone-100/80 flex items-center overflow-hidden
-        ${expanded ? "px-4 gap-3" : "px-3 justify-center"}`}>
-        <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
-          <ShoppingBag size={21} className="text-rose-400" />
-        </div>
-        {expanded && (
-          <div className="overflow-hidden whitespace-nowrap">
-            <p className="font-semibold text-stone-700 text-[16px] leading-none tracking-wide">Meisy</p>
-            <p className="text-[10px] text-stone-400 mt-1 tracking-widest uppercase">Inhouse</p>
+  // ── Shared nav content (dùng cho cả mobile lẫn desktop) ───────────
+  function NavContent({ isOpen: show }: { isOpen: boolean }) {
+    return (
+      <>
+        {/* Logo */}
+        <div className={`py-5 border-b border-stone-100/80 flex items-center overflow-hidden
+          ${show ? "px-4 gap-3" : "px-3 justify-center"}`}>
+          <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+            <ShoppingBag size={21} className="text-rose-400" />
           </div>
-        )}
-      </div>
+          {show && (
+            <div className="overflow-hidden whitespace-nowrap">
+              <p className="font-semibold text-stone-700 text-[16px] leading-none tracking-wide">Meisy</p>
+              <p className="text-[10px] text-stone-400 mt-1 tracking-widest uppercase">Inhouse</p>
+            </div>
+          )}
+        </div>
 
-      {/* ── Nav ── */}
-      <nav className="flex-1 py-3 space-y-1 overflow-y-auto overflow-x-hidden px-2">
-        {MODULES.filter(m => visible(m.moduleKey)).map(mod => {
-          const Icon           = mod.icon;
-          const isOpen         = openKeys.has(mod.key);
-          const hasKids        = !!mod.children?.length;
-          const anyChildActive = mod.children?.some(
-            c => pathname === c.href || pathname.startsWith(c.href + "/")
-          );
-          const isActive = !hasKids && mod.href
-            ? (pathname === mod.href || pathname.startsWith(mod.href + "/"))
-            : false;
-
-          const iconBadge = (
-            <span className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0
-              transition-all duration-150 group-hover:shadow-sm ${mod.bg}`}>
-              <Icon size={21} className={mod.text} />
-            </span>
-          );
-
-          if (!hasKids && mod.href) {
-            return (
-              <Link
-                key={mod.key}
-                href={mod.href}
-                title={!expanded ? mod.label : undefined}
-                className={`group flex items-center gap-3 px-1.5 py-1.5 rounded-xl transition-all duration-150
-                  ${isActive ? "bg-rose-50/70" : "hover:bg-stone-50"}
-                  ${expanded ? "" : "justify-center"}`}
-              >
-                {iconBadge}
-                {expanded && (
-                  <span className={`text-[13.5px] whitespace-nowrap overflow-hidden font-medium
-                    ${isActive ? "text-rose-500" : "text-stone-500 group-hover:text-stone-700"}`}>
-                    {mod.label}
-                  </span>
-                )}
-              </Link>
+        {/* Nav */}
+        <nav className="flex-1 py-3 space-y-1 overflow-y-auto overflow-x-hidden px-2">
+          {MODULES.filter(m => visible(m.moduleKey)).map(mod => {
+            const Icon           = mod.icon;
+            const isModOpen      = openKeys.has(mod.key);
+            const hasKids        = !!mod.children?.length;
+            const anyChildActive = mod.children?.some(
+              c => pathname === c.href || pathname.startsWith(c.href + "/")
             );
-          }
+            const isActive = !hasKids && mod.href
+              ? (pathname === mod.href || pathname.startsWith(mod.href + "/"))
+              : false;
 
-          return (
-            <div key={mod.key}>
-              <button
-                onClick={() => expanded && toggle(mod.key)}
-                title={!expanded ? mod.label : undefined}
-                className={`group w-full flex items-center gap-3 px-1.5 py-1.5 rounded-xl transition-all duration-150
-                  ${anyChildActive ? "bg-rose-50/70" : "hover:bg-stone-50"}
-                  ${expanded ? "" : "justify-center"}`}
-              >
-                {iconBadge}
-                {expanded && (
-                  <>
-                    <span className={`flex-1 text-[13.5px] text-left whitespace-nowrap font-medium
-                      ${anyChildActive ? "text-rose-500" : "text-stone-500 group-hover:text-stone-700"}`}>
+            const iconBadge = (
+              <span className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0
+                transition-all duration-150 group-hover:shadow-sm ${mod.bg}`}>
+                <Icon size={21} className={mod.text} />
+              </span>
+            );
+
+            if (!hasKids && mod.href) {
+              return (
+                <Link key={mod.key} href={mod.href}
+                  title={!show ? mod.label : undefined}
+                  className={`group flex items-center gap-3 px-1.5 py-1.5 rounded-xl transition-all duration-150
+                    ${isActive ? "bg-rose-50/70" : "hover:bg-stone-50"}
+                    ${show ? "" : "justify-center"}`}>
+                  {iconBadge}
+                  {show && (
+                    <span className={`text-[13.5px] whitespace-nowrap overflow-hidden font-medium
+                      ${isActive ? "text-rose-500" : "text-stone-500 group-hover:text-stone-700"}`}>
                       {mod.label}
                     </span>
-                    {isOpen
-                      ? <ChevronDown size={12} className="text-stone-300 flex-shrink-0" />
-                      : <ChevronRight size={12} className="text-stone-300 flex-shrink-0" />
-                    }
-                  </>
+                  )}
+                </Link>
+              );
+            }
+
+            return (
+              <div key={mod.key}>
+                <button
+                  onClick={() => show ? toggle(mod.key) : undefined}
+                  title={!show ? mod.label : undefined}
+                  className={`group w-full flex items-center gap-3 px-1.5 py-1.5 rounded-xl transition-all duration-150
+                    ${anyChildActive ? "bg-rose-50/70" : "hover:bg-stone-50"}
+                    ${show ? "" : "justify-center"}`}>
+                  {iconBadge}
+                  {show && (
+                    <>
+                      <span className={`flex-1 text-[13.5px] text-left whitespace-nowrap font-medium
+                        ${anyChildActive ? "text-rose-500" : "text-stone-500 group-hover:text-stone-700"}`}>
+                        {mod.label}
+                      </span>
+                      {isModOpen
+                        ? <ChevronDown size={12} className="text-stone-300 flex-shrink-0" />
+                        : <ChevronRight size={12} className="text-stone-300 flex-shrink-0" />}
+                    </>
+                  )}
+                </button>
+
+                {show && isModOpen && (
+                  <div className="ml-[22px] mt-0.5 pl-3.5 space-y-0.5"
+                    style={{ borderLeft: "1px solid #ede8e4" }}>
+                    {mod.children!.filter(c => visible(c.moduleKey)).map(child => {
+                      const CIcon     = child.icon;
+                      const isCActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                      return (
+                        <Link key={child.href} href={child.href}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all
+                            ${isCActive ? "text-rose-500 bg-rose-50/60" : "text-stone-400 hover:text-stone-600 hover:bg-stone-50"}`}>
+                          <CIcon size={12} className="flex-shrink-0" />
+                          <span className="whitespace-nowrap">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              </button>
+              </div>
+            );
+          })}
+        </nav>
 
-              {expanded && isOpen && (
-                <div className="ml-[22px] mt-0.5 pl-3.5 space-y-0.5"
-                  style={{ borderLeft: "1px solid #ede8e4" }}>
-                  {mod.children!.filter(c => visible(c.moduleKey)).map(child => {
-                    const CIcon     = child.icon;
-                    const isCActive = pathname === child.href || pathname.startsWith(child.href + "/");
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all
-                          ${isCActive
-                            ? "text-rose-500 bg-rose-50/60"
-                            : "text-stone-400 hover:text-stone-600 hover:bg-stone-50"
-                          }`}
-                      >
-                        <CIcon size={12} className="flex-shrink-0" />
-                        <span className="whitespace-nowrap">{child.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
+        {/* Footer */}
+        {show && user && (
+          <div className="px-3 py-3 border-t border-stone-100/80">
+            <div className="px-3 py-2 rounded-xl bg-rose-50/40">
+              <p className="text-[12px] font-semibold text-stone-600 truncate">{user.name}</p>
+              <p className="text-[10px] text-stone-400 tracking-wide uppercase mt-0.5">
+                {user.role === "admin" ? "Admin" : "Nhân viên"}
+              </p>
             </div>
-          );
-        })}
-      </nav>
-
-      {/* ── Footer ── */}
-      {expanded && user && (
-        <div className="px-3 py-3 border-t border-stone-100/80">
-          <div className="px-3 py-2 rounded-xl bg-rose-50/40">
-            <p className="text-[12px] font-semibold text-stone-600 truncate">{user.name}</p>
-            <p className="text-[10px] text-stone-400 tracking-wide uppercase mt-0.5">
-              {user.role === "admin" ? "Admin" : "Nhân viên"}
-            </p>
           </div>
-        </div>
-      )}
-    </aside>
+        )}
+      </>
+    );
+  }
 
-    {/* ── Nút đăng xuất cố định góc dưới trái ── */}
-    <button
-      onClick={handleLogout}
-      className="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-2 rounded-xl
-        bg-[#fdfaf8] border border-stone-200 shadow-sm text-[13px]
-        text-stone-400 hover:bg-rose-50/80 hover:text-rose-400 hover:border-rose-200 transition-all"
-    >
-      <LogOut size={14} />
-      <span>Đăng xuất</span>
-    </button>
+  return (
+    <>
+      {/* ── MOBILE: Hamburger button ── */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-3 left-3 z-50 w-10 h-10 rounded-xl
+          bg-white border border-stone-200 shadow-sm
+          flex items-center justify-center text-stone-500 hover:bg-stone-50 transition">
+        <Menu size={20} />
+      </button>
+
+      {/* ── MOBILE: Backdrop ── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── MOBILE: Sidebar overlay ── */}
+      <aside className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col
+        bg-[#fdfaf8] border-r border-stone-100 shadow-2xl
+        transition-transform duration-200 ease-in-out
+        ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        {/* Close button */}
+        <button onClick={() => setMobileOpen(false)}
+          className="absolute top-3 right-3 w-8 h-8 rounded-lg border border-stone-200
+            flex items-center justify-center text-stone-400 hover:bg-stone-50 transition">
+          <X size={16} />
+        </button>
+        <NavContent isOpen={true} />
+      </aside>
+
+      {/* ── DESKTOP: Sidebar hover-to-expand ── */}
+      <aside
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+        className={`hidden md:flex min-h-screen flex-col flex-shrink-0
+          transition-all duration-200 ease-in-out z-40
+          bg-[#fdfaf8] border-r border-stone-100
+          shadow-[1px_0_16px_0_rgba(160,120,100,0.06)]
+          ${expanded ? "w-64" : "w-[84px]"}`}>
+        <NavContent isOpen={expanded} />
+      </aside>
+
+      {/* ── Nút đăng xuất (desktop) ── */}
+      <button
+        onClick={handleLogout}
+        className="hidden md:flex fixed bottom-4 left-4 z-50 items-center gap-2 px-3 py-2 rounded-xl
+          bg-[#fdfaf8] border border-stone-200 shadow-sm text-[13px]
+          text-stone-400 hover:bg-rose-50/80 hover:text-rose-400 hover:border-rose-200 transition-all">
+        <LogOut size={14} />
+        <span>Đăng xuất</span>
+      </button>
     </>
   );
 }
