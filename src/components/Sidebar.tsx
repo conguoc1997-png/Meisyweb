@@ -23,6 +23,7 @@ import {
   Landmark,
   QrCode,
   Clock,
+  CalendarDays,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -104,6 +105,12 @@ const MODULES: NavModule[] = [
       { href: "/ke-toan/cong-no",        label: "Công nợ NCC",       icon: BookOpen,      moduleKey: "ke-toan" },
       { href: "/ke-toan/so-sach",        label: "Sổ sách thuế HKD",  icon: BookOpen,      moduleKey: "ke-toan" },
     ],
+  },
+  {
+    key: "calendar", moduleKey: "calendar",
+    label: "Lịch Công Ty", icon: CalendarDays,
+    bg: "bg-rose-50", text: "text-rose-400",
+    href: "/calendar",
   },
   {
     key: "cham-cong", moduleKey: "cham-cong",
