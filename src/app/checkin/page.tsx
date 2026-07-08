@@ -8,7 +8,12 @@ type NhanVien = {
   caLamViec?: { gioVao: string; gioRa: string; nghiTrua: number } | null;
   homNay?: { gioVao?: string; gioRa?: string; trangThai?: string } | null;
 };
-type Step = "xin-vitri" | "lay-vitri" | "chon-nv" | "dang-gui" | "thanh-cong" | "loi";
+type Step = "chon-cong-ty" | "xin-vitri" | "lay-vitri" | "chon-nv" | "dang-gui" | "thanh-cong" | "loi";
+
+const CONG_TY = [
+  { key: "vp", name: "Văn phòng Gia Lâm", emoji: "🏢", desc: "Ngô Xuân Quảng, Gia Lâm, Hà Nội" },
+  { key: "xn", name: "Xưởng Bắc Ninh",    emoji: "🏭", desc: "Khu công nghiệp Bắc Ninh" },
+];
 type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string; diMuon?: boolean; phutMuon?: number; gioVaoCa?: string };
 
 function isWebView() {
@@ -60,13 +65,14 @@ function todayLabel() {
 export default function CheckInPage() {
   const [dsNV, setDsNV]           = useState<NhanVien[]>([]);
   const [selected, setSelected]   = useState<NhanVien | null>(null);
-  const [step, setStep]           = useState<Step>("xin-vitri");
+  const [step, setStep]           = useState<Step>("chon-cong-ty");
   const [result, setResult]       = useState<ResultData | null>(null);
   const [errMsg, setErrMsg]       = useState("");
   const [search, setSearch]       = useState("");
   const [coords, setCoords]       = useState<{ lat: number; lng: number } | null>(null);
   const [inWebView, setInWebView] = useState(false);
   const [copied, setCopied]       = useState(false);
+  const [congTy, setCongTy]       = useState<string>("");
 
   useEffect(() => {
     setInWebView(isWebView());
@@ -98,7 +104,8 @@ export default function CheckInPage() {
   }
 
   function reset() {
-    setStep("xin-vitri"); setSelected(null); setResult(null); setErrMsg(""); setSearch(""); setCoords(null);
+    setStep("chon-cong-ty"); setSelected(null); setResult(null); setErrMsg("");
+    setSearch(""); setCoords(null); setCongTy("");
     fetch("/api/checkin").then(r => r.json()).then(d => setDsNV(Array.isArray(d) ? d : []));
   }
 
@@ -112,6 +119,41 @@ export default function CheckInPage() {
     nv.ten.toLowerCase().includes(search.toLowerCase()) ||
     nv.maNV.toLowerCase().includes(search.toLowerCase())
   );
+
+  // ── Bước 1: Chọn công ty ─────────────────────────────────────────
+  if (step === "chon-cong-ty") {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-5 pb-10">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <p className="text-rose-400 text-2xl font-mono font-semibold mb-1"><Clock24 /></p>
+            <p className="text-slate-500 text-sm">{todayLabel()}</p>
+            <h1 className="text-white text-2xl font-bold mt-4 mb-1">Bạn đang ở đâu?</h1>
+            <p className="text-slate-400 text-sm">Chọn địa điểm làm việc hôm nay</p>
+          </div>
+
+          <div className="space-y-3">
+            {CONG_TY.map(ct => (
+              <button key={ct.key}
+                onClick={() => { setCongTy(ct.name); setStep("xin-vitri"); }}
+                className="w-full flex items-center gap-4 bg-slate-800 hover:bg-slate-700
+                  border border-slate-700 hover:border-rose-500/50 rounded-2xl px-5 py-4
+                  transition-all active:scale-[0.98] text-left group">
+                <div className="w-14 h-14 bg-slate-700 group-hover:bg-rose-500/20 rounded-xl
+                  flex items-center justify-center text-3xl flex-shrink-0 transition-colors">
+                  {ct.emoji}
+                </div>
+                <div>
+                  <p className="text-white font-bold text-base">{ct.name}</p>
+                  <p className="text-slate-500 text-xs mt-0.5">{ct.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Webview: hướng dẫn mở trình duyệt ───────────────────────────
   if (step === "xin-vitri" && inWebView) {
@@ -158,15 +200,20 @@ export default function CheckInPage() {
   if (step === "xin-vitri") {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col">
-        {/* Header */}
         <div className="flex-1 flex flex-col items-center justify-center px-5 pb-4">
-          <div className="text-center mb-12">
-            <div className="w-24 h-24 bg-rose-500/20 rounded-[28px] flex items-center justify-center mx-auto mb-6">
+          <div className="text-center mb-10">
+            <div className="w-24 h-24 bg-rose-500/20 rounded-[28px] flex items-center justify-center mx-auto mb-5">
               <MapPin size={44} className="text-rose-400" />
             </div>
-            <h1 className="text-white text-3xl font-bold mb-2">Chấm công</h1>
-            <p className="text-slate-400 text-base">{todayLabel()}</p>
-            <p className="text-rose-400 text-2xl font-mono font-semibold mt-1"><Clock24 /></p>
+            {congTy && (
+              <div className="inline-flex items-center gap-2 bg-rose-500/10 border border-rose-500/30
+                rounded-full px-4 py-1.5 mb-4">
+                <span className="text-rose-400 text-sm font-semibold">📍 {congTy}</span>
+              </div>
+            )}
+            <h1 className="text-white text-2xl font-bold mb-1">Xác nhận vị trí</h1>
+            <p className="text-slate-400 text-sm">{todayLabel()}</p>
+            <p className="text-rose-400 text-xl font-mono font-semibold mt-1"><Clock24 /></p>
           </div>
 
           <div className="w-full max-w-sm space-y-3">
@@ -176,10 +223,12 @@ export default function CheckInPage() {
               📍 Xác định vị trí của tôi
             </button>
             <p className="text-center text-slate-500 text-xs">Khi hỏi quyền vị trí → bấm "Cho phép"</p>
+            <button onClick={() => setStep("chon-cong-ty")}
+              className="w-full py-3 text-slate-500 hover:text-slate-300 text-sm transition flex items-center justify-center gap-2">
+              <ArrowLeft size={14} /> Quay lại chọn địa điểm
+            </button>
           </div>
         </div>
-
-        {/* Footer */}
         <div className="pb-8 text-center">
           <p className="text-slate-600 text-xs">Meisy · Hệ thống chấm công GPS</p>
         </div>
@@ -216,7 +265,10 @@ export default function CheckInPage() {
         {/* Header */}
         <div className="bg-slate-900 px-5 pt-12 pb-4 sticky top-0 z-10">
           <div className="flex items-center justify-between mb-1">
-            <h1 className="text-white text-xl font-bold">Chọn tên của bạn</h1>
+            <div>
+              <h1 className="text-white text-xl font-bold">Chọn tên của bạn</h1>
+              {congTy && <p className="text-rose-400 text-xs mt-0.5">📍 {congTy}</p>}
+            </div>
             <div className="text-right">
               <p className="text-rose-400 font-mono font-semibold text-base"><Clock24 /></p>
               <p className="text-slate-500 text-xs">{todayLabel()}</p>
@@ -273,10 +325,12 @@ export default function CheckInPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-semibold text-[15px] truncate">{nv.ten}</p>
-                        <p className="text-slate-400 text-xs mt-0.5">
-                          {nv.maNV}{nv.phongBan ? ` · ${nv.phongBan}` : ""}
-                          {nv.caLamViec ? ` · ${nv.caLamViec.gioVao}–${nv.caLamViec.gioRa}` : ""}
-                        </p>
+                        {(nv.phongBan || nv.caLamViec) && (
+                          <p className="text-slate-400 text-xs mt-0.5">
+                            {nv.phongBan ?? ""}
+                            {nv.caLamViec ? ` · ${nv.caLamViec.gioVao}–${nv.caLamViec.gioRa}` : ""}
+                          </p>
+                        )}
                       </div>
                       {hasVao && (
                         <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30
@@ -306,7 +360,7 @@ export default function CheckInPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-slate-300 font-semibold text-[15px] truncate">{nv.ten}</p>
-                      <p className="text-slate-500 text-xs mt-0.5">{nv.maNV}{nv.phongBan ? ` · ${nv.phongBan}` : ""}</p>
+                      {nv.phongBan && <p className="text-slate-500 text-xs mt-0.5">{nv.phongBan}</p>}
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="flex items-center gap-1 text-emerald-500">
