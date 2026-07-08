@@ -519,6 +519,17 @@ export default function ChamCongPage() {
     return m;
   }, [chamCongs]);
 
+  // Map giờ vào/ra: "nvId_ngayISO" → { gioVao, gioRa, tongGio }
+  const gioMap = useMemo(() => {
+    const m: Record<string, { gioVao?: string | null; gioRa?: string | null; tongGio?: number | null }> = {};
+    chamCongs.forEach(c => {
+      if (c.gioVao || c.gioRa) {
+        m[`${c.nhanVienId}_${c.ngay.slice(0, 10)}`] = { gioVao: c.gioVao, gioRa: c.gioRa, tongGio: c.tongGio };
+      }
+    });
+    return m;
+  }, [chamCongs]);
+
   // Popover ghi chú ô chấm công
   const [notePopover, setNotePopover] = useState<{
     key: string; nvId: string; day: number; ngay: string;
@@ -1095,11 +1106,25 @@ export default function ChamCongPage() {
                         const holiday = isHoliday(d);
                         const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
                         const chuaRa = chuaRaMap[key]; // có vào nhưng chưa ra
+                        const gio = gioMap[key];
+                        // Tooltip chi tiết: giờ vào/ra + ghi chú
+                        const buildTitle = () => {
+                          if (locked) return "🔒 Bảng đang khoá";
+                          if (chuaRa) return `⚠️ Chưa chấm ra — Vào lúc ${gio?.gioVao ?? "?"}`;
+                          if (tt === "da_dang_ky") return `📅 Đã đăng ký${ghiChuMap[key] ? ` — ${ghiChuMap[key]}` : ""} · Click để xác nhận Đi làm`;
+                          if (!info) return sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công";
+                          const parts: string[] = [info.title];
+                          if (gio?.gioVao) parts.push(`Vào: ${gio.gioVao}`);
+                          if (gio?.gioRa)  parts.push(`Ra: ${gio.gioRa}`);
+                          if (gio?.tongGio != null) parts.push(`Tổng: ${gio.tongGio}h`);
+                          if (ghiChuMap[key]) parts.push(ghiChuMap[key]);
+                          return parts.join(" · ");
+                        };
                         return (
                           <td key={d}
                             className={`p-0 text-center select-none border-x border-slate-100 transition-colors ${defaultBg} ${locked ? "cursor-default" : "cursor-pointer hover:bg-slate-200/40 active:bg-slate-300/50"}`}
                             onClick={() => handleCellClick(nv.id, d)}
-                            title={locked ? "🔒 Bảng đang khoá" : chuaRa ? "⚠️ Đã chấm vào nhưng chưa chấm ra" : tt === "da_dang_ky" ? `📅 Đã đăng ký${ghiChuMap[key] ? ` — ${ghiChuMap[key]}` : ""} · Click để xác nhận Đi làm` : info?.title ?? (sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công")}
+                            title={buildTitle()}
                           >
                             {info ? (
                               <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text} group/cell`}>
