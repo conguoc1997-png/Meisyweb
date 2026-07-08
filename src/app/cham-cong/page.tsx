@@ -530,6 +530,13 @@ export default function ChamCongPage() {
     return m;
   }, [chamCongs]);
 
+  // Hover card — hiện chi tiết khi rê chuột vào ô
+  const [hoverCard, setHoverCard] = useState<{
+    x: number; y: number;
+    ten: string; ngay: string; trangThai: string;
+    gioVao?: string | null; gioRa?: string | null; tongGio?: number | null; ghiChu?: string | null;
+  } | null>(null);
+
   // Popover ghi chú ô chấm công
   const [notePopover, setNotePopover] = useState<{
     key: string; nvId: string; day: number; ngay: string;
@@ -1107,24 +1114,27 @@ export default function ChamCongPage() {
                         const defaultBg = sun ? "bg-slate-100/80" : holiday ? "bg-purple-50/60" : "";
                         const chuaRa = chuaRaMap[key]; // có vào nhưng chưa ra
                         const gio = gioMap[key];
-                        // Tooltip chi tiết: giờ vào/ra + ghi chú
-                        const buildTitle = () => {
-                          if (locked) return "🔒 Bảng đang khoá";
-                          if (chuaRa) return `⚠️ Chưa chấm ra — Vào lúc ${gio?.gioVao ?? "?"}`;
-                          if (tt === "da_dang_ky") return `📅 Đã đăng ký${ghiChuMap[key] ? ` — ${ghiChuMap[key]}` : ""} · Click để xác nhận Đi làm`;
-                          if (!info) return sun ? "Chủ nhật" : holiday ? (holidayLabels[`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`] ?? "Ngày lễ") : "Click để chấm công";
-                          const parts: string[] = [info.title];
-                          if (gio?.gioVao) parts.push(`Vào: ${gio.gioVao}`);
-                          if (gio?.gioRa)  parts.push(`Ra: ${gio.gioRa}`);
-                          if (gio?.tongGio != null) parts.push(`Tổng: ${gio.tongGio}h`);
-                          if (ghiChuMap[key]) parts.push(ghiChuMap[key]);
-                          return parts.join(" · ");
-                        };
+                        const ngayStr = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
                         return (
                           <td key={d}
                             className={`p-0 text-center select-none border-x border-slate-100 transition-colors ${defaultBg} ${locked ? "cursor-default" : "cursor-pointer hover:bg-slate-200/40 active:bg-slate-300/50"}`}
                             onClick={() => handleCellClick(nv.id, d)}
-                            title={buildTitle()}
+                            onMouseEnter={e => {
+                              if (!info && !chuaRa) return; // ô trống / CN / lễ không cần card
+                              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setHoverCard({
+                                x: r.left + r.width / 2,
+                                y: r.top,
+                                ten: nv.ten,
+                                ngay: `${DAY_OF_WEEK[new Date(ngayStr).getDay()]} ${d}/${month}`,
+                                trangThai: chuaRa ? "Chưa chấm ra" : info?.title ?? "",
+                                gioVao: chuaRa ? gio?.gioVao : gio?.gioVao,
+                                gioRa: gio?.gioRa,
+                                tongGio: gio?.tongGio,
+                                ghiChu: ghiChuMap[key] || null,
+                              });
+                            }}
+                            onMouseLeave={() => setHoverCard(null)}
                           >
                             {info ? (
                               <div className={`relative flex items-center justify-center w-full h-8 text-[11px] font-bold rounded-sm ${info.bg} ${info.text} group/cell`}>
@@ -2487,6 +2497,42 @@ export default function ChamCongPage() {
           </div>
         );
       })()}
+
+      {/* ═══ HOVER CARD CHI TIẾT Ô CHẤM CÔNG ═══ */}
+      {hoverCard && (
+        <div
+          className="pointer-events-none fixed z-[9998] bg-slate-800 text-white rounded-xl shadow-2xl px-3.5 py-2.5 text-xs min-w-[160px] max-w-[240px] border border-slate-600"
+          style={{
+            left: Math.min(hoverCard.x, window.innerWidth - 250),
+            top: hoverCard.y - 8,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <p className="font-semibold text-slate-100 truncate mb-1">{hoverCard.ten}</p>
+          <p className="text-slate-400 text-[10px] mb-1.5">{hoverCard.ngay}</p>
+          <p className={`font-medium mb-1 ${
+            hoverCard.trangThai === "Đi muộn" ? "text-amber-400" :
+            hoverCard.trangThai === "Chưa chấm ra" ? "text-orange-400" :
+            hoverCard.trangThai === "Vắng" ? "text-red-400" :
+            "text-emerald-400"
+          }`}>{hoverCard.trangThai}</p>
+          {hoverCard.gioVao && (
+            <p className="text-slate-300">🕐 Vào: <span className="font-semibold text-white">{hoverCard.gioVao}</span></p>
+          )}
+          {hoverCard.gioRa && (
+            <p className="text-slate-300">🕕 Ra: <span className="font-semibold text-white">{hoverCard.gioRa}</span></p>
+          )}
+          {hoverCard.tongGio != null && (
+            <p className="text-slate-300">⏱ Tổng: <span className="font-semibold text-white">{hoverCard.tongGio}h</span></p>
+          )}
+          {hoverCard.ghiChu && (
+            <p className="text-amber-300 mt-1 border-t border-slate-700 pt-1 leading-relaxed">{hoverCard.ghiChu}</p>
+          )}
+          {!hoverCard.gioVao && !hoverCard.ghiChu && hoverCard.trangThai !== "Chưa chấm ra" && (
+            <p className="text-slate-500 italic text-[10px]">Chấm thủ công (không có giờ)</p>
+          )}
+        </div>
+      )}
 
       {/* ═══ POPOVER GHI CHÚ Ô CHẤM CÔNG ═══ */}
       {notePopover && (
