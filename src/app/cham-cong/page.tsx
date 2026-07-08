@@ -510,6 +510,15 @@ export default function ChamCongPage() {
     return m;
   }, [chamCongs]);
 
+  // Map về sớm: "nvId_ngayISO" → true nếu ghiChu chứa "Về sớm"
+  const veSomMap = useMemo(() => {
+    const m: Record<string, true> = {};
+    chamCongs.forEach(c => {
+      if (c.ghiChu?.includes("Về sớm")) m[`${c.nhanVienId}_${c.ngay.slice(0, 10)}`] = true;
+    });
+    return m;
+  }, [chamCongs]);
+
   // Popover ghi chú ô chấm công
   const [notePopover, setNotePopover] = useState<{
     key: string; nvId: string; day: number; ngay: string;
@@ -1098,8 +1107,15 @@ export default function ChamCongPage() {
                                 {chuaRa && (
                                   <span className="absolute top-0 right-0 w-2 h-2 bg-orange-400 rounded-full border border-white" title="Chưa chấm ra" />
                                 )}
-                                {/* Chấm xanh nếu có ghi chú */}
-                                {ghiChuMap[key] && !chuaRa && (
+                                {/* Badge "S" nếu về sớm */}
+                                {veSomMap[key] && !chuaRa && (
+                                  <span
+                                    className="absolute bottom-0 left-0 px-[3px] text-[7px] font-bold bg-rose-500 text-white rounded-tr leading-[11px]"
+                                    title={ghiChuMap[key] ?? "Về sớm"}
+                                  >S</span>
+                                )}
+                                {/* Chấm xanh nếu có ghi chú nhưng không phải về sớm */}
+                                {ghiChuMap[key] && !chuaRa && !veSomMap[key] && (
                                   <span className="absolute top-0 left-0 w-1.5 h-1.5 bg-sky-400 rounded-full" title={ghiChuMap[key]} />
                                 )}
                                 {/* Icon ghi chú — chỉ hiện khi hover, không khoá */}

@@ -24,11 +24,15 @@ async function autoMigrate() {
         PRIMARY KEY ("id")
       )
     `),
-    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`),
-    run(`ALTER TABLE "NhanVien" ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`),
-    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`),
-    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`),
-    run(`ALTER TABLE "ChamCong" ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`),
+    run(`ALTER TABLE "NhanVien"  ADD COLUMN IF NOT EXISTS "caLamViecId" TEXT`),
+    run(`ALTER TABLE "NhanVien"  ADD COLUMN IF NOT EXISTS "luongGio" DOUBLE PRECISION`),
+    run(`ALTER TABLE "CaLamViec" ADD COLUMN IF NOT EXISTS "gioVao2" TEXT`),
+    run(`ALTER TABLE "CaLamViec" ADD COLUMN IF NOT EXISTS "gioRa2" TEXT`),
+    run(`ALTER TABLE "ChamCong"  ADD COLUMN IF NOT EXISTS "gioVao"  TEXT`),
+    run(`ALTER TABLE "ChamCong"  ADD COLUMN IF NOT EXISTS "gioRa"   TEXT`),
+    run(`ALTER TABLE "ChamCong"  ADD COLUMN IF NOT EXISTS "tongGio" DOUBLE PRECISION`),
+    run(`ALTER TABLE "ChamCong"  ADD COLUMN IF NOT EXISTS "gioVao2" TEXT`),
+    run(`ALTER TABLE "ChamCong"  ADD COLUMN IF NOT EXISTS "gioRa2"  TEXT`),
   ]);
   migrated = true;
 }
@@ -70,14 +74,14 @@ async function assignCa(caId: string, apDung: string, boPhanList: string[], nhan
 export async function POST(req: NextRequest) {
   try {
     await autoMigrate();
-    const { ten, gioVao, gioRa, nghiTrua, ghiChu, apDung, boPhanList, nhanVienIds } = await req.json();
+    const { ten, gioVao, gioRa, nghiTrua, ghiChu, apDung, boPhanList, nhanVienIds, gioVao2, gioRa2 } = await req.json();
     if (!ten || !gioVao || !gioRa) {
       return NextResponse.json({ error: "Thiếu thông tin" }, { status: 400 });
     }
     const id = newId();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "CaLamViec" ("id","ten","gioVao","gioRa","nghiTrua","ghiChu") VALUES ($1,$2,$3,$4,$5,$6)`,
-      id, ten, gioVao, gioRa, Number(nghiTrua) || 90, ghiChu || null
+      `INSERT INTO "CaLamViec" ("id","ten","gioVao","gioRa","nghiTrua","ghiChu","gioVao2","gioRa2") VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      id, ten, gioVao, gioRa, Number(nghiTrua) || 90, ghiChu || null, gioVao2 || null, gioRa2 || null
     );
     await assignCa(id, apDung || "khong", boPhanList || [], nhanVienIds || []);
     const rows = await prisma.$queryRawUnsafe<object[]>(
@@ -94,12 +98,12 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     autoMigrate(); // fire-and-forget — bảng đã tồn tại khi user đã load được dữ liệu
-    const { id, ten, gioVao, gioRa, nghiTrua, ghiChu, apDung, boPhanList, nhanVienIds } = await req.json();
+    const { id, ten, gioVao, gioRa, nghiTrua, ghiChu, apDung, boPhanList, nhanVienIds, gioVao2, gioRa2 } = await req.json();
     if (!id) return NextResponse.json({ error: "Thiếu id" }, { status: 400 });
     await assignCa(id, apDung || "khong", boPhanList || [], nhanVienIds || []);
     await prisma.$executeRawUnsafe(
-      `UPDATE "CaLamViec" SET "ten"=$2,"gioVao"=$3,"gioRa"=$4,"nghiTrua"=$5,"ghiChu"=$6 WHERE "id"=$1`,
-      id, ten, gioVao, gioRa, Number(nghiTrua) || 90, ghiChu || null
+      `UPDATE "CaLamViec" SET "ten"=$2,"gioVao"=$3,"gioRa"=$4,"nghiTrua"=$5,"ghiChu"=$6,"gioVao2"=$7,"gioRa2"=$8 WHERE "id"=$1`,
+      id, ten, gioVao, gioRa, Number(nghiTrua) || 90, ghiChu || null, gioVao2 || null, gioRa2 || null
     );
     const rows = await prisma.$queryRawUnsafe<object[]>(
       `SELECT * FROM "CaLamViec" WHERE "id" = $1`, id

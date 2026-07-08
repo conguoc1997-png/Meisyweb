@@ -5,8 +5,8 @@ import { MapPin, Loader2, LogIn, LogOut, Timer, ChevronRight, Check, Clock, Sear
 type NhanVien = {
   id: string; ten: string; maNV: string; phongBan?: string;
   loaiLuong: string;
-  caLamViec?: { gioVao: string; gioRa: string; nghiTrua: number } | null;
-  homNay?: { gioVao?: string; gioRa?: string; trangThai?: string } | null;
+  caLamViec?: { gioVao: string; gioRa: string; nghiTrua: number; gioVao2?: string | null; gioRa2?: string | null } | null;
+  homNay?: { gioVao?: string; gioRa?: string; gioVao2?: string; gioRa2?: string; trangThai?: string } | null;
 };
 type Step = "chon-cong-ty" | "xin-vitri" | "lay-vitri" | "chon-nv" | "dang-gui" | "thanh-cong" | "loi";
 
@@ -14,7 +14,7 @@ const CONG_TY = [
   { key: "vp", name: "Văn phòng Gia Lâm", emoji: "🏢", desc: "Ngô Xuân Quảng, Gia Lâm, Hà Nội" },
   { key: "xn", name: "Xưởng Bắc Ninh",    emoji: "🏭", desc: "Khu công nghiệp Bắc Ninh" },
 ];
-type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string; diMuon?: boolean; phutMuon?: number; gioVaoCa?: string };
+type ResultData = { action: string; time: string; location: string; tongGio?: number; tangCa?: number; gioVao?: string; diMuon?: boolean; phutMuon?: number; gioVaoCa?: string; veSom?: boolean; phutVeSom?: number; gioRaCa?: string };
 
 function isWebView() {
   if (typeof navigator === "undefined") return false;
@@ -116,8 +116,8 @@ export default function CheckInPage() {
   }
 
   const filtered = dsNV.filter(nv =>
-    nv.ten.toLowerCase().includes(search.toLowerCase()) ||
-    nv.maNV.toLowerCase().includes(search.toLowerCase())
+    (nv.ten || "").toLowerCase().includes(search.toLowerCase()) ||
+    (nv.maNV || "").toLowerCase().includes(search.toLowerCase())
   );
 
   // ── Bước 1: Chọn công ty ─────────────────────────────────────────
@@ -257,8 +257,23 @@ export default function CheckInPage() {
 
   // ── Chọn nhân viên ───────────────────────────────────────────────
   if (step === "chon-nv") {
-    const daCham  = filtered.filter(nv => nv.homNay?.gioVao);
-    const chuaCham = filtered.filter(nv => !nv.homNay?.gioVao);
+    // Phân loại nhân viên theo bước chấm công
+    const isDone = (nv: NhanVien) => {
+      const co2ca = !!nv.caLamViec?.gioVao2;
+      if (co2ca) return !!(nv.homNay?.gioVao2 && nv.homNay?.gioRa2);
+      return !!(nv.homNay?.gioVao && nv.homNay?.gioRa);
+    };
+    const getStatus = (nv: NhanVien): { label: string; color: string; detail?: string } => {
+      const h = nv.homNay;
+      const co2ca = !!nv.caLamViec?.gioVao2;
+      if (!h?.gioVao) return { label: "Chưa chấm", color: "text-slate-400" };
+      if (h.gioVao && !h.gioRa) return { label: "Vào ca 1", color: "text-blue-400", detail: h.gioVao };
+      if (h.gioVao && h.gioRa && co2ca && !h.gioVao2) return { label: "Chờ ca 2", color: "text-indigo-400", detail: `${h.gioVao}→${h.gioRa}` };
+      if (h.gioVao2 && !h.gioRa2) return { label: "Vào ca 2", color: "text-indigo-400", detail: h.gioVao2 };
+      return { label: "Hoàn thành", color: "text-emerald-400", detail: co2ca ? `${h.gioVao}→${h.gioRa2}` : `${h.gioVao}→${h.gioRa}` };
+    };
+    const dangLam = filtered.filter(nv => !isDone(nv));
+    const daXong  = filtered.filter(nv => isDone(nv));
 
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col">
@@ -307,13 +322,18 @@ export default function CheckInPage() {
               </p>
             </div>
           )}
-          {/* Chưa chấm */}
-          {chuaCham.length > 0 && (
+          {/* Đang làm / chưa hoàn thành — có thể click */}
+          {dangLam.length > 0 && (
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-widest font-semibold mb-3">Chưa chấm hôm nay</p>
+              <p className="text-slate-500 text-xs uppercase tracking-widest font-semibold mb-3">Chọn để chấm công</p>
               <div className="space-y-2">
-                {chuaCham.map(nv => {
-                  const hasVao = !!nv.homNay?.gioVao;
+                {dangLam.map(nv => {
+                  const st = getStatus(nv);
+                  const caStr = nv.caLamViec
+                    ? nv.caLamViec.gioVao2
+                      ? `${nv.caLamViec.gioVao}–${nv.caLamViec.gioRa} · ${nv.caLamViec.gioVao2}–${nv.caLamViec.gioRa2}`
+                      : `${nv.caLamViec.gioVao}–${nv.caLamViec.gioRa}`
+                    : "";
                   return (
                     <button key={nv.id} onClick={() => handleCheckin(nv)}
                       className="w-full flex items-center gap-4 bg-slate-800 hover:bg-slate-750
@@ -325,17 +345,18 @@ export default function CheckInPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-semibold text-[15px] truncate">{nv.ten}</p>
-                        {(nv.phongBan || nv.caLamViec) && (
-                          <p className="text-slate-400 text-xs mt-0.5">
-                            {nv.phongBan ?? ""}
-                            {nv.caLamViec ? ` · ${nv.caLamViec.gioVao}–${nv.caLamViec.gioRa}` : ""}
+                        {(nv.phongBan || caStr) && (
+                          <p className="text-slate-500 text-xs mt-0.5 truncate">
+                            {nv.phongBan ?? ""}{caStr ? ` · ${caStr}` : ""}
                           </p>
                         )}
                       </div>
-                      {hasVao && (
-                        <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30
-                          px-2 py-1 rounded-lg font-medium flex-shrink-0">
-                          Vào {nv.homNay?.gioVao}
+                      {nv.homNay?.gioVao && (
+                        <span className={`text-[10px] px-2 py-1 rounded-lg font-medium flex-shrink-0 border
+                          ${st.color === "text-indigo-400"
+                            ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/30"
+                            : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
+                          {st.label}{st.detail ? ` · ${st.detail}` : ""}
                         </span>
                       )}
                       <ChevronRight size={16} className="text-slate-600 flex-shrink-0" />
@@ -346,40 +367,35 @@ export default function CheckInPage() {
             </div>
           )}
 
-          {/* Đã chấm đủ */}
-          {daCham.filter(nv => nv.homNay?.gioVao && nv.homNay?.gioRa).length > 0 && (
+          {/* Đã hoàn thành tất cả ca */}
+          {daXong.length > 0 && (
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-widest font-semibold mb-3">Đã chấm đủ hôm nay</p>
+              <p className="text-slate-500 text-xs uppercase tracking-widest font-semibold mb-3">Đã hoàn thành hôm nay</p>
               <div className="space-y-2">
-                {daCham.filter(nv => nv.homNay?.gioVao && nv.homNay?.gioRa).map(nv => (
-                  <div key={nv.id}
-                    className="w-full flex items-center gap-4 bg-slate-800/50 rounded-2xl px-4 py-3.5 opacity-50">
-                    <div className={`w-12 h-12 ${avatarColor(nv.ten)} rounded-xl flex items-center
-                      justify-center text-white font-bold text-base flex-shrink-0 grayscale`}>
-                      {initials(nv.ten)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-slate-300 font-semibold text-[15px] truncate">{nv.ten}</p>
-                      {nv.phongBan && <p className="text-slate-500 text-xs mt-0.5">{nv.phongBan}</p>}
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="flex items-center gap-1 text-emerald-500">
-                        <Check size={12} />
-                        <span className="text-xs font-medium">Hoàn thành</span>
+                {daXong.map(nv => {
+                  const st = getStatus(nv);
+                  return (
+                    <div key={nv.id}
+                      className="w-full flex items-center gap-4 bg-slate-800/50 rounded-2xl px-4 py-3.5 opacity-50">
+                      <div className={`w-12 h-12 ${avatarColor(nv.ten)} rounded-xl flex items-center
+                        justify-center text-white font-bold text-base flex-shrink-0 grayscale`}>
+                        {initials(nv.ten)}
                       </div>
-                      <p className="text-slate-500 text-[11px] mt-0.5">
-                        {nv.homNay?.gioVao} → {nv.homNay?.gioRa}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-slate-300 font-semibold text-[15px] truncate">{nv.ten}</p>
+                        {nv.phongBan && <p className="text-slate-500 text-xs mt-0.5">{nv.phongBan}</p>}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="flex items-center gap-1 text-emerald-500">
+                          <Check size={12} />
+                          <span className="text-xs font-medium">Hoàn thành</span>
+                        </div>
+                        {st.detail && <p className="text-slate-500 text-[11px] mt-0.5">{st.detail}</p>}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-          )}
-
-          {filtered.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-slate-500">Không tìm thấy nhân viên</p>
             </div>
           )}
         </div>
@@ -393,18 +409,20 @@ export default function CheckInPage() {
     const isRa  = result.action === "ra";
     const isTC  = result.action === "tang_ca";
 
-    const isMuon = isVao && result.diMuon;
-    const accent = isTC ? "amber" : isMuon ? "orange" : isVao ? "blue" : "emerald";
+    const isMuon  = isVao && result.diMuon;
+    const isVeSom = isRa  && result.veSom;
+    const accent = isTC ? "amber" : isMuon ? "orange" : isVeSom ? "rose" : isVao ? "blue" : "emerald";
     const accentMap: Record<string, string> = {
       amber:   "bg-amber-500 text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-amber-500/20",
       orange:  "bg-orange-500 text-orange-400 bg-orange-500/10 border-orange-500/30 shadow-orange-500/20",
+      rose:    "bg-rose-500 text-rose-400 bg-rose-500/10 border-rose-500/30 shadow-rose-500/20",
       blue:    "bg-blue-500 text-blue-400 bg-blue-500/10 border-blue-500/30 shadow-blue-500/20",
       emerald: "bg-emerald-500 text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-emerald-500/20",
     };
     const [btnBg, textColor, iconBg, iconBorder, shadowColor] = accentMap[accent].split(" ");
 
-    const icon  = isTC ? "⏰" : isMuon ? "⚠️" : isVao ? "🟢" : "🏁";
-    const title = isTC ? "Đã ghi tăng ca!" : isMuon ? "Vào muộn!" : isVao ? "Chấm VÀO thành công!" : "Chấm RA thành công!";
+    const icon  = isTC ? "⏰" : isMuon ? "⚠️" : isVeSom ? "🕐" : isVao ? "🟢" : "🏁";
+    const title = isTC ? "Đã ghi tăng ca!" : isMuon ? "Vào muộn!" : isVeSom ? "Về sớm hơn ca!" : isVao ? "Chấm VÀO thành công!" : "Chấm RA thành công!";
 
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-5 pb-10">
@@ -426,6 +444,15 @@ export default function CheckInPage() {
                 Muộn {result.phutMuon} phút so với ca ({result.gioVaoCa})
               </p>
               <p className="text-slate-400 text-xs mt-0.5">Đã tự động ghi trạng thái "Đi muộn"</p>
+            </div>
+          )}
+          {/* Banner về sớm */}
+          {isVeSom && (
+            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-2.5 mt-4">
+              <p className="text-rose-400 text-sm font-semibold">
+                Về sớm {result.phutVeSom} phút so với ca ({result.gioRaCa})
+              </p>
+              <p className="text-slate-400 text-xs mt-0.5">Đã ghi chú "Về sớm" vào bảng chấm công</p>
             </div>
           )}
 

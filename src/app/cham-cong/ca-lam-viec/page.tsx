@@ -5,17 +5,19 @@ import { Plus, Trash2, Clock, Save, X, Users, Building2, Check } from "lucide-re
 type Ca = {
   id: string; ten: string; gioVao: string; gioRa: string;
   nghiTrua: number; ghiChu?: string;
+  gioVao2?: string | null; gioRa2?: string | null;
 };
 type NhanVien = { id: string; ten: string; maNV: string; phongBan?: string | null; caLamViecId?: string | null };
 type ApDung = "khong" | "bo_phan" | "nhan_vien";
 
 const PHONG_BAN = ["Kho", "May", "CSKH", "Livestream", "Văn phòng"];
 
-function soGioChuẩn(gioVao: string, gioRa: string, nghiTrua: number) {
-  const [h1, m1] = gioVao.split(":").map(Number);
-  const [h2, m2] = gioRa.split(":").map(Number);
-  const total = (h2 * 60 + m2) - (h1 * 60 + m1) - nghiTrua;
-  return (total / 60).toFixed(1);
+function soGioChuẩn(gioVao: string, gioRa: string, nghiTrua: number, gioVao2?: string | null, gioRa2?: string | null) {
+  const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const shift1 = toMin(gioRa) - toMin(gioVao);
+  const shift2 = gioVao2 && gioRa2 ? toMin(gioRa2) - toMin(gioVao2) : 0;
+  const total = shift1 + shift2 - nghiTrua;
+  return (Math.max(0, total) / 60).toFixed(1);
 }
 
 export default function CaLamViecPage() {
@@ -27,6 +29,7 @@ export default function CaLamViecPage() {
   const [editingId, setEditingId] = useState<string | null>(null); // null = không sửa, "new" = thêm mới
   const [draft, setDraft]     = useState<Ca & { apDung: ApDung; boPhanList: string[]; nhanVienIds: string[] }>({
     id: "", ten: "", gioVao: "07:30", gioRa: "17:30", nghiTrua: 90, ghiChu: "",
+    gioVao2: null, gioRa2: null,
     apDung: "khong", boPhanList: [], nhanVienIds: [],
   });
   const [saving, setSaving]   = useState(false);
@@ -47,6 +50,7 @@ export default function CaLamViecPage() {
   function startNew() {
     setEditingId("new");
     setDraft({ id: "", ten: "", gioVao: "07:30", gioRa: "17:30", nghiTrua: 90, ghiChu: "",
+      gioVao2: null, gioRa2: null,
       apDung: "khong", boPhanList: [], nhanVienIds: [] });
   }
   function cancelEdit() { setEditingId(null); }
@@ -85,7 +89,7 @@ export default function CaLamViecPage() {
 
   // Card ở chế độ sửa
   function EditCard({ ca }: { ca?: Ca }) {
-    const soGio = soGioChuẩn(draft.gioVao, draft.gioRa, draft.nghiTrua);
+    const soGio = soGioChuẩn(draft.gioVao, draft.gioRa, draft.nghiTrua, draft.gioVao2, draft.gioRa2);
     return (
       <div className="bg-white border-2 border-rose-200 rounded-2xl px-5 py-4 shadow-sm">
         {/* Dòng 1: tên + giờ */}
@@ -128,6 +132,41 @@ export default function CaLamViecPage() {
             <span className="text-xs text-stone-400">p</span>
           </div>
           <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{soGio}h/ngày</span>
+        </div>
+
+        {/* Ca 2 (tuỳ chọn) */}
+        <div className="ml-14 mb-3">
+          <button
+            type="button"
+            onClick={() => setDraft(d => d.gioVao2 != null
+              ? { ...d, gioVao2: null, gioRa2: null }
+              : { ...d, gioVao2: "18:00", gioRa2: "22:30" }
+            )}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all font-medium
+              ${draft.gioVao2 != null ? "bg-indigo-50 text-indigo-600 border-indigo-200" : "bg-white text-stone-400 border-stone-200 hover:border-indigo-200 hover:text-indigo-500"}`}
+          >
+            <span>{draft.gioVao2 != null ? "✓" : "+"}</span>
+            Ca 2 (buổi tối)
+          </button>
+          {draft.gioVao2 != null && (
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-stone-400">Vào</span>
+                <input type="time" value={draft.gioVao2 || "18:00"}
+                  onChange={e => setDraft(d => ({ ...d, gioVao2: e.target.value }))}
+                  className="text-sm font-medium text-stone-700 border border-stone-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+              <span className="text-stone-300">→</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-stone-400">Ra</span>
+                <input type="time" value={draft.gioRa2 || "22:30"}
+                  onChange={e => setDraft(d => ({ ...d, gioRa2: e.target.value }))}
+                  className="text-sm font-medium text-stone-700 border border-stone-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Ghi chú */}
@@ -283,9 +322,13 @@ export default function CaLamViecPage() {
                     )}
                   </div>
                   <p className="text-sm text-stone-400 mt-0.5">
-                    {ca.gioVao} → {ca.gioRa} · nghỉ {ca.nghiTrua}p ·{" "}
+                    {ca.gioVao} → {ca.gioRa}
+                    {ca.gioVao2 && ca.gioRa2 && (
+                      <span className="text-indigo-400"> · {ca.gioVao2} → {ca.gioRa2}</span>
+                    )}
+                    {" "}· nghỉ {ca.nghiTrua}p ·{" "}
                     <span className="text-emerald-600 font-medium">
-                      {soGioChuẩn(ca.gioVao, ca.gioRa, ca.nghiTrua)}h/ngày
+                      {soGioChuẩn(ca.gioVao, ca.gioRa, ca.nghiTrua, ca.gioVao2, ca.gioRa2)}h/ngày
                     </span>
                   </p>
                   {ca.ghiChu && <p className="text-xs text-stone-300 mt-0.5">{ca.ghiChu}</p>}
