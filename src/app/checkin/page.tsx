@@ -241,6 +241,20 @@ export default function CheckInPage() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-6">
+          {/* Empty state */}
+          {filtered.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-4xl mb-3">{search ? "🔍" : "👥"}</p>
+              <p className="text-slate-300 font-semibold text-base mb-1">
+                {search ? `Không tìm thấy "${search}"` : "Chưa có nhân viên nào"}
+              </p>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {search
+                  ? "Thử tìm bằng tên đầy đủ hoặc mã nhân viên"
+                  : "Liên hệ admin để được thêm vào hệ thống"}
+              </p>
+            </div>
+          )}
           {/* Chưa chấm */}
           {chuaCham.length > 0 && (
             <div>
