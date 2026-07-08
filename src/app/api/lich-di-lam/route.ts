@@ -27,6 +27,10 @@ async function ensureTable() {
   await Promise.all([
     prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "ca" TEXT`).catch(() => {}),
     prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "loai" TEXT NOT NULL DEFAULT 'dang_ky'`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "ghiChu" TEXT`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`).catch(() => {}),
+    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "adminNote" TEXT`).catch(() => {}),
   ]);
 }
 
