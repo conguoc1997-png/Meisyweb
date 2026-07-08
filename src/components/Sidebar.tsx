@@ -157,7 +157,7 @@ const MODULES: NavModule[] = [
 ];
 
 // Các route không hiện sidebar (trang công khai, mobile-only)
-const NO_SIDEBAR_ROUTES = ["/checkin", "/login", "/lich-di-lam"];
+const NO_SIDEBAR_ROUTES = ["/checkin", "/login"];
 
 export default function Sidebar() {
   const pathname = usePathname();
