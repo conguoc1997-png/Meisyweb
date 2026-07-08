@@ -154,6 +154,7 @@ export default function ChamCongPage() {
   const [lichCount, setLichCount] = useState(0);
   const [adminNoteInput, setAdminNoteInput] = useState<Record<string, string>>({});
   const [selectedLichId, setSelectedLichId] = useState<string | null>(null);
+  const [selectedLichDate, setSelectedLichDate] = useState<string | null>(null);
 
   const fetchLich = async () => {
     setLichLoading(true);
@@ -1709,7 +1710,7 @@ export default function ChamCongPage() {
 
       {/* ═══ TAB ĐĂNG KÝ LỊCH ĐI LÀM ═══ */}
       {activeTab === "dang_ky" && (() => {
-        // Helper: label ca
+        const DOW = ["CN","T2","T3","T4","T5","T6","T7"];
         const caLabel = (r: LichRow) => {
           if (r.ca === "ca1") return "Ca 1";
           if (r.ca === "ca2") return "Ca 2";
@@ -1717,29 +1718,41 @@ export default function ChamCongPage() {
           if (r.gioVao && r.gioRa) return `${r.gioVao}–${r.gioRa}`;
           return "Khác";
         };
-        const DOW = ["CN","T2","T3","T4","T5","T6","T7"];
-        const ngayChip = (ngay: string) => {
-          const d = new Date(ngay + "T00:00:00");
-          return `${DOW[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`;
-        };
 
-        // Group by nhanVienId
-        const grouped = lichList.reduce<Record<string, { nv: LichRow["nhanVien"]; rows: LichRow[] }>>((acc, r) => {
-          if (!acc[r.nhanVienId]) acc[r.nhanVienId] = { nv: r.nhanVien, rows: [] };
-          acc[r.nhanVienId].rows.push(r);
+        // Build calendar days for current month
+        const [y, m] = thang.split("-").map(Number);
+        const firstDay = new Date(y, m - 1, 1).getDay(); // 0=CN
+        const daysInMonth = new Date(y, m, 0).getDate();
+        // Build grid cells: nulls for padding + day numbers
+        const cells: (number | null)[] = [
+          ...Array(firstDay).fill(null),
+          ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+        ];
+        // Pad to complete last row
+        while (cells.length % 7 !== 0) cells.push(null);
+
+        // Map: "YYYY-MM-DD" → LichRow[]
+        const byDate = lichList.reduce<Record<string, LichRow[]>>((acc, r) => {
+          (acc[r.ngay] = acc[r.ngay] || []).push(r);
           return acc;
         }, {});
-        const groups = Object.entries(grouped);
 
-        // "Duyệt tất cả" cho 1 nhân viên
-        const duyetTatCa = async (rows: LichRow[]) => {
-          const pending = rows.filter(r => r.trangThai === "cho_duyet");
-          for (const r of pending) await handleDuyetLich(r.id, "da_duyet");
+        const toDateStr = (day: number) =>
+          `${y}-${String(m).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        // Rows for selected date
+        const dateRows = selectedLichDate ? (byDate[selectedLichDate] ?? []) : [];
+        const pendingAll = lichList.filter(r => r.trangThai === "cho_duyet");
+
+        const duyetTatCa = async () => {
+          for (const r of pendingAll) await handleDuyetLich(r.id, "da_duyet");
         };
 
         return (
           <div className="space-y-4">
-            {/* Header + filter */}
+            {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-slate-800">📅 Đăng ký lịch đi làm</h2>
@@ -1749,17 +1762,20 @@ export default function ChamCongPage() {
                   {" "}→ Admin duyệt tại đây
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {(["", "cho_duyet", "da_duyet", "tu_choi"] as const).map(tt => (
-                  <button key={tt} onClick={() => { setLichTT(tt); setSelectedLichId(null); }}
+                  <button key={tt} onClick={() => { setLichTT(tt); setSelectedLichDate(null); }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition
-                      ${lichTT === tt
-                        ? "bg-violet-500 text-white border-violet-500"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}>
+                      ${lichTT === tt ? "bg-violet-500 text-white border-violet-500" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
                     {tt === "" ? "Tất cả" : tt === "cho_duyet" ? `Chờ duyệt${lichCount > 0 ? ` (${lichCount})` : ""}` : tt === "da_duyet" ? "Đã duyệt" : "Từ chối"}
                   </button>
                 ))}
+                {pendingAll.length > 0 && (
+                  <button onClick={duyetTatCa}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition flex items-center gap-1.5">
+                    ⚡ Duyệt tất cả ({pendingAll.length})
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1767,127 +1783,151 @@ export default function ChamCongPage() {
               <div className="flex justify-center py-12">
                 <span className="w-6 h-6 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : groups.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center text-slate-400">
-                <p className="text-2xl mb-2">📭</p>
-                <p className="text-sm">Không có đăng ký nào{lichTT === "cho_duyet" ? " đang chờ duyệt" : ""} tháng này</p>
-              </div>
             ) : (
-              <div className="space-y-3">
-                {groups.map(([nvId, { nv, rows }]) => {
-                  const pendingRows = rows.filter(r => r.trangThai === "cho_duyet");
-                  // Sort rows by date asc
-                  const sorted = [...rows].sort((a, b) => a.ngay.localeCompare(b.ngay));
-                  return (
-                    <div key={nvId} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                      {/* Employee header */}
-                      <div className="flex items-center justify-between px-4 py-3 bg-slate-50/70 border-b border-slate-100">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-bold text-violet-600">{nv.ten.split(" ").pop()?.charAt(0)}</span>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-800 text-sm">{nv.ten}</p>
-                            <p className="text-xs text-slate-400">{nv.maNV}{nv.phongBan ? ` · ${nv.phongBan}` : ""}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-400">{rows.length} ngày</span>
-                          {pendingRows.length > 0 && (
-                            <button
-                              onClick={() => duyetTatCa(pendingRows)}
-                              className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-                              ⚡ Duyệt tất cả ({pendingRows.length})
-                            </button>
-                          )}
-                        </div>
+              <div className="flex gap-4 items-start">
+                {/* ── Calendar grid ── */}
+                <div className="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-0">
+                  {/* Day-of-week header */}
+                  <div className="grid grid-cols-7 border-b border-slate-100">
+                    {DOW.map(d => (
+                      <div key={d} className={`py-2.5 text-center text-xs font-semibold
+                        ${d === "CN" ? "text-red-400" : "text-slate-400"}`}>
+                        {d}
                       </div>
+                    ))}
+                  </div>
+                  {/* Calendar cells */}
+                  <div className="grid grid-cols-7">
+                    {cells.map((day, idx) => {
+                      if (!day) return <div key={`pad-${idx}`} className="border-b border-r border-slate-50 min-h-[80px]" />;
+                      const dateStr = toDateStr(day);
+                      const rows = byDate[dateStr] ?? [];
+                      const isToday = dateStr === todayStr;
+                      const isSelected = selectedLichDate === dateStr;
+                      const hasPending = rows.some(r => r.trangThai === "cho_duyet");
+                      const dow = (firstDay + day - 1) % 7;
+                      const isSun = dow === 0;
 
-                      {/* Day chips */}
-                      <div className="px-4 py-3 flex flex-wrap gap-2">
-                        {sorted.map(r => {
-                          const isSelected = selectedLichId === r.id;
-                          const chipBg =
-                            r.trangThai === "da_duyet" ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
-                            r.trangThai === "tu_choi"  ? "bg-red-50 border-red-200 text-red-600" :
-                                                         "bg-amber-50 border-amber-300 text-amber-700";
-                          const dot =
-                            r.trangThai === "da_duyet" ? "bg-emerald-400" :
-                            r.trangThai === "tu_choi"  ? "bg-red-400" : "bg-amber-400";
-                          return (
-                            <button
-                              key={r.id}
-                              onClick={() => setSelectedLichId(isSelected ? null : r.id)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold
-                                transition-all duration-150 hover:shadow-sm
-                                ${chipBg}
-                                ${isSelected ? "ring-2 ring-violet-400 ring-offset-1 shadow-md" : ""}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
-                              <span>{ngayChip(r.ngay)}</span>
-                              <span className="opacity-70 font-normal">· {caLabel(r)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Detail panel khi click chip */}
-                      {sorted.filter(r => r.id === selectedLichId).map(r => (
-                        <div key={r.id} className="mx-4 mb-4 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-1.5 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-bold text-slate-700">{ngayChip(r.ngay)}</span>
-                                <span className="text-xs text-slate-500">·</span>
-                                <span className="text-sm font-semibold text-violet-600">{caLabel(r)}</span>
-                                {r.gioVao && r.gioRa && r.ca && (
-                                  <span className="text-xs text-slate-400">{r.gioVao}–{r.gioRa}</span>
-                                )}
+                      return (
+                        <div key={dateStr}
+                          onClick={() => rows.length > 0 && setSelectedLichDate(isSelected ? null : dateStr)}
+                          className={`border-b border-r border-slate-50 min-h-[80px] p-1.5 transition-all
+                            ${rows.length > 0 ? "cursor-pointer hover:bg-violet-50/40" : ""}
+                            ${isSelected ? "bg-violet-50 ring-2 ring-inset ring-violet-300" : ""}`}>
+                          {/* Day number */}
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full
+                              ${isToday ? "bg-violet-500 text-white" : isSun ? "text-red-400" : "text-slate-500"}`}>
+                              {day}
+                            </span>
+                            {hasPending && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                            )}
+                          </div>
+                          {/* Employee badges */}
+                          <div className="space-y-0.5">
+                            {rows.slice(0, 3).map(r => (
+                              <div key={r.id}
+                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded truncate leading-tight
+                                  ${r.trangThai === "da_duyet" ? "bg-emerald-100 text-emerald-700" :
+                                    r.trangThai === "tu_choi"  ? "bg-red-100 text-red-600" :
+                                                                  "bg-amber-100 text-amber-700"}`}>
+                                {r.nhanVien.ten.split(" ").pop()} · {caLabel(r)}
                               </div>
-                              {r.ghiChu && (
-                                <p className="text-xs text-slate-500 italic">"{r.ghiChu}"</p>
-                              )}
-                              {r.adminNote && (
-                                <p className="text-xs text-slate-400">Admin: {r.adminNote}</p>
-                              )}
-                            </div>
-                            {r.trangThai === "cho_duyet" ? (
-                              <div className="flex flex-col gap-2 min-w-[200px]">
-                                <input
-                                  placeholder="Ghi chú (tuỳ chọn)"
-                                  value={adminNoteInput[r.id] ?? ""}
-                                  onChange={e => setAdminNoteInput(p => ({ ...p, [r.id]: e.target.value }))}
-                                  className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-200 bg-white"
-                                />
-                                <div className="flex gap-2">
-                                  <button onClick={() => { handleDuyetLich(r.id, "da_duyet"); setSelectedLichId(null); }}
-                                    className="flex-1 text-xs bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 rounded-xl transition">
-                                    ✓ Duyệt
-                                  </button>
-                                  <button onClick={() => { handleDuyetLich(r.id, "tu_choi"); setSelectedLichId(null); }}
-                                    className="flex-1 text-xs bg-red-100 hover:bg-red-200 text-red-600 font-semibold py-2 rounded-xl transition">
-                                    ✗ Từ chối
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                                  r.trangThai === "da_duyet" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"
-                                }`}>
-                                  {r.trangThai === "da_duyet" ? "✓ Đã duyệt" : "✗ Từ chối"}
-                                </span>
-                                <button onClick={() => { handleXoaLich(r.id); setSelectedLichId(null); }}
-                                  className="text-xs text-slate-400 hover:text-red-500 transition px-2 py-1 rounded-lg hover:bg-red-50">
-                                  Xóa
-                                </button>
-                              </div>
+                            ))}
+                            {rows.length > 3 && (
+                              <div className="text-[10px] text-slate-400 pl-1">+{rows.length - 3} khác</div>
                             )}
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── Detail panel ── */}
+                {selectedLichDate ? (
+                  <div className="w-72 flex-shrink-0 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60">
+                      <div>
+                        {(() => {
+                          const d = new Date(selectedLichDate + "T00:00:00");
+                          return (
+                            <>
+                              <p className="text-sm font-bold text-slate-800">
+                                {DOW[d.getDay()]} {d.getDate()}/{d.getMonth()+1}/{d.getFullYear()}
+                              </p>
+                              <p className="text-xs text-slate-400">{dateRows.length} đăng ký</p>
+                            </>
+                          );
+                        })()}
+                      </div>
+                      <button onClick={() => setSelectedLichDate(null)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 transition text-lg leading-none">
+                        ×
+                      </button>
+                    </div>
+                    <div className="divide-y divide-slate-50 max-h-[520px] overflow-y-auto">
+                      {dateRows.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-8">Không có đăng ký</p>
+                      ) : dateRows.map(r => (
+                        <div key={r.id} className="px-4 py-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-violet-600">{r.nhanVien.ten.split(" ").pop()?.charAt(0)}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-slate-800 truncate">{r.nhanVien.ten}</p>
+                              <p className="text-[10px] text-slate-400">{r.nhanVien.maNV}{r.nhanVien.phongBan ? ` · ${r.nhanVien.phongBan}` : ""}</p>
+                            </div>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0
+                              ${r.trangThai === "da_duyet" ? "bg-emerald-100 text-emerald-700" :
+                                r.trangThai === "tu_choi"  ? "bg-red-100 text-red-600" :
+                                                              "bg-amber-100 text-amber-700"}`}>
+                              {r.trangThai === "da_duyet" ? "✓ Duyệt" : r.trangThai === "tu_choi" ? "✗ Từ chối" : "Chờ"}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 font-medium pl-9">{caLabel(r)}</div>
+                          {r.ghiChu && <p className="text-[10px] text-slate-400 italic pl-9">"{r.ghiChu}"</p>}
+                          {r.adminNote && <p className="text-[10px] text-slate-400 pl-9">Admin: {r.adminNote}</p>}
+                          {r.trangThai === "cho_duyet" && (
+                            <div className="pl-9 space-y-1.5">
+                              <input
+                                placeholder="Ghi chú (tuỳ chọn)"
+                                value={adminNoteInput[r.id] ?? ""}
+                                onChange={e => setAdminNoteInput(p => ({ ...p, [r.id]: e.target.value }))}
+                                className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                              />
+                              <div className="flex gap-1.5">
+                                <button onClick={() => handleDuyetLich(r.id, "da_duyet")}
+                                  className="flex-1 text-xs bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-1.5 rounded-lg transition">
+                                  ✓ Duyệt
+                                </button>
+                                <button onClick={() => handleDuyetLich(r.id, "tu_choi")}
+                                  className="flex-1 text-xs bg-red-100 hover:bg-red-200 text-red-600 font-semibold py-1.5 rounded-lg transition">
+                                  ✗ Từ chối
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {r.trangThai !== "cho_duyet" && (
+                            <div className="pl-9">
+                              <button onClick={() => handleXoaLich(r.id)}
+                                className="text-[10px] text-slate-400 hover:text-red-500 transition">
+                                Xóa
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
-                  );
-                })}
+                  </div>
+                ) : (
+                  <div className="w-64 flex-shrink-0 bg-white/60 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center py-12 text-center">
+                    <p className="text-3xl mb-2">👆</p>
+                    <p className="text-xs text-slate-400">Click vào ngày có<br/>đăng ký để xem chi tiết</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
