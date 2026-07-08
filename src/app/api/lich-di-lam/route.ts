@@ -31,6 +31,8 @@ async function ensureTable() {
     prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`).catch(() => {}),
     prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`).catch(() => {}),
     prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "adminNote" TEXT`).catch(() => {}),
+    // Đảm bảo updatedAt có DEFAULT (bảng cũ có thể thiếu)
+    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP`).catch(() => {}),
   ]);
 }
 
@@ -123,8 +125,8 @@ export async function POST(req: NextRequest) {
     if (loaiValue === "thay_doi") {
       const id = cuid();
       await prisma.$executeRawUnsafe(
-        `INSERT INTO "LichDiLam" (id,"nhanVienId","ngay","gioVao","gioRa","ghiChu","trangThai","ca","loai")
-         VALUES ($1,$2,$3::date,$4,$5,$6,'cho_duyet',$7,'thay_doi')`,
+        `INSERT INTO "LichDiLam" (id,"nhanVienId","ngay","gioVao","gioRa","ghiChu","trangThai","ca","loai","updatedAt")
+         VALUES ($1,$2,$3::date,$4,$5,$6,'cho_duyet',$7,'thay_doi',NOW())`,
         id, nhanVienId, ngay, gioVao || null, gioRa || null, ghiChu || null, ca || null
       );
       return NextResponse.json({ ok: true, id }, { status: 201 });
@@ -144,17 +146,17 @@ export async function POST(req: NextRequest) {
       }
       // Cập nhật lại nếu chưa được duyệt
       await prisma.$executeRawUnsafe(
-        `UPDATE "LichDiLam" SET "gioVao"=$3,"gioRa"=$4,"ghiChu"=$5,"trangThai"='cho_duyet',"adminNote"=NULL,"updatedAt"=NOW()
-         WHERE id=$6`,
-        nhanVienId, ngay, gioVao || null, gioRa || null, ghiChu || null, existing[0].id
+        `UPDATE "LichDiLam" SET "gioVao"=$2,"gioRa"=$3,"ghiChu"=$4,"trangThai"='cho_duyet',"adminNote"=NULL,"updatedAt"=NOW()
+         WHERE id=$1`,
+        existing[0].id, gioVao || null, gioRa || null, ghiChu || null
       );
       return NextResponse.json({ ok: true, id: existing[0].id, updated: true });
     }
 
     const id = cuid();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "LichDiLam" (id,"nhanVienId","ngay","gioVao","gioRa","ghiChu","trangThai","ca","loai")
-       VALUES ($1,$2,$3::date,$4,$5,$6,'cho_duyet',$7,'dang_ky')`,
+      `INSERT INTO "LichDiLam" (id,"nhanVienId","ngay","gioVao","gioRa","ghiChu","trangThai","ca","loai","updatedAt")
+       VALUES ($1,$2,$3::date,$4,$5,$6,'cho_duyet',$7,'dang_ky',NOW())`,
       id, nhanVienId, ngay, gioVao || null, gioRa || null, ghiChu || null, ca || null
     );
     return NextResponse.json({ ok: true, id }, { status: 201 });
