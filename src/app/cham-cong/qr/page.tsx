@@ -5,7 +5,7 @@ import { Printer, MapPin } from "lucide-react";
 
 export default function QRPage() {
   const [size, setSize] = useState(256);
-  const [checkinUrl, setCheckinUrl] = useState("https://meisyweb.vercel.app/checkin");
+  const [checkinUrl, setCheckinUrl] = useState("");
 
   // Lấy URL động theo domain thực tế
   useEffect(() => {
