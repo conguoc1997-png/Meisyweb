@@ -536,6 +536,8 @@ export default function ChamCongPage() {
     ten: string; ngay: string; trangThai: string;
     gioVao?: string | null; gioRa?: string | null; tongGio?: number | null; ghiChu?: string | null;
   } | null>(null);
+  const [winW, setWinW] = useState(1200);
+  useEffect(() => { setWinW(window.innerWidth); }, []);
 
   // Popover ghi chú ô chấm công
   const [notePopover, setNotePopover] = useState<{
@@ -2503,7 +2505,7 @@ export default function ChamCongPage() {
         <div
           className="pointer-events-none fixed z-[9998] bg-slate-800 text-white rounded-xl shadow-2xl px-3.5 py-2.5 text-xs min-w-[160px] max-w-[240px] border border-slate-600"
           style={{
-            left: Math.min(hoverCard.x, window.innerWidth - 250),
+            left: Math.min(hoverCard.x, winW - 250),
             top: hoverCard.y - 8,
             transform: "translate(-50%, -100%)",
           }}
