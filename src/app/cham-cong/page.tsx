@@ -361,8 +361,8 @@ export default function ChamCongPage() {
   const [nghiViecModal, setNghiViecModal] = useState<{ nv: NhanVien; date: string } | null>(null);
   const [nvError, setNvError] = useState("");
 
-  // Phụ cấp theo tháng: { [nvId]: { phuCapCC, phuCapAn, phuCapDB } }
-  type PhuCapMap = Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }>;
+  // Phụ cấp theo tháng: { [nvId]: { phuCapCC, phuCapAn, phuCapDB, heSoTC? } }
+  type PhuCapMap = Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC?: number | null }>;
   const [phuCapMap, setPhuCapMap] = useState<PhuCapMap>({});
 
   const fetchPhuCap = useCallback(async () => {
@@ -1430,7 +1430,7 @@ export default function ChamCongPage() {
                     const totalCoBanTC = isMayGroup(phongBan)
                       ? nvList.filter(n => n.loaiLuong !== "khoan").reduce((s, n) => {
                           const gioCoBan = getHoursNV(n.id);
-                          return s + gioCoBan * (n.heSoTC ?? 1.5);
+                          return s + gioCoBan * (phuCapMap[n.id]?.heSoTC ?? n.heSoTC ?? 1.5);
                         }, 0)
                       : 0;
 
@@ -1549,7 +1549,7 @@ export default function ChamCongPage() {
                   const congVang   = summary["vang"]      ?? 0;
                   const congTinhLuong = congCoMat + congMuon + congNuaNgay + congPhep + congLe;
 
-                  const heSoTC        = nv.heSoTC ?? 1.5;
+                  const heSoTC        = phuCapMap[nv.id]?.heSoTC ?? nv.heSoTC ?? 1.5;
                   // Phụ cấp theo tháng (ưu tiên) → fallback về NV default
                   const pcThang       = phuCapMap[nv.id];
                   const phuCapCC      = pcThang?.phuCapCC   ?? 0;
@@ -1631,21 +1631,24 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-center text-amber-600">{congMuon || ""}</td>
                       <td className="px-3 py-2 text-center text-cyan-600">{congNuaNgay || ""}</td>
                       <td className="px-3 py-2 text-center text-orange-600 font-semibold">{tongTC > 0 ? tongTC : ""}</td>
-                      {/* Hệ số TC — inline edit */}
+                      {/* Hệ số TC — inline edit (per-month) */}
                       <td className="px-2 py-1.5 text-center">
                         <input
-                          type="number" step="0.1" min="1" max="5"
+                          type="number" step="1000" min="0"
+                          key={`${nv.id}-${thang}-${heSoTC}`}
                           defaultValue={heSoTC}
                           onBlur={async e => {
-                            const val = parseFloat(e.target.value) || 1.5;
-                            await fetch(`/api/cham-cong/nhan-vien/${nv.id}`, {
-                              method: "PATCH", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ heSoTC: val }),
+                            const val = parseFloat(e.target.value) || 0;
+                            const cur = phuCapMap[nv.id] ?? { phuCapCC: 0, phuCapAn: 0, phuCapDB: 0 };
+                            const updated = { ...cur, heSoTC: val };
+                            setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
+                            await fetch("/api/cham-cong/phu-cap", {
+                              method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
                             });
-                            fetchNV();
                           }}
                           onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                          className="w-14 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="w-20 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </td>
                       <td className="px-3 py-2 text-right text-slate-700">
@@ -1655,7 +1658,7 @@ export default function ChamCongPage() {
                             : <span className="text-slate-300 text-xs">—</span>)
                           : isCoBanMay
                             ? (gioNV > 0
-                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(nv.heSoTC ?? 1.5)}₫/h</span></span>
+                              ? <span className="text-blue-600 font-semibold">{fmt(Math.round(luongCoBanMay))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(gioNV)}h × {fmt(heSoTC)}₫/h</span></span>
                               : <span className="text-slate-300 text-xs">—</span>)
                             : isThoiVu
                               ? <span className="text-teal-600 font-semibold">{fmt(Math.round(luongThoiVu))}₫<br/><span className="text-[10px] font-normal text-slate-400">{fmt(tongTC)}h × {fmt(heSoTC)}₫/h</span></span>

@@ -24,6 +24,10 @@ async function autoMigrate() {
       )
     `);
   } catch { /* table already exists */ }
+  // Thêm cột heSoTC nếu chưa có
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "PhuCapThang" ADD COLUMN IF NOT EXISTS "heSoTC" DOUBLE PRECISION`);
+  } catch { /* ignore */ }
   migrated = true;
 }
 
@@ -35,9 +39,11 @@ export async function GET(req: NextRequest) {
   if (!thang) return NextResponse.json({});
 
   try {
-    const rows = await prisma.phuCapThang.findMany({ where: { thang } });
-    const map: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }> = {};
-    rows.forEach(r => { map[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB }; });
+    const rows = await prisma.$queryRawUnsafe<Array<{nhanVienId:string;phuCapCC:number;phuCapAn:number;phuCapDB:number;heSoTC:number|null}>>(
+      `SELECT "nhanVienId","phuCapCC","phuCapAn","phuCapDB","heSoTC" FROM "PhuCapThang" WHERE "thang"=$1`, thang
+    );
+    const map: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }> = {};
+    rows.forEach(r => { map[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB, heSoTC: r.heSoTC }; });
     return NextResponse.json(map);
   } catch {
     return NextResponse.json({});
@@ -48,26 +54,21 @@ export async function GET(req: NextRequest) {
 // Body: { nhanVienId, thang, phuCapCC, phuCapAn, phuCapDB }
 export async function POST(req: NextRequest) {
   await autoMigrate();
-  const { nhanVienId, thang, phuCapCC, phuCapAn, phuCapDB } = await req.json();
+  const { nhanVienId, thang, phuCapCC, phuCapAn, phuCapDB, heSoTC } = await req.json();
   if (!nhanVienId || !thang) return NextResponse.json({ error: "Thiếu nhanVienId hoặc thang" }, { status: 400 });
 
   try {
-    const record = await prisma.phuCapThang.upsert({
-      where: { nhanVienId_thang: { nhanVienId, thang } },
-      update: {
-        phuCapCC: Number(phuCapCC) || 0,
-        phuCapAn: Number(phuCapAn) || 0,
-        phuCapDB: Number(phuCapDB) || 0,
-      },
-      create: {
-        id: `${nhanVienId}_${thang}`,
-        nhanVienId, thang,
-        phuCapCC: Number(phuCapCC) || 0,
-        phuCapAn: Number(phuCapAn) || 0,
-        phuCapDB: Number(phuCapDB) || 0,
-      },
-    });
-    return NextResponse.json(record);
+    // Dùng raw SQL để tránh Prisma client chưa có cột heSoTC
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "PhuCapThang" ("id","nhanVienId","thang","phuCapCC","phuCapAn","phuCapDB","heSoTC","createdAt","updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())
+       ON CONFLICT ("nhanVienId","thang") DO UPDATE SET
+         "phuCapCC"=$4, "phuCapAn"=$5, "phuCapDB"=$6, "heSoTC"=$7, "updatedAt"=NOW()`,
+      `${nhanVienId}_${thang}`, nhanVienId, thang,
+      Number(phuCapCC) || 0, Number(phuCapAn) || 0, Number(phuCapDB) || 0,
+      heSoTC !== undefined && heSoTC !== null ? Number(heSoTC) : null
+    );
+    return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi" }, { status: 500 });
   }
