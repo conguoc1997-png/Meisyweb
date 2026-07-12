@@ -26,6 +26,7 @@ import {
   CalendarDays,
   Menu,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUser } from "@/lib/user-context";
@@ -118,9 +119,13 @@ const MODULES: NavModule[] = [
   },
   {
     key: "calendar", moduleKey: "calendar",
-    label: "Lịch Công Ty", icon: CalendarDays,
+    label: "Lịch & Công việc", icon: CalendarDays,
     bg: "bg-rose-50", text: "text-rose-400",
-    href: "/calendar",
+    children: [
+      { href: "/calendar",     label: "Lịch Công Ty",  icon: CalendarDays,  moduleKey: "calendar" },
+      { href: "/giao-viec",    label: "Giao việc",      icon: ClipboardList, moduleKey: "calendar" },
+      { href: "/viec-cua-toi", label: "Việc của tôi",  icon: CheckCircle2,  moduleKey: "calendar" },
+    ],
   },
   {
     key: "cham-cong", moduleKey: "cham-cong",

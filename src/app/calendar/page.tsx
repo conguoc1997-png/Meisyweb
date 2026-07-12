@@ -198,6 +198,7 @@ export default function CalendarPage() {
   const [lichList,    setLichList]    = useState<LichRow[]>([]);
   const [ccList,      setCcList]      = useState<ChamCongRow[]>([]);
   const [events,      setEvents]      = useState<CalEvent[]>([]);
+  const [workTasks,   setWorkTasks]   = useState<{ id:string; title:string; deadline:string; color:string; trangThai:string; assignments:{ten:string;trangThai:string}[] }[]>([]);
   const [loading,     setLoading]     = useState(false);
   const [filterPB,    setFilterPB]    = useState("");
 
@@ -225,16 +226,18 @@ export default function CalendarPage() {
     const thang = monthStr(year, month);
     const bust  = `&_t=${Date.now()}`;
     try {
-      const [lich, cc, ev, pending] = await Promise.all([
+      const [lich, cc, ev, pending, wt] = await Promise.all([
         fetch(`/api/lich-di-lam?thang=${thang}&trangThai=da_duyet${bust}`).then(r=>r.json()).catch(()=>[]),
         fetch(`/api/cham-cong?thang=${thang}${bust}`).then(r=>r.json()).catch(()=>({ chamCongs:[] })),
         fetch(`/api/calendar?thang=${thang}${bust}`).then(r=>r.json()).catch(()=>[]),
         fetch(`/api/lich-di-lam?thang=${thang}&trangThai=cho_duyet${bust}`).then(r=>r.json()).catch(()=>[]),
+        fetch(`/api/giao-viec?_t=${Date.now()}`).then(r=>r.json()).catch(()=>[]),
       ]);
       setLichList(Array.isArray(lich) ? lich : []);
       setCcList(Array.isArray(cc) ? cc : (cc?.chamCongs ?? []));
       setEvents(Array.isArray(ev) ? ev : []);
       setPendingLich(Array.isArray(pending) ? pending : []);
+      setWorkTasks(Array.isArray(wt) ? wt.filter((t: { deadline: string | null }) => t.deadline) : []);
     } finally {
       setLoading(false);
     }
@@ -293,6 +296,17 @@ export default function CalendarPage() {
     });
     return m;
   }, [events]);
+
+  const workTasksByDate = useMemo(() => {
+    const m = new Map<string, typeof workTasks>();
+    workTasks.forEach(t => {
+      if (!t.deadline) return;
+      const d = t.deadline.slice(0, 10);
+      if (!m.has(d)) m.set(d, []);
+      m.get(d)!.push(t);
+    });
+    return m;
+  }, [workTasks]);
 
   // ── Navigation ───────────────────────────────────────────────────
   const prevMonth = () => { if (month===1){setYear(y=>y-1);setMonth(12);}else setMonth(m=>m-1); };
@@ -504,6 +518,7 @@ export default function CalendarPage() {
                 const nvIds = [...new Set([...ccDay.map(c=>c.nhanVienId),...lichDay.map(l=>l.nhanVienId)])];
                 const diLamCount  = ccDay.filter(c => c.trangThai==="di_lam"||c.trangThai==="di_muon").length;
                 const dangKyCount = lichDay.filter(l => !ccDay.find(c => c.nhanVienId===l.nhanVienId)).length;
+                const wtDay = workTasksByDate.get(dateStr) ?? [];
 
                 return (
                   <div key={i}
@@ -530,9 +545,9 @@ export default function CalendarPage() {
                       </button>
                     </div>
 
-                    {/* Events */}
+                    {/* Events + Work tasks */}
                     <div className="px-1 space-y-0.5 pb-1">
-                      {evDay.slice(0, 3).map(ev => (
+                      {evDay.slice(0, 2).map(ev => (
                         <button key={ev.id}
                           onClick={e => { e.stopPropagation(); setTaskModal({ date: ev.date, event: ev }); }}
                           className="w-full text-left flex items-center gap-1 px-1.5 py-[3px] rounded text-[11px] font-medium text-white truncate hover:opacity-90 transition"
@@ -543,11 +558,23 @@ export default function CalendarPage() {
                           <span className="truncate">{ev.title}</span>
                         </button>
                       ))}
-                      {evDay.length > 3 && (
+                      {/* Work task deadlines */}
+                      {wtDay.slice(0, 2).map(wt => {
+                        const doneAll = wt.assignments.length > 0 && wt.assignments.every(a => a.trangThai === "hoan_thanh");
+                        return (
+                          <div key={wt.id}
+                            className="w-full flex items-center gap-1 px-1.5 py-[3px] rounded text-[11px] font-medium truncate"
+                            style={{ background: wt.color + "22", color: wt.color, border: `1px solid ${wt.color}44` }}>
+                            <span className="flex-shrink-0">{doneAll ? "✓" : "📋"}</span>
+                            <span className="truncate">{wt.title}</span>
+                          </div>
+                        );
+                      })}
+                      {(evDay.length + wtDay.length) > 4 && (
                         <button
                           onClick={e => { e.stopPropagation(); setSelected(dateStr); }}
                           className="w-full text-left px-1.5 py-[2px] text-[10px] text-gray-500 hover:bg-gray-100 rounded">
-                          +{evDay.length - 3} sự kiện
+                          +{evDay.length + wtDay.length - 4} thêm
                         </button>
                       )}
                     </div>
@@ -682,6 +709,34 @@ export default function CalendarPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto">
+
+                {/* Work task deadlines on selected day */}
+                {selected && (workTasksByDate.get(selected) ?? []).length > 0 && (
+                  <div className="px-3 pt-3">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-2">📋 Deadline hôm nay</p>
+                    {(workTasksByDate.get(selected) ?? []).map(wt => {
+                      const done  = wt.assignments.filter(a => a.trangThai === "hoan_thanh").length;
+                      const total = wt.assignments.length;
+                      const pct   = total > 0 ? Math.round(done/total*100) : 0;
+                      return (
+                        <div key={wt.id} className="flex items-start gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 mb-1">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" style={{ background: wt.color }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{wt.title}</p>
+                            {total > 0 && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: wt.color }} />
+                                </div>
+                                <span className="text-[10px] text-gray-400">{done}/{total}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Events */}
                 {selectedEvts.length > 0 && (
