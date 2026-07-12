@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   ChevronLeft, ChevronRight, Bell, X, Plus, Trash2,
   CalendarDays, CheckCircle2, Clock, Users, Check, XCircle,
-  Pencil,
+  Pencil, MoreHorizontal,
 } from "lucide-react";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -25,19 +25,26 @@ type CalEvent = {
 
 // ── Constants ───────────────────────────────────────────────────────
 const DOW = ["T2","T3","T4","T5","T6","T7","CN"];
+const DOW_FULL = ["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","Chủ nhật"];
 
 const COLORS = [
-  "#ef4444","#f97316","#eab308","#22c55e",
-  "#06b6d4","#6366f1","#ec4899","#8b5cf6",
+  { hex: "#4285f4", name: "Xanh dương" },
+  { hex: "#0f9d58", name: "Xanh lá" },
+  { hex: "#db4437", name: "Đỏ" },
+  { hex: "#f4b400", name: "Vàng" },
+  { hex: "#ab47bc", name: "Tím" },
+  { hex: "#00acc1", name: "Xanh ngọc" },
+  { hex: "#ff7043", name: "Cam" },
+  { hex: "#795548", name: "Nâu" },
 ];
 
-const CC_STATUS: Record<string, { label: string; dot: string; pill: string }> = {
-  di_lam:     { label: "Đi làm",     dot: "bg-emerald-400", pill: "bg-emerald-100 text-emerald-700" },
-  di_muon:    { label: "Đi muộn",    dot: "bg-amber-400",   pill: "bg-amber-100 text-amber-700" },
-  nghi_phep:  { label: "Nghỉ phép",  dot: "bg-blue-400",    pill: "bg-blue-100 text-blue-700" },
-  nghi_benh:  { label: "Nghỉ bệnh",  dot: "bg-purple-400",  pill: "bg-purple-100 text-purple-700" },
-  vang_mat:   { label: "Vắng mặt",   dot: "bg-red-400",     pill: "bg-red-100 text-red-600" },
-  da_dang_ky: { label: "Đã đăng ký", dot: "bg-violet-400",  pill: "bg-violet-100 text-violet-700" },
+const CC_STATUS: Record<string, { label: string; color: string }> = {
+  di_lam:     { label: "Đi làm",     color: "#0f9d58" },
+  di_muon:    { label: "Đi muộn",    color: "#f4b400" },
+  nghi_phep:  { label: "Nghỉ phép",  color: "#4285f4" },
+  nghi_benh:  { label: "Nghỉ bệnh",  color: "#ab47bc" },
+  vang_mat:   { label: "Vắng mặt",   color: "#db4437" },
+  da_dang_ky: { label: "Đã đăng ký", color: "#9e9e9e" },
 };
 
 const CA_LABEL: Record<string, string> = {
@@ -45,22 +52,13 @@ const CA_LABEL: Record<string, string> = {
 };
 
 const DEPT_COLOR: Record<string, string> = {
-  Livestream: "bg-pink-400", CSKH: "bg-sky-400",
-  Kho: "bg-amber-400", May: "bg-teal-400",
+  Livestream: "#ec407a", CSKH: "#29b6f6",
+  Kho: "#ffa726", May: "#26a69a",
 };
-function deptDot(pb: string | null) {
-  if (!pb) return "bg-stone-300";
+function deptColor(pb: string | null) {
+  if (!pb) return "#bdbdbd";
   for (const [k, v] of Object.entries(DEPT_COLOR)) if (pb.includes(k)) return v;
-  return "bg-stone-300";
-}
-function deptBg(pb: string | null) {
-  const map: Record<string,string> = {
-    Livestream:"bg-pink-100 text-pink-700", CSKH:"bg-sky-100 text-sky-700",
-    Kho:"bg-amber-100 text-amber-700", May:"bg-teal-100 text-teal-700",
-  };
-  if (!pb) return "bg-stone-100 text-stone-500";
-  for (const [k,v] of Object.entries(map)) if (pb.includes(k)) return v;
-  return "bg-stone-100 text-stone-500";
+  return "#9e9e9e";
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -70,12 +68,15 @@ function toYMD(d: Date) {
 function monthStr(y: number, m: number) {
   return `${y}-${String(m).padStart(2,"0")}`;
 }
-function fmtDate(s: string) {
+function fmtDateFull(s: string) {
   const d = new Date(s + "T00:00:00");
-  return `${["CN","T2","T3","T4","T5","T6","T7"][d.getDay()]}, ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  const dows = ["CN","T2","T3","T4","T5","T6","T7"];
+  return `${dows[d.getDay()]}, ${d.getDate()} tháng ${d.getMonth()+1}, ${d.getFullYear()}`;
 }
+let _tmpId = 0;
+function tmpId() { return `tmp_${++_tmpId}`; }
 
-// ── Create/Edit Task Modal ───────────────────────────────────────────
+// ── Task Modal ───────────────────────────────────────────────────────
 function TaskModal({
   date, event, onSave, onDelete, onClose,
 }: {
@@ -85,15 +86,15 @@ function TaskModal({
   onDelete?: () => Promise<void>;
   onClose: () => void;
 }) {
-  const [title,   setTitle]   = useState(event?.title ?? "");
-  const [start,   setStart]   = useState(event?.startTime ?? "");
-  const [end,     setEnd]     = useState(event?.endTime ?? "");
-  const [desc,    setDesc]    = useState(event?.description ?? "");
-  const [color,   setColor]   = useState(event?.color ?? "#6366f1");
-  const [saving,  setSaving]  = useState(false);
+  const [title,  setTitle]  = useState(event?.title ?? "");
+  const [start,  setStart]  = useState(event?.startTime ?? "");
+  const [end,    setEnd]    = useState(event?.endTime ?? "");
+  const [desc,   setDesc]   = useState(event?.description ?? "");
+  const [color,  setColor]  = useState(event?.color ?? "#4285f4");
+  const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { titleRef.current?.focus(); }, []);
+  useEffect(() => { setTimeout(() => titleRef.current?.focus(), 50); }, []);
 
   async function submit() {
     if (!title.trim()) return;
@@ -104,19 +105,18 @@ function TaskModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Color stripe */}
-        <div className="h-2" style={{ background: color }} />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/40" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Top color bar */}
+        <div className="h-1.5 rounded-t-2xl" style={{ background: color }} />
 
-        <div className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-stone-800">{event ? "Sửa sự kiện" : "Tạo sự kiện mới"}</h3>
-            <button onClick={onClose} className="text-stone-300 hover:text-stone-500"><X size={18} /></button>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-500">{fmtDateFull(date)}</span>
+            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition">
+              <X size={15} />
+            </button>
           </div>
-
-          {/* Date */}
-          <p className="text-xs text-stone-400 mb-3">{fmtDate(date)}</p>
 
           {/* Title */}
           <input
@@ -124,60 +124,62 @@ function TaskModal({
             value={title}
             onChange={e => setTitle(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") submit(); }}
-            placeholder="Tên sự kiện / công việc..."
-            className="w-full border-b-2 border-stone-200 focus:border-indigo-400 px-0 py-2 text-stone-800 font-medium outline-none text-[15px] mb-4 transition"
+            placeholder="Thêm tiêu đề..."
+            className="w-full border-b-2 border-gray-200 focus:border-blue-500 px-0 py-2 text-gray-800 font-medium outline-none text-[17px] mb-5 transition"
           />
 
           {/* Time */}
-          <div className="flex gap-3 mb-4">
-            <div className="flex-1">
-              <label className="text-xs text-stone-400 mb-1 block">Bắt đầu</label>
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={16} className="text-gray-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 flex-1">
               <input type="time" value={start} onChange={e => setStart(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-stone-400 mb-1 block">Kết thúc</label>
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+              <span className="text-gray-400 text-sm">–</span>
               <input type="time" value={end} onChange={e => setEnd(e.target.value)}
-                className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200" />
             </div>
           </div>
 
           {/* Description */}
-          <textarea
-            value={desc}
-            onChange={e => setDesc(e.target.value)}
-            placeholder="Mô tả (không bắt buộc)..."
-            rows={2}
-            className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm text-stone-600 resize-none outline-none focus:ring-2 focus:ring-indigo-200 mb-4"
-          />
+          <div className="flex gap-2 mb-5">
+            <div className="w-4 flex-shrink-0" />
+            <textarea
+              value={desc}
+              onChange={e => setDesc(e.target.value)}
+              placeholder="Thêm mô tả..."
+              rows={2}
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 resize-none outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
 
           {/* Color picker */}
-          <div className="flex items-center gap-2 mb-5">
-            <span className="text-xs text-stone-400">Màu:</span>
+          <div className="flex items-center gap-2 mb-6 pl-5">
             {COLORS.map(c => (
-              <button key={c} onClick={() => setColor(c)}
-                className={`w-6 h-6 rounded-full transition-all ${color === c ? "ring-2 ring-offset-1 ring-stone-400 scale-110" : ""}`}
-                style={{ background: c }} />
+              <button key={c.hex} onClick={() => setColor(c.hex)} title={c.name}
+                className="w-6 h-6 rounded-full transition-all flex items-center justify-center"
+                style={{ background: c.hex }}>
+                {color === c.hex && <Check size={12} className="text-white" strokeWidth={3} />}
+              </button>
             ))}
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 border-t border-gray-100 pt-4">
             {onDelete && (
               <button onClick={async () => { await onDelete(); onClose(); }}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-red-400 hover:bg-red-50 rounded-xl transition">
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:bg-red-50 rounded-lg transition">
                 <Trash2 size={14} /> Xóa
               </button>
             )}
             <div className="flex-1" />
             <button onClick={onClose}
-              className="px-4 py-2 text-sm text-stone-500 hover:bg-stone-50 rounded-xl transition">
+              className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition font-medium">
               Hủy
             </button>
             <button onClick={submit} disabled={!title.trim() || saving}
-              className="px-5 py-2 text-sm font-semibold text-white rounded-xl transition disabled:opacity-40"
+              className="px-5 py-2 text-sm font-semibold text-white rounded-lg transition disabled:opacity-40 shadow-sm"
               style={{ background: color }}>
-              {saving ? "Đang lưu..." : event ? "Lưu" : "Tạo"}
+              {saving ? "Đang lưu..." : event ? "Lưu thay đổi" : "Lưu"}
             </button>
           </div>
         </div>
@@ -192,35 +194,33 @@ export default function CalendarPage() {
   const [year,  setYear]  = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth()+1);
 
-  const [nvList,     setNvList]     = useState<NhanVien[]>([]);
-  const [lichList,   setLichList]   = useState<LichRow[]>([]);
-  const [ccList,     setCcList]     = useState<ChamCongRow[]>([]);
-  const [events,     setEvents]     = useState<CalEvent[]>([]);
-  const [loading,    setLoading]    = useState(false);
+  const [nvList,      setNvList]      = useState<NhanVien[]>([]);
+  const [lichList,    setLichList]    = useState<LichRow[]>([]);
+  const [ccList,      setCcList]      = useState<ChamCongRow[]>([]);
+  const [events,      setEvents]      = useState<CalEvent[]>([]);
+  const [loading,     setLoading]     = useState(false);
+  const [filterPB,    setFilterPB]    = useState("");
 
-  // Notifications (lịch chờ duyệt)
-  const [showNotif,  setShowNotif]  = useState(false);
+  // Notifications
+  const [showNotif,   setShowNotif]   = useState(false);
   const [pendingLich, setPendingLich] = useState<LichRow[]>([]);
-  const [notifNote,  setNotifNote]  = useState<Record<string, string>>({});
-  const [duyeting,   setDuyeting]   = useState<string | null>(null);
+  const [notifNote,   setNotifNote]   = useState<Record<string, string>>({});
+  const [duyeting,    setDuyeting]    = useState<string | null>(null);
 
   // Calendar state
-  const [selected,   setSelected]   = useState<string | null>(toYMD(today));
-  const [filterPB,   setFilterPB]   = useState("");
-
-  // Task modal
-  const [taskModal,  setTaskModal]  = useState<{ date: string; event?: CalEvent } | null>(null);
+  const [selected,    setSelected]    = useState<string | null>(toYMD(today));
+  const [taskModal,   setTaskModal]   = useState<{ date: string; event?: CalEvent } | null>(null);
 
   const todayStr = toYMD(today);
 
-  // ── Fetch all NV (once) ──────────────────────────────────────────
+  // ── Fetch NV ────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/cham-cong/nhan-vien")
       .then(r => r.json()).then(d => setNvList(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
-  // ── Fetch month data ─────────────────────────────────────────────
-  const fetchMonth = async () => {
+  // ── Fetch month ─────────────────────────────────────────────────
+  const fetchMonth = useCallback(async () => {
     setLoading(true);
     const thang = monthStr(year, month);
     const bust  = `&_t=${Date.now()}`;
@@ -232,24 +232,24 @@ export default function CalendarPage() {
         fetch(`/api/lich-di-lam?thang=${thang}&trangThai=cho_duyet${bust}`).then(r=>r.json()).catch(()=>[]),
       ]);
       setLichList(Array.isArray(lich) ? lich : []);
-      const ccArr = Array.isArray(cc) ? cc : (cc?.chamCongs ?? []);
-      setCcList(ccArr);
+      setCcList(Array.isArray(cc) ? cc : (cc?.chamCongs ?? []));
       setEvents(Array.isArray(ev) ? ev : []);
       setPendingLich(Array.isArray(pending) ? pending : []);
     } finally {
       setLoading(false);
     }
-  };
+  }, [year, month]);
 
-  useEffect(() => { fetchMonth(); }, [year, month]);
+  useEffect(() => { fetchMonth(); }, [fetchMonth]);
 
-  // ── Calendar grid calc ───────────────────────────────────────────
+  // ── Calendar grid ────────────────────────────────────────────────
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDow    = (() => {
     const d = new Date(year, month-1, 1).getDay();
-    return d === 0 ? 6 : d-1;
+    return d === 0 ? 6 : d-1; // 0=Mon
   })();
   const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  const weeks = totalCells / 7;
 
   // ── Derived maps ─────────────────────────────────────────────────
   const nvMap = useMemo(() => Object.fromEntries(nvList.map(nv => [nv.id, nv])), [nvList]);
@@ -259,6 +259,11 @@ export default function CalendarPage() {
     nvList.forEach(nv => { if (nv.phongBan) s.add(nv.phongBan); });
     return Array.from(s).sort();
   }, [nvList]);
+
+  function filterNv(nvId: string) {
+    if (!filterPB) return true;
+    return nvMap[nvId]?.phongBan === filterPB;
+  }
 
   const ccByDate = useMemo(() => {
     const m = new Map<string, ChamCongRow[]>();
@@ -289,53 +294,75 @@ export default function CalendarPage() {
     return m;
   }, [events]);
 
-  function filterNv(nvId: string) {
-    if (!filterPB) return true;
-    return nvMap[nvId]?.phongBan === filterPB;
-  }
-
-  // ── Navigation ────────────────────────────────────────────────────
+  // ── Navigation ───────────────────────────────────────────────────
   const prevMonth = () => { if (month===1){setYear(y=>y-1);setMonth(12);}else setMonth(m=>m-1); };
   const nextMonth = () => { if (month===12){setYear(y=>y+1);setMonth(1);}else setMonth(m=>m+1); };
-  const goToday   = () => { setYear(today.getFullYear()); setMonth(today.getMonth()+1); setSelected(todayStr); };
+  const goToday   = () => {
+    setYear(today.getFullYear());
+    setMonth(today.getMonth()+1);
+    setSelected(todayStr);
+  };
 
-  // ── Duyet lich ───────────────────────────────────────────────────
+  // ── Duyệt lịch ──────────────────────────────────────────────────
   async function handleDuyet(id: string, trangThai: "da_duyet" | "tu_choi") {
     setDuyeting(id);
-    const note = notifNote[id] || "";
     await fetch(`/api/lich-di-lam/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trangThai, adminNote: note }),
+      body: JSON.stringify({ trangThai, adminNote: notifNote[id] || "" }),
     }).catch(() => {});
     setPendingLich(prev => prev.filter(r => r.id !== id));
     setDuyeting(null);
     fetchMonth();
   }
 
-  // ── Task CRUD ─────────────────────────────────────────────────────
+  // ── Task CRUD (optimistic) ───────────────────────────────────────
   async function createEvent(data: Omit<CalEvent,"id"|"type">) {
-    await fetch("/api/calendar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, type: "task" }),
-    });
-    fetchMonth();
-  }
-  async function updateEvent(id: string, data: Omit<CalEvent,"id"|"type">) {
-    await fetch(`/api/calendar/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    fetchMonth();
-  }
-  async function deleteEvent(id: string) {
-    await fetch(`/api/calendar/${id}`, { method: "DELETE" });
-    fetchMonth();
+    // Optimistic: thêm ngay vào state
+    const optimId = tmpId();
+    const optimEv: CalEvent = { ...data, id: optimId, type: "task" };
+    setEvents(prev => [...prev, optimEv]);
+
+    try {
+      const res = await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, type: "task" }),
+      });
+      const saved = await res.json();
+      // Replace optimistic entry with real one
+      setEvents(prev => prev.map(e => e.id === optimId ? { ...saved, ...data, id: saved.id ?? optimId } : e));
+    } catch {
+      // Rollback
+      setEvents(prev => prev.filter(e => e.id !== optimId));
+    }
   }
 
-  // ── Selected day detail ───────────────────────────────────────────
+  async function updateEvent(id: string, data: Omit<CalEvent,"id"|"type">) {
+    // Optimistic update
+    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+    try {
+      await fetch(`/api/calendar/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+    } catch {
+      fetchMonth(); // rollback via refetch
+    }
+  }
+
+  async function deleteEvent(id: string) {
+    // Optimistic remove
+    setEvents(prev => prev.filter(e => e.id !== id));
+    try {
+      await fetch(`/api/calendar/${id}`, { method: "DELETE" });
+    } catch {
+      fetchMonth();
+    }
+  }
+
+  // ── Selected day detail ──────────────────────────────────────────
   const selectedCC   = selected ? (ccByDate.get(selected)    ?? []) : [];
   const selectedLich = selected ? (lichByDate.get(selected)  ?? []) : [];
   const selectedEvts = selected ? (eventsByDate.get(selected)?? []) : [];
@@ -363,352 +390,383 @@ export default function CalendarPage() {
     return rows.sort((a,b) => a.ten.localeCompare(b.ten));
   }, [selected, selectedCC, selectedLich, nvMap, filterPB]);
 
-  // ── Day cell ──────────────────────────────────────────────────────
-  function DayCell({ dayNum }: { dayNum: number }) {
-    const dateStr = `${year}-${String(month).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
-    const ccDay   = (ccByDate.get(dateStr)    ?? []).filter(c => filterNv(c.nhanVienId));
-    const lichDay = (lichByDate.get(dateStr)  ?? []).filter(l => filterNv(l.nhanVienId));
-    const evDay   = eventsByDate.get(dateStr) ?? [];
-    const isToday    = dateStr === todayStr;
-    const isSelected = dateStr === selected;
+  // Selected date info
+  const selDate = selected ? new Date(selected + "T00:00:00") : null;
+  const selDowIdx = selDate ? selDate.getDay() : -1; // 0=Sun
+  const selDow = selDate ? ["CN","T2","T3","T4","T5","T6","T7"][selDowIdx] : "";
 
-    const diLam  = ccDay.filter(c => c.trangThai==="di_lam"||c.trangThai==="di_muon").length;
-    const dangKy = lichDay.filter(l => !ccDay.find(c => c.nhanVienId===l.nhanVienId)).length;
+  return (
+    <div className="h-screen flex flex-col bg-white overflow-hidden">
 
-    const nvIds = [...new Set([...ccDay.map(c=>c.nhanVienId),...lichDay.map(l=>l.nhanVienId)])];
+      {/* ── Google-style Top Bar ── */}
+      <header className="flex items-center h-16 px-4 border-b border-gray-200 flex-shrink-0 gap-3">
+        {/* Logo + title */}
+        <div className="flex items-center gap-3 mr-2">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "#4285f4" }}>
+            <CalendarDays size={17} className="text-white" />
+          </div>
+          <span className="text-xl font-normal text-gray-700 hidden sm:block">Lịch Công Ty</span>
+        </div>
 
-    return (
-      <div
-        onClick={() => setSelected(isSelected ? null : dateStr)}
-        className={`relative min-h-[90px] rounded-xl cursor-pointer transition-all border group
-          ${isSelected ? "bg-indigo-50 border-indigo-300 shadow-sm"
-            : isToday  ? "border-rose-300 bg-rose-50/40"
-            : "border-stone-100 hover:border-stone-300 hover:bg-stone-50/60"}`}
-      >
-        {/* Date number */}
-        <div className="flex items-center justify-between px-2 pt-1.5">
-          <span className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-semibold
-            ${isToday ? "bg-rose-500 text-white" : isSelected ? "bg-indigo-500 text-white" : "text-stone-600"}`}>
-            {dayNum}
-          </span>
-          {/* Quick add button */}
-          <button
-            onClick={e => { e.stopPropagation(); setTaskModal({ date: dateStr }); }}
-            className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-full bg-indigo-100 text-indigo-500 flex items-center justify-center transition-all hover:bg-indigo-200">
-            <Plus size={11} />
+        {/* Today button */}
+        <button onClick={goToday}
+          className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-full hover:bg-gray-50 transition">
+          Hôm nay
+        </button>
+
+        {/* Nav arrows */}
+        <div className="flex items-center gap-1">
+          <button onClick={prevMonth}
+            className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition">
+            <ChevronLeft size={18} className="text-gray-600" />
+          </button>
+          <button onClick={nextMonth}
+            className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition">
+            <ChevronRight size={18} className="text-gray-600" />
           </button>
         </div>
 
-        {/* Tasks/events */}
-        <div className="px-1.5 pb-1 space-y-0.5 mt-0.5">
-          {evDay.slice(0,3).map(ev => (
-            <button key={ev.id}
-              onClick={e => { e.stopPropagation(); setTaskModal({ date: ev.date, event: ev }); }}
-              className="w-full text-left flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-white truncate transition hover:opacity-80"
-              style={{ background: ev.color }}>
-              {ev.startTime && <span className="opacity-80 text-[9px]">{ev.startTime.slice(0,5)}</span>}
-              <span className="truncate">{ev.title}</span>
-            </button>
-          ))}
-          {evDay.length > 3 && (
-            <p className="text-[9px] text-stone-400 px-1.5">+{evDay.length-3} sự kiện</p>
-          )}
-        </div>
+        {/* Month/Year title */}
+        <h2 className="text-xl font-normal text-gray-700 min-w-[160px]">
+          Tháng {month} năm {year}
+        </h2>
 
-        {/* Attendance dots */}
-        {(diLam > 0 || dangKy > 0) && (
-          <div className="px-1.5 pb-1.5">
-            <div className="flex flex-wrap gap-0.5 mt-0.5">
-              {nvIds.slice(0,6).map((id,i) => (
-                <span key={i} className={`w-1.5 h-1.5 rounded-full ${deptDot(nvMap[id]?.phongBan??null)}`} />
-              ))}
-              {nvIds.length > 6 && <span className="text-[8px] text-stone-300">+{nvIds.length-6}</span>}
-            </div>
-            {(diLam > 0 || dangKy > 0) && (
-              <div className="flex gap-1.5 mt-0.5">
-                {diLam  > 0 && <span className="text-[9px] text-emerald-600">✓{diLam}</span>}
-                {dangKy > 0 && <span className="text-[9px] text-violet-500">●{dangKy}</span>}
-              </div>
-            )}
-          </div>
+        {loading && (
+          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-1" />
         )}
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-[#fdfaf8] flex flex-col">
-      {/* ── Header ── */}
-      <div className="bg-white border-b border-stone-100 px-6 py-3 flex items-center gap-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center">
-            <CalendarDays size={18} className="text-indigo-500" />
-          </div>
-          <div>
-            <h1 className="text-base font-bold text-stone-800 leading-none">Lịch Công Ty</h1>
-            <p className="text-[11px] text-stone-400 mt-0.5">Quản lý lịch, sự kiện & chấm công</p>
-          </div>
-        </div>
+        <div className="flex-1" />
 
         {/* Filter phòng ban */}
         <div className="flex items-center gap-2">
-          <Users size={13} className="text-stone-400" />
+          <Users size={14} className="text-gray-400" />
           <select value={filterPB} onChange={e => setFilterPB(e.target.value)}
-            className="text-sm border border-stone-200 rounded-xl px-3 py-1.5 bg-white text-stone-600 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+            className="text-sm border border-gray-300 rounded-full px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
             <option value="">Tất cả phòng ban</option>
             {phongBanList.map(pb => <option key={pb} value={pb}>{pb}</option>)}
           </select>
         </div>
 
-        {/* Notification bell */}
+        {/* Notification */}
         <button onClick={() => setShowNotif(!showNotif)}
-          className={`relative flex items-center gap-2 px-3 py-2 rounded-xl border transition
-            ${showNotif ? "bg-amber-50 border-amber-200 text-amber-600" : "border-stone-200 text-stone-500 hover:bg-stone-50"}`}>
-          <Bell size={16} />
+          className={`relative w-10 h-10 rounded-full flex items-center justify-center transition
+            ${showNotif ? "bg-blue-100 text-blue-600" : "hover:bg-gray-100 text-gray-600"}`}>
+          <Bell size={18} />
           {pendingLich.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+            <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
               {pendingLich.length > 9 ? "9+" : pendingLich.length}
             </span>
           )}
-          <span className="text-sm font-medium hidden sm:block">Thông báo</span>
         </button>
-      </div>
 
+        {/* Create button */}
+        <button onClick={() => setTaskModal({ date: selected ?? todayStr })}
+          className="flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition shadow-sm">
+          <Plus size={16} /> Tạo
+        </button>
+      </header>
+
+      {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Calendar ── */}
-        <div className="flex-1 flex flex-col overflow-hidden p-5">
-          {/* Month nav */}
-          <div className="flex items-center gap-3 mb-4">
-            <button onClick={prevMonth} className="w-8 h-8 border border-stone-200 rounded-lg flex items-center justify-center hover:bg-stone-50 transition">
-              <ChevronLeft size={15} className="text-stone-500" />
-            </button>
-            <h2 className="text-xl font-bold text-stone-800 min-w-[150px] text-center">
-              Tháng {month}/{year}
-            </h2>
-            <button onClick={nextMonth} className="w-8 h-8 border border-stone-200 rounded-lg flex items-center justify-center hover:bg-stone-50 transition">
-              <ChevronRight size={15} className="text-stone-500" />
-            </button>
-            <button onClick={goToday} className="text-xs px-3 py-1.5 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-50 transition font-medium">
-              Hôm nay
-            </button>
-            {loading && <span className="text-xs text-stone-400 animate-pulse ml-1">Đang tải...</span>}
 
-            <div className="flex-1" />
-
-            {/* New event button */}
-            <button onClick={() => setTaskModal({ date: selected ?? todayStr })}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition">
-              <Plus size={15} /> Tạo sự kiện
-            </button>
-          </div>
-
-          {/* DOW headers */}
-          <div className="grid grid-cols-7 gap-1.5 mb-1.5">
-            {DOW.map(d => (
-              <div key={d} className={`text-center text-[11px] font-semibold py-1 ${d==="CN"?"text-rose-400":"text-stone-400"}`}>
+        {/* ── Calendar grid ── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* DOW header row */}
+          <div className="grid grid-cols-7 border-b border-gray-200 flex-shrink-0">
+            {DOW.map((d, i) => (
+              <div key={d} className={`text-center py-2 text-[11px] font-semibold uppercase tracking-wider
+                ${i === 6 ? "text-red-400" : "text-gray-500"}`}>
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Grid */}
-          <div className="grid grid-cols-7 gap-1.5 flex-1 auto-rows-fr">
-            {Array.from({ length: totalCells }, (_, i) => {
-              const dayNum = i - firstDow + 1;
-              if (dayNum < 1 || dayNum > daysInMonth) return <div key={i} />;
-              return <DayCell key={i} dayNum={dayNum} />;
-            })}
-          </div>
+          {/* Grid cells */}
+          <div className="flex-1 overflow-auto">
+            <div className="grid grid-cols-7 h-full" style={{ minHeight: `${weeks * 110}px` }}>
+              {Array.from({ length: totalCells }, (_, i) => {
+                const dayNum = i - firstDow + 1;
+                const isOtherMonth = dayNum < 1 || dayNum > daysInMonth;
+                if (isOtherMonth) {
+                  return (
+                    <div key={i} className="border-r border-b border-gray-100 bg-gray-50/50 min-h-[110px]" />
+                  );
+                }
 
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-stone-100">
-            {[
-              { c:"bg-emerald-400", l:"Đi làm" }, { c:"bg-violet-400", l:"Đã đăng ký" },
-              { c:"bg-amber-400",   l:"Đi muộn" },
-            ].map(({c,l}) => (
-              <div key={l} className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${c}`}/><span className="text-[11px] text-stone-500">{l}</span>
-              </div>
-            ))}
-            <span className="text-[11px] text-stone-400 ml-2">Chấm màu = phòng ban:</span>
-            {Object.entries(DEPT_COLOR).map(([dept, c]) => (
-              <div key={dept} className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${c}`}/><span className="text-[11px] text-stone-500">{dept}</span>
-              </div>
-            ))}
+                const dateStr = `${year}-${String(month).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
+                const ccDay   = (ccByDate.get(dateStr) ?? []).filter(c => filterNv(c.nhanVienId));
+                const lichDay = (lichByDate.get(dateStr) ?? []).filter(l => filterNv(l.nhanVienId));
+                const evDay   = eventsByDate.get(dateStr) ?? [];
+                const isToday    = dateStr === todayStr;
+                const isSelected = dateStr === selected;
+                const isSun = (i % 7) === 6;
+
+                const nvIds = [...new Set([...ccDay.map(c=>c.nhanVienId),...lichDay.map(l=>l.nhanVienId)])];
+                const diLamCount  = ccDay.filter(c => c.trangThai==="di_lam"||c.trangThai==="di_muon").length;
+                const dangKyCount = lichDay.filter(l => !ccDay.find(c => c.nhanVienId===l.nhanVienId)).length;
+
+                return (
+                  <div key={i}
+                    onClick={() => setSelected(isSelected ? null : dateStr)}
+                    className={`border-r border-b border-gray-200 min-h-[110px] cursor-pointer group relative transition-colors
+                      ${isSelected ? "bg-blue-50" : isSun ? "bg-red-50/20 hover:bg-red-50/40" : "hover:bg-gray-50/80"}`}
+                  >
+                    {/* Date number */}
+                    <div className="flex items-center justify-between px-2 pt-2 pb-0.5">
+                      <span className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-sm font-medium transition
+                        ${isToday
+                          ? "bg-blue-600 text-white font-bold"
+                          : isSun
+                            ? "text-red-500 hover:bg-red-100"
+                            : "text-gray-700 hover:bg-gray-200"}`}>
+                        {dayNum}
+                      </span>
+
+                      {/* Quick add */}
+                      <button
+                        onClick={e => { e.stopPropagation(); setTaskModal({ date: dateStr }); }}
+                        className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition">
+                        <Plus size={13} />
+                      </button>
+                    </div>
+
+                    {/* Events */}
+                    <div className="px-1 space-y-0.5 pb-1">
+                      {evDay.slice(0, 3).map(ev => (
+                        <button key={ev.id}
+                          onClick={e => { e.stopPropagation(); setTaskModal({ date: ev.date, event: ev }); }}
+                          className="w-full text-left flex items-center gap-1 px-1.5 py-[3px] rounded text-[11px] font-medium text-white truncate hover:opacity-90 transition"
+                          style={{ background: ev.color }}>
+                          {ev.startTime && (
+                            <span className="opacity-80 text-[10px] flex-shrink-0">{ev.startTime.slice(0,5)}</span>
+                          )}
+                          <span className="truncate">{ev.title}</span>
+                        </button>
+                      ))}
+                      {evDay.length > 3 && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setSelected(dateStr); }}
+                          className="w-full text-left px-1.5 py-[2px] text-[10px] text-gray-500 hover:bg-gray-100 rounded">
+                          +{evDay.length - 3} sự kiện
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Attendance summary */}
+                    {(nvIds.length > 0) && (
+                      <div className="px-2 pb-1.5">
+                        {/* Avatar dots */}
+                        <div className="flex items-center gap-[3px]">
+                          {nvIds.slice(0, 7).map((id, idx) => (
+                            <span key={idx}
+                              className="w-[7px] h-[7px] rounded-full inline-block flex-shrink-0"
+                              style={{ background: deptColor(nvMap[id]?.phongBan ?? null) }}
+                            />
+                          ))}
+                          {nvIds.length > 7 && (
+                            <span className="text-[8px] text-gray-400 ml-0.5">+{nvIds.length-7}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {diLamCount > 0 && (
+                            <span className="text-[9px] text-emerald-600 font-medium">✓{diLamCount}</span>
+                          )}
+                          {dangKyCount > 0 && (
+                            <span className="text-[9px] text-gray-400">●{dangKyCount}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        {/* ── Right panel ── */}
-        {(selected || showNotif) && (
-          <div className="w-80 border-l border-stone-100 bg-white flex flex-col overflow-hidden flex-shrink-0">
-            {/* Notifications */}
-            {showNotif && (
-              <div className="border-b border-stone-100">
-                <div className="flex items-center justify-between px-4 py-3 bg-amber-50/60">
-                  <div className="flex items-center gap-2">
-                    <Bell size={15} className="text-amber-500" />
-                    <span className="text-sm font-bold text-amber-700">Thông báo lịch</span>
-                    {pendingLich.length > 0 && (
-                      <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 font-bold">{pendingLich.length}</span>
-                    )}
-                  </div>
-                  <button onClick={() => setShowNotif(false)} className="text-stone-300 hover:text-stone-500"><X size={15} /></button>
-                </div>
+        {/* ── Right Panel ── */}
+        <div className={`w-72 border-l border-gray-200 flex flex-col bg-white flex-shrink-0 transition-all ${!selected && !showNotif ? "hidden" : ""}`}>
 
-                <div className="max-h-72 overflow-y-auto divide-y divide-stone-50">
-                  {pendingLich.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-stone-400">
-                      <CheckCircle2 size={24} className="mx-auto mb-1 text-stone-200" />
-                      Không có thông báo mới
-                    </div>
-                  ) : pendingLich.map(r => (
-                    <div key={r.id} className="px-4 py-3 hover:bg-stone-50 transition">
-                      <div className="flex items-start gap-2.5">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5 ${deptDot(r.nhanVien.phongBan)}`}>
-                          {r.nhanVien.ten.split(" ").slice(-1)[0]?.[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-stone-700">{r.nhanVien.ten}</p>
-                          <p className="text-[11px] text-stone-500">
-                            {r.loai === "thay_doi" ? "🔄 Đề xuất thay đổi" : "📅 Đăng ký lịch"}
-                          </p>
-                          <p className="text-[11px] text-stone-400">
-                            {new Date(r.ngay + "T00:00:00").toLocaleDateString("vi-VN")}
-                            {r.ca ? ` · ${CA_LABEL[r.ca] ?? r.ca}` : ""}
-                          </p>
-                          {/* Note input */}
-                          <input
-                            value={notifNote[r.id] ?? ""}
-                            onChange={e => setNotifNote(p => ({ ...p, [r.id]: e.target.value }))}
-                            placeholder="Ghi chú (tuỳ chọn)..."
-                            className="w-full mt-1.5 text-[11px] border border-stone-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-200"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-1.5 mt-2 ml-9">
-                        <button onClick={() => handleDuyet(r.id, "da_duyet")}
-                          disabled={duyeting === r.id}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-semibold transition disabled:opacity-50">
-                          <Check size={11} /> Duyệt
-                        </button>
-                        <button onClick={() => handleDuyet(r.id, "tu_choi")}
-                          disabled={duyeting === r.id}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 text-[11px] font-semibold transition disabled:opacity-50">
-                          <XCircle size={11} /> Từ chối
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+          {/* Notification panel */}
+          {showNotif && (
+            <div className="border-b border-gray-200">
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Bell size={14} className="text-gray-500" />
+                  <span className="text-sm font-semibold text-gray-700">Thông báo</span>
+                  {pendingLich.length > 0 && (
+                    <span className="text-[10px] bg-red-500 text-white rounded-full px-1.5 py-0.5 font-bold">{pendingLich.length}</span>
+                  )}
                 </div>
+                <button onClick={() => setShowNotif(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={14} />
+                </button>
               </div>
-            )}
 
-            {/* Selected day detail */}
-            {selected && (
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+              <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
+                {pendingLich.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <CheckCircle2 size={22} className="mx-auto mb-1 text-gray-200" />
+                    <p className="text-xs text-gray-400">Không có thông báo</p>
+                  </div>
+                ) : pendingLich.map(r => (
+                  <div key={r.id} className="px-4 py-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                        style={{ background: deptColor(r.nhanVien.phongBan) }}>
+                        {r.nhanVien.ten.split(" ").slice(-1)[0]?.[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-700">{r.nhanVien.ten}</p>
+                        <p className="text-[11px] text-gray-500">
+                          {new Date(r.ngay + "T00:00:00").toLocaleDateString("vi-VN")}
+                          {r.ca ? ` · ${CA_LABEL[r.ca] ?? r.ca}` : ""}
+                        </p>
+                        <input
+                          value={notifNote[r.id] ?? ""}
+                          onChange={e => setNotifNote(p => ({ ...p, [r.id]: e.target.value }))}
+                          placeholder="Ghi chú..."
+                          className="w-full mt-1 text-[11px] border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 mt-2 ml-9">
+                      <button onClick={() => handleDuyet(r.id, "da_duyet")} disabled={duyeting===r.id}
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[11px] font-semibold text-white transition disabled:opacity-50"
+                        style={{ background: "#0f9d58" }}>
+                        <Check size={11} /> Duyệt
+                      </button>
+                      <button onClick={() => handleDuyet(r.id, "tu_choi")} disabled={duyeting===r.id}
+                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded bg-red-50 text-red-500 text-[11px] font-semibold transition disabled:opacity-50">
+                        <XCircle size={11} /> Từ chối
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Day detail */}
+          {selected && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Day header */}
+              <div className="px-4 py-3 border-b border-gray-200">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-stone-400 uppercase tracking-wide font-medium">
-                      {["CN","T2","T3","T4","T5","T6","T7"][new Date(selected+"T00:00:00").getDay()]}
-                    </p>
-                    <p className="text-lg font-bold text-stone-800">
-                      {parseInt(selected.slice(8))} tháng {parseInt(selected.slice(5,7))}
-                    </p>
-                    {selected === todayStr && <p className="text-[10px] text-rose-400">📍 Hôm nay</p>}
+                    <p className="text-xs text-gray-400 font-medium">{selDow}</p>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className={`text-3xl font-light leading-none
+                        ${selected === todayStr ? "text-blue-600" : "text-gray-800"}`}>
+                        {parseInt(selected.slice(8))}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        tháng {parseInt(selected.slice(5,7))}
+                      </span>
+                    </div>
+                    {selected === todayStr && (
+                      <p className="text-[10px] text-blue-500 mt-0.5">Hôm nay</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setTaskModal({ date: selected })}
-                      className="w-8 h-8 rounded-xl bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-500 transition">
-                      <Plus size={15} />
+                      className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition">
+                      <Plus size={16} />
                     </button>
-                    <button onClick={() => setSelected(null)} className="w-8 h-8 rounded-xl hover:bg-stone-100 flex items-center justify-center text-stone-300 hover:text-stone-500 transition">
-                      <X size={15} />
+                    <button onClick={() => setSelected(null)}
+                      className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition">
+                      <X size={14} />
                     </button>
                   </div>
                 </div>
-
-                <div className="flex-1 overflow-y-auto">
-                  {/* Tasks/Events */}
-                  {selectedEvts.length > 0 && (
-                    <div className="px-4 pt-3 pb-2">
-                      <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">Sự kiện / Công việc</p>
-                      <div className="space-y-1.5">
-                        {selectedEvts.map(ev => (
-                          <button key={ev.id} onClick={() => setTaskModal({ date: ev.date, event: ev })}
-                            className="w-full text-left flex items-center gap-2.5 p-2.5 rounded-xl border border-stone-100 hover:border-stone-200 hover:bg-stone-50 transition">
-                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: ev.color }} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-stone-700 truncate">{ev.title}</p>
-                              {(ev.startTime||ev.endTime) && (
-                                <p className="text-[10px] text-stone-400">
-                                  {ev.startTime?.slice(0,5)}{ev.endTime ? ` – ${ev.endTime.slice(0,5)}` : ""}
-                                </p>
-                              )}
-                              {ev.description && <p className="text-[10px] text-stone-400 truncate">{ev.description}</p>}
-                            </div>
-                            <Pencil size={11} className="text-stone-300 flex-shrink-0" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Divider */}
-                  {selectedEvts.length > 0 && selectedDetail.length > 0 && (
-                    <div className="mx-4 border-t border-stone-100 my-1" />
-                  )}
-
-                  {/* Attendance */}
-                  {selectedDetail.length > 0 && (
-                    <div className="px-4 pt-3">
-                      <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">Nhân viên ({selectedDetail.length})</p>
-                      <div className="space-y-1.5">
-                        {selectedDetail.map((r, i) => {
-                          const s = CC_STATUS[r.status] ?? CC_STATUS.di_lam;
-                          return (
-                            <div key={i} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-stone-50 transition">
-                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 ${deptDot(r.phongBan)}`}>
-                                {r.ten.split(" ").slice(-1)[0]?.[0]}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-stone-700 truncate">{r.ten}</p>
-                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  {r.phongBan && (
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${deptBg(r.phongBan)}`}>{r.phongBan}</span>
-                                  )}
-                                  {r.gioVao && <span className="text-[9px] text-stone-400">{r.gioVao}{r.gioRa?`–${r.gioRa}`:""}</span>}
-                                  {r.ca && <span className="text-[9px] text-stone-400">{CA_LABEL[r.ca]??r.ca}</span>}
-                                  {(r.tangCa ?? 0) > 0 && <span className="text-[9px] text-amber-600 font-medium">+{r.tangCa}h</span>}
-                                </div>
-                              </div>
-                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${s.pill}`}>
-                                {s.label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedEvts.length === 0 && selectedDetail.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-10 text-stone-300">
-                      <CalendarDays size={28} className="mb-2" />
-                      <p className="text-xs">Ngày trống</p>
-                      <button onClick={() => setTaskModal({ date: selected })}
-                        className="mt-3 flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-600 transition">
-                        <Plus size={12} /> Tạo sự kiện
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="h-4" />
-                </div>
               </div>
-            )}
-          </div>
-        )}
+
+              <div className="flex-1 overflow-y-auto">
+
+                {/* Events */}
+                {selectedEvts.length > 0 && (
+                  <div className="px-3 pt-3">
+                    {selectedEvts.map(ev => (
+                      <button key={ev.id} onClick={() => setTaskModal({ date: ev.date, event: ev })}
+                        className="w-full text-left flex items-start gap-2.5 px-2 py-2.5 rounded-lg hover:bg-gray-50 transition group/ev mb-1">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" style={{ background: ev.color }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{ev.title}</p>
+                          {(ev.startTime || ev.endTime) && (
+                            <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                              <Clock size={10} />
+                              {ev.startTime?.slice(0,5)}{ev.endTime ? ` – ${ev.endTime.slice(0,5)}` : ""}
+                            </p>
+                          )}
+                          {ev.description && <p className="text-[10px] text-gray-400 truncate mt-0.5">{ev.description}</p>}
+                        </div>
+                        <Pencil size={11} className="text-gray-300 group-hover/ev:text-gray-400 flex-shrink-0 mt-1" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Divider */}
+                {selectedEvts.length > 0 && selectedDetail.length > 0 && (
+                  <div className="mx-3 border-t border-gray-100 my-2" />
+                )}
+
+                {/* Attendance */}
+                {selectedDetail.length > 0 && (
+                  <div className="px-3 pb-3">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-2">
+                      Nhân viên ({selectedDetail.length})
+                    </p>
+                    {selectedDetail.map((r, i) => {
+                      const s = CC_STATUS[r.status] ?? CC_STATUS.di_lam;
+                      return (
+                        <div key={i} className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-gray-50 transition">
+                          {/* Avatar */}
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                            style={{ background: deptColor(r.phongBan) }}>
+                            {r.ten.split(" ").slice(-1)[0]?.[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-700 truncate">{r.ten}</p>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              {r.gioVao && (
+                                <span className="text-[10px] text-gray-400">
+                                  {r.gioVao}{r.gioRa ? `–${r.gioRa}` : ""}
+                                </span>
+                              )}
+                              {r.ca && <span className="text-[10px] text-gray-400">{CA_LABEL[r.ca]??r.ca}</span>}
+                              {(r.tangCa ?? 0) > 0 && (
+                                <span className="text-[10px] text-amber-600 font-medium">+{r.tangCa}h</span>
+                              )}
+                            </div>
+                          </div>
+                          {/* Status pill */}
+                          <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0"
+                            style={{ background: s.color }}>
+                            {s.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {selectedEvts.length === 0 && selectedDetail.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-300">
+                    <CalendarDays size={30} className="mb-2" />
+                    <p className="text-xs text-gray-400">Không có sự kiện</p>
+                    <button onClick={() => setTaskModal({ date: selected })}
+                      className="mt-3 text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition">
+                      <Plus size={12} /> Tạo sự kiện
+                    </button>
+                  </div>
+                )}
+
+                <div className="h-4" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Task Modal ── */}
