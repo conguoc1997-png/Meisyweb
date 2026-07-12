@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ChevronLeft, ChevronRight, X, Users, Printer, CalendarDays, Trash2, RotateCcw, Lock, Unlock } from "lucide-react";
 
 type LuongCBHistory = { thangApDung: string; luongCB: number };
+type CaInfo = { id: string; ten: string; gioVao: string; gioRa: string; gioVao2?: string | null; gioRa2?: string | null };
 type NhanVien = {
   id: string; maNV: string; ten: string;
   chucVu: string | null; phongBan: string | null;
@@ -14,6 +15,7 @@ type NhanVien = {
   ngayNghiViec?: string | null;
   active: boolean;
   luongCBHistory?: LuongCBHistory[];
+  caLamViec?: CaInfo | null;
 };
 
 // Lương CB áp dụng cho 1 tháng cụ thể — lấy bản ghi lịch sử gần nhất có
@@ -535,6 +537,7 @@ export default function ChamCongPage() {
     x: number; y: number;
     ten: string; ngay: string; trangThai: string;
     gioVao?: string | null; gioRa?: string | null; tongGio?: number | null; ghiChu?: string | null;
+    caGioVao?: string | null; caGioRa?: string | null; caTen?: string | null;
   } | null>(null);
   const [winW, setWinW] = useState(1200);
   useEffect(() => { setWinW(window.innerWidth); }, []);
@@ -1132,10 +1135,13 @@ export default function ChamCongPage() {
                                 ten: nv.ten,
                                 ngay: `${DAY_OF_WEEK[new Date(ngayStr).getDay()]} ${d}/${month}`,
                                 trangThai: chuaRa ? "Chưa chấm ra" : info?.title ?? "",
-                                gioVao: chuaRa ? gio?.gioVao : gio?.gioVao,
+                                gioVao: gio?.gioVao,
                                 gioRa: gio?.gioRa,
                                 tongGio: gio?.tongGio,
                                 ghiChu: ghiChuMap[key] || null,
+                                caGioVao: nv.caLamViec?.gioVao ?? null,
+                                caGioRa: nv.caLamViec?.gioRa ?? null,
+                                caTen: nv.caLamViec?.ten ?? null,
                               });
                             }}
                             onMouseLeave={() => setHoverCard(null)}
@@ -2511,40 +2517,69 @@ export default function ChamCongPage() {
       })()}
 
       {/* ═══ HOVER CARD CHI TIẾT Ô CHẤM CÔNG ═══ */}
-      {hoverCard && (
+      {hoverCard && (() => {
+        // Tính muộn/về sớm dựa theo Ca
+        const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+        const muonPhut = hoverCard.caGioVao && hoverCard.gioVao
+          ? Math.max(0, toMin(hoverCard.gioVao) - toMin(hoverCard.caGioVao))
+          : 0;
+        const veSomPhut = hoverCard.caGioRa && hoverCard.gioRa
+          ? Math.max(0, toMin(hoverCard.caGioRa) - toMin(hoverCard.gioRa))
+          : 0;
+        const BIEN_DO = 5;
+        const isMuon = muonPhut > BIEN_DO;
+        const isVeSom = veSomPhut > BIEN_DO;
+        return (
         <div
-          className="pointer-events-none fixed z-[9998] bg-slate-800 text-white rounded-xl shadow-2xl px-3.5 py-2.5 text-xs min-w-[160px] max-w-[240px] border border-slate-600"
+          className="pointer-events-none fixed z-[9998] bg-slate-800 text-white rounded-xl shadow-2xl px-3.5 py-2.5 text-xs min-w-[180px] max-w-[260px] border border-slate-600"
           style={{
-            left: Math.min(hoverCard.x, winW - 250),
+            left: Math.min(hoverCard.x, winW - 270),
             top: hoverCard.y - 8,
             transform: "translate(-50%, -100%)",
           }}
         >
-          <p className="font-semibold text-slate-100 truncate mb-1">{hoverCard.ten}</p>
+          <p className="font-semibold text-slate-100 truncate mb-0.5">{hoverCard.ten}</p>
           <p className="text-slate-400 text-[10px] mb-1.5">{hoverCard.ngay}</p>
-          <p className={`font-medium mb-1 ${
+          <p className={`font-medium mb-1.5 ${
             hoverCard.trangThai === "Đi muộn" ? "text-amber-400" :
             hoverCard.trangThai === "Chưa chấm ra" ? "text-orange-400" :
             hoverCard.trangThai === "Vắng" ? "text-red-400" :
             "text-emerald-400"
           }`}>{hoverCard.trangThai}</p>
+
+          {/* Ca làm việc */}
+          {hoverCard.caTen && (
+            <p className="text-slate-400 text-[10px] mb-1">
+              📋 Ca: <span className="text-slate-200">{hoverCard.caTen}</span>
+              {hoverCard.caGioVao && <span className="text-slate-500"> ({hoverCard.caGioVao}–{hoverCard.caGioRa})</span>}
+            </p>
+          )}
+
+          {/* Giờ thực tế */}
           {hoverCard.gioVao && (
-            <p className="text-slate-300">🕐 Vào: <span className="font-semibold text-white">{hoverCard.gioVao}</span></p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-slate-300">🕐 Vào: <span className="font-semibold text-white">{hoverCard.gioVao}</span></p>
+              {isMuon && <span className="bg-amber-500 text-white rounded px-1 py-0.5 text-[9px] font-bold">⚠ Muộn {muonPhut} phút</span>}
+            </div>
           )}
           {hoverCard.gioRa && (
-            <p className="text-slate-300">🕕 Ra: <span className="font-semibold text-white">{hoverCard.gioRa}</span></p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-slate-300">🕕 Ra: <span className="font-semibold text-white">{hoverCard.gioRa}</span></p>
+              {isVeSom && <span className="bg-rose-500 text-white rounded px-1 py-0.5 text-[9px] font-bold">⚠ Sớm {veSomPhut} phút</span>}
+            </div>
           )}
           {hoverCard.tongGio != null && (
-            <p className="text-slate-300">⏱ Tổng: <span className="font-semibold text-white">{hoverCard.tongGio}h</span></p>
+            <p className="text-slate-300 mt-0.5">⏱ Tổng: <span className="font-semibold text-white">{hoverCard.tongGio}h</span></p>
           )}
           {hoverCard.ghiChu && (
-            <p className="text-amber-300 mt-1 border-t border-slate-700 pt-1 leading-relaxed">{hoverCard.ghiChu}</p>
+            <p className="text-amber-300 mt-1.5 border-t border-slate-700 pt-1.5 leading-relaxed">{hoverCard.ghiChu}</p>
           )}
           {!hoverCard.gioVao && !hoverCard.ghiChu && hoverCard.trangThai !== "Chưa chấm ra" && (
             <p className="text-slate-500 italic text-[10px]">Chấm thủ công (không có giờ)</p>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* ═══ POPOVER GHI CHÚ Ô CHẤM CÔNG ═══ */}
       {notePopover && (

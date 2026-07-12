@@ -43,24 +43,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ chamCongs: ccRows, phuCaps: phuCapMap });
     }
 
-    // Chế độ đầy đủ: NV + CC + PhuCap song song
-    const [nvPrisma, nvExtraRaw, ccRows, phuCapRows] = await Promise.all([
+    // Chế độ đầy đủ: NV + CC + PhuCap + Ca song song
+    const [nvPrisma, nvExtraRaw, ccRows, phuCapRows, caRows] = await Promise.all([
       prisma.nhanVien.findMany({
         orderBy: { ten: "asc" },
         ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
       }),
-      prisma.$queryRawUnsafe<{ id: string; ngayNghiViec: string | null }[]>(
-        `SELECT "id","ngayNghiViec" FROM "NhanVien"`
+      prisma.$queryRawUnsafe<{ id: string; ngayNghiViec: string | null; caLamViecId: string | null }[]>(
+        `SELECT "id","ngayNghiViec","caLamViecId" FROM "NhanVien"`
       ).catch(() => null),
       ccPromise,
       pcPromise,
+      // Lấy Ca để tính muộn/về sớm trong hover card
+      prisma.$queryRawUnsafe<{ id: string; ten: string; gioVao: string; gioRa: string; gioVao2: string | null; gioRa2: string | null }[]>(
+        `SELECT "id","ten","gioVao","gioRa","gioVao2","gioRa2" FROM "CaLamViec"`
+      ).catch(() => [] as { id: string; ten: string; gioVao: string; gioRa: string; gioVao2: string | null; gioRa2: string | null }[]),
     ]);
 
     const nvExtra = nvExtraRaw ?? [];
     const nghiColExists = nvExtraRaw !== null;
     const nghiMap = Object.fromEntries(nvExtra.map(r => [r.id, r.ngayNghiViec ?? null]));
+    const caIdMap  = Object.fromEntries(nvExtra.map(r => [r.id, r.caLamViecId ?? null]));
+    const caByIdMap = Object.fromEntries(caRows.map(c => [c.id, c]));
+
     const nhanViens = nvPrisma
-      .map(nv => ({ ...nv, ngayNghiViec: nghiMap[nv.id] ?? null }))
+      .map(nv => ({
+        ...nv,
+        ngayNghiViec: nghiMap[nv.id] ?? null,
+        caLamViec: caIdMap[nv.id] ? (caByIdMap[caIdMap[nv.id]!] ?? null) : null,
+      }))
       .filter(nv => {
         if (nv.active) return true;
         if (!nghiColExists) return false;
