@@ -12,8 +12,13 @@ export async function GET() {
     return NextResponse.json({ error: msg === "UNAUTHORIZED" ? "Chưa đăng nhập" : "Không có quyền" }, { status: msg === "UNAUTHORIZED" ? 401 : 403 });
   }
 
-  // Dùng raw SQL để lấy nhanVienId (cột mới, Prisma client chưa biết)
   type UserRow = { id: string; email: string; name: string; role: string; active: boolean; createdAt: Date; nhanVienId: string | null };
+
+  // Đảm bảo cột nhanVienId tồn tại trước khi query
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "nhanVienId" TEXT`
+  ).catch(() => {});
+
   const users = await prisma.$queryRawUnsafe<UserRow[]>(
     `SELECT id, email, name, role, active, "createdAt", "nhanVienId" FROM "User" ORDER BY "createdAt" ASC`
   );
