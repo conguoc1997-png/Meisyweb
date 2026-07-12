@@ -1097,13 +1097,15 @@ export default function ChamCongPage() {
                             <p className="font-semibold text-slate-800 text-[13px]">{nv.ten}</p>
                             {nv.chucVu && <p className="text-[11px] text-slate-400">{nv.chucVu}</p>}
                           </div>
-                          <button
-                            title="Xoá toàn bộ chấm công tháng này"
-                            onClick={() => resetEmployee(nv.id, nv.ten)}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 text-slate-300 hover:text-red-500 transition-all shrink-0"
-                          >
-                            <RotateCcw size={13} />
-                          </button>
+                          {!locked && (
+                            <button
+                              title="Xoá toàn bộ chấm công tháng này"
+                              onClick={() => resetEmployee(nv.id, nv.ten)}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 text-slate-300 hover:text-red-500 transition-all shrink-0"
+                            >
+                              <RotateCcw size={13} />
+                            </button>
+                          )}
                         </div>
                       </td>
                       {/* Cells chấm công */}
@@ -1633,23 +1635,26 @@ export default function ChamCongPage() {
                       <td className="px-3 py-2 text-center text-orange-600 font-semibold">{tongTC > 0 ? tongTC : ""}</td>
                       {/* Hệ số TC — inline edit (per-month) */}
                       <td className="px-2 py-1.5 text-center">
-                        <input
-                          type="number" step="1000" min="0"
-                          key={`${nv.id}-${thang}-${heSoTC}`}
-                          defaultValue={heSoTC}
-                          onBlur={async e => {
-                            const val = parseFloat(e.target.value) || 0;
-                            const cur = phuCapMap[nv.id] ?? { phuCapCC: 0, phuCapAn: 0, phuCapDB: 0 };
-                            const updated = { ...cur, heSoTC: val };
-                            setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
-                            await fetch("/api/cham-cong/phu-cap", {
-                              method: "POST", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
-                            });
-                          }}
-                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                          className="w-20 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                        />
+                        {locked
+                          ? <span className="text-xs font-semibold text-orange-600">{fmt(heSoTC)}</span>
+                          : <input
+                              type="number" step="1000" min="0"
+                              key={`${nv.id}-${thang}-${heSoTC}`}
+                              defaultValue={heSoTC}
+                              onBlur={async e => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const cur = phuCapMap[nv.id] ?? { phuCapCC: 0, phuCapAn: 0, phuCapDB: 0 };
+                                const updated = { ...cur, heSoTC: val };
+                                setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
+                                await fetch("/api/cham-cong/phu-cap", {
+                                  method: "POST", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
+                                });
+                              }}
+                              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                              className="w-20 text-center text-xs font-semibold text-orange-600 border border-orange-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-orange-400 bg-orange-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                        }
                       </td>
                       <td className="px-3 py-2 text-right text-slate-700">
                         {isKhoan
@@ -1678,25 +1683,27 @@ export default function ChamCongPage() {
                           ] as const).map(({ key, field, val, step, label }) => (
                             <div key={key} className="flex items-center gap-1">
                               <span className="text-[10px] text-slate-400 w-7 shrink-0">{label}</span>
-                              <input
-                                key={`${thang}_${nv.id}_${field}_${val}`}
-                                type="number" step={step} min="0"
-                                defaultValue={val || ""}
-                                placeholder="0"
-                                onBlur={async e => {
-                                  const newVal = parseFloat(e.target.value) || 0;
-                                  const cur = phuCapMap[nv.id] ?? { phuCapCC, phuCapAn: phuCapAnNgay, phuCapDB };
-                                  const updated = { ...cur, [field]: newVal };
-                                  // Optimistic update
-                                  setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
-                                  await fetch("/api/cham-cong/phu-cap", {
-                                    method: "POST", headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
-                                  }).catch(() => fetchPhuCap());
-                                }}
-                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                              />
+                              {locked
+                                ? <span className="text-xs font-semibold text-teal-700 w-20 text-right pr-1">{val ? fmt(val) : "—"}</span>
+                                : <input
+                                    key={`${thang}_${nv.id}_${field}_${val}`}
+                                    type="number" step={step} min="0"
+                                    defaultValue={val || ""}
+                                    placeholder="0"
+                                    onBlur={async e => {
+                                      const newVal = parseFloat(e.target.value) || 0;
+                                      const cur = phuCapMap[nv.id] ?? { phuCapCC, phuCapAn: phuCapAnNgay, phuCapDB };
+                                      const updated = { ...cur, [field]: newVal };
+                                      setPhuCapMap(prev => ({ ...prev, [nv.id]: updated }));
+                                      await fetch("/api/cham-cong/phu-cap", {
+                                        method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ nhanVienId: nv.id, thang, ...updated }),
+                                      }).catch(() => fetchPhuCap());
+                                    }}
+                                    onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                    className="w-20 text-right text-xs font-semibold text-teal-700 border border-teal-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-400 bg-teal-50/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  />
+                              }
                               {label === "Ăn" && phuCapAnNgay > 0 && <span className="text-[10px] text-slate-400">×{ngayAnDuCong}ng</span>}
                             </div>
                           ))}
