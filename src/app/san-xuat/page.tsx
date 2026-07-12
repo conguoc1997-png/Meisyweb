@@ -241,6 +241,17 @@ export default function SanXuatPage() {
   const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL"];
   type SzItem = { size: string; qty: number; checked: boolean };
   const [sizeItems, setSizeItems] = useState<SzItem[]>(SIZES.map(s => ({ size: s, qty: 1, checked: false })));
+  const [addingSize, setAddingSize] = useState(false);
+  const [newSizeName, setNewSizeName] = useState("");
+  const addCustomSize = () => {
+    const sz = newSizeName.trim().toUpperCase();
+    if (!sz || sizeItems.some(s => s.size === sz)) { setAddingSize(false); setNewSizeName(""); return; }
+    setSizeItems(prev => {
+      const next = [...prev, { size: sz, qty: 1, checked: true }];
+      syncSizeToForm(next); return next;
+    });
+    setAddingSize(false); setNewSizeName("");
+  };
 
   const syncSizeToForm = (items: SzItem[]) => {
     const sel = items.filter(s => s.checked);
@@ -268,6 +279,7 @@ export default function SanXuatPage() {
         const sz = m[2].toUpperCase();
         const idx = result.findIndex(r => r.size === sz);
         if (idx >= 0) result[idx] = { ...result[idx], qty, checked: true };
+        else result.push({ size: sz, qty, checked: true }); // size tùy chỉnh
       }
     });
     return result;
@@ -2446,7 +2458,7 @@ export default function SanXuatPage() {
                     <div className="col-span-2">
                       <label className="text-xs text-slate-600 mb-1 block">Size & Số lượng mỗi size</label>
                       <div className="border border-slate-200 rounded-lg p-3">
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 items-start">
                           {sizeItems.map(item => (
                             <div key={item.size} className="flex flex-col items-center gap-1">
                               <button type="button" onClick={() => toggleSize(item.size)}
@@ -2460,6 +2472,28 @@ export default function SanXuatPage() {
                               )}
                             </div>
                           ))}
+                          {/* Nút thêm size tùy chỉnh */}
+                          {addingSize ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                autoFocus
+                                value={newSizeName}
+                                onChange={e => setNewSizeName(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustomSize(); } if (e.key === "Escape") { setAddingSize(false); setNewSizeName(""); } }}
+                                placeholder="VD: 5XL"
+                                className="w-14 text-center border border-indigo-300 rounded-lg px-1 py-1.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                              />
+                              <button type="button" onClick={addCustomSize}
+                                className="px-2 py-1.5 rounded-lg text-xs font-bold bg-indigo-500 text-white hover:bg-indigo-600 transition">✓</button>
+                              <button type="button" onClick={() => { setAddingSize(false); setNewSizeName(""); }}
+                                className="px-2 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-500 hover:bg-slate-200 transition">✕</button>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => setAddingSize(true)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition">
+                              + Size
+                            </button>
+                          )}
                         </div>
                         {sizeItems.some(s => s.checked) && (
                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
