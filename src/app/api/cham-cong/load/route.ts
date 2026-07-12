@@ -43,8 +43,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ chamCongs: ccRows, phuCaps: phuCapMap });
     }
 
-    // Chế độ đầy đủ: NV + CC + PhuCap + Ca song song
-    const [nvPrisma, nvExtraRaw, ccRows, phuCapRows, caRows] = await Promise.all([
+    // Chế độ đầy đủ: NV + CC + PhuCap + LichDiLam song song
+    const [y2, m2] = thang ? thang.split("-").map(Number) : [0, 0];
+    const lichStart = thang ? new Date(Date.UTC(y2, m2 - 1, 1)) : null;
+    const lichEnd   = thang ? new Date(Date.UTC(y2, m2, 1))     : null;
+
+    const [nvPrisma, nvExtraRaw, ccRows, phuCapRows, lichRows] = await Promise.all([
       prisma.nhanVien.findMany({
         orderBy: { ten: "asc" },
         ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
@@ -54,24 +58,29 @@ export async function GET(req: NextRequest) {
       ).catch(() => null),
       ccPromise,
       pcPromise,
-      // Lấy Ca để tính muộn/về sớm trong hover card
-      prisma.$queryRawUnsafe<{ id: string; ten: string; gioVao: string; gioRa: string; gioVao2: string | null; gioRa2: string | null }[]>(
-        `SELECT "id","ten","gioVao","gioRa","gioVao2","gioRa2" FROM "CaLamViec"`
-      ).catch(() => [] as { id: string; ten: string; gioVao: string; gioRa: string; gioVao2: string | null; gioRa2: string | null }[]),
+      // Lịch làm việc (gioVao/gioRa thực tế từng ngày) — dùng cho hover card
+      lichStart && lichEnd
+        ? prisma.$queryRawUnsafe<{ nhanVienId: string; ngay: Date; gioVao: string | null; gioRa: string | null; ca: string | null }[]>(
+            `SELECT "nhanVienId","ngay","gioVao","gioRa","ca" FROM "LichDiLam"
+             WHERE "ngay" >= $1 AND "ngay" < $2 AND "loai" = 'dang_ky' AND "trangThai" IN ('da_duyet','di_lam')`,
+            lichStart, lichEnd
+          ).catch(() => [] as { nhanVienId: string; ngay: Date; gioVao: string | null; gioRa: string | null; ca: string | null }[])
+        : Promise.resolve([] as { nhanVienId: string; ngay: Date; gioVao: string | null; gioRa: string | null; ca: string | null }[]),
     ]);
 
     const nvExtra = nvExtraRaw ?? [];
     const nghiColExists = nvExtraRaw !== null;
     const nghiMap = Object.fromEntries(nvExtra.map(r => [r.id, r.ngayNghiViec ?? null]));
-    const caIdMap  = Object.fromEntries(nvExtra.map(r => [r.id, r.caLamViecId ?? null]));
-    const caByIdMap = Object.fromEntries(caRows.map(c => [c.id, c]));
+
+    // Map lịch: "nvId_YYYY-MM-DD" → { gioVao, gioRa, ca }
+    const lichMap: Record<string, { gioVao: string | null; gioRa: string | null; ca: string | null }> = {};
+    for (const r of lichRows) {
+      const ngayStr = (r.ngay instanceof Date ? r.ngay : new Date(r.ngay)).toISOString().slice(0, 10);
+      lichMap[`${r.nhanVienId}_${ngayStr}`] = { gioVao: r.gioVao, gioRa: r.gioRa, ca: r.ca };
+    }
 
     const nhanViens = nvPrisma
-      .map(nv => ({
-        ...nv,
-        ngayNghiViec: nghiMap[nv.id] ?? null,
-        caLamViec: caIdMap[nv.id] ? (caByIdMap[caIdMap[nv.id]!] ?? null) : null,
-      }))
+      .map(nv => ({ ...nv, ngayNghiViec: nghiMap[nv.id] ?? null }))
       .filter(nv => {
         if (nv.active) return true;
         if (!nghiColExists) return false;
@@ -84,7 +93,7 @@ export async function GET(req: NextRequest) {
       phuCapMap[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB };
     }
 
-    return NextResponse.json({ nhanViens, chamCongs: ccRows, phuCaps: phuCapMap });
+    return NextResponse.json({ nhanViens, chamCongs: ccRows, phuCaps: phuCapMap, lichMap });
   } catch (e) {
     console.error("GET /api/cham-cong/load error:", e);
     return NextResponse.json({ error: String(e) }, { status: 500 });

@@ -365,6 +365,9 @@ export default function ChamCongPage() {
 
   // Phụ cấp theo tháng: { [nvId]: { phuCapCC, phuCapAn, phuCapDB, heSoTC? } }
   type PhuCapMap = Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC?: number | null }>;
+  // Lịch làm việc theo ngày: "nvId_YYYY-MM-DD" → { gioVao, gioRa, ca }
+  type LichMap = Record<string, { gioVao: string | null; gioRa: string | null; ca: string | null }>;
+  const [lichMap, setLichMap] = useState<LichMap>({});
   const [phuCapMap, setPhuCapMap] = useState<PhuCapMap>({});
 
   const fetchPhuCap = useCallback(async () => {
@@ -449,6 +452,7 @@ export default function ChamCongPage() {
       }
       setChamCongs(Array.isArray(data.chamCongs) ? data.chamCongs as ChamCong[] : []);
       setPhuCapMap(data.phuCaps && typeof data.phuCaps === "object" ? data.phuCaps : {});
+      setLichMap(data.lichMap && typeof data.lichMap === "object" ? data.lichMap : {});
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return; // request bị hủy bình thường
       console.error("fetchData error:", e);
@@ -1139,9 +1143,9 @@ export default function ChamCongPage() {
                                 gioRa: gio?.gioRa,
                                 tongGio: gio?.tongGio,
                                 ghiChu: ghiChuMap[key] || null,
-                                caGioVao: nv.caLamViec?.gioVao ?? null,
-                                caGioRa: nv.caLamViec?.gioRa ?? null,
-                                caTen: nv.caLamViec?.ten ?? null,
+                                caGioVao: lichMap[`${nv.id}_${ngayStr}`]?.gioVao ?? null,
+                                caGioRa: lichMap[`${nv.id}_${ngayStr}`]?.gioRa ?? null,
+                                caTen: lichMap[`${nv.id}_${ngayStr}`]?.ca ?? null,
                               });
                             }}
                             onMouseLeave={() => setHoverCard(null)}
