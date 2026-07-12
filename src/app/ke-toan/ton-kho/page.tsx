@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Search, Plus, X, Pencil, PackageCheck, RefreshCw, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -108,12 +108,21 @@ export default function TonKhoPage() {
   const [items, setItems]         = useState<TonKho[]>([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");
+  const [searchInput, setSearchInput] = useState(""); // raw input, debounced → search
   const [filterLoai, setFilterLoai] = useState("");
   const [filterNhom, setFilterNhom] = useState("");
 
+  // Debounce search input 200ms
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchInput = (v: string) => {
+    setSearchInput(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearch(v), 200);
+  };
+
   const [modal, setModal]         = useState<"create" | "edit" | null>(null);
   const [editTarget, setEditTarget] = useState<TonKho | null>(null);
-  const [form, setForm]           = useState<VatTuForm>({ ma: "", ten: "", loai: "vai", nhom: "", donVi: "m", ghiChu: "" });
+  const [form, setForm]           = useState<VatTuForm>({ ma: "", ten: "", loai: "vai", nhom: "", donVi: "m", donViMua: "m", quyDoi: 1, ghiChu: "" });
   const [customLoai, setCustomLoai] = useState("");
   const [customNhom, setCustomNhom] = useState("");
   const [saving, setSaving]       = useState(false);
@@ -132,9 +141,11 @@ export default function TonKhoPage() {
   const [deleteStep, setDeleteStep]     = useState(0); // 0=closed, 1=first, 2=second
   const [deleting, setDeleting]         = useState(false);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (bust = false) => {
     setLoading(true);
-    const res = await fetch("/api/ke-toan/ton-kho");
+    // bust=true khi vừa save/delete → bỏ qua server cache
+    const url = bust ? `/api/ke-toan/ton-kho?_t=${Date.now()}` : "/api/ke-toan/ton-kho";
+    const res = await fetch(url);
     const data = await res.json();
     setItems(Array.isArray(data) ? data : []);
     setLoading(false);
@@ -297,7 +308,7 @@ export default function TonKhoPage() {
         return;
       }
       setModal(null);
-      fetchAll();
+      fetchAll(true);
     } finally {
       setSaving(false);
     }
@@ -311,7 +322,7 @@ export default function TonKhoPage() {
       const data = await res.json();
       if (res.ok) {
         alert(`✅ Đã tính lại ${data.updated} mặt hàng thành công!`);
-        fetchAll();
+        fetchAll(true);
       } else {
         alert("❌ Lỗi: " + (data.error || "Không xác định"));
       }
@@ -334,7 +345,7 @@ export default function TonKhoPage() {
         setSelected(new Set());
         setMergeModal(false);
         setMasterId("");
-        fetchAll();
+        fetchAll(true);
       } else {
         const d = await res.json();
         alert("❌ Lỗi: " + (d.error || "Không xác định"));
@@ -352,7 +363,7 @@ export default function TonKhoPage() {
     try {
       await fetch(`/api/ke-toan/vat-tu/${deleteTarget.vatTuId}`, { method: "DELETE" });
       cancelDelete();
-      fetchAll();
+      fetchAll(true);
     } finally { setDeleting(false); }
   }
 
@@ -419,7 +430,7 @@ export default function TonKhoPage() {
       <div className="flex gap-3 flex-wrap items-center">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
+          <input value={searchInput} onChange={e => handleSearchInput(e.target.value)}
             placeholder="Tìm mã, tên vật tư..."
             className="pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm w-48 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
         </div>

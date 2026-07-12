@@ -2,68 +2,75 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// ── In-memory cache: 60 giây, tránh gọi DB liên tục khi user reload ──
+let _cache: { data: object; ts: number } | null = null;
+const CACHE_TTL = 60_000; // 60s
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const loai = searchParams.get("loai");
-    const nhom = searchParams.get("nhom");
+    const loai    = searchParams.get("loai");
+    const nhom    = searchParams.get("nhom");
+    const noCache = searchParams.get("_t") !== null; // ?_t=... → bỏ qua cache
 
-    const [items, chiTiets, quyDoiDonVis] = await Promise.all([
-      prisma.tonKhoVatTu.findMany({
-        where: {
-          vatTu: {
-            active: true,
-            ...(loai && { loai }),
-            ...(nhom && { nhom }),
+    // ── Trả cache nếu còn hạn và không có filter động ──
+    if (!noCache && !loai && !nhom && _cache && Date.now() - _cache.ts < CACHE_TTL) {
+      return NextResponse.json(_cache.data);
+    }
+
+    // ── 1 query duy nhất — VatTu đã có donViMua + quyDoi sẵn ──
+    // Bỏ 2 query cũ: chiTietNhapKho (join PhieuNhapKho, distinct) + quyDoiDonVi
+    const items = await prisma.tonKhoVatTu.findMany({
+      where: {
+        vatTu: {
+          active: true,
+          ...(loai && { loai }),
+          ...(nhom && { nhom }),
+        },
+      },
+      include: {
+        vatTu: {
+          select: {
+            id: true, ma: true, ten: true, loai: true,
+            nhom: true, donVi: true, donViMua: true,
+            quyDoi: true, ghiChu: true,
           },
         },
-        include: { vatTu: true },
-        orderBy: [
-          { vatTu: { loai: "asc" } },
-          { vatTu: { nhom: "asc" } },
-          { vatTu: { ten: "asc" } },
-        ],
-      }),
-      // Lấy donViMua, quyDoi, donViQuyDoi mới nhất từ lịch sử nhập kho
-      prisma.chiTietNhapKho.findMany({
-        select: { vatTuId: true, donViMua: true, quyDoi: true, donViQuyDoi: true },
-        orderBy: { phieu: { ngay: "desc" } },
-        distinct: ["vatTuId"],
-      }),
-      // Bảng quy đổi đơn vị (fallback khi donViQuyDoi chưa được nhập)
-      prisma.quyDoiDonVi.findMany({
-        select: { tuDonVi: true, veDonVi: true },
-      }),
-    ]);
-
-    // Map donViMua → veDonVi từ bảng QuyDoiDonVi
-    const quyDoiDVMap = new Map(quyDoiDonVis.map(q => [q.tuDonVi, q.veDonVi]));
-
-    // Map vatTuId → { donViMua, quyDoi, donViQuyDoi }
-    const nhapMap = new Map(chiTiets.map(c => [c.vatTuId, {
-      donViMua:    c.donViMua,
-      quyDoi:      c.quyDoi,
-      // Ưu tiên: (1) donViQuyDoi đã lưu trong DB, (2) lookup từ QuyDoiDonVi, (3) null
-      donViQuyDoi: (c.donViQuyDoi && c.donViQuyDoi !== c.donViMua)
-        ? c.donViQuyDoi
-        : (quyDoiDVMap.get(c.donViMua) ?? null),
-    }]));
+      },
+      orderBy: [
+        { vatTu: { loai: "asc" } },
+        { vatTu: { nhom: "asc" } },
+        { vatTu: { ten: "asc" } },
+      ],
+    });
 
     const result = items.map(t => {
-      const info = nhapMap.get(t.vatTuId);
-      const donViMua    = info?.donViMua    ?? t.vatTu.donVi;
-      const quyDoi      = info?.quyDoi      ?? 1;
-      // Fallback cuối: nếu vatTu là vải → "m", ngược lại → vatTu.donVi
-      const donViQuyDoi = info?.donViQuyDoi
-        ?? (t.vatTu.loai === "vai" ? "m" : t.vatTu.donVi);
+      const donViMua    = t.vatTu.donViMua || t.vatTu.donVi;
+      const quyDoi      = t.vatTu.quyDoi   ?? 1;
+      // donViQuyDoi = đơn vị tồn kho cơ bản (donVi trên VatTu)
+      // Fallback: vải → "m", còn lại dùng donVi
+      const donViQuyDoi = t.vatTu.donVi
+        || (t.vatTu.loai === "vai" ? "m" : "cai");
+
       return {
-        ...t,
+        id:            t.id,
+        vatTuId:       t.vatTuId,
+        soLuong:       t.soLuong,
+        giaTrungBinh:  t.giaTrungBinh,
+        giaTriTon:     t.giaTriTon,
+        updatedAt:     t.updatedAt,
         donViMua,
         quyDoi,
         donViQuyDoi,
-        soLuongQD: t.soLuong * quyDoi,
+        soLuongQD:     t.soLuong * quyDoi,
+        vatTu:         t.vatTu,
       };
     });
+
+    // Lưu cache chỉ khi không có filter
+    if (!loai && !nhom) {
+      _cache = { data: result, ts: Date.now() };
+    }
 
     return NextResponse.json(result);
   } catch (e: unknown) {
@@ -73,4 +80,9 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Invalidate cache khi có thay đổi (gọi từ nhập-kho, xuất-kho, recalc)
+export function invalidateCache() {
+  _cache = null;
 }
