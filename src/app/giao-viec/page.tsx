@@ -8,6 +8,7 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────
 type NhanVien = { id: string; ten: string; maNV: string; phongBan: string | null };
+type UserAccount = { id: string; name: string; email: string; role: string; active: boolean; nhanVienId: string | null };
 type Assignment = {
   id: string; taskId: string; nhanVienId: string;
   trangThai: string; note: string | null;
@@ -70,10 +71,11 @@ const tmpId = () => `tmp_${++_tmpId}`;
 
 // ── Task Modal ───────────────────────────────────────────────────────
 function TaskModal({
-  task, nvList, onSave, onDelete, onClose,
+  task, nvList, userAccounts, onSave, onDelete, onClose,
 }: {
   task?: Task;
   nvList: NhanVien[];
+  userAccounts: UserAccount[];
   onSave: (data: {
     title: string; description: string; deadline: string;
     priority: string; color: string; nhanVienIds: string[];
@@ -92,8 +94,8 @@ function TaskModal({
 
   useEffect(() => { setTimeout(() => titleRef.current?.focus(), 50); }, []);
 
-  const toggleNv = (id: string) =>
-    setNvIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleNv = (nvId: string) =>
+    setNvIds(prev => prev.includes(nvId) ? prev.filter(x => x !== nvId) : [...prev, nvId]);
 
   async function submit() {
     if (!title.trim()) return;
@@ -103,7 +105,11 @@ function TaskModal({
     onClose();
   }
 
-  const prioInfo = PRIORITY_MAP[priority];
+  // Users who have a linked NhanVien (can receive tasks)
+  const assignableUsers = userAccounts.filter(u => u.nhanVienId && u.active);
+  // NhanVien without any user account (legacy fallback)
+  const linkedNvIds = new Set(userAccounts.map(u => u.nhanVienId).filter(Boolean));
+  const unlinkedNv = nvList.filter(nv => !linkedNvIds.has(nv.id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 bg-black/40"
@@ -164,28 +170,66 @@ function TaskModal({
             ))}
           </div>
 
-          {/* Assign NV */}
+          {/* Assign — User Accounts */}
           <div className="mb-2">
-            <label className="text-xs text-gray-500 mb-2 block flex items-center gap-1">
-              <Users size={11} /> Giao cho
+            <label className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+              <Users size={11} /> Giao cho tài khoản
             </label>
-            <div className="flex flex-wrap gap-2">
-              {nvList.map(nv => {
-                const selected = nvIds.includes(nv.id);
-                return (
-                  <button key={nv.id} onClick={() => toggleNv(nv.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all
-                      ${selected ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
-                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
-                      style={{ background: deptColor(nv.phongBan) }}>
-                      {nv.ten.split(" ").slice(-1)[0]?.[0]}
-                    </span>
-                    {nv.ten.split(" ").slice(-1)[0]}
-                    {selected && <Check size={10} className="text-blue-500" strokeWidth={3} />}
-                  </button>
-                );
-              })}
-            </div>
+
+            {assignableUsers.length === 0 ? (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Chưa có tài khoản nào được liên kết nhân viên. Vào{" "}
+                <span className="font-semibold">/admin/users</span> để gán.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {assignableUsers.map(u => {
+                  const nv = nvList.find(n => n.id === u.nhanVienId);
+                  const nvId = u.nhanVienId!;
+                  const selected = nvIds.includes(nvId);
+                  const initials = u.name.split(" ").slice(-1)[0]?.[0] ?? "?";
+                  return (
+                    <button key={u.id} onClick={() => toggleNv(nvId)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all
+                        ${selected ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
+                      <span className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+                        style={{ background: deptColor(nv?.phongBan ?? null) }}>
+                        {initials}
+                      </span>
+                      <span>{u.name.split(" ").slice(-1)[0]}</span>
+                      {nv && <span className="text-[10px] opacity-60">({nv.maNV})</span>}
+                      {selected && <Check size={10} className="text-blue-500" strokeWidth={3} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Fallback: NV without account */}
+            {unlinkedNv.length > 0 && (
+              <details className="mt-3">
+                <summary className="text-[11px] text-gray-400 cursor-pointer hover:text-gray-600 select-none">
+                  + {unlinkedNv.length} nhân viên chưa có tài khoản
+                </summary>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {unlinkedNv.map(nv => {
+                    const selected = nvIds.includes(nv.id);
+                    return (
+                      <button key={nv.id} onClick={() => toggleNv(nv.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-all
+                          ${selected ? "border-purple-400 bg-purple-50 text-purple-700" : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"}`}>
+                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+                          style={{ background: deptColor(nv.phongBan) }}>
+                          {nv.ten.split(" ").slice(-1)[0]?.[0]}
+                        </span>
+                        {nv.ten.split(" ").slice(-1)[0]}
+                        {selected && <Check size={10} className="text-purple-500" strokeWidth={3} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
         </div>
 
@@ -351,11 +395,12 @@ function TaskCard({
 
 // ── Main Page ────────────────────────────────────────────────────────
 export default function GiaoViecPage() {
-  const [tasks,   setTasks]   = useState<Task[]>([]);
-  const [nvList,  setNvList]  = useState<NhanVien[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState<{ task?: Task } | null>(null);
-  const [filterNv,setFilterNv]= useState("");
+  const [tasks,        setTasks]        = useState<Task[]>([]);
+  const [nvList,       setNvList]       = useState<NhanVien[]>([]);
+  const [userAccounts, setUserAccounts] = useState<UserAccount[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [modal,        setModal]        = useState<{ task?: Task } | null>(null);
+  const [filterNv,     setFilterNv]     = useState("");
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -369,6 +414,7 @@ export default function GiaoViecPage() {
 
   useEffect(() => {
     fetch("/api/cham-cong/nhan-vien").then(r => r.json()).then(d => setNvList(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch("/api/admin/users").then(r => r.json()).then(d => setUserAccounts(Array.isArray(d) ? d : [])).catch(() => {});
     fetchTasks();
   }, [fetchTasks]);
 
@@ -509,11 +555,16 @@ export default function GiaoViecPage() {
           )}
         </div>
 
-        {/* Filter by NV */}
+        {/* Filter by user account */}
         <select value={filterNv} onChange={e => setFilterNv(e.target.value)}
           className="text-sm border border-gray-200 rounded-full px-3 py-2 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-200">
           <option value="">Tất cả nhân viên</option>
-          {nvList.map(nv => <option key={nv.id} value={nv.id}>{nv.ten}</option>)}
+          {userAccounts.filter(u => u.nhanVienId && u.active).map(u => (
+            <option key={u.id} value={u.nhanVienId!}>{u.name}</option>
+          ))}
+          {nvList.filter(nv => !userAccounts.some(u => u.nhanVienId === nv.id)).map(nv => (
+            <option key={nv.id} value={nv.id}>{nv.ten} (chưa có tài khoản)</option>
+          ))}
         </select>
 
         <button onClick={() => setModal({})}
@@ -584,6 +635,7 @@ export default function GiaoViecPage() {
         <TaskModal
           task={modal.task}
           nvList={nvList}
+          userAccounts={userAccounts}
           onSave={modal.task
             ? (data) => handleUpdate(modal.task!.id, data)
             : handleCreate}
