@@ -12,10 +12,11 @@ export async function GET() {
     return NextResponse.json({ error: msg === "UNAUTHORIZED" ? "Chưa đăng nhập" : "Không có quyền" }, { status: msg === "UNAUTHORIZED" ? 401 : 403 });
   }
 
-  const users = await prisma.user.findMany({
-    select: { id: true, email: true, name: true, role: true, active: true, createdAt: true },
-    orderBy: { createdAt: "asc" },
-  });
+  // Dùng raw SQL để lấy nhanVienId (cột mới, Prisma client chưa biết)
+  type UserRow = { id: string; email: string; name: string; role: string; active: boolean; createdAt: Date; nhanVienId: string | null };
+  const users = await prisma.$queryRawUnsafe<UserRow[]>(
+    `SELECT id, email, name, role, active, "createdAt", "nhanVienId" FROM "User" ORDER BY "createdAt" ASC`
+  );
   return NextResponse.json(users);
 }
 

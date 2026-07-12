@@ -5,6 +5,7 @@ import {
   CalendarDays, Flag, Users, X, Check, Clock,
   AlertCircle, Smile,
 } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 // ── Types ────────────────────────────────────────────────────────────
 type NhanVien = { id: string; ten: string; maNV: string; phongBan: string | null };
@@ -256,22 +257,40 @@ function MyTaskItem({
 
 // ── Main Page ────────────────────────────────────────────────────────
 export default function ViecCuaToiPage() {
+  const { user, loading: authLoading } = useUser();
   const [nvList,  setNvList]  = useState<NhanVien[]>([]);
   const [me,      setMe]      = useState<NhanVien | null>(null);
   const [tasks,   setTasks]   = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter,  setFilter]  = useState<"all" | "chua_lam" | "dang_lam" | "hoan_thanh">("all");
+  // true when NV was auto-linked from account (không cho phép đổi người)
+  const [autoLinked, setAutoLinked] = useState(false);
 
   // Load NV list
   useEffect(() => {
     fetch("/api/cham-cong/nhan-vien").then(r => r.json())
       .then(d => setNvList(Array.isArray(d) ? d : [])).catch(() => {});
-    // Restore from localStorage
+  }, []);
+
+  // Auto-detect from logged-in user's nhanVienId
+  useEffect(() => {
+    if (authLoading || !user?.nhanVienId || nvList.length === 0) return;
+    const linked = nvList.find(n => n.id === user.nhanVienId);
+    if (linked) {
+      setMe(linked);
+      setAutoLinked(true);
+    }
+  }, [user, authLoading, nvList]);
+
+  // Fallback: restore from localStorage if no auto-link
+  useEffect(() => {
+    if (authLoading) return;
+    if (user?.nhanVienId) return; // auto-link will handle it
     try {
       const saved = localStorage.getItem("meisy_me_nv");
       if (saved) setMe(JSON.parse(saved));
     } catch {}
-  }, []);
+  }, [authLoading, user]);
 
   const fetchMyTasks = useCallback(async (nvId: string) => {
     setLoading(true);
@@ -289,11 +308,13 @@ export default function ViecCuaToiPage() {
 
   function selectMe(nv: NhanVien) {
     setMe(nv);
+    setAutoLinked(false);
     try { localStorage.setItem("meisy_me_nv", JSON.stringify(nv)); } catch {}
   }
 
   function logout() {
     setMe(null);
+    setAutoLinked(false);
     setTasks([]);
     try { localStorage.removeItem("meisy_me_nv"); } catch {}
   }
@@ -338,8 +359,51 @@ export default function ViecCuaToiPage() {
     hoan_thanh: myTasks.filter(x => x.myAss!.trangThai === "hoan_thanh").length,
   }), [myTasks]);
 
-  // ── Not logged in ─────────────────────────────────────────────
-  if (!me) return <NVPicker nvList={nvList} onSelect={selectMe} />;
+  // ── Auth loading ──────────────────────────────────────────────
+  if (authLoading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  // ── No NV selected → show picker (or "contact admin" message if signed in without link) ──
+  if (!me) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        {user && !user.nhanVienId ? (
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8 text-center">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-amber-100">
+              <AlertCircle size={28} className="text-amber-500" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Chưa liên kết nhân viên</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Tài khoản <span className="font-semibold text-gray-700">{user.name}</span> chưa được gán nhân viên.
+              Liên hệ admin để được liên kết.
+            </p>
+            <p className="text-xs text-gray-400 mb-4">Hoặc chọn tạm thời:</p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {nvList.map(nv => (
+                <button key={nv.id} onClick={() => selectMe(nv)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition text-left group">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                    style={{ background: deptColor(nv.phongBan) }}>
+                    {nv.ten.split(" ").slice(-1)[0]?.[0]}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-700 group-hover:text-blue-700">{nv.ten}</p>
+                    {nv.phongBan && <p className="text-[11px] text-gray-400">{nv.phongBan}</p>}
+                  </div>
+                  <Check size={14} className="text-blue-400 opacity-0 group-hover:opacity-100 transition" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <NVPicker nvList={nvList} onSelect={selectMe} />
+        )}
+      </div>
+    );
+  }
 
   const urgent = myTasks.filter(x =>
     x.myAss!.trangThai !== "hoan_thanh" && x.task.deadline &&
@@ -378,10 +442,16 @@ export default function ViecCuaToiPage() {
           )}
         </div>
 
-        <button onClick={logout}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition">
-          <X size={13} /> Đổi người
-        </button>
+        {autoLinked ? (
+          <div className="flex items-center gap-1 text-xs text-green-600 px-2 py-1 rounded-lg bg-green-50 border border-green-200">
+            <Check size={11} /> Tài khoản
+          </div>
+        ) : (
+          <button onClick={logout}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition">
+            <X size={13} /> Đổi người
+          </button>
+        )}
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-5">

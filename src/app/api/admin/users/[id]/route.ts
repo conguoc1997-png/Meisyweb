@@ -27,6 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.name) data.name = body.name;
   if (body.role !== undefined) data.role = body.role;
   if (typeof body.active === "boolean") data.active = body.active;
+  if ("nhanVienId" in body) data.nhanVienId = body.nhanVienId || null;
 
   if (body.password) {
     data.password = await bcrypt.hash(body.password, 10);
@@ -39,6 +40,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       });
       data.sessionVersion = (current?.sessionVersion ?? 0) + 1;
     }
+  }
+
+  // nhanVienId là cột mới chưa có trong Prisma schema → xử lý riêng bằng raw SQL
+  if ("nhanVienId" in data) {
+    const nv = data.nhanVienId as string | null;
+    await prisma.$executeRawUnsafe(
+      `UPDATE "User" SET "nhanVienId" = $1 WHERE id = $2`,
+      nv, id
+    );
+    delete data.nhanVienId;
   }
 
   const user = await prisma.user.update({
