@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Users, Plus, Pencil, Trash2, X, Check, Link } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Users, Plus, Pencil, Trash2, X, Check, Link, Camera } from "lucide-react";
 import { ALL_MODULES, parseModules } from "@/lib/auth";
 
 type User = {
@@ -12,7 +12,29 @@ type User = {
   active: boolean;
   createdAt: string;
   nhanVienId: string | null;
+  avatarUrl: string | null;
 };
+
+// Nén ảnh client-side → base64 JPEG 200×200
+function compressAvatar(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const SIZE = 200;
+      const canvas = document.createElement("canvas");
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext("2d")!;
+      // Crop vuông giữa ảnh
+      const min = Math.min(img.width, img.height);
+      const sx = (img.width - min) / 2;
+      const sy = (img.height - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, SIZE, SIZE);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 type NhanVien = { id: string; ten: string; maNV: string; phongBan: string | null };
 
@@ -44,6 +66,9 @@ export default function AdminUsersPage() {
   const [selectedMods, setSelectedMods] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const load = () => fetch("/api/admin/users").then(r => r.json()).then(setUsers);
 
@@ -58,6 +83,7 @@ export default function AdminUsersPage() {
     setForm({ email: "", name: "", password: "", isAdmin: false, logoutOtherDevices: true, nhanVienId: "" });
     setSelectedMods([]);
     setError("");
+    setAvatarPreview(null);
     setShowForm(true);
   }
 
@@ -70,7 +96,26 @@ export default function AdminUsersPage() {
     });
     setSelectedMods(u.role === "admin" ? [] : parseModules(u.role));
     setError("");
+    setAvatarPreview(u.avatarUrl ?? null);
     setShowForm(true);
+  }
+
+  async function handleAvatarFile(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    setAvatarUploading(true);
+    try {
+      const compressed = await compressAvatar(file);
+      setAvatarPreview(compressed);
+      // Nếu đang edit → lưu avatar ngay
+      if (editUser) {
+        await fetch(`/api/admin/users/${editUser.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ avatarUrl: compressed }),
+        });
+        load();
+      }
+    } catch { /* ignore */ }
+    finally { setAvatarUploading(false); }
   }
 
   async function handleSave() {
@@ -166,10 +211,22 @@ export default function AdminUsersPage() {
               const linkedNv = u.nhanVienId ? nvMap[u.nhanVienId] : null;
               return (
                 <tr key={u.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  {/* Tên + email */}
+                  {/* Avatar + Tên + email */}
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-800">{u.name}</p>
-                    <p className="text-xs text-slate-400">{u.email}</p>
+                    <div className="flex items-center gap-3">
+                      {u.avatarUrl ? (
+                        <img src={u.avatarUrl} alt={u.name}
+                          className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-slate-200" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500 font-bold text-sm">
+                          {u.name.split(" ").slice(-1)[0]?.[0] ?? "?"}
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-slate-800">{u.name}</p>
+                        <p className="text-xs text-slate-400">{u.email}</p>
+                      </div>
+                    </div>
                   </td>
 
                   {/* NV liên kết — dropdown quick-link */}
@@ -272,6 +329,48 @@ export default function AdminUsersPage() {
               <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
+              {/* Avatar upload */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="avatar"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-slate-200" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl font-bold">
+                      {form.name.split(" ").slice(-1)[0]?.[0] ?? "?"}
+                    </div>
+                  )}
+                  {avatarUploading && (
+                    <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarFile(f); e.target.value = ""; }} />
+                  <button type="button" onClick={() => avatarInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition">
+                    <Camera size={13} /> {avatarPreview ? "Đổi ảnh" : "Upload ảnh"}
+                  </button>
+                  {avatarPreview && (
+                    <button type="button" onClick={async () => {
+                      setAvatarPreview(null);
+                      if (editUser) {
+                        await fetch(`/api/admin/users/${editUser.id}`, {
+                          method: "PATCH", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ avatarUrl: null }),
+                        });
+                        load();
+                      }
+                    }} className="mt-1 text-[11px] text-red-400 hover:text-red-600 transition block">
+                      Xoá ảnh
+                    </button>
+                  )}
+                  <p className="text-[10px] text-slate-400 mt-1">JPG/PNG, tự nén 200×200</p>
+                </div>
+              </div>
+
               {!editUser && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Email</label>

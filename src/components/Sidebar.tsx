@@ -334,11 +334,21 @@ export default function Sidebar() {
         {/* Footer */}
         {show && user && (
           <div className="px-3 py-3 border-t border-stone-100/80">
-            <div className="px-3 py-2 rounded-xl bg-rose-50/40">
-              <p className="text-[12px] font-semibold text-stone-600 truncate">{user.name}</p>
-              <p className="text-[10px] text-stone-400 tracking-wide uppercase mt-0.5">
-                {user.role === "admin" ? "Admin" : "Nhân viên"}
-              </p>
+            <div className="px-3 py-2 rounded-xl bg-rose-50/40 flex items-center gap-2">
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name}
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-stone-200" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0 text-rose-400 font-bold text-sm">
+                  {user.name.split(" ").slice(-1)[0]?.[0] ?? "?"}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-stone-600 truncate">{user.name}</p>
+                <p className="text-[10px] text-stone-400 tracking-wide uppercase mt-0.5">
+                  {user.role === "admin" ? "Admin" : "Nhân viên"}
+                </p>
+              </div>
             </div>
           </div>
         )}

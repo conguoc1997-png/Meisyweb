@@ -7,6 +7,7 @@ export type SessionUser = {
   role: string; // "admin" | comma-separated module keys e.g. "kho,san-xuat,doi-tra"
   sessionVersion?: number;
   nhanVienId?: string | null; // liên kết với NhanVien (cho /viec-cua-toi)
+  avatarUrl?: string | null;  // ảnh đại diện
 };
 
 // Tất cả module keys có thể phân quyền

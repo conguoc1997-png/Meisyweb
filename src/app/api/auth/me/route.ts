@@ -15,6 +15,9 @@ async function ensureCols() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "nhanVienId" TEXT`
   ).catch(() => {});
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT`
+  ).catch(() => {});
 }
 
 export async function GET(req: NextRequest) {
@@ -31,9 +34,9 @@ export async function GET(req: NextRequest) {
   if (user.id !== "admin_fallback") {
     try {
       await ensureCols();
-      type DbUser = { active: boolean; role: string; name: string; sessionVersion: number; nhanVienId: string | null };
+      type DbUser = { active: boolean; role: string; name: string; sessionVersion: number; nhanVienId: string | null; avatarUrl: string | null };
       const [dbUser] = await prisma.$queryRawUnsafe<DbUser[]>(
-        `SELECT active, role, name, "sessionVersion", "nhanVienId" FROM "User" WHERE id = $1`,
+        `SELECT active, role, name, "sessionVersion", "nhanVienId", "avatarUrl" FROM "User" WHERE id = $1`,
         user.id
       );
 
@@ -57,6 +60,7 @@ export async function GET(req: NextRequest) {
         role:         dbUser.role,
         sessionVersion: dbUser.sessionVersion,
         nhanVienId:   dbUser.nhanVienId ?? null,
+        avatarUrl:    dbUser.avatarUrl ?? null,
       });
     } catch {
       // DB lỗi → graceful degradation

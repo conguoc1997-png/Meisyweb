@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.role !== undefined) data.role = body.role;
   if (typeof body.active === "boolean") data.active = body.active;
   if ("nhanVienId" in body) data.nhanVienId = body.nhanVienId || null;
+  if ("avatarUrl" in body) data.avatarUrl = body.avatarUrl || null;
 
   if (body.password) {
     data.password = await bcrypt.hash(body.password, 10);
@@ -42,14 +43,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-  // nhanVienId là cột mới chưa có trong Prisma schema → xử lý riêng bằng raw SQL
-  if ("nhanVienId" in data) {
-    const nv = data.nhanVienId as string | null;
+  // nhanVienId + avatarUrl là cột mới chưa có trong Prisma schema → raw SQL
+  if ("nhanVienId" in data || "avatarUrl" in data) {
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    let pi = 1;
+    if ("nhanVienId" in data) { sets.push(`"nhanVienId" = $${pi++}`); vals.push(data.nhanVienId); delete data.nhanVienId; }
+    if ("avatarUrl" in data)  { sets.push(`"avatarUrl" = $${pi++}`);  vals.push(data.avatarUrl);  delete data.avatarUrl; }
+    vals.push(id);
     await prisma.$executeRawUnsafe(
-      `UPDATE "User" SET "nhanVienId" = $1 WHERE id = $2`,
-      nv, id
+      `UPDATE "User" SET ${sets.join(", ")} WHERE id = $${pi}`,
+      ...vals
     );
-    delete data.nhanVienId;
   }
 
   const user = await prisma.user.update({
