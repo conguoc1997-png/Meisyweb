@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Package, RefreshCcw, Star, AlertTriangle,
-  Clock, Scissors,
-  BarChart3, CalendarDays, Calculator, BookOpen,
+  Package, RefreshCcw, Star,
+  Scissors,
+  CalendarDays, Calculator, BookOpen,
   CalendarCheck, Landmark, ClipboardList, ArrowRight,
   CheckCircle2,
 } from "lucide-react";
@@ -64,7 +64,11 @@ export default function TongQuanPage() {
   }, []);
 
   const now = new Date();
-  const greeting = now.getHours() < 12 ? "Chào buổi sáng" : now.getHours() < 18 ? "Chào buổi chiều" : "Chào buổi tối";
+  // Giờ Việt Nam (UTC+7)
+  const vnHour = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })).getHours();
+  const greeting = vnHour < 12 ? "Chào buổi sáng" : vnHour < 18 ? "Chào buổi chiều" : "Chào buổi tối";
+  const greetIcon = vnHour < 12 ? "🌅" : vnHour < 18 ? "☀️" : "🌙";
+  const displayName = user?.name ? user.name.split(" ").slice(-1)[0] : "";
 
   const MODULES: ModCard[] = [
     {
@@ -145,33 +149,31 @@ export default function TongQuanPage() {
     <div className="min-h-screen bg-[#f7f8fa] p-6 max-w-6xl mx-auto">
 
       {/* ── Header ── */}
-      <div className="mb-8">
-        <p className="text-sm text-slate-400 mb-1">{greeting}{user?.name ? `, ${user.name.split(" ").slice(-1)[0]}` : ""} 👋</p>
-        <h1 className="text-2xl font-bold text-slate-800">Tổng quan hệ thống</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          {now.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-        </p>
+      <div className="flex items-center gap-4 mb-8">
+        {/* Avatar */}
+        <div className="flex-shrink-0">
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.name}
+              className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-white ring-2 ring-slate-100" />
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center shadow-sm">
+              <span className="text-white text-xl font-bold">
+                {user?.name ? user.name.charAt(0).toUpperCase() : "?"}
+              </span>
+            </div>
+          )}
+        </div>
+        {/* Text */}
+        <div>
+          <p className="text-sm text-slate-400 mb-0.5">
+            {greeting}{displayName ? `, ${displayName}` : ""} {greetIcon}
+          </p>
+          <h1 className="text-2xl font-bold text-slate-800">Tổng quan hệ thống</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {now.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" })}
+          </p>
+        </div>
       </div>
-
-      {/* ── Alerts ── */}
-      {(data?.kho.spSapHet ?? 0) > 0 && (
-        <Link href="/kho" className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-3 hover:bg-red-100/60 transition group">
-          <AlertTriangle size={16} className="text-red-400 shrink-0" />
-          <p className="text-sm text-red-600 flex-1">
-            <span className="font-semibold">{data!.kho.spSapHet} sản phẩm</span> sắp hết hàng (tồn ≤ 5)
-          </p>
-          <ArrowRight size={14} className="text-red-300 group-hover:text-red-400 transition" />
-        </Link>
-      )}
-      {(data?.doiTra.chuaXuLy ?? 0) > 0 && (
-        <Link href="/doi-tra" className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-6 hover:bg-amber-100/60 transition group">
-          <Clock size={16} className="text-amber-400 shrink-0" />
-          <p className="text-sm text-amber-700 flex-1">
-            <span className="font-semibold">{data!.doiTra.chuaXuLy} case đổi trả</span> chưa có mã vận đơn
-          </p>
-          <ArrowRight size={14} className="text-amber-300 group-hover:text-amber-400 transition" />
-        </Link>
-      )}
 
       {/* ── Module Grid ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
