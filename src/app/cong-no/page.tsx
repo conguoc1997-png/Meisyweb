@@ -5,6 +5,7 @@ import {
   Plus, X, CheckCircle, AlertCircle, TrendingUp, TrendingDown,
   Wallet, RefreshCw, ChevronDown
 } from "lucide-react";
+import { useUser } from "@/lib/user-context";
 
 // ────────── Types ──────────
 type CongNoNCC = {
@@ -43,10 +44,26 @@ const HO_LIST = [
 
 const thangHienTai = new Date().toISOString().slice(0, 7);
 
+// Chuẩn hóa tên → ho key (bỏ dấu, lowercase, thay space bằng _)
+function nameToHoKey(name: string) {
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d").replace(/\s+/g, "_");
+}
+
 export default function CongNoPage() {
+  const { user } = useUser();
   const [tab, setTab] = useState<"ncc" | "kh">("ncc");
   const [ho, setHo] = useState("meisy");
   const [thang, setThang] = useState(thangHienTai);
+
+  // Auto-detect ho từ tài khoản đăng nhập
+  useEffect(() => {
+    if (!user) return;
+    const key = nameToHoKey(user.name);
+    const matched = HO_LIST.find(h => h.key === key);
+    if (matched) setHo(matched.key);
+  }, [user]);
 
   // Data
   const [nccList, setNccList] = useState<CongNoNCC[]>([]);
@@ -224,16 +241,22 @@ export default function CongNoPage() {
           <p className="text-sm text-slate-500 mt-0.5">Quản lý công nợ NCC và khách hàng</p>
         </div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          {/* Hộ */}
-          <select
-            value={ho}
-            onChange={e => setHo(e.target.value)}
-            className="text-sm border rounded-lg px-3 py-1.5 bg-white"
-          >
-            {HO_LIST.map(h => (
-              <option key={h.key} value={h.key}>{h.label}</option>
-            ))}
-          </select>
+          {/* Hộ — admin thấy dropdown, user thường thấy tên của mình */}
+          {user?.role === "admin" ? (
+            <select
+              value={ho}
+              onChange={e => setHo(e.target.value)}
+              className="text-sm border rounded-lg px-3 py-1.5 bg-white"
+            >
+              {HO_LIST.map(h => (
+                <option key={h.key} value={h.key}>{h.label}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-sm font-medium text-slate-700 bg-white border rounded-lg px-3 py-1.5">
+              {HO_LIST.find(h => h.key === ho)?.label ?? user?.name ?? "—"}
+            </span>
+          )}
           {/* Tháng */}
           <input
             type="month"
