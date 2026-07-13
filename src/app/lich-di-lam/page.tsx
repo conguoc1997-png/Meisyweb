@@ -123,9 +123,17 @@ export default function LichDiLamPage() {
   const loadLich = async (nvId: string) => {
     setLoadingLich(true);
     try {
-      const res = await fetch(`/api/lich-di-lam?nhanVienId=${nvId}`);
-      const d = await res.json();
-      setLichList(Array.isArray(d) ? d : []);
+      // Chỉ load tháng hiện tại + tháng tới (tránh fetch toàn bộ lịch sử)
+      const now2 = new Date();
+      const thisMonth = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, "0")}`;
+      const nextDate = new Date(now2.getFullYear(), now2.getMonth() + 1, 1);
+      const nextMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`;
+      const [r1, r2] = await Promise.all([
+        fetch(`/api/lich-di-lam?nhanVienId=${nvId}&thang=${thisMonth}`).then(r => r.json()),
+        fetch(`/api/lich-di-lam?nhanVienId=${nvId}&thang=${nextMonth}`).then(r => r.json()),
+      ]);
+      const combined = [...(Array.isArray(r1) ? r1 : []), ...(Array.isArray(r2) ? r2 : [])];
+      setLichList(combined);
     } catch { setLichList([]); }
     finally { setLoadingLich(false); }
   };

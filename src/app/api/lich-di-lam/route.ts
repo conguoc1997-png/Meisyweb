@@ -4,36 +4,37 @@ import { prisma } from "@/lib/prisma";
 
 const cuid = () => crypto.randomUUID().replace(/-/g, "").slice(0, 24);
 
-// Tạo bảng + thêm cột mới nếu chưa có
+// Tạo bảng + thêm cột mới — chỉ chạy 1 lần duy nhất mỗi process
 let tableReady = false;
 async function ensureTable() {
   if (tableReady) return;
+  // Đánh dấu ngay để tránh race condition
   tableReady = true;
+  // Tạo bảng + tất cả cột cần thiết trong 1 câu lệnh duy nhất
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "LichDiLam" (
-      "id"          TEXT        NOT NULL PRIMARY KEY,
-      "nhanVienId"  TEXT        NOT NULL,
-      "ngay"        DATE        NOT NULL,
+      "id"          TEXT         NOT NULL PRIMARY KEY,
+      "nhanVienId"  TEXT         NOT NULL,
+      "ngay"        DATE         NOT NULL,
       "gioVao"      TEXT,
       "gioRa"       TEXT,
       "ghiChu"      TEXT,
-      "trangThai"   TEXT        NOT NULL DEFAULT 'cho_duyet',
+      "trangThai"   TEXT         NOT NULL DEFAULT 'cho_duyet',
       "adminNote"   TEXT,
+      "ca"          TEXT,
+      "loai"        TEXT         NOT NULL DEFAULT 'dang_ky',
       "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `).catch(() => {});
-  // Thêm cột mới nếu chưa có
-  await Promise.all([
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "ca" TEXT`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "loai" TEXT NOT NULL DEFAULT 'dang_ky'`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "ghiChu" TEXT`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "gioVao" TEXT`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "gioRa" TEXT`).catch(() => {}),
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ADD COLUMN IF NOT EXISTS "adminNote" TEXT`).catch(() => {}),
-    // Đảm bảo updatedAt có DEFAULT (bảng cũ có thể thiếu)
-    prisma.$executeRawUnsafe(`ALTER TABLE "LichDiLam" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP`).catch(() => {}),
-  ]);
+  // Chỉ add cột nếu bảng đã tồn tại trước đó (cột mới có thể thiếu)
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      BEGIN ALTER TABLE "LichDiLam" ADD COLUMN "ca" TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END;
+      BEGIN ALTER TABLE "LichDiLam" ADD COLUMN "loai" TEXT NOT NULL DEFAULT 'dang_ky'; EXCEPTION WHEN duplicate_column THEN NULL; END;
+      BEGIN ALTER TABLE "LichDiLam" ADD COLUMN "adminNote" TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    END $$
+  `).catch(() => {});
 }
 
 type Row = {
