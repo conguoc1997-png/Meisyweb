@@ -253,17 +253,21 @@ export default function SanXuatPage() {
     setAddingSize(false); setNewSizeName("");
   };
 
+  // Format 1 size thành chuỗi: size bắt đầu bằng số (4XL, 5XL) dùng "qty*size" để tránh ambiguous
+  const fmtSizeItem = (s: SzItem) => /^\d/.test(s.size) ? `${s.qty}*${s.size}` : `${s.qty}${s.size}`;
+
+  const buildSoSize = (items: SzItem[]) =>
+    items.filter(s => s.checked).map(fmtSizeItem).join("-");
+
   const syncSizeToForm = (items: SzItem[]) => {
     const sel = items.filter(s => s.checked);
     const tongQty = sel.reduce((s, i) => s + i.qty, 0);
     setForm(f => ({
       ...f,
-      soSize: sel.map(s => `${s.qty}${s.size}`).join("-"),
+      soSize: buildSoSize(items),
       tongSize: tongQty > 0 ? String(tongQty) : "",
     }));
   };
-  // Luôn giữ form.soSize đồng bộ với sizeItems (tránh lệch khi mở edit)
-  useEffect(() => { syncSizeToForm(sizeItems); }, [sizeItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSize = (size: string) => setSizeItems(prev => {
     const next = prev.map(s => s.size === size ? { ...s, checked: !s.checked } : s);
     syncSizeToForm(next); return next;
@@ -274,14 +278,44 @@ export default function SanXuatPage() {
   });
   const parseSizeStr = (s: string): SzItem[] => {
     const result = SIZES.map(sz => ({ size: sz, qty: 1, checked: false }));
-    if (s) s.split("-").forEach(part => {
-      const m = part.match(/^(\d+)?([A-Za-z0-9]+)$/);
-      if (m) {
-        const qty = m[1] ? parseInt(m[1]) : 1;
-        const sz = m[2].toUpperCase();
-        const idx = result.findIndex(r => r.size === sz);
+    if (!s) return result;
+    s.split("-").forEach(part => {
+      // Format mới: "qty*size" (dùng cho size bắt đầu bằng số như 4XL, 5XL)
+      if (part.includes("*")) {
+        const [qtyStr, sz] = part.split("*", 2);
+        const qty = parseInt(qtyStr) || 1;
+        const sizeName = sz.toUpperCase();
+        const idx = result.findIndex(r => r.size === sizeName);
         if (idx >= 0) result[idx] = { ...result[idx], qty, checked: true };
-        else result.push({ size: sz, qty, checked: true }); // size tùy chỉnh
+        else result.push({ size: sizeName, qty, checked: true });
+        return;
+      }
+      // Format cũ: thử match known sizes từ dài đến ngắn để tránh "24XL" → 4XL=2
+      const knownSizes = [...SIZES].sort((a, b) => b.length - a.length);
+      let matched = false;
+      for (const knownSz of knownSizes) {
+        if (part.toUpperCase().endsWith(knownSz)) {
+          const qtyStr = part.slice(0, part.length - knownSz.length);
+          if (qtyStr === "" || /^\d+$/.test(qtyStr)) {
+            const qty = qtyStr ? parseInt(qtyStr) : 1;
+            const idx = result.findIndex(r => r.size === knownSz);
+            if (idx >= 0) result[idx] = { ...result[idx], qty, checked: true };
+            else result.push({ size: knownSz, qty, checked: true });
+            matched = true;
+            break;
+          }
+        }
+      }
+      // Fallback: custom size với letter-only regex
+      if (!matched) {
+        const m = part.match(/^(\d+)([A-Za-z][A-Za-z0-9]*)$|^([A-Za-z][A-Za-z0-9]*)$/);
+        if (m) {
+          const qty = m[1] ? parseInt(m[1]) : 1;
+          const sz = (m[2] || m[3]).toUpperCase();
+          const idx = result.findIndex(r => r.size === sz);
+          if (idx >= 0) result[idx] = { ...result[idx], qty, checked: true };
+          else result.push({ size: sz, qty, checked: true });
+        }
       }
     });
     return result;
@@ -440,18 +474,19 @@ export default function SanXuatPage() {
   };
 
   const openEdit = (lo: LoCat) => {
-    // Parse rồi regenerate soSize để fix chuỗi sai trong DB (vd: "1XXL-24XL-15XL" → "15XL-1XXL")
+    // Parse soSize → set cả sizeItems và form.soSize đồng thời (tránh race condition)
     const parsedSizes = parseSizeStr(lo.soSize ?? "");
-    const cleanedSoSize = parsedSizes.filter(s => s.checked).map(s => `${s.qty}${s.size}`).join("-");
-    const cleanedTongSize = String(parsedSizes.filter(s => s.checked).reduce((sum, i) => sum + i.qty, 0)) || "";
+    const newSoSize = buildSoSize(parsedSizes);
+    const newTongSize = String(parsedSizes.filter(s => s.checked).reduce((sum, i) => sum + i.qty, 0)) || "";
+    setSizeItems(parsedSizes);  // set sizeItems TRƯỚC để không bị trigger useEffect cũ
     setForm({
       ngay: lo.ngay.slice(0, 10), loaiHang: lo.loaiHang ?? "dai_thuong", xuong: lo.xuong, hangCat: lo.hangCat,
-      soSize: cleanedSoSize, maVai: lo.maVai ?? "",
+      soSize: newSoSize, maVai: lo.maVai ?? "",
       soMSoDo: lo.soMSoDo != null ? String(lo.soMSoDo) : "",
       soCay: String(lo.soCay ?? 1),
       soY: lo.soY != null ? String(lo.soY) : "",
       soM: lo.soM != null ? String(lo.soM) : "",
-      tongSize: cleanedTongSize || (lo.tongSize != null ? String(lo.tongSize) : ""),
+      tongSize: newTongSize || (lo.tongSize != null ? String(lo.tongSize) : ""),
       soLaThucTe: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "",
       hangThucTe: lo.hangThucTe != null ? String(lo.hangThucTe) : "",
       xuongNhanHang: lo.xuongNhanHang ?? "",
@@ -467,7 +502,6 @@ export default function SanXuatPage() {
       mauGiat: lo.mauGiat ?? "",
       ghiChu: lo.ghiChu ?? "",
     });
-    setSizeItems(parsedSizes);
     // Load cayRows from cayData
     const n = lo.soCay ?? 1;
     if (n > 1 && lo.cayData) {
@@ -516,10 +550,10 @@ export default function SanXuatPage() {
         ? soSanPham_calc - Number(hangThucTeTotal)
         : soLuongThieu_calc;
       // Luôn regenerate soSize từ sizeItems để tránh lưu chuỗi sai vào DB
-      const cleanedSoSize = sizeItems.filter(s => s.checked).map(s => `${s.qty}${s.size}`).join("-");
+      const savedSoSize = buildSoSize(sizeItems) || form.soSize;
       const payload = {
         ...form,
-        soSize: cleanedSoSize || form.soSize,
+        soSize: savedSoSize,
         hangThucTe: hangThucTeTotal,
         soCay: numCay,
         cayData: numCay > 1 ? JSON.stringify(cayRows.map(r => ({
