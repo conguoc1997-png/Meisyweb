@@ -4,12 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Package, RefreshCcw, Star, AlertTriangle,
-  TrendingUp, ShoppingBag, Clock, Scissors,
+  Clock, Scissors,
   BarChart3, CalendarDays, Calculator, BookOpen,
   CalendarCheck, Landmark, ClipboardList, ArrowRight,
   CheckCircle2,
 } from "lucide-react";
-import { formatCurrency, LOAI_VAN_DE, TRANG_THAI_DOI_TRA, formatDateTime } from "@/lib/utils";
 import { useUser } from "@/lib/user-context";
 
 type DashboardData = {
@@ -215,66 +214,6 @@ export default function TongQuanPage() {
         })}
       </div>
 
-      {/* ── KPI tháng này ── */}
-      {data && (() => {
-        const roiKOC = data.koc.tongChiPhiKOC > 0
-          ? ((data.koc.tongDoanhThuKOC - data.koc.tongChiPhiKOC) / data.koc.tongChiPhiKOC * 100).toFixed(1)
-          : "0";
-        return (
-          <div className="mb-6">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Chỉ số tháng này</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: "Booking KOC", value: data.koc.tongBooking, sub: `${data.koc.bookingDangChay} đang chạy`, color: "text-amber-600" },
-                { label: "Chi phí KOC", value: formatCurrency(data.koc.tongChiPhiKOC), sub: "tổng đầu tư", color: "text-slate-700" },
-                { label: "Doanh thu KOC", value: formatCurrency(data.koc.tongDoanhThuKOC), sub: "ước tính", color: "text-emerald-600" },
-                { label: "ROI KOC", value: `${roiKOC}%`, sub: "hiệu quả đầu tư", color: Number(roiKOC) >= 0 ? "text-emerald-600" : "text-red-500" },
-              ].map(k => (
-                <div key={k.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
-                  <p className="text-[11px] text-slate-400 mb-1">{k.label}</p>
-                  <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{k.sub}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Đổi trả gần đây ── */}
-      {data && data.recentDoiTra.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <ShoppingBag size={14} className="text-rose-400" />
-            <p className="text-sm font-semibold text-slate-700">Đổi trả gần đây</p>
-            <Link href="/doi-tra" className="ml-auto text-xs text-rose-400 hover:text-rose-600 flex items-center gap-1 transition">
-              Xem tất cả <ArrowRight size={11} />
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {data.recentDoiTra.map(dt => (
-              <div key={dt.id}
-                className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50/70 hover:bg-gray-100/60 transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-rose-300 flex-shrink-0" />
-                  <div>
-                    <p className="text-[11px] font-mono text-rose-400">{dt.maDoiTra}</p>
-                    <p className="text-sm text-slate-700">{dt.tenKhach}
-                      <span className="text-[11px] text-slate-400 ml-1.5">{LOAI_VAN_DE[dt.loaiVanDe]?.label}</span>
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${TRANG_THAI_DOI_TRA[dt.trangThai]?.color ?? "bg-slate-100 text-slate-500"}`}>
-                    {TRANG_THAI_DOI_TRA[dt.trangThai]?.label ?? dt.trangThai}
-                  </span>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{formatDateTime(dt.createdAt)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
