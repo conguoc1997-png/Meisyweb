@@ -165,10 +165,10 @@ export default function TongQuanPage() {
         </div>
         {/* Text */}
         <div>
-          <p className="text-base text-slate-400 mb-0.5">
-            {greeting} {greetIcon}
-          </p>
-          <h1 className="text-3xl font-bold text-slate-800">{user?.name || "Tổng quan hệ thống"}</h1>
+          <p className="text-sm text-slate-400 mb-0.5">Tổng quan hệ thống</p>
+          <h1 className="text-3xl font-bold text-slate-800">
+            {greeting}{user?.name ? `, ${user.name}` : ""} {greetIcon}
+          </h1>
           <p className="text-sm text-slate-400 mt-1">
             {now.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" })}
           </p>
