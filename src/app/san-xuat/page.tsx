@@ -262,6 +262,8 @@ export default function SanXuatPage() {
       tongSize: tongQty > 0 ? String(tongQty) : "",
     }));
   };
+  // Luôn giữ form.soSize đồng bộ với sizeItems (tránh lệch khi mở edit)
+  useEffect(() => { syncSizeToForm(sizeItems); }, [sizeItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSize = (size: string) => setSizeItems(prev => {
     const next = prev.map(s => s.size === size ? { ...s, checked: !s.checked } : s);
     syncSizeToForm(next); return next;
@@ -2470,9 +2472,9 @@ export default function SanXuatPage() {
                                 {item.size}
                               </button>
                               {item.checked && (
-                                <input type="number" min="1" max="9" value={item.qty}
+                                <input type="number" min="1" max="999" value={item.qty}
                                   onChange={e => setSizeQty(item.size, parseInt(e.target.value) || 1)}
-                                  className="w-10 text-center border border-rose-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50" />
+                                  className="w-12 text-center border border-rose-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300 bg-rose-50" />
                               )}
                             </div>
                           ))}
