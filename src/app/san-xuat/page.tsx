@@ -1238,7 +1238,7 @@ export default function SanXuatPage() {
                   {vaiTons.filter(v => !filterVaiXuong || (v.xuong || "__chua_chon__") === filterVaiXuong).map(v => {
                     const hasCayData = v.soCay > 1 && v.cayData;
                     const isVaiExpanded = expandedVaiRows.has(v.id);
-                    let cayDataParsed: { soMet: number; cut?: boolean }[] = [];
+                    let cayDataParsed: { soMet: number; soMetUsed?: number; cut?: boolean }[] = [];
                     // Parse cayData for ALL vải (not just soCay>1) so cut status shows for single-cây
                     if (v.cayData) { try { cayDataParsed = JSON.parse(v.cayData!); } catch {} }
                     return (
@@ -1342,7 +1342,7 @@ export default function SanXuatPage() {
                           <td className="px-3 py-1.5 text-center text-[14px] text-slate-400">{ci + 1}</td>
                           <td className="px-3 py-1.5 text-right">
                             <span className={`text-[14px] font-bold ${cay.cut ? "text-slate-400 line-through" : cay.soMet <= 0 ? "text-red-500" : cay.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
-                              {cay.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
+                              {(cay.cut ? (cay.soMet + (cay.soMetUsed ?? 0)) : cay.soMet).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}
                             </span>
                           </td>
                           <td className={`px-3 py-1.5 text-[14px] ${cay.cut ? "text-slate-400 line-through" : "text-slate-400"}`}>{v.donVi}</td>
@@ -2623,8 +2623,8 @@ export default function SanXuatPage() {
                                       {isCut && <span className="text-[9px] bg-red-100 text-red-500 px-1 py-0.5 rounded font-semibold">đã cắt</span>}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className={`font-semibold ${checked ? "text-emerald-700" : isCut ? "text-red-400" : c.soMet < 5 ? "text-amber-600" : "text-emerald-700"}`}>
-                                        {c.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
+                                      <span className={`font-semibold ${checked ? "text-emerald-700" : isCut ? "text-red-400 line-through" : getCaySoM(c) < 5 ? "text-amber-600" : "text-emerald-700"}`}>
+                                        {getCaySoM(c).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {matched.donVi}
                                       </span>
                                       {isCut && (
                                         <button type="button"
