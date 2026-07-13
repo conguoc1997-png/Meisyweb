@@ -238,7 +238,7 @@ export default function SanXuatPage() {
   const [skuSearch, setSkuSearch] = useState("");
 
   // ── Size picker ──
-  const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL"];
+  const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "XXXXL", "XXXXXL"];
   type SzItem = { size: string; qty: number; checked: boolean };
   const [sizeItems, setSizeItems] = useState<SzItem[]>(SIZES.map(s => ({ size: s, qty: 1, checked: false })));
   const [addingSize, setAddingSize] = useState(false);
