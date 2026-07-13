@@ -33,8 +33,10 @@ type ModCard = {
   icon: React.ElementType;
   label: string;
   desc: string;
-  iconBg: string;
-  iconColor: string;
+  iconBg: string;      // bg của icon container (đậm hơn)
+  iconColor: string;   // màu icon
+  cardBg: string;      // bg toàn ô (nhạt hơn)
+  cardBorder: string;  // border ô
   stat?: () => { value: string | number; label: string; urgent?: boolean } | null;
 };
 
@@ -74,73 +76,85 @@ export default function TongQuanPage() {
     {
       href: "/kho", icon: Package,
       label: "Kho hàng", desc: "Quản lý tồn kho sản phẩm",
-      iconBg: "bg-amber-50", iconColor: "text-amber-500",
+      cardBg: "bg-amber-50", cardBorder: "border-amber-100",
+      iconBg: "bg-amber-200", iconColor: "text-amber-600",
       stat: () => data ? { value: data.kho.tongSanPham, label: "sản phẩm", urgent: data.kho.spSapHet > 0 } : null,
     },
     {
       href: "/san-xuat", icon: Scissors,
       label: "Sản xuất", desc: "Theo dõi lô cắt & hoá đơn",
-      iconBg: "bg-violet-50", iconColor: "text-violet-500",
+      cardBg: "bg-violet-50", cardBorder: "border-violet-100",
+      iconBg: "bg-violet-200", iconColor: "text-violet-600",
       stat: () => sanXuat ? { value: sanXuat.dangSanXuat, label: "lô đang chạy" } : null,
     },
     {
       href: "/doi-tra", icon: RefreshCcw,
       label: "Chăm sóc KH", desc: "Xử lý đổi trả & sự cố",
-      iconBg: "bg-rose-50", iconColor: "text-rose-400",
+      cardBg: "bg-rose-50", cardBorder: "border-rose-100",
+      iconBg: "bg-rose-200", iconColor: "text-rose-500",
       stat: () => data ? { value: data.doiTra.chuaXuLy, label: "case chờ xử lý", urgent: data.doiTra.chuaXuLy > 0 } : null,
     },
     {
       href: "/koc", icon: Star,
       label: "KOC Booking", desc: "Quảng bá & booking chiến dịch",
-      iconBg: "bg-amber-50", iconColor: "text-amber-400",
+      cardBg: "bg-yellow-50", cardBorder: "border-yellow-100",
+      iconBg: "bg-yellow-200", iconColor: "text-yellow-600",
       stat: () => data ? { value: data.koc.bookingDangChay, label: "booking đang chạy" } : null,
     },
     {
       href: "/gia-ban", icon: Calculator,
       label: "Cấu trúc chi phí", desc: "Giá bán & định mức NPL",
-      iconBg: "bg-emerald-50", iconColor: "text-emerald-500",
+      cardBg: "bg-emerald-50", cardBorder: "border-emerald-100",
+      iconBg: "bg-emerald-200", iconColor: "text-emerald-600",
       stat: () => null,
     },
     {
       href: "/ke-toan/ton-kho", icon: Package,
       label: "Kho NPL", desc: "Nhập xuất & tồn nguyên phụ liệu",
-      iconBg: "bg-slate-50", iconColor: "text-slate-500",
+      cardBg: "bg-slate-100", cardBorder: "border-slate-200",
+      iconBg: "bg-slate-300", iconColor: "text-slate-600",
       stat: () => null,
     },
     {
       href: "/so-thu-chi", icon: BookOpen,
       label: "Sổ Thu Chi", desc: "Ghi nhận thu chi nội bộ",
-      iconBg: "bg-green-50", iconColor: "text-green-500",
+      cardBg: "bg-green-50", cardBorder: "border-green-100",
+      iconBg: "bg-green-200", iconColor: "text-green-600",
       stat: () => null,
     },
     {
       href: "/cong-no", icon: Landmark,
       label: "Công Nợ & DT", desc: "Theo dõi công nợ & doanh thu",
-      iconBg: "bg-teal-50", iconColor: "text-teal-500",
+      cardBg: "bg-teal-50", cardBorder: "border-teal-100",
+      iconBg: "bg-teal-200", iconColor: "text-teal-600",
       stat: () => null,
     },
     {
       href: "/calendar", icon: CalendarDays,
       label: "Lịch & Công việc", desc: "Lịch công ty & giao việc NV",
-      iconBg: "bg-blue-50", iconColor: "text-blue-400",
+      cardBg: "bg-blue-50", cardBorder: "border-blue-100",
+      iconBg: "bg-blue-200", iconColor: "text-blue-600",
       stat: () => null,
     },
     {
       href: "/cham-cong", icon: CalendarCheck,
       label: "Chấm công", desc: "Điểm danh & bảng lương NV",
-      iconBg: "bg-orange-50", iconColor: "text-orange-400",
+      cardBg: "bg-orange-50", cardBorder: "border-orange-100",
+      iconBg: "bg-orange-200", iconColor: "text-orange-600",
       stat: () => null,
     },
     {
       href: "/viec-cua-toi", icon: CheckCircle2,
       label: "Việc của tôi", desc: "Xem & cập nhật công việc được giao",
-      iconBg: "bg-indigo-50", iconColor: "text-indigo-500",
+      cardBg: "bg-indigo-50", cardBorder: "border-indigo-100",
+      iconBg: "bg-indigo-200", iconColor: "text-indigo-600",
       stat: () => null,
     },
     {
       href: "/lich-di-lam", icon: ClipboardList,
       label: "Đăng ký lịch", desc: "Đăng ký & quản lý lịch đi làm",
-      iconBg: "bg-pink-50", iconColor: "text-pink-400",
+      cardBg: "bg-pink-50", cardBorder: "border-pink-100",
+      iconBg: "bg-pink-200", iconColor: "text-pink-600",
       stat: () => null,
     },
   ];
@@ -176,41 +190,39 @@ export default function TongQuanPage() {
       </div>
 
       {/* ── Module Grid ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
         {MODULES.map(mod => {
           const Icon = mod.icon;
           const stat = mod.stat?.();
           return (
             <Link key={mod.href} href={mod.href}
-              className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-4
-                hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-3">
+              className={`group ${mod.cardBg} border ${mod.cardBorder} rounded-2xl shadow-sm p-5
+                hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
+                flex flex-col items-center text-center gap-3`}>
 
               {/* Icon */}
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${mod.iconBg}`}>
-                <Icon size={20} className={mod.iconColor} />
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${mod.iconBg} mt-1`}>
+                <Icon size={28} className={mod.iconColor} />
               </div>
 
               {/* Text */}
               <div className="flex-1">
-                <p className="text-[13px] font-semibold text-slate-700 leading-snug group-hover:text-slate-900 transition-colors">
+                <p className="text-[22px] font-bold text-slate-800 leading-tight group-hover:text-slate-900 transition-colors">
                   {mod.label}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{mod.desc}</p>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{mod.desc}</p>
               </div>
 
               {/* Live stat */}
               {stat && (
-                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit
+                <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold
                   ${stat.urgent
-                    ? "bg-red-50 text-red-500 border border-red-200"
-                    : "bg-gray-50 text-slate-500 border border-gray-200"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${stat.urgent ? "bg-red-400" : "bg-gray-300"}`} />
+                    ? "bg-red-100 text-red-600 border border-red-200"
+                    : "bg-white/70 text-slate-500 border border-white/80"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${stat.urgent ? "bg-red-400" : "bg-slate-300"}`} />
                   {stat.value} {stat.label}
                 </div>
               )}
-
-              {/* Arrow */}
-              <ArrowRight size={13} className="text-gray-200 group-hover:text-gray-400 transition-colors self-end mt-auto" />
             </Link>
           );
         })}
