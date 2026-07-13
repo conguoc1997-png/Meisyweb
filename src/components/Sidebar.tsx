@@ -28,7 +28,7 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/lib/user-context";
 import { parseModules } from "@/lib/auth";
 
@@ -207,6 +207,24 @@ export default function Sidebar() {
   const visible = (moduleKey: string) =>
     !user || user.role === "admin" || userModules.includes(moduleKey);
 
+  // ── Badge: số việc đang chờ của nhân viên ──
+  const [pendingTasks, setPendingTasks] = useState(0);
+  const fetchedRef = useRef(false);
+  useEffect(() => {
+    if (!user?.nhanVienId || fetchedRef.current) return;
+    fetchedRef.current = true;
+    fetch(`/api/giao-viec?nv=${user.nhanVienId}`)
+      .then(r => r.json())
+      .then((data: Array<{ assignments: Array<{ nhanVienId: string; trangThai: string }> }>) => {
+        if (!Array.isArray(data)) return;
+        const count = data.filter(t =>
+          t.assignments.some(a => a.nhanVienId === user.nhanVienId && a.trangThai !== "hoan_thanh")
+        ).length;
+        setPendingTasks(count);
+      })
+      .catch(() => {});
+  }, [user?.nhanVienId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Shared nav content (dùng cho cả mobile lẫn desktop) ───────────
   function NavContent({ isOpen: show }: { isOpen: boolean }) {
     return (
@@ -291,12 +309,18 @@ export default function Sidebar() {
                     {mod.children!.filter(c => visible(c.moduleKey)).map(child => {
                       const CIcon     = child.icon;
                       const isCActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                      const showBadge = child.href === "/viec-cua-toi" && pendingTasks > 0;
                       return (
                         <Link key={child.href} href={child.href}
                           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all
                             ${isCActive ? "text-rose-500 bg-rose-50/60" : "text-stone-400 hover:text-stone-600 hover:bg-stone-50"}`}>
                           <CIcon size={12} className="flex-shrink-0" />
-                          <span className="whitespace-nowrap">{child.label}</span>
+                          <span className="whitespace-nowrap flex-1">{child.label}</span>
+                          {showBadge && (
+                            <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                              {pendingTasks}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
