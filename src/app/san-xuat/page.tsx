@@ -515,8 +515,11 @@ export default function SanXuatPage() {
       const soLuongThieuFinal = soSanPham_calc > 0 && hangThucTeTotal
         ? soSanPham_calc - Number(hangThucTeTotal)
         : soLuongThieu_calc;
+      // Luôn regenerate soSize từ sizeItems để tránh lưu chuỗi sai vào DB
+      const cleanedSoSize = sizeItems.filter(s => s.checked).map(s => `${s.qty}${s.size}`).join("-");
       const payload = {
         ...form,
+        soSize: cleanedSoSize || form.soSize,
         hangThucTe: hangThucTeTotal,
         soCay: numCay,
         cayData: numCay > 1 ? JSON.stringify(cayRows.map(r => ({
