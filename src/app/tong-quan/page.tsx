@@ -149,15 +149,15 @@ export default function TongQuanPage() {
     <div className="min-h-screen bg-[#f7f8fa] p-6 max-w-6xl mx-auto">
 
       {/* ── Header ── */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-center gap-5 mb-8">
         {/* Avatar */}
         <div className="flex-shrink-0">
           {user?.avatarUrl ? (
             <img src={user.avatarUrl} alt={user.name}
-              className="w-14 h-14 rounded-2xl object-cover shadow-sm border border-white ring-2 ring-slate-100" />
+              className="w-28 h-28 rounded-3xl object-cover shadow-md border-2 border-white ring-2 ring-slate-100" />
           ) : (
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center shadow-sm">
-              <span className="text-white text-xl font-bold">
+            <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center shadow-md">
+              <span className="text-white text-4xl font-bold">
                 {user?.name ? user.name.charAt(0).toUpperCase() : "?"}
               </span>
             </div>
@@ -165,11 +165,11 @@ export default function TongQuanPage() {
         </div>
         {/* Text */}
         <div>
-          <p className="text-sm text-slate-400 mb-0.5">
-            {greeting}{displayName ? `, ${displayName}` : ""} {greetIcon}
+          <p className="text-base text-slate-400 mb-0.5">
+            {greeting} {greetIcon}
           </p>
-          <h1 className="text-2xl font-bold text-slate-800">Tổng quan hệ thống</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <h1 className="text-3xl font-bold text-slate-800">{user?.name || "Tổng quan hệ thống"}</h1>
+          <p className="text-sm text-slate-400 mt-1">
             {now.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Ho_Chi_Minh" })}
           </p>
         </div>
