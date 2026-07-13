@@ -438,14 +438,18 @@ export default function SanXuatPage() {
   };
 
   const openEdit = (lo: LoCat) => {
+    // Parse rồi regenerate soSize để fix chuỗi sai trong DB (vd: "1XXL-24XL-15XL" → "15XL-1XXL")
+    const parsedSizes = parseSizeStr(lo.soSize ?? "");
+    const cleanedSoSize = parsedSizes.filter(s => s.checked).map(s => `${s.qty}${s.size}`).join("-");
+    const cleanedTongSize = String(parsedSizes.filter(s => s.checked).reduce((sum, i) => sum + i.qty, 0)) || "";
     setForm({
       ngay: lo.ngay.slice(0, 10), loaiHang: lo.loaiHang ?? "dai_thuong", xuong: lo.xuong, hangCat: lo.hangCat,
-      soSize: lo.soSize ?? "", maVai: lo.maVai ?? "",
+      soSize: cleanedSoSize, maVai: lo.maVai ?? "",
       soMSoDo: lo.soMSoDo != null ? String(lo.soMSoDo) : "",
       soCay: String(lo.soCay ?? 1),
       soY: lo.soY != null ? String(lo.soY) : "",
       soM: lo.soM != null ? String(lo.soM) : "",
-      tongSize: lo.tongSize != null ? String(lo.tongSize) : "",
+      tongSize: cleanedTongSize || (lo.tongSize != null ? String(lo.tongSize) : ""),
       soLaThucTe: lo.soLaThucTe != null ? String(lo.soLaThucTe) : "",
       hangThucTe: lo.hangThucTe != null ? String(lo.hangThucTe) : "",
       xuongNhanHang: lo.xuongNhanHang ?? "",
@@ -461,7 +465,7 @@ export default function SanXuatPage() {
       mauGiat: lo.mauGiat ?? "",
       ghiChu: lo.ghiChu ?? "",
     });
-    setSizeItems(parseSizeStr(lo.soSize ?? ""));
+    setSizeItems(parsedSizes);
     // Load cayRows from cayData
     const n = lo.soCay ?? 1;
     if (n > 1 && lo.cayData) {
