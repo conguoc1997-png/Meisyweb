@@ -25,6 +25,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json();
   const data: Record<string, unknown> = {};
   if (body.name) data.name = body.name;
+  if (body.email) {
+    const newEmail = body.email.toLowerCase().trim();
+    // Kiểm tra email trùng với user khác
+    const existing = await prisma.user.findFirst({ where: { email: newEmail, NOT: { id } } });
+    if (existing) return NextResponse.json({ error: "Email này đã được dùng bởi tài khoản khác" }, { status: 400 });
+    data.email = newEmail;
+  }
   if (body.role !== undefined) data.role = body.role;
   if (typeof body.active === "boolean") data.active = body.active;
   if ("nhanVienId" in body) data.nhanVienId = body.nhanVienId || null;
