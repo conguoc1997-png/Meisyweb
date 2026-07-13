@@ -1639,10 +1639,11 @@ export default function KocPage() {
       {tab === "kocs" && (() => {
         const [kocListThang, setKocListThang] = [filterThang, setFilterThang];
         const TRANG_THAI_HOP_TAC: Record<string, { label: string; color: string }> = {
-          chua_tra_loi:  { label: "Chưa trả lời", color: "bg-slate-100 text-slate-500" },
-          da_duyet:      { label: "Đã duyệt",     color: "bg-green-100 text-green-700" },
-          dang_hop_tac:  { label: "Đang hợp tác", color: "bg-blue-100 text-blue-700"  },
-          tu_choi:       { label: "Từ chối",       color: "bg-red-100 text-red-600"    },
+          chua_tra_loi:  { label: "Chưa trả lời",  color: "bg-slate-100 text-slate-500"    },
+          dang_can_nhac: { label: "Đang cân nhắc", color: "bg-orange-100 text-orange-600"  },
+          da_duyet:      { label: "Đã duyệt",       color: "bg-green-100 text-green-700"   },
+          dang_hop_tac:  { label: "Đang hợp tác",   color: "bg-blue-100 text-blue-700"     },
+          tu_choi:       { label: "Từ chối",         color: "bg-red-100 text-red-600"       },
         };
         const updateTrangThai = async (kocId: string, trangThaiHopTac: string) => {
           await fetch(`/api/koc/${kocId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trangThaiHopTac }) });
