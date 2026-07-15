@@ -1472,13 +1472,13 @@ export default function SanXuatPage() {
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Tên vải</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">T.Size</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá KH</th>
+                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">T.Size</th>
+                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M / Y</th>
+                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">Lá KH</th>
                 <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[14px]">Đã cắt</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Lá TT</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">SP / Lá</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ghi chú may</th>
+                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">Lá TT</th>
+                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">SP / Lá</th>
+                <th className="text-left px-3 py-2.5 text-slate-500 font-medium min-w-[260px]">Ghi chú may</th>
                 <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu giặt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50 hidden">Số SP</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Nhận về</th>
@@ -1528,9 +1528,16 @@ export default function SanXuatPage() {
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{lo.hangCat}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.maVai ?? "—"}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-600">{lo.soM != null ? lo.soM.toFixed(2) : "—"}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-500">{lo.soLa != null ? lo.soLa.toFixed(1) : "—"}</td>
+                    <td className="px-2 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      {lo.soM != null
+                        ? <span className="block text-slate-600 font-medium">{lo.soM.toFixed(2)} m</span>
+                        : <span className="text-slate-300">—</span>}
+                      {lo.soY != null && (
+                        <span className="block text-[11px] text-slate-400">{lo.soY.toFixed(2)} y</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2.5 text-right text-slate-500">{lo.soLa != null ? lo.soLa.toFixed(1) : "—"}</td>
                     {/* Đã cắt */}
                     <td className="px-2 py-2.5 text-center">
                       {hasCay ? (
@@ -1596,7 +1603,7 @@ export default function SanXuatPage() {
                       })()}
                     </td>
                     {/* Ghi chú may — ghi chú chung cấp lô, luôn hiện dù 1 hay nhiều cây */}
-                    <td className="px-1.5 py-1 max-w-[150px]">
+                    <td className="px-1.5 py-1 min-w-[260px]">
                       {editingGhiChuMay?.id === lo.id ? (
                         <input
                           autoFocus
@@ -1612,7 +1619,7 @@ export default function SanXuatPage() {
                       ) : (
                         <button
                           onClick={() => setEditingGhiChuMay({ id: lo.id, val: lo.ghiChuMay ?? "" })}
-                          className="text-rose-600 font-bold hover:bg-rose-50 rounded px-2 py-1 text-sm w-full text-left transition truncate block max-w-[140px]"
+                          className="text-rose-600 font-bold hover:bg-rose-50 rounded px-2 py-1 text-sm w-full text-left transition block"
                           title={lo.ghiChuMay ?? "Click để nhập ghi chú"}
                         >
                           {lo.ghiChuMay ?? <span className="text-slate-300 font-normal text-xs">— nhập</span>}
