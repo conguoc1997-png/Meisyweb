@@ -38,6 +38,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ("avatarUrl" in body) data.avatarUrl = body.avatarUrl || null;
 
   if (body.password) {
+    if (body.password.length < 8) return NextResponse.json({ error: "Mật khẩu phải có ít nhất 8 ký tự" }, { status: 400 });
+    if (!/[A-Z]/.test(body.password)) return NextResponse.json({ error: "Mật khẩu phải có ít nhất 1 chữ hoa" }, { status: 400 });
+    if (!/[0-9]/.test(body.password)) return NextResponse.json({ error: "Mật khẩu phải có ít nhất 1 chữ số" }, { status: 400 });
     data.password = await bcrypt.hash(body.password, 10);
     // Nếu admin chọn "đăng xuất thiết bị khác" → tăng sessionVersion
     if (body.logoutOtherDevices) {

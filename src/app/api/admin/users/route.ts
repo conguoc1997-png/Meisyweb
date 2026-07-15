@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
   if (!email || !name || !password || !role) {
     return NextResponse.json({ error: "Thiếu thông tin" }, { status: 400 });
   }
+  // Kiểm tra độ mạnh mật khẩu
+  if (password.length < 8) return NextResponse.json({ error: "Mật khẩu phải có ít nhất 8 ký tự" }, { status: 400 });
+  if (!/[A-Z]/.test(password)) return NextResponse.json({ error: "Mật khẩu phải có ít nhất 1 chữ hoa" }, { status: 400 });
+  if (!/[0-9]/.test(password)) return NextResponse.json({ error: "Mật khẩu phải có ít nhất 1 chữ số" }, { status: 400 });
   const hashed = await bcrypt.hash(password, 10);
   try {
     const user = await prisma.user.create({

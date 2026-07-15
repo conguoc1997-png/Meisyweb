@@ -44,7 +44,7 @@ const getSecret = () => {
 export async function signToken(user: SessionUser): Promise<string> {
   return new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("30d")
+    .setExpirationTime("8h")
     .sign(getSecret());
 }
 

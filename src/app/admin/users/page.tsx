@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Users, Plus, Pencil, Trash2, X, Check, Link, Camera } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, X, Check, Link, Camera, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { ALL_MODULES, parseModules } from "@/lib/auth";
 
 type User = {
@@ -53,9 +53,13 @@ function deptColor(pb: string | null) {
   return "#9e9e9e";
 }
 
+type LoginLog = { id: string; userId: string | null; userName?: string; email: string; ip: string | null; success: boolean; reason: string | null; createdAt: string };
+
 export default function AdminUsersPage() {
+  const [tab, setTab]         = useState<"users"|"logs">("users");
   const [users,   setUsers]   = useState<User[]>([]);
   const [nvList,  setNvList]  = useState<NhanVien[]>([]);
+  const [logs,    setLogs]    = useState<LoginLog[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [form, setForm] = useState({
@@ -72,8 +76,11 @@ export default function AdminUsersPage() {
 
   const load = () => fetch("/api/admin/users").then(r => r.json()).then(setUsers);
 
+  const loadLogs = () => fetch("/api/admin/login-log").then(r => r.json()).then(d => Array.isArray(d) ? setLogs(d) : null).catch(() => {});
+
   useEffect(() => {
     load();
+    loadLogs();
     fetch("/api/cham-cong/nhan-vien")
       .then(r => r.json()).then(d => setNvList(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
@@ -189,14 +196,70 @@ export default function AdminUsersPage() {
             <p className="text-sm text-slate-500">Thêm, sửa, phân quyền & gán nhân viên</p>
           </div>
         </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-600 transition">
-          <Plus size={16} /> Thêm tài khoản
+        {tab === "users" && (
+          <button onClick={openAdd}
+            className="flex items-center gap-2 bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-600 transition">
+            <Plus size={16} /> Thêm tài khoản
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-5 bg-slate-100 p-1 rounded-xl w-fit">
+        <button onClick={() => setTab("users")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition
+            ${tab === "users" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}>
+          <Users size={14} /> Tài khoản
+        </button>
+        <button onClick={() => { setTab("logs"); loadLogs(); }}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition
+            ${tab === "logs" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700"}`}>
+          <ShieldAlert size={14} /> Lịch sử đăng nhập
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {/* ── Tab: Lịch sử đăng nhập ── */}
+      {tab === "logs" && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-4 py-3 text-slate-600 font-semibold">Thời gian</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-semibold">Tên / Email</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-semibold">IP</th>
+                <th className="text-center px-4 py-3 text-slate-600 font-semibold">Kết quả</th>
+                <th className="text-left px-4 py-3 text-slate-600 font-semibold">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-10 text-slate-400">Chưa có lịch sử</td></tr>
+              ) : logs.map(l => (
+                <tr key={l.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <td className="px-4 py-2.5 text-slate-500 text-xs whitespace-nowrap">
+                    {new Date(l.createdAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-slate-800">{l.userName ?? "—"}</p>
+                    <p className="text-xs text-slate-400">{l.email}</p>
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-500 text-xs font-mono">{l.ip ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    {l.success
+                      ? <span className="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium"><CheckCircle2 size={11} /> Thành công</span>
+                      : <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-medium"><X size={11} /> Thất bại</span>
+                    }
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-slate-400">{l.reason ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Tab: Tài khoản ── */}
+      {tab === "users" && (<><div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
@@ -320,6 +383,7 @@ export default function AdminUsersPage() {
         <Link size={12} />
         <span>Cột "Nhân viên liên kết" dùng cho trang <strong>/viec-cua-toi</strong> — NV đăng nhập sẽ tự thấy việc của mình</span>
       </div>
+      </>)}
 
       {/* Form Modal */}
       {showForm && (
@@ -396,6 +460,33 @@ export default function AdminUsersPage() {
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-400"
                   value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••" />
+                {/* Password strength indicator */}
+                {form.password && (() => {
+                  const p = form.password;
+                  const checks = [
+                    { ok: p.length >= 8,     label: "≥ 8 ký tự" },
+                    { ok: /[A-Z]/.test(p),   label: "Có chữ hoa" },
+                    { ok: /[0-9]/.test(p),   label: "Có chữ số" },
+                  ];
+                  const passed = checks.filter(c => c.ok).length;
+                  const color  = passed === 3 ? "bg-emerald-500" : passed === 2 ? "bg-amber-400" : "bg-red-400";
+                  return (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex gap-1">
+                        {[0,1,2].map(i => (
+                          <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i < passed ? color : "bg-slate-200"}`} />
+                        ))}
+                      </div>
+                      <div className="flex gap-3">
+                        {checks.map(c => (
+                          <span key={c.label} className={`text-[11px] flex items-center gap-1 ${c.ok ? "text-emerald-600" : "text-slate-400"}`}>
+                            {c.ok ? "✓" : "○"} {c.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {editUser && form.password && (
                   <label className="flex items-center gap-2 mt-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer">
                     <input type="checkbox" checked={form.logoutOtherDevices}
