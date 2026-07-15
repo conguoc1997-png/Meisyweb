@@ -1468,10 +1468,10 @@ export default function SanXuatPage() {
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-2 py-2.5 w-6"></th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Ngày</th>
+                <th className="text-left px-2 py-2.5 text-slate-500 font-medium w-[72px]">Ngày</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Tên vải</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
+                <th className="text-left px-2 py-2.5 text-slate-500 font-medium">Tên vải</th>
+                <th className="text-left px-1 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-2 py-2.5 text-slate-500 font-medium">T.Size</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số Y</th>
@@ -1525,10 +1525,12 @@ export default function SanXuatPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-600">{formatDate(lo.ngay)}</td>
+                    <td className="px-2 py-2.5 text-slate-600 text-[13px] whitespace-nowrap">
+                      {new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).format(new Date(lo.ngay))}
+                    </td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{lo.hangCat}</td>
-                    <td className="px-3 py-2.5 text-slate-500">{lo.maVai ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
+                    <td className="px-2 py-2.5 text-slate-500">{lo.maVai ?? "—"}</td>
+                    <td className="px-1 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-2 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right text-slate-600 font-medium">
                       {lo.soM != null ? lo.soM.toFixed(2) : <span className="text-slate-300 font-normal">—</span>}
