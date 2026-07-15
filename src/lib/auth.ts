@@ -12,19 +12,18 @@ export type SessionUser = {
 
 // Tất cả module keys có thể phân quyền
 export const ALL_MODULES = [
-  { key: "tong-quan", label: "Tổng quan",       routes: ["/tong-quan", "/api/dashboard", "/"] },
-  { key: "kho",       label: "Quản lý Kho",      routes: ["/kho", "/api/kho", "/doi-soat", "/api/doi-soat", "/fake-kho", "/api/fake-kho"] },
-  { key: "san-xuat",  label: "Sản xuất",          routes: ["/san-xuat", "/api/san-xuat"] },
-  { key: "doi-tra",   label: "Chăm sóc KH",      routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
-  { key: "koc",       label: "KOC Booking",       routes: ["/koc", "/api/koc"] },
-  { key: "gia-ban",   label: "Giá bán SP",        routes: ["/gia-ban", "/api/gia-ban"] },
-  { key: "ke-toan",   label: "Kế toán",           routes: ["/ke-toan", "/api/ke-toan"] },
-  { key: "cham-cong", label: "Chấm công",           routes: ["/cham-cong", "/bang-luong", "/api/cham-cong", "/api/lich-di-lam", "/cham-cong/ca-lam-viec", "/cham-cong/qr"] },
-  { key: "calendar",  label: "Lịch Công Ty",        routes: ["/calendar", "/api/calendar"] },
-  { key: "so-thu-chi", label: "Sổ Thu Chi",        routes: ["/so-thu-chi", "/api/so-thu-chi"] },
-  { key: "cong-no",    label: "Công Nợ & DT",       routes: ["/cong-no", "/api/cong-no-ncc", "/api/cong-no-khach-hang", "/api/doanh-thu"] },
-  { key: "users",     label: "Quản lý User",      routes: ["/admin/users", "/api/admin"] },
-  { key: "backup",    label: "Backup & Restore",  routes: ["/backup", "/api/backup"] },
+  { key: "tong-quan",  label: "Tổng quan",          routes: ["/tong-quan", "/api/dashboard", "/"] },
+  { key: "kho",        label: "Quản lý Kho",         routes: ["/kho", "/api/kho", "/doi-soat", "/api/doi-soat", "/fake-kho", "/api/fake-kho"] },
+  { key: "san-xuat",   label: "Sản xuất",             routes: ["/san-xuat", "/api/san-xuat"] },
+  { key: "doi-tra",    label: "Chăm sóc KH",         routes: ["/doi-tra", "/api/doi-tra", "/api/feedback", "/api/bu-tien", "/api/ung-tien"] },
+  { key: "koc",        label: "Marketing",            routes: ["/koc", "/api/koc"] },
+  { key: "gia-ban",    label: "Cấu trúc chi phí",    routes: ["/gia-ban", "/api/gia-ban"] },
+  { key: "ke-toan",    label: "Kho NPL & Kế toán",   routes: ["/ke-toan", "/api/ke-toan", "/so-thu-chi", "/api/so-thu-chi"] },
+  { key: "cham-cong",  label: "Nhân sự",              routes: ["/cham-cong", "/bang-luong", "/api/cham-cong", "/api/lich-di-lam", "/cham-cong/ca-lam-viec", "/cham-cong/qr", "/lich-di-lam"] },
+  { key: "calendar",   label: "Lịch & Công việc",    routes: ["/calendar", "/api/calendar", "/giao-viec", "/api/giao-viec", "/viec-cua-toi", "/api/viec-cua-toi"] },
+  { key: "cong-no",    label: "Công Nợ & DT",        routes: ["/cong-no", "/api/cong-no-ncc", "/api/cong-no-khach-hang", "/api/doanh-thu"] },
+  { key: "users",      label: "Quản trị",             routes: ["/admin/users", "/api/admin"] },
+  { key: "backup",     label: "Backup & Restore",    routes: ["/backup", "/api/backup"] },
 ] as const;
 
 // Chuyển đổi role cũ sang module keys mới (backward compat)

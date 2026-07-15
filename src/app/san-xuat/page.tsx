@@ -1473,7 +1473,8 @@ export default function SanXuatPage() {
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Tên vải</th>
                 <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Size</th>
                 <th className="text-right px-2 py-2.5 text-slate-500 font-medium">T.Size</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M / Y</th>
+                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
+                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số Y</th>
                 <th className="text-right px-2 py-2.5 text-slate-500 font-medium">Lá KH</th>
                 <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[14px]">Đã cắt</th>
                 <th className="text-right px-2 py-2.5 text-slate-500 font-medium">Lá TT</th>
@@ -1529,13 +1530,11 @@ export default function SanXuatPage() {
                     <td className="px-3 py-2.5 text-slate-500">{lo.maVai ?? "—"}</td>
                     <td className="px-3 py-2.5 text-slate-500">{lo.soSize ?? "—"}</td>
                     <td className="px-2 py-2.5 text-right text-slate-500">{lo.tongSize ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-right">
-                      {lo.soM != null
-                        ? <span className="block text-slate-600 font-medium">{lo.soM.toFixed(2)} m</span>
-                        : <span className="text-slate-300">—</span>}
-                      {lo.soY != null && (
-                        <span className="block text-[11px] text-slate-400">{lo.soY.toFixed(2)} y</span>
-                      )}
+                    <td className="px-3 py-2.5 text-right text-slate-600 font-medium">
+                      {lo.soM != null ? lo.soM.toFixed(2) : <span className="text-slate-300 font-normal">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-500">
+                      {lo.soY != null ? lo.soY.toFixed(2) : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-2 py-2.5 text-right text-slate-500">{lo.soLa != null ? lo.soLa.toFixed(1) : "—"}</td>
                     {/* Đã cắt */}
