@@ -1759,7 +1759,9 @@ export default function SanXuatPage() {
                         <td></td>
                         {/* col 6: Số M */}
                         <td className="px-3 py-1.5 text-right text-[14px] text-slate-600">{Number(cay.soM) > 0 ? Number(cay.soM).toFixed(2) : "—"}</td>
-                        {/* col 6: Lá KH */}
+                        {/* col 6b: Số Y — per-cây lưu soY riêng nếu có */}
+                        <td className="px-3 py-1.5 text-right text-[14px] text-slate-400">{Number(cay.soY) > 0 ? Number(cay.soY).toFixed(2) : "—"}</td>
+                        {/* col 7: Lá KH */}
                         <td className="px-3 py-1.5 text-right text-[14px] text-blue-600 font-semibold">{laKH != null ? laKH.toFixed(1) : "—"}</td>
                         {/* col 7: Đã cắt per-cây */}
                         <td className="px-2 py-1.5 text-center">
