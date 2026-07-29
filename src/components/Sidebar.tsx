@@ -79,6 +79,7 @@ const MODULES: NavModule[] = [
     bg: "bg-rose-50", text: "text-rose-400",
     children: [
       { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw, moduleKey: "doi-tra" },
+      { href: "/kenh-ban", label: "Kênh bán", icon: ShoppingBag, moduleKey: "doi-tra" },
     ],
   },
   {

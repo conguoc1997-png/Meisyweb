@@ -1464,29 +1464,29 @@ export default function SanXuatPage() {
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-[15px] whitespace-nowrap">
+          <table className="w-full text-[15px]">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="px-2 py-2.5 w-6"></th>
                 <th className="text-left px-2 py-2.5 text-slate-500 font-medium w-[72px]">Ngày</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Hàng cắt</th>
-                <th className="text-left px-2 py-2.5 text-slate-500 font-medium">Tên vải</th>
-                <th className="text-left px-1 py-2.5 text-slate-500 font-medium">Size</th>
-                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">T.Size</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số M</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Số Y</th>
-                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">Lá KH</th>
-                <th className="text-center px-2 py-2.5 text-emerald-600 font-medium text-[14px]">Đã cắt</th>
-                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">Lá TT</th>
-                <th className="text-right px-2 py-2.5 text-slate-500 font-medium">SP / Lá</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium min-w-[260px]">Ghi chú may</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Màu giặt</th>
+                <th className="text-left px-2 py-2.5 text-slate-500 font-medium w-[100px]">Hàng cắt</th>
+                <th className="text-left px-2 py-2.5 text-slate-500 font-medium w-[60px]">Tên vải</th>
+                <th className="text-left px-2 py-2.5 text-slate-500 font-medium w-[160px]">Size</th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[44px]">T.S</th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[56px]">Số M</th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[52px]">Số Y</th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[46px]">Lá KH</th>
+                <th className="text-center px-1 py-2.5 text-emerald-600 font-medium text-[13px] w-[48px]">Đã cắt</th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[46px]">Lá TT</th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[40px]">SP/Lá</th>
+                <th className="text-left px-3 py-2.5 text-slate-500 font-medium min-w-[220px]">Ghi chú may</th>
+                <th className="text-center px-2 py-2.5 text-slate-500 font-medium w-[76px]">Màu giặt</th>
                 <th className="text-right px-3 py-2.5 text-slate-500 font-medium bg-orange-50 hidden">Số SP</th>
-                <th className="text-right px-3 py-2.5 text-slate-500 font-medium">Nhận về</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Loại hàng</th>
-                <th className="text-center px-3 py-2.5 text-slate-500 font-medium">Trạng thái</th>
-                <th className="text-left px-3 py-2.5 text-slate-500 font-medium">Xưởng</th>
-                <th className="px-3 py-2.5"></th>
+                <th className="text-right px-1 py-2.5 text-slate-500 font-medium w-[66px]">Nhận về</th>
+                <th className="text-center px-1 py-2.5 text-slate-500 font-medium w-[96px]">Loại hàng</th>
+                <th className="text-center px-1 py-2.5 text-slate-500 font-medium w-[90px]">Trạng thái</th>
+                <th className="text-left px-2 py-2.5 text-slate-500 font-medium w-[72px]">Xưởng</th>
+                <th className="px-2 py-2.5 w-8"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

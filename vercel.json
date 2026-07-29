@@ -1,8 +1,17 @@
 {
+  "regions": ["sin1"],
   "crons": [
     {
       "path": "/api/ping",
       "schedule": "0 8 */3 * *"
+    },
+    {
+      "path": "/api/cron/sync-nhanh",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/sync-nhanh",
+      "schedule": "0 5 * * *"
     }
   ]
 }

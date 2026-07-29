@@ -702,3 +702,11 @@ model FakeKho {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
+
+
+model AppSettings {
+  key   String @id
+  value String
+
+  @@map("_AppSettings")
+}
