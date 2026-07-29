@@ -678,11 +678,26 @@ export default function KhoPage() {
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Size</label>
-                  <input value={formSP.size} onChange={(e) => setFormSP({ ...formSP, size: e.target.value })} placeholder="S, M, L, XL..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  <select value={formSP.size} onChange={(e) => setFormSP({ ...formSP, size: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
+                    <option value="">— Không có size —</option>
+                    {["S","M","L","XL","2XL","3XL","4XL","5XL"].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
-                  <input value={formSP.mauSac} onChange={(e) => setFormSP({ ...formSP, mauSac: e.target.value })} placeholder="Đỏ, Xanh..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  <select value={formSP.mauSac} onChange={(e) => setFormSP({ ...formSP, mauSac: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
+                    <option value="">— Chọn màu —</option>
+                    {[
+                      ["TRẮNG","TRG"],["ĐEN","DN"],["ĐEN THAN","DTHAN"],["XÁM","XAM"],["KHÓI","KHOI"],
+                      ["ĐỎ","DO"],["CAM","CAM"],["VÀNG","VANG"],["VÀNG CHANH","VCHANH"],
+                      ["XANH NHẠT","XN"],["XANH ĐẬM","XDAM"],["XANH ĐEN","XDEN"],["XANH NAVY","NAVY"],["XANH BABY","XBABY"],
+                      ["XANH MUỐI TIÊU","MUOITIEU"],["TÍM","TIM"],["HỒNG","HONG"],
+                      ["NÂU","NAU"],["BÒ","BO"],["KEM","KEM"],["NUDE","NUDE"],["BE","BE"],["KAKI","KAKI"],
+                      ["CHẤM","CHAM"],["2 VIỀN","2VIEN"],["LỤA XANH ĐẬM","LTUAXDAM"],["LỤA XANH NHẠT","LTUAXN"],
+                    ].map(([ten, vietTat]) => (
+                      <option key={vietTat} value={ten}>{ten} ({vietTat})</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Giá nhập (VNĐ)</label>
