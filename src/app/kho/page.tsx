@@ -37,7 +37,7 @@ export default function KhoPage() {
   const [tab, setTab] = useState<"san-pham" | "lich-su">("san-pham");
 
   // Form states
-  const [formSP, setFormSP] = useState({ ten: "", sku: "", mauSac: "", size: "", giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
+  const [formSP, setFormSP] = useState({ ten: "", sku: "", mauSac: "", size: [] as string[], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
   const [formNX, setFormNX] = useState({ sanPhamId: "", soLuong: "", ghiChu: "", nguoiTao: "" });
   const [editSP, setEditSP] = useState<SanPham | null>(null);
   const [editingTikTokId, setEditingTikTokId] = useState<string | null>(null);
@@ -213,14 +213,24 @@ export default function KhoPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("/api/kho/san-pham", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formSP),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const sizes = formSP.size;
+      const toCreate = sizes.length === 0
+        ? [{ ...formSP, size: "" }]
+        : sizes.map(sz => ({
+            ...formSP,
+            size: sz,
+            sku: formSP.sku + sz,
+            ten: formSP.ten + " - " + sz,
+          }));
+      for (const sp of toCreate) {
+        const res = await fetch("/api/kho/san-pham", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sp),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+      }
       setModal(null);
-      setFormSP({ ten: "", sku: "", mauSac: "", size: "", giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
+      setFormSP({ ten: "", sku: "", mauSac: "", size: [], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
       fetchData();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Lỗi");
@@ -676,12 +686,20 @@ export default function KhoPage() {
                     <option value="khac">Khác</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Size</label>
-                  <select value={formSP.size} onChange={(e) => setFormSP({ ...formSP, size: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
-                    <option value="">— Không có size —</option>
-                    {["S","M","L","XL","2XL","3XL","4XL","5XL"].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1.5 block">Size <span className="text-slate-400">(bỏ trống nếu không có size)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {["S","M","L","XL","2XL","3XL","4XL","5XL"].map(s => {
+                      const checked = formSP.size.includes(s);
+                      return (
+                        <button type="button" key={s}
+                          onClick={() => setFormSP({ ...formSP, size: checked ? formSP.size.filter(x => x !== s) : [...formSP.size, s] })}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${checked ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-600 border-slate-200 hover:border-rose-300"}`}>
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
