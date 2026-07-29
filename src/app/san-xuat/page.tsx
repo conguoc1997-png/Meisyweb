@@ -1765,7 +1765,7 @@ export default function SanXuatPage() {
                     const laTT = cay.soLaTT !== "" && cay.soLaTT != null ? Number(cay.soLaTT) : null;
                     const chenh = laKH != null && laTT != null ? laTT - laKH : null;
                     const spPerCay = laTT != null && lo.tongSize != null ? laTT * lo.tongSize : null;
-                    const nhanVeCay = (cay.hangThucTe != null && cay.hangThucTe !== "") ? cay.hangThucTe : null;
+                    const nhanVeCay = (cay.hangThucTe != null) ? cay.hangThucTe : null;
                     const thieuCay = spPerCay != null && nhanVeCay != null ? spPerCay - nhanVeCay : null;
                     return (
                       <tr key={`${lo.id}-cay-${ci}`} className="bg-slate-50/80 border-l-2 border-rose-200">

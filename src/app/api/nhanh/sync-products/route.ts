@@ -200,7 +200,7 @@ export async function POST(): Promise<NextResponse> {
         },
       });
 
-      localBySku.set(nhanhSku, { id: "", sku: variant.code, ten, mauSac: mauSac ?? null, size: sizeVal, giaNhap: parentLocal.giaNhap, giaBan: parentLocal.giaBan, tonKho, nguon: parentLocal.nguon, tiktokProductId: null, createdAt: new Date(), updatedAt: new Date() });
+      localBySku.set(nhanhSku, { id: "", sku: variant.code, ten, mauSac: mauSac ?? null, size: sizeVal, giaNhap: parentLocal.giaNhap, giaBan: parentLocal.giaBan, tonKho, nguon: parentLocal.nguon, tiktokProductId: null, createdAt: new Date(), updatedAt: new Date(), dinhLuong: null, tenVai: null, giaVai: null, loaiGiaCong: null, giaGiaCong: null });
       sizeCreated++;
       if (tonKho > 0) tonKhoUpdated++;
     }
