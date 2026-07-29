@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical } from "lucide-react";
+import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical, Search } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 type SanPham = { id: string; sku: string; ten: string };
@@ -115,6 +115,7 @@ export default function SanXuatPage() {
   const [savingVai, setSavingVai] = useState(false);
   const [editingVaiXuong, setEditingVaiXuong] = useState<string | null>(null);
   const [filterVaiXuong, setFilterVaiXuong] = useState<string>("");
+  const [searchVai, setSearchVai] = useState("");
   const [expandedVaiRows, setExpandedVaiRows] = useState<Set<string>>(new Set());
   const toggleVaiExpand = (id: string) => setExpandedVaiRows(prev => {
     const next = new Set(prev);
@@ -203,6 +204,7 @@ export default function SanXuatPage() {
   });
   const [filterXuong, setFilterXuong] = useState("");
   const [filterTrangThai, setFilterTrangThai] = useState("");
+  const [filterXuatKho, setFilterXuatKho] = useState<"" | "da_xuat" | "chua_xuat">();
   const [activeMainTab, setActiveMainTab] = useState<"lo-cat" | "hoa-don">("lo-cat");
   const [modalAdd, setModalAdd] = useState(false);
   const [modalEdit, setModalEdit] = useState<LoCat | null>(null);
@@ -1249,6 +1251,16 @@ export default function SanXuatPage() {
                 );
               })}
               {vaiTons.length === 0 && <span className="text-xs text-slate-400">Chưa có dữ liệu</span>}
+              <div className="ml-auto relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchVai}
+                  onChange={e => setSearchVai(e.target.value)}
+                  placeholder="Tìm mã vải..."
+                  className="pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-200 w-40"
+                />
+              </div>
             </div>
           );
         })()}
@@ -1272,7 +1284,14 @@ export default function SanXuatPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {vaiTons.filter(v => !filterVaiXuong || (v.xuong || "__chua_chon__") === filterVaiXuong).map(v => {
+                  {vaiTons.filter(v => {
+                    if (filterVaiXuong && (v.xuong || "__chua_chon__") !== filterVaiXuong) return false;
+                    if (searchVai.trim()) {
+                      const q = searchVai.trim().toLowerCase();
+                      return v.maVai.toLowerCase().includes(q) || (v.mauSac ?? "").toLowerCase().includes(q);
+                    }
+                    return true;
+                  }).map(v => {
                     const hasCayData = v.soCay > 1 && v.cayData;
                     const isVaiExpanded = expandedVaiRows.has(v.id);
                     let cayDataParsed: { soMet: number; soMetUsed?: number; cut?: boolean }[] = [];
@@ -1536,7 +1555,10 @@ export default function SanXuatPage() {
                       {lo.soM != null ? lo.soM.toFixed(2) : <span className="text-slate-300 font-normal">—</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right text-slate-500">
-                      {lo.soY != null ? lo.soY.toFixed(2) : <span className="text-slate-300">—</span>}
+                      {(() => {
+                        const val = lo.soY ?? (hasCay ? cayParsed.reduce((s, c) => s + (Number((c as {soY?: string}).soY) || 0), 0) : null);
+                        return val != null && val > 0 ? val.toFixed(2) : <span className="text-slate-300">—</span>;
+                      })()}
                     </td>
                     <td className="px-2 py-2.5 text-right text-slate-500">{lo.soLa != null ? lo.soLa.toFixed(1) : "—"}</td>
                     {/* Đã cắt */}
@@ -1928,15 +1950,32 @@ export default function SanXuatPage() {
 
       {/* ═══ TAB: XUẤT HÓA ĐƠN ═══ */}
       {activeMainTab === "hoa-don" && (() => {
-        const hoaDonRows = allLoCat.filter(l => l.trangThai === "da_nhap").sort((a, b) => {
+        const allHoaDon = allLoCat.filter(l => l.trangThai === "da_nhap").sort((a, b) => {
           const da = a.ngay ? new Date(a.ngay).getTime() : 0;
           const db = b.ngay ? new Date(b.ngay).getTime() : 0;
           return db - da;
         });
+        const hoaDonRows = filterXuatKho === "da_xuat"
+          ? allHoaDon.filter(l => l.xuatHoaDonDa)
+          : filterXuatKho === "chua_xuat"
+          ? allHoaDon.filter(l => !l.xuatHoaDonDa)
+          : allHoaDon;
         return (
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-slate-700">Hóa đơn đã nhận ({hoaDonRows.length})</span>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-sm font-semibold text-slate-700">Hóa đơn đã nhận ({hoaDonRows.length}/{allHoaDon.length})</span>
+              <div className="flex items-center gap-1 ml-auto">
+                {([["", "Tất cả"], ["chua_xuat", "Chưa xuất"], ["da_xuat", "Đã xuất"]] as const).map(([val, label]) => (
+                  <button key={val} onClick={() => setFilterXuatKho(val)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition ${filterXuatKho === val
+                      ? val === "da_xuat" ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+                        : val === "chua_xuat" ? "bg-amber-100 border-amber-300 text-amber-700"
+                        : "bg-slate-200 border-slate-300 text-slate-700"
+                      : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -2061,21 +2100,29 @@ export default function SanXuatPage() {
               {modalVai === "new" && vaiForm.maVai.trim() && (() => {
                 const matches = vaiTons.filter(v => v.maVai.trim().toLowerCase() === vaiForm.maVai.trim().toLowerCase());
                 if (matches.length === 0) return null;
+                // Kiểm tra trùng cả mã + màu
+                const exactDuplicate = matches.find(v =>
+                  (v.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase()
+                );
                 return (
-                  <div className="border border-amber-200 rounded-lg overflow-hidden bg-amber-50">
-                    <div className="px-3 py-2 bg-amber-100 border-b border-amber-200 flex items-center gap-2">
-                      <span className="text-[14px] font-semibold text-amber-700">⚠ Mã "{vaiForm.maVai}" đã tồn tại — chọn để cộng vào hoặc thêm mới bên dưới</span>
+                  <div className={`border rounded-lg overflow-hidden ${exactDuplicate ? "border-red-300 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+                    <div className={`px-3 py-2 border-b flex items-center gap-2 ${exactDuplicate ? "bg-red-100 border-red-200" : "bg-amber-100 border-amber-200"}`}>
+                      {exactDuplicate
+                        ? <span className="text-[13px] font-semibold text-red-700">🚫 Mã + màu này đã tồn tại — không thể thêm mới, hãy dùng "Cộng vào"</span>
+                        : <span className="text-[13px] font-semibold text-amber-700">⚠ Mã "{vaiForm.maVai}" đã tồn tại — chọn để cộng vào hoặc thêm màu mới</span>
+                      }
                     </div>
                     <div className="divide-y divide-amber-100">
                       {matches.map(m => {
                         let mCays: { soMet: number }[] = [];
                         if (m.cayData) { try { mCays = JSON.parse(m.cayData); } catch {} }
                         const newTotal = vaiCayRows.reduce((s, r) => s + (Number(r.soMet) || 0), 0);
+                        const isExact = (m.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase();
                         return (
-                          <div key={m.id} className="flex items-center justify-between px-3 py-2">
+                          <div key={m.id} className={`flex items-center justify-between px-3 py-2 ${isExact ? "bg-red-50" : ""}`}>
                             <div className="text-xs">
                               <span className="font-semibold text-slate-700">{m.maVai}</span>
-                              {m.mauSac && <span className="ml-1.5 text-slate-500">{m.mauSac}</span>}
+                              {m.mauSac && <span className={`ml-1.5 font-medium ${isExact ? "text-red-600" : "text-slate-500"}`}>{m.mauSac}</span>}
                               {m.xuong && <span className="ml-1.5 text-slate-400">· {XUONG_LABEL[m.xuong] ?? m.xuong}</span>}
                               <div className="text-slate-400 mt-0.5">
                                 Tồn: <strong className="text-blue-700">{m.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {m.donVi}</strong>
@@ -2085,7 +2132,7 @@ export default function SanXuatPage() {
                             </div>
                             <button type="button" onClick={() => congVaoVai(m)}
                               disabled={savingVai || newTotal <= 0}
-                              className="ml-2 flex-shrink-0 text-[14px] font-semibold bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                              className={`ml-2 flex-shrink-0 text-[13px] font-semibold text-white px-2.5 py-1 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed ${isExact ? "bg-red-500 hover:bg-red-600" : "bg-amber-500 hover:bg-amber-600"}`}>
                               Cộng vào
                             </button>
                           </div>
@@ -2348,7 +2395,7 @@ export default function SanXuatPage() {
           {/* Nút cố định ở dưới, không scroll */}
           <div className="flex gap-2 px-6 py-4 border-t border-slate-100 bg-white rounded-b-xl">
               <button onClick={() => setModalVai(null)} className="flex-1 px-4 py-2 border rounded-lg text-sm hover:bg-slate-50">Huỷ</button>
-              <button onClick={saveVai} disabled={!vaiForm.maVai || savingVai}
+              <button onClick={saveVai} disabled={!vaiForm.maVai || savingVai || (modalVai === "new" && vaiTons.some(v => v.maVai.trim().toLowerCase() === vaiForm.maVai.trim().toLowerCase() && (v.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase()))}
                 className="flex-1 px-4 py-2 bg-rose-500 text-white rounded-lg text-sm hover:bg-rose-600 disabled:opacity-50">
                 {savingVai ? "Đang lưu..." : modalVai === "new" ? "Thêm" : "Lưu"}
               </button>
