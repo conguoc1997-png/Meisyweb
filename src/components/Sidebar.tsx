@@ -63,6 +63,7 @@ const MODULES: NavModule[] = [
     bg: "bg-amber-50", text: "text-amber-500",
     children: [
       { href: "/kho",       label: "Kho hàng",           icon: Package,       moduleKey: "kho" },
+      { href: "/sku-list",  label: "Danh sách SKU",      icon: ClipboardList, moduleKey: "kho" },
       { href: "/fake-kho",  label: "Fake Kho",           icon: Package,       moduleKey: "kho" },
       { href: "/doi-soat",  label: "Đối soát hoàn trả",  icon: ClipboardList, moduleKey: "kho" },
       { href: "/kenh-ban",  label: "Kênh bán",           icon: ShoppingBag,   moduleKey: "doi-tra" },

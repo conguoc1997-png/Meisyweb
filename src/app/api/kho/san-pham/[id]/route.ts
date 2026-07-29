@@ -20,6 +20,11 @@ export async function PUT(
         giaBan: Number(body.giaBan) || 0,
         nguon: body.nguon || null,
         tiktokProductId: body.tiktokProductId ?? null,
+        ...(body.dinhLuong    !== undefined ? { dinhLuong:    body.dinhLuong    !== "" ? Number(body.dinhLuong)    : null } : {}),
+        ...(body.tenVai       !== undefined ? { tenVai:       body.tenVai       || null } : {}),
+        ...(body.giaVai       !== undefined ? { giaVai:       body.giaVai       !== "" ? Number(body.giaVai)       : null } : {}),
+        ...(body.loaiGiaCong  !== undefined ? { loaiGiaCong:  body.loaiGiaCong  || null } : {}),
+        ...(body.giaGiaCong   !== undefined ? { giaGiaCong:   body.giaGiaCong   !== "" ? Number(body.giaGiaCong)   : null } : {}),
       },
     });
     return NextResponse.json(sp);

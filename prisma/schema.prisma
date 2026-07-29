@@ -35,6 +35,12 @@ model SanPham {
   tonKho          Int      @default(0)
   nguon           String?
   tiktokProductId String?
+  // Cấu trúc chi phí SKU
+  dinhLuong       Float?   // định lượng vải (m)
+  tenVai          String?  // mã vải (vd: 2777, 1288)
+  giaVai          Float?   // giá vải (tính theo m)
+  loaiGiaCong     String?  // loại gia công (02KAKI, DLM, 01VS...)
+  giaGiaCong      Float?   // giá gia công
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -703,6 +709,17 @@ model FakeKho {
   updatedAt     DateTime  @updatedAt
 }
 
+
+// Bảng giá gia công: mỗi row là 1 loại gia công (01M, DLM, ...)
+model GiaCongLoai {
+  id         String   @id @default(cuid())
+  nhomXuong  String   // NHÀ, DŨNG LINH, ...
+  ma         String   @unique  // 01M, 01VS, DLM, DLVS...
+  chiPhi     Json     @default("{}")  // { "cat_so_do": 1500, "may": 15000, ... }
+  thuTu      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
 
 model AppSettings {
   key   String @id
