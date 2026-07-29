@@ -191,7 +191,8 @@ export default function SkuListPage() {
 
   // ── Derived ──
   const filteredSP = sanPhams.filter(sp =>
-    !skuSearch || sp.sku.toLowerCase().includes(skuSearch.toLowerCase()) || sp.ten.toLowerCase().includes(skuSearch.toLowerCase())
+    !sp.size &&
+    (!skuSearch || sp.sku.toLowerCase().includes(skuSearch.toLowerCase()) || sp.ten.toLowerCase().includes(skuSearch.toLowerCase()))
   );
 
   const loaiMap = Object.fromEntries(loais.map(l => [l.ma, l]));
