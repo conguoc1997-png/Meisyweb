@@ -65,6 +65,7 @@ const MODULES: NavModule[] = [
       { href: "/kho",       label: "Kho hàng",           icon: Package,       moduleKey: "kho" },
       { href: "/fake-kho",  label: "Fake Kho",           icon: Package,       moduleKey: "kho" },
       { href: "/doi-soat",  label: "Đối soát hoàn trả",  icon: ClipboardList, moduleKey: "kho" },
+      { href: "/kenh-ban",  label: "Kênh bán",           icon: ShoppingBag,   moduleKey: "doi-tra" },
     ],
   },
   {
@@ -79,7 +80,6 @@ const MODULES: NavModule[] = [
     bg: "bg-rose-50", text: "text-rose-400",
     children: [
       { href: "/doi-tra", label: "Đổi trả / Sự cố", icon: RefreshCcw, moduleKey: "doi-tra" },
-      { href: "/kenh-ban", label: "Kênh bán", icon: ShoppingBag, moduleKey: "doi-tra" },
     ],
   },
   {
