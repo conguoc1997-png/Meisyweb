@@ -701,10 +701,9 @@ export default function KhoPage() {
                     })}
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
-                  <select value={formSP.mauSac} onChange={(e) => setFormSP({ ...formSP, mauSac: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 bg-white">
-                    <option value="">— Chọn màu —</option>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1.5 block">Màu sắc {formSP.mauSac && <span className="text-rose-500 font-semibold">· {formSP.mauSac}</span>}</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
                     {[
                       ["TRẮNG","TRG"],["ĐEN","DN"],["ĐEN THAN","DTHAN"],["XÁM","XAM"],["KHÓI","KHOI"],
                       ["ĐỎ","DO"],["CAM","CAM"],["VÀNG","VANG"],["VÀNG CHANH","VCHANH"],
@@ -712,10 +711,17 @@ export default function KhoPage() {
                       ["XANH MUỐI TIÊU","MUOITIEU"],["TÍM","TIM"],["HỒNG","HONG"],
                       ["NÂU","NAU"],["BÒ","BO"],["KEM","KEM"],["NUDE","NUDE"],["BE","BE"],["KAKI","KAKI"],
                       ["CHẤM","CHAM"],["2 VIỀN","2VIEN"],["LỤA XANH ĐẬM","LTUAXDAM"],["LỤA XANH NHẠT","LTUAXN"],
-                    ].map(([ten, vietTat]) => (
-                      <option key={vietTat} value={ten}>{ten} ({vietTat})</option>
-                    ))}
-                  </select>
+                    ].map(([ten, vietTat]) => {
+                      const selected = formSP.mauSac === ten;
+                      return (
+                        <button type="button" key={vietTat}
+                          onClick={() => setFormSP({ ...formSP, mauSac: selected ? "" : ten })}
+                          className={`px-2 py-1 rounded-lg text-xs font-medium border transition ${selected ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-600 border-slate-200 hover:border-rose-300"}`}>
+                          {vietTat}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Giá nhập (VNĐ)</label>
