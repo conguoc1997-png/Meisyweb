@@ -4,7 +4,7 @@ import { Plus, Trash2, Settings, Check, X } from "lucide-react";
 
 interface SanPham {
   id: string; sku: string; ten: string; mauSac: string | null; size: string | null;
-  giaNhap: number; giaBan: number;
+  giaNhap: number; giaBan: number; updatedAt: string;
   dinhLuong: number | null; tenVai: string | null; giaVai: number | null;
   loaiGiaCong: string | null; giaGiaCong: number | null;
 }
@@ -41,6 +41,21 @@ function EditableCell({ value, onSave, type = "text", className = "" }: {
         ? (type === "number" ? Number(value).toLocaleString("vi-VN") : String(value))
         : <span className="text-slate-300">—</span>}
     </span>
+  );
+}
+
+function DinhLuongInput({ sp, onSave }: { sp: SanPham; onSave: (sp: SanPham, v: string) => void }) {
+  const [val, setVal] = useState(sp.dinhLuong != null ? String(sp.dinhLuong) : "");
+  useEffect(() => { setVal(sp.dinhLuong != null ? String(sp.dinhLuong) : ""); }, [sp.dinhLuong]);
+  return (
+    <input
+      type="number" step="0.01" value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={() => onSave(sp, val)}
+      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      placeholder="—"
+      className="w-16 text-right px-2 py-1 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded outline-none text-sm bg-transparent focus:bg-white transition"
+    />
   );
 }
 
@@ -240,6 +255,7 @@ export default function SkuListPage() {
                     <th className="px-4 py-3 text-right">Giá gia công</th>
                     <th className="px-4 py-3 text-right bg-amber-50 text-amber-700">Giá nhập</th>
                     <th className="px-4 py-3 text-right bg-emerald-50 text-emerald-700">Giá bán</th>
+                    <th className="px-4 py-3 text-center text-slate-400">Cập nhật</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -251,9 +267,8 @@ export default function SkuListPage() {
                       <tr key={sp.id} className="hover:bg-slate-50">
                         <td className="px-4 py-2.5 font-mono font-bold text-slate-800 sticky left-0 bg-white hover:bg-slate-50 z-10">{sp.sku}</td>
                         <td className="px-4 py-2.5 text-slate-600 max-w-[220px] truncate">{sp.ten}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <EditableCell value={sp.dinhLuong} type="number" className="text-right"
-                            onSave={v => handleDinhLuong(sp, v)} />
+                        <td className="px-2 py-1.5 text-right">
+                          <DinhLuongInput sp={sp} onSave={handleDinhLuong} />
                         </td>
                         <td className="px-4 py-2.5">
                           <select value={sp.tenVai ?? ""}
@@ -283,6 +298,9 @@ export default function SkuListPage() {
                         <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 bg-emerald-50">
                           <EditableCell value={sp.giaBan || null} type="number" className="text-right text-emerald-700"
                             onSave={v => updateSku(sp.id, { giaBan: v === "" ? 0 : Number(v) })} />
+                        </td>
+                        <td className="px-4 py-2.5 text-center text-xs text-slate-400 whitespace-nowrap">
+                          {sp.updatedAt ? new Date(sp.updatedAt).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"}
                         </td>
                       </tr>
                     );
