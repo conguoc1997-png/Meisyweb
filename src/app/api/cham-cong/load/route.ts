@@ -30,15 +30,17 @@ export async function GET(req: NextRequest) {
     })() : Promise.resolve([]);
 
     const pcPromise = thang
-      ? prisma.phuCapThang.findMany({ where: { thang } }).catch(() => [])
-      : Promise.resolve([]);
+      ? prisma.$queryRawUnsafe<Array<{ nhanVienId: string; phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }>>(
+          `SELECT "nhanVienId","phuCapCC","phuCapAn","phuCapDB","heSoTC" FROM "PhuCapThang" WHERE "thang"=$1`, thang
+        ).catch(() => [] as Array<{ nhanVienId: string; phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }>)
+      : Promise.resolve([] as Array<{ nhanVienId: string; phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }>);
 
     if (skipNV) {
       // Chế độ nhanh: chỉ CC + PhuCap
       const [ccRows, phuCapRows] = await Promise.all([ccPromise, pcPromise]);
-      const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }> = {};
+      const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }> = {};
       for (const r of phuCapRows) {
-        phuCapMap[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB };
+        phuCapMap[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB, heSoTC: r.heSoTC ?? null };
       }
       return NextResponse.json({ chamCongs: ccRows, phuCaps: phuCapMap });
     }
@@ -88,9 +90,9 @@ export async function GET(req: NextRequest) {
         return nv.ngayNghiViec != null && nv.ngayNghiViec >= monthStart;
       });
 
-    const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number }> = {};
+    const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }> = {};
     for (const r of phuCapRows) {
-      phuCapMap[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB };
+      phuCapMap[r.nhanVienId] = { phuCapCC: r.phuCapCC, phuCapAn: r.phuCapAn, phuCapDB: r.phuCapDB, heSoTC: r.heSoTC ?? null };
     }
 
     return NextResponse.json({ nhanViens, chamCongs: ccRows, phuCaps: phuCapMap, lichMap });
