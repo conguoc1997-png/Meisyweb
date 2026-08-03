@@ -50,7 +50,12 @@ export async function GET(req: NextRequest) {
     await autoMigrate();
     const withHistory = url.searchParams.get("h") === "1";
     const list = await prisma.nhanVien.findMany({
-      where: { active: true },
+      where: {
+        OR: [
+          { active: true },
+          { active: false, ngayNghiViec: { not: null } },
+        ],
+      },
       orderBy: { ten: "asc" },
       ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
     });

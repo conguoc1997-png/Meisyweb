@@ -592,11 +592,14 @@ export default function ChamCongPage() {
   const getKey = (nvId: string, day: number) =>
     `${nvId}_${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-  // Filter nhân viên theo hộ đang chọn (getHo defined above)
-  const nhanViens = useMemo(() =>
-    selectedHo ? nhanViensAll.filter(nv => getHo(nv) === selectedHo) : nhanViensAll,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  [nhanViensAll, selectedHo]);
+  // Filter nhân viên theo hộ và tháng đang xem (ẩn NV đã nghỉ trước tháng này)
+  const nhanViens = useMemo(() => {
+    const thangStart = new Date(thang + "-01");
+    const activeInMonth = (nv: NhanVien) =>
+      !nv.ngayNghiViec || new Date(nv.ngayNghiViec) >= thangStart;
+    const base = selectedHo ? nhanViensAll.filter(nv => getHo(nv) === selectedHo) : nhanViensAll;
+    return base.filter(activeInMonth);
+  }, [nhanViensAll, selectedHo, thang]);
 
   // ── Birthday notifications ──
   const birthdayAlerts = useMemo(() => {
