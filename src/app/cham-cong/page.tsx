@@ -1583,7 +1583,7 @@ export default function ChamCongPage() {
                   const isCoBanMay    = nv.loaiLuong !== "khoan"  && isMayGroup(phongBan);
                   const gioNV         = (isKhoan || isCoBanMay) ? congTinhLuong * 8 + tongTC : 0;
                   const luongKhoan    = isKhoan    ? donGiaGioKhoan * gioNV : 0;
-                  const luongCoBanMay = isCoBanMay ? gioNV * (nv.heSoTC ?? 1.5) : 0;
+                  const luongCoBanMay = isCoBanMay ? gioNV * heSoTC : 0;
                   const thucLinhKhoan    = isKhoan    ? luongKhoan    + tongPhuCap : thucLinh;
                   const thucLinhCoBanMay = isCoBanMay ? luongCoBanMay + tongPhuCap : thucLinh;
 
@@ -1745,7 +1745,7 @@ export default function ChamCongPage() {
                             thucLinh: isKhoan ? Math.round(thucLinhKhoan) : isCoBanMay ? Math.round(thucLinhCoBanMay) : Math.round(thucLinh),
                             isKhoan, isCoBanMay,
                             gioNV: (isKhoan || isCoBanMay) ? gioNV : undefined,
-                            donGiaGio: isKhoan ? Math.round(donGiaGioKhoan) : isCoBanMay ? (nv.heSoTC ?? 1.5) : undefined,
+                            donGiaGio: isKhoan ? Math.round(donGiaGioKhoan) : isCoBanMay ? heSoTC : undefined,
                             luongMay: isKhoan ? Math.round(luongKhoan) : isCoBanMay ? Math.round(luongCoBanMay) : undefined,
                           })}
                           className="p-1.5 rounded-lg hover:bg-violet-100 text-slate-300 hover:text-violet-600 transition">
