@@ -28,6 +28,68 @@ type NhapXuat = {
 
 type ModalType = "them-sp" | "nhap" | "xuat" | "sua" | null;
 
+function MauAutocomplete({ value, mauList, onChange }: { value: string[]; mauList: { ten: string; vietTat: string }[]; onChange: (v: string[]) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = query.trim() === ""
+    ? mauList
+    : mauList.filter(m => m.ten.toLowerCase().includes(query.toLowerCase()) || m.vietTat.toLowerCase().includes(query.toLowerCase()));
+
+  function toggle(ten: string) {
+    onChange(value.includes(ten) ? value.filter(v => v !== ten) : [...value, ten]);
+    setQuery("");
+    inputRef.current?.focus();
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex flex-wrap items-center gap-1 border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus-within:border-rose-400 focus-within:ring-1 focus-within:ring-rose-200 cursor-text min-h-[36px]"
+        onClick={() => { setOpen(true); inputRef.current?.focus(); }}>
+        {value.map(ten => (
+          <span key={ten} className="flex items-center gap-1 bg-rose-100 text-rose-700 text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap">
+            {mauList.find(m => m.ten === ten)?.vietTat ?? ten}
+            <button type="button" onMouseDown={e => { e.stopPropagation(); onChange(value.filter(v => v !== ten)); }} className="hover:text-rose-900 leading-none">✕</button>
+          </span>
+        ))}
+        <input ref={inputRef}
+          className="flex-1 text-sm outline-none bg-transparent min-w-[80px]"
+          placeholder={value.length === 0 ? "Gõ tên hoặc viết tắt..." : ""}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.map(m => {
+            const selected = value.includes(m.ten);
+            return (
+              <button type="button" key={m.vietTat}
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-rose-50 text-left ${selected ? "bg-rose-50 text-rose-700 font-medium" : "text-slate-700"}`}
+                onMouseDown={e => { e.preventDefault(); toggle(m.ten); }}>
+                <span className="flex items-center gap-2">
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[9px] ${selected ? "bg-rose-500 border-rose-500 text-white" : "border-slate-300"}`}>{selected ? "✓" : ""}</span>
+                  {m.ten}
+                </span>
+                <span className="text-xs text-slate-400">{m.vietTat}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function KhoPage() {
   const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [lichSu, setLichSu] = useState<NhapXuat[]>([]);
@@ -37,9 +99,14 @@ export default function KhoPage() {
   const [tab, setTab] = useState<"san-pham" | "lich-su">("san-pham");
 
   // Form states
-  const [formSP, setFormSP] = useState({ ten: "", sku: "", mauSac: "", size: [] as string[], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
+  const [formSP, setFormSP] = useState({ ten: "", sku: "", mauSac: [] as string[], size: [] as string[], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
+  const [mauList, setMauList] = useState<{ ten: string; vietTat: string }[]>([]);
+  useEffect(() => { fetch("/api/gia-cong/mau").then(r => r.json()).then(setMauList).catch(() => {}); }, []);
   const [formNX, setFormNX] = useState({ sanPhamId: "", soLuong: "", ghiChu: "", nguoiTao: "" });
   const [editSP, setEditSP] = useState<SanPham | null>(null);
+  const [editGroup, setEditGroup] = useState<SanPham[] | null>(null);
+  const [editGroupRows, setEditGroupRows] = useState<{ id: string; ten: string; sku: string; mauSac: string; size: string; giaNhap: string; giaBan: string }[]>([]);
+  const [formSuaGroup, setFormSuaGroup] = useState({ ten: "", sku: "", giaNhap: "", giaBan: "", size: [] as string[], mauSac: [] as string[], nguon: "shopee" });
   const [editingTikTokId, setEditingTikTokId] = useState<string | null>(null);
   const tikTokInputRef = useRef<HTMLInputElement>(null);
   const [formSua, setFormSua] = useState({ ten: "", sku: "", giaNhap: "", giaBan: "", mauSac: "", size: "", nguon: "" });
@@ -153,52 +220,51 @@ export default function KhoPage() {
       sp.sku.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Nhóm sản phẩm theo parent: ưu tiên tìm cha qua ten field (strip " - Size"),
-  // fallback về strip size từ SKU
+  // Nhóm sản phẩm: SP có size → group theo baseName (strip size+màu khỏi tên)
   const SIZES = ["5XL", "4XL", "3XL", "2XL", "XL", "XS", "L", "M", "S"];
-  function stripSizeSuffix(sku: string, size: string): string {
-    const upper = sku.toUpperCase();
-    const sz = size.toUpperCase();
-    if (upper.endsWith(sz)) return sku.slice(0, sku.length - sz.length);
-    return sku;
+  // Regex strip "- SIZE" hoặc "- SIZE / MÀU" hoặc "- SIZE-MÀU" ở cuối tên
+  const SIZE_RE = /\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])\b.*/i;
+
+  function baseName(sp: SanPham): string {
+    if (!sp.size) return sp.ten.trim();
+    // Strip "- SIZE-..." từ cuối tên
+    const stripped = sp.ten.replace(SIZE_RE, "").trim();
+    if (stripped !== sp.ten.trim()) return stripped;
+    // Fallback: strip theo sp.size literal
+    return sp.ten.replace(new RegExp(`\\s*-\\s*${sp.size}(-.+)?$`, "i"), "").trim();
   }
 
-  // Map: tên cha → SKU cha (cho sản phẩm không có size)
-  const parentNameMap = new Map<string, string>();
-  for (const sp of filteredSP) {
-    if (!sp.size) parentNameMap.set(sp.ten.trim(), sp.sku);
+  function baseSkuOf(sp: SanPham): string {
+    if (!sp.size) return sp.sku;
+    // Tìm vị trí size trong SKU (vd "OR26CT5XL-XANH" → idx=6 → "OR26CT")
+    const idx = sp.sku.toUpperCase().indexOf(sp.size.toUpperCase());
+    if (idx > 0) return sp.sku.slice(0, idx);
+    return sp.sku;
   }
-  const skuSet = new Set(filteredSP.map(sp => sp.sku.toUpperCase()));
+
+  // Map: baseName → group key (dùng SKU cha nếu tồn tại, không thì dùng baseName)
+  const parentSkuMap = new Map<string, string>(); // baseName → SKU mẹ
+  for (const sp of filteredSP) {
+    if (!sp.size) parentSkuMap.set(sp.ten.trim(), sp.sku);
+  }
 
   const groupMap = new Map<string, SanPham[]>();
   for (const sp of filteredSP) {
-    let key = sp.sku;
-    if (sp.size && SIZES.includes(sp.size.toUpperCase())) {
-      // 1. Tìm cha theo ten: "CVXOEDTHAN - S" → "CVXOEDTHAN"
-      const baseName = sp.ten.replace(/\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])$/i, "").trim();
-      const parentSku = parentNameMap.get(baseName);
-      if (parentSku) {
-        key = parentSku;
-      } else {
-        // 2. Fallback: strip size từ SKU (SKU theo chuẩn cũ)
-        const base = stripSizeSuffix(sp.sku, sp.size);
-        if (base !== sp.sku && skuSet.has(base.toUpperCase())) key = base;
-      }
-    }
+    const base = baseName(sp);
+    const key = parentSkuMap.get(base) ?? base;
     if (!groupMap.has(key)) groupMap.set(key, []);
     groupMap.get(key)!.push(sp);
   }
 
+  const SIZE_ORDER = ["S","M","L","XL","2XL","3XL","4XL","5XL","XS"];
   const groups = Array.from(groupMap.entries()).map(([key, items]) => {
-    const hasVariants = items.length > 1;
-    // Khi có variants: chỉ cộng stock của các size variant, không cộng stock cha (tránh double-count)
-    const totalTon = hasVariants
-      ? items.filter(sp => sp.size).reduce((s, sp) => s + sp.tonKho, 0)
-      : items.reduce((s, sp) => s + sp.tonKho, 0);
-    return {
-      key, items, hasVariants, totalTon,
-      repr: items.find(sp => !sp.size) ?? items.find(sp => sp.sku.toUpperCase() === key.toUpperCase()) ?? items[0],
-    };
+    const sorted = [...items].sort((a, b) => SIZE_ORDER.indexOf(a.size ?? "") - SIZE_ORDER.indexOf(b.size ?? ""));
+    const hasVariants = items.some(sp => sp.size) && items.length > 1;
+    const totalTon = items.filter(sp => sp.size || !hasVariants).reduce((s, sp) => s + sp.tonKho, 0);
+    const reprItem = items.find(sp => !sp.size) ?? sorted[0];
+    const displayName = baseName(reprItem);
+    const baseSku = baseSkuOf(reprItem);
+    return { key, items: sorted, hasVariants, totalTon, repr: reprItem, displayName, baseSku };
   });
 
   const toggleGroup = (key: string) => {
@@ -213,15 +279,32 @@ export default function KhoPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const sizes = formSP.size;
-      const toCreate = sizes.length === 0
-        ? [{ ...formSP, size: "" }]
-        : sizes.map(sz => ({
-            ...formSP,
-            size: sz,
-            sku: formSP.sku + sz,
-            ten: formSP.ten + " - " + sz,
-          }));
+      const sizes = formSP.size.length > 0 ? formSP.size : [""];
+      const maus = formSP.mauSac.length > 0 ? formSP.mauSac : [""];
+      const hasVariants = formSP.size.length > 0 || formSP.mauSac.length > 0;
+
+      // Tạo SP cha nếu có variants
+      if (hasVariants) {
+        const parentRes = await fetch("/api/kho/san-pham", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...formSP, mauSac: "", size: "", tonKho: "0" }),
+        });
+        if (!parentRes.ok) throw new Error((await parentRes.json()).error);
+      }
+
+      // Tạo SP con (size × màu)
+      const toCreate = sizes.flatMap(sz => maus.map(mau => {
+        const vietTat = mau ? (mauList.find(m => m.ten === mau)?.vietTat ?? mau.replace(/\s+/g, "").toUpperCase()) : "";
+        const skuSuffix = [vietTat, sz].filter(Boolean).join("").toUpperCase();
+        const nameSuffix = [sz, mau].filter(Boolean).join(" / ");
+        return {
+          ...formSP,
+          mauSac: mau || "",
+          size: sz,
+          sku: skuSuffix ? formSP.sku + skuSuffix : formSP.sku,
+          ten: nameSuffix ? formSP.ten + " - " + nameSuffix : formSP.ten,
+        };
+      }));
       for (const sp of toCreate) {
         const res = await fetch("/api/kho/san-pham", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -230,7 +313,7 @@ export default function KhoPage() {
         if (!res.ok) throw new Error((await res.json()).error);
       }
       setModal(null);
-      setFormSP({ ten: "", sku: "", mauSac: "", size: [], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
+      setFormSP({ ten: "", sku: "", mauSac: [], size: [], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
       fetchData();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Lỗi");
@@ -270,10 +353,112 @@ export default function KhoPage() {
     fetchData();
   };
 
-  const openSua = (sp: SanPham) => {
+  const handleXoa = async (sp: SanPham) => {
+    if (!confirm(`Xoá "${sp.ten}" (${sp.sku})?\nHành động này không thể hoàn tác.`)) return;
+    await fetch(`/api/kho/san-pham/${sp.id}`, { method: "DELETE" });
+    fetchData();
+  };
+
+  const openSua = (sp: SanPham, group?: SanPham[]) => {
+    if (group && group.length > 1) {
+      const children = group.filter(s => s.size);
+      const parentSP = group.find(s => !s.size);
+      const SIZE_STRIP = /\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])\b.*/i;
+      const repr = children[0] ?? group[0];
+      // Tên và SKU gốc: dùng SP cha nếu có, không thì strip từ con
+      const baseTen = parentSP ? parentSP.ten : repr.ten.replace(SIZE_STRIP, "").trim();
+      const baseSku = parentSP ? parentSP.sku : (() => {
+        // Strip {vietTat}{size} từ cuối SKU
+        const sz = (repr.size ?? "").toUpperCase();
+        const vietTats = mauList.map(m => m.vietTat.toUpperCase());
+        const skuUp = repr.sku.toUpperCase();
+        for (const vt of vietTats) {
+          const suffix = vt + sz;
+          if (suffix && skuUp.endsWith(suffix)) return repr.sku.slice(0, repr.sku.length - suffix.length);
+        }
+        // Fallback: strip chỉ size
+        if (sz && skuUp.endsWith(sz)) return repr.sku.slice(0, repr.sku.length - sz.length);
+        return repr.sku;
+      })();
+      const sizes = [...new Set(children.map(s => s.size).filter(Boolean))] as string[];
+      const maus = [...new Set(children.map(s => s.mauSac).filter(Boolean))] as string[];
+      setEditGroup(group);
+      setFormSuaGroup({
+        ten: baseTen, sku: baseSku,
+        giaNhap: String(children[0]?.giaNhap ?? repr.giaNhap),
+        giaBan: String(children[0]?.giaBan ?? repr.giaBan),
+        size: sizes, mauSac: maus, nguon: repr.nguon || "shopee",
+      });
+      setModal("sua");
+      return;
+    }
+    setEditGroup(null);
     setFormSua({ ten: sp.ten, sku: sp.sku, giaNhap: String(sp.giaNhap), giaBan: String(sp.giaBan), mauSac: sp.mauSac || "", size: sp.size || "", nguon: sp.nguon || "" });
     setEditSP(sp);
     setModal("sua");
+  };
+
+  const handleSuaGroup = async () => {
+    if (!editGroup) return;
+    setLoading(true);
+    try {
+      const f = formSuaGroup;
+      const sizes = f.size.length > 0 ? f.size : [""];
+      const maus = f.mauSac.length > 0 ? f.mauSac : [""];
+      const parent = editGroup.find(s => !s.size);
+
+      // Cập nhật hoặc tạo SP cha
+      if (parent) {
+        await fetch(`/api/kho/san-pham/${parent.id}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: f.ten, sku: f.sku, nguon: f.nguon }),
+        });
+      } else {
+        await fetch("/api/kho/san-pham", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: f.ten, sku: f.sku, nguon: f.nguon, mauSac: "", size: "", giaNhap: Number(f.giaNhap), giaBan: Number(f.giaBan), tonKho: "0" }),
+        });
+      }
+
+      // Build danh sách SP con mới cần có
+      const children = editGroup.filter(s => s.size);
+      const existingMap = new Map(children.map(s => [`${s.size}|${s.mauSac ?? ""}`, s]));
+
+      for (const sz of sizes) {
+        for (const mau of maus) {
+          const vietTat = mau ? (mauList.find(m => m.ten === mau)?.vietTat ?? mau.replace(/\s+/g, "").toUpperCase()) : "";
+          const skuSuffix = [vietTat, sz].filter(Boolean).join("").toUpperCase();
+          const nameSuffix = [sz, mau].filter(Boolean).join(" / ");
+          const newSku = skuSuffix ? f.sku + skuSuffix : f.sku;
+          const newTen = nameSuffix ? f.ten + " - " + nameSuffix : f.ten;
+          const existing = existingMap.get(`${sz}|${mau}`);
+          if (existing) {
+            // Update
+            await fetch(`/api/kho/san-pham/${existing.id}`, {
+              method: "PUT", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ten: newTen, sku: newSku, mauSac: mau, size: sz, giaNhap: Number(f.giaNhap), giaBan: Number(f.giaBan), nguon: f.nguon }),
+            });
+            existingMap.delete(`${sz}|${mau}`);
+          } else {
+            // Create
+            await fetch("/api/kho/san-pham", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ten: newTen, sku: newSku, mauSac: mau, size: sz, giaNhap: Number(f.giaNhap), giaBan: Number(f.giaBan), nguon: f.nguon, tonKho: "0" }),
+            });
+          }
+        }
+      }
+
+      // Xoá các SP con không còn trong danh sách mới
+      for (const [, sp] of existingMap) {
+        await fetch(`/api/kho/san-pham/${sp.id}`, { method: "DELETE" });
+      }
+
+      setModal(null); setEditGroup(null);
+      fetchData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Lỗi");
+    } finally { setLoading(false); }
   };
 
   const handleSua = async (e: React.FormEvent) => {
@@ -499,9 +684,10 @@ export default function KhoPage() {
                     Chưa có sản phẩm nào
                   </td>
                 </tr>
-              ) : groups.map(({ key, items, hasVariants, totalTon, repr }) => {
+              ) : groups.map(({ key, items, hasVariants, totalTon, repr, displayName, baseSku }) => {
                 const isExpanded = expandedGroups.has(key);
-                const colorLabel = repr.mauSac || "—";
+                const sizeCount = items.filter(sp => sp.size).length;
+                const mauLabels = [...new Set(items.map(sp => sp.mauSac).filter(Boolean))];
                 return (
                   <>
                     {/* Row cha / row đơn */}
@@ -516,12 +702,15 @@ export default function KhoPage() {
                           : null}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-800">{hasVariants ? repr.ten.replace(/\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])$/i, "") : repr.ten}</p>
-                        <p className="text-xs text-slate-400 font-mono">{hasVariants ? key : repr.sku}</p>
+                        <p className="font-medium text-slate-800">{displayName}</p>
+                        <p className="text-xs text-slate-400 font-mono">{baseSku}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {hasVariants
-                          ? <span className="text-xs text-slate-500">{colorLabel} · <span className="font-medium">{items.filter(sp => sp.size).length} size</span></span>
+                          ? <span className="text-xs text-slate-500">
+                              {mauLabels.length > 0 && <span>{mauLabels.join(", ")} · </span>}
+                              <span className="font-medium">{sizeCount} size</span>
+                            </span>
                           : ([repr.mauSac, repr.size].filter(Boolean).join(" / ") || "—")}
                       </td>
                       <td className="px-4 py-3">
@@ -560,7 +749,10 @@ export default function KhoPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                        {!hasVariants && <button onClick={() => openSua(repr)} className="text-xs text-rose-500 hover:underline">Sửa</button>}
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openSua(repr, hasVariants ? items : undefined)} className="text-xs text-rose-500 hover:underline">Sửa</button>
+                          {!hasVariants && <button onClick={() => handleXoa(repr)} className="text-xs text-slate-300 hover:text-red-500 transition">Xoá</button>}
+                        </div>
                       </td>
                     </tr>
 
@@ -607,8 +799,11 @@ export default function KhoPage() {
                               {sp.tonKho}
                             </span>
                           </td>
-                          <td className="px-4 py-2 text-right">
-                            <button onClick={() => openSua(sp)} className="text-xs text-rose-500 hover:underline">Sửa</button>
+                          <td className="px-4 py-2 text-right" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => openSua(sp)} className="text-xs text-rose-500 hover:underline">Sửa</button>
+                              <button onClick={() => handleXoa(sp)} className="text-xs text-slate-300 hover:text-red-500 transition">Xoá</button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -702,26 +897,12 @@ export default function KhoPage() {
                   </div>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs text-slate-600 mb-1.5 block">Màu sắc {formSP.mauSac && <span className="text-rose-500 font-semibold">· {formSP.mauSac}</span>}</label>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-                    {[
-                      ["TRẮNG","TRG"],["ĐEN","DN"],["ĐEN THAN","DTHAN"],["XÁM","XAM"],["KHÓI","KHOI"],
-                      ["ĐỎ","DO"],["CAM","CAM"],["VÀNG","VANG"],["VÀNG CHANH","VCHANH"],
-                      ["XANH NHẠT","XN"],["XANH ĐẬM","XDAM"],["XANH ĐEN","XDEN"],["XANH NAVY","NAVY"],["XANH BABY","XBABY"],
-                      ["XANH MUỐI TIÊU","MUOITIEU"],["TÍM","TIM"],["HỒNG","HONG"],
-                      ["NÂU","NAU"],["BÒ","BO"],["KEM","KEM"],["NUDE","NUDE"],["BE","BE"],["KAKI","KAKI"],
-                      ["CHẤM","CHAM"],["2 VIỀN","2VIEN"],["LỤA XANH ĐẬM","LTUAXDAM"],["LỤA XANH NHẠT","LTUAXN"],
-                    ].map(([ten, vietTat]) => {
-                      const selected = formSP.mauSac === ten;
-                      return (
-                        <button type="button" key={vietTat}
-                          onClick={() => setFormSP({ ...formSP, mauSac: selected ? "" : ten })}
-                          className={`px-2 py-1 rounded-lg text-xs font-medium border transition ${selected ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-600 border-slate-200 hover:border-rose-300"}`}>
-                          {vietTat}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
+                  <MauAutocomplete value={formSP.mauSac} mauList={mauList}
+                    onChange={v => setFormSP({ ...formSP, mauSac: v })} />
+                  {formSP.mauSac.length > 0 && formSP.size.length > 0 && (
+                    <p className="text-xs text-slate-400 mt-1">→ Sẽ tạo {formSP.size.length * formSP.mauSac.length} sản phẩm</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Giá nhập (VNĐ)</label>
@@ -858,45 +1039,114 @@ export default function KhoPage() {
       )}
 
       {/* Modal Sửa sản phẩm */}
-      {modal === "sua" && editSP && (
+      {modal === "sua" && (editSP || editGroup) && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="p-5 border-b border-slate-200">
-              <h2 className="font-bold text-slate-800">Sửa thông tin sản phẩm</h2>
-              <p className="text-xs text-slate-400 mt-0.5 font-mono">{editSP.sku}</p>
+          <div className={`bg-white rounded-xl shadow-xl w-full ${editGroup ? "max-w-2xl" : "max-w-md"}`}>
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-800">{editGroup ? `Sửa nhóm sản phẩm (${editGroupRows.length} variants)` : "Sửa thông tin sản phẩm"}</h2>
+                <p className="text-xs text-slate-400 mt-0.5 font-mono">{editGroup ? editGroupRows[0]?.sku?.replace(/[SMLs]$|[0-9]+XL$/i, "").replace(/-$/, "") : editSP?.sku}</p>
+              </div>
+              <button type="button" onClick={() => { setModal(null); setEditSP(null); setEditGroup(null); }} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
             </div>
-            <form onSubmit={handleSua} className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="text-xs text-slate-600 mb-1 block">Tên sản phẩm *</label>
-                  <input required value={formSua.ten} onChange={e => setFormSua({ ...formSua, ten: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+
+            {editGroup ? (
+              /* ── Chế độ Group: form giống Thêm SP ── */
+              <div className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-xs text-slate-600 mb-1 block">Tên sản phẩm *</label>
+                    <input required value={formSuaGroup.ten} onChange={e => setFormSuaGroup({ ...formSuaGroup, ten: e.target.value })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">SKU gốc *</label>
+                    <input required value={formSuaGroup.sku} onChange={e => setFormSuaGroup({ ...formSuaGroup, sku: e.target.value })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Nguồn</label>
+                    <select value={formSuaGroup.nguon} onChange={e => setFormSuaGroup({ ...formSuaGroup, nguon: e.target.value })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200">
+                      <option value="shopee">Shopee</option><option value="tiktok">TikTok</option><option value="other">Khác</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-slate-600 mb-1.5 block">Size</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["S","M","L","XL","2XL","3XL","4XL","5XL"].map(s => {
+                        const checked = formSuaGroup.size.includes(s);
+                        return (
+                          <button type="button" key={s}
+                            onClick={() => setFormSuaGroup({ ...formSuaGroup, size: checked ? formSuaGroup.size.filter(x => x !== s) : [...formSuaGroup.size, s] })}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${checked ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-600 border-slate-200 hover:border-rose-300"}`}>
+                            {s}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
+                    <MauAutocomplete value={formSuaGroup.mauSac} mauList={mauList}
+                      onChange={v => setFormSuaGroup({ ...formSuaGroup, mauSac: v })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Giá nhập chung (VNĐ)</label>
+                    <input type="number" min="0" value={formSuaGroup.giaNhap} onChange={e => setFormSuaGroup({ ...formSuaGroup, giaNhap: e.target.value })}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 ${Number(formSuaGroup.giaNhap) === 0 ? "border-amber-300 bg-amber-50" : "border-slate-200"}`} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Giá bán chung (VNĐ)</label>
+                    <input type="number" min="0" value={formSuaGroup.giaBan} onChange={e => setFormSuaGroup({ ...formSuaGroup, giaBan: e.target.value })}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Giá nhập (VNĐ)</label>
-                  <input type="number" min="0" value={formSua.giaNhap} onChange={e => setFormSua({ ...formSua, giaNhap: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 ${Number(formSua.giaNhap) === 0 ? "border-amber-300 bg-amber-50" : "border-slate-200"}`}
-                    placeholder="Nhập giá..." />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Giá bán (VNĐ)</label>
-                  <input type="number" min="0" value={formSua.giaBan} onChange={e => setFormSua({ ...formSua, giaBan: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Size</label>
-                  <input value={formSua.size} onChange={e => setFormSua({ ...formSua, size: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
-                  <input value={formSua.mauSac} onChange={e => setFormSua({ ...formSua, mauSac: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                {formSuaGroup.size.length > 0 && formSuaGroup.mauSac.length > 0 && (
+                  <p className="text-xs text-slate-400">→ {formSuaGroup.size.length * formSuaGroup.mauSac.length} variants sau khi lưu</p>
+                )}
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => { setModal(null); setEditGroup(null); }} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                  <button type="button" onClick={handleSuaGroup} disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">
+                    {loading ? "Đang lưu..." : "Lưu"}
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => { setModal(null); setEditSP(null); }} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
-                <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">
-                  {loading ? "Đang lưu..." : "Lưu"}
-                </button>
-              </div>
-            </form>
+            ) : (
+              /* ── Chế độ đơn ── */
+              <form onSubmit={handleSua} className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-xs text-slate-600 mb-1 block">Tên sản phẩm *</label>
+                    <input required value={formSua.ten} onChange={e => setFormSua({ ...formSua, ten: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Giá nhập (VNĐ)</label>
+                    <input type="number" min="0" value={formSua.giaNhap} onChange={e => setFormSua({ ...formSua, giaNhap: e.target.value })}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200 ${Number(formSua.giaNhap) === 0 ? "border-amber-300 bg-amber-50" : "border-slate-200"}`}
+                      placeholder="Nhập giá..." />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Giá bán (VNĐ)</label>
+                    <input type="number" min="0" value={formSua.giaBan} onChange={e => setFormSua({ ...formSua, giaBan: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Size</label>
+                    <input value={formSua.size} onChange={e => setFormSua({ ...formSua, size: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Màu sắc</label>
+                    <input value={formSua.mauSac} onChange={e => setFormSua({ ...formSua, mauSac: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-200" />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => { setModal(null); setEditSP(null); }} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-2 text-sm bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50">
+                    {loading ? "Đang lưu..." : "Lưu"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

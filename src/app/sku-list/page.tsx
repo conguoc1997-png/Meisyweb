@@ -13,6 +13,7 @@ interface GiaCongLoai {
 }
 interface Col { key: string; label: string; nhom: string }
 interface VaiItem { ma: string; giaMet: number }
+interface MauItem { ten: string; vietTat: string }
 
 function fmt(n: number | null | undefined) {
   if (n == null || n === 0) return "";
@@ -35,8 +36,8 @@ function EditableCell({ value, onSave, type = "text", className = "" }: {
       onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
       className={`w-full px-1 py-0.5 border border-blue-400 rounded outline-none text-sm bg-white ${className}`} />;
   return (
-    <span onDoubleClick={() => { setDraft(String(value ?? "")); setEditing(true); }}
-      className={`block min-h-[1.5rem] cursor-text select-none ${className}`} title="Double-click để sửa">
+    <span onClick={() => { setDraft(String(value ?? "")); setEditing(true); }}
+      className={`block min-h-[1.5rem] cursor-text select-none ${className}`}>
       {value != null && value !== 0 && value !== ""
         ? (type === "number" ? Number(value).toLocaleString("vi-VN") : String(value))
         : <span className="text-slate-300">—</span>}
@@ -60,7 +61,7 @@ function DinhLuongInput({ sp, onSave }: { sp: SanPham; onSave: (sp: SanPham, v: 
 }
 
 export default function SkuListPage() {
-  const [tab, setTab] = useState<"sku" | "vai" | "giacong">("sku");
+  const [tab, setTab] = useState<"sku" | "vai" | "giacong" | "mau">("sku");
 
   // SKU
   const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
@@ -71,6 +72,11 @@ export default function SkuListPage() {
   const [vais, setVais] = useState<VaiItem[]>([]);
   const [vaiLoading, setVaiLoading] = useState(true);
   const [addVaiForm, setAddVaiForm] = useState<{ ma: string; giaMet: string } | null>(null);
+
+  // Màu
+  const [maus, setMaus] = useState<MauItem[]>([]);
+  const [mauLoading, setMauLoading] = useState(true);
+  const [addMauForm, setAddMauForm] = useState<{ ten: string; vietTat: string } | null>(null);
 
   // Gia công
   const [loais, setLoais] = useState<GiaCongLoai[]>([]);
@@ -84,6 +90,7 @@ export default function SkuListPage() {
   useEffect(() => {
     fetch("/api/kho/san-pham").then(r => r.json()).then(setSanPhams).finally(() => setSkuLoading(false));
     fetch("/api/gia-cong/vai").then(r => r.json()).then(setVais).finally(() => setVaiLoading(false));
+    fetch("/api/gia-cong/mau").then(r => r.json()).then(setMaus).finally(() => setMauLoading(false));
   }, []);
 
   const loadGiaCong = useCallback(() => {
@@ -143,6 +150,24 @@ export default function SkuListPage() {
   async function deleteVai(idx: number) {
     if (!confirm("Xoá loại vải này?")) return;
     await saveVais(vais.filter((_, i) => i !== idx));
+  }
+
+  // Màu CRUD
+  async function saveMaus(newMaus: MauItem[]) {
+    setMaus(newMaus);
+    await fetch("/api/gia-cong/mau", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newMaus) });
+  }
+  async function addMau() {
+    if (!addMauForm?.ten || !addMauForm?.vietTat) return;
+    await saveMaus([...maus, { ten: addMauForm.ten.toUpperCase(), vietTat: addMauForm.vietTat.toUpperCase() }]);
+    setAddMauForm(null);
+  }
+  async function updateMau(idx: number, patch: Partial<MauItem>) {
+    await saveMaus(maus.map((m, i) => i === idx ? { ...m, ...patch } : m));
+  }
+  async function deleteMau(idx: number) {
+    if (!confirm("Xoá màu này?")) return;
+    await saveMaus(maus.filter((_, i) => i !== idx));
   }
 
   // Gia công
@@ -215,6 +240,7 @@ export default function SkuListPage() {
   const TABS = [
     { key: "sku", label: "Danh sách SKU" },
     { key: "vai", label: "Bảng vải" },
+    { key: "mau", label: "Bảng màu" },
     { key: "giacong", label: "Bảng giá gia công" },
   ] as const;
 
@@ -376,6 +402,68 @@ export default function SkuListPage() {
         </div>
       )}
 
+      {/* ═══ TAB BẢNG MÀU ═══ */}
+      {tab === "mau" && (
+        <div className="max-w-md">
+          <p className="text-sm text-slate-500 mb-3">Danh sách màu sắc và viết tắt — dùng trong form nhập kho và danh sách SKU</p>
+          {mauLoading ? <p className="text-slate-400 text-sm">Đang tải...</p> : (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-semibold uppercase">
+                <tr>
+                  <th className="px-4 py-3 text-left">Tên màu</th>
+                  <th className="px-4 py-3 text-left">Viết tắt</th>
+                  <th className="px-3 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {maus.map((m, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-4 py-2.5">
+                      <EditableCell value={m.ten} onSave={val => updateMau(i, { ten: val.toUpperCase() })} />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <EditableCell value={m.vietTat} onSave={val => updateMau(i, { vietTat: val.toUpperCase() })} />
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button onClick={() => deleteMau(i)} className="text-slate-300 hover:text-rose-400 transition"><Trash2 size={14}/></button>
+                    </td>
+                  </tr>
+                ))}
+                {addMauForm ? (
+                  <tr className="bg-blue-50/40">
+                    <td className="px-3 py-2">
+                      <input value={addMauForm.ten} onChange={e => setAddMauForm({ ...addMauForm, ten: e.target.value })}
+                        placeholder="Tên màu..." className="w-full px-2 py-1 border border-blue-300 rounded text-sm outline-none"/>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input value={addMauForm.vietTat} onChange={e => setAddMauForm({ ...addMauForm, vietTat: e.target.value })}
+                        placeholder="Viết tắt..." className="w-full px-2 py-1 border border-blue-300 rounded text-sm outline-none"/>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <button onClick={addMau} className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700"><Check size={13}/></button>
+                        <button onClick={() => setAddMauForm(null)} className="p-1 border border-slate-200 rounded hover:bg-slate-100"><X size={13}/></button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-2">
+                      <button onClick={() => setAddMauForm({ ten: "", vietTat: "" })}
+                        className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-blue-600 transition">
+                        <Plus size={14}/> Thêm màu
+                      </button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </div>
+      )}
+
       {/* ═══ TAB GIA CÔNG ═══ */}
       {tab === "giacong" && (
         <div>
@@ -428,7 +516,7 @@ export default function SkuListPage() {
                   <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     <th className="px-4 py-2 border border-slate-200 text-left sticky left-0 bg-slate-50 z-10" rowSpan={2}>Nhóm</th>
                     <th className="px-4 py-2 border border-slate-200 text-left sticky left-[100px] bg-slate-50 z-10" rowSpan={2}>Mã</th>
-                    <th className="px-4 py-2 border border-slate-200 text-right bg-amber-50 text-amber-700" rowSpan={2}>TỔNG</th>
+                    <th className="px-4 py-2 border border-slate-200 text-right bg-amber-50 text-amber-700 whitespace-nowrap min-w-[100px]" rowSpan={2}>TỔNG</th>
                     {mainCols.map(c => <th key={c.key} className="px-3 py-2 border border-slate-200 text-right bg-green-50 text-green-700">{c.label}</th>)}
                     {phuLieuCols.length > 0 && <th className="px-3 py-2 border border-slate-200 text-center bg-blue-50 text-blue-700" colSpan={phuLieuCols.length}>PHỤ LIỆU</th>}
                     <th className="px-3 py-2 border border-slate-200" rowSpan={2}></th>
@@ -451,7 +539,7 @@ export default function SkuListPage() {
                         <td className="px-4 py-2 border border-slate-200 font-semibold text-slate-800 sticky left-[100px] bg-white z-10">
                           <EditableCell value={loai.ma} onSave={v => updateLoaiField(loai, "ma", v)} />
                         </td>
-                        <td className="px-4 py-2 border border-slate-200 text-right font-bold text-amber-700 bg-amber-50">
+                        <td className="px-4 py-2 border border-slate-200 text-right font-bold text-amber-700 bg-amber-50 min-w-[100px]">
                           {fmt(tong(loai)) || <span className="text-slate-300">0</span>}
                         </td>
                         {cols.map(c => (

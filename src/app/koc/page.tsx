@@ -5,7 +5,7 @@ import { Plus, Star, TrendingUp, Eye, ShoppingBag, DollarSign, Users, Package, U
 import * as XLSX from "xlsx";
 import { formatCurrency, formatDate, PLATFORM_LABEL, TRANG_THAI_BOOKING } from "@/lib/utils";
 
-type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null; mauSac?: string | null };
+type SanPham = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; tonKho: number; createdAt: string; tiktokProductId?: string | null; mauSac?: string | null; size?: string | null };
 type KOC = { id: string; ten: string; platform: string; follower: number; giaCast: number; linkProfile: string | null; sdt: string | null; email: string | null; diaChi: string | null; ghiChu: string | null; trangThaiHopTac: string; createdAt: string };
 type Booking = {
   id: string; kocId: string; sanPhamId: string | null;
@@ -2282,14 +2282,43 @@ export default function KocPage() {
             </div>
             <div className="overflow-y-auto flex-1 p-3 space-y-2">
               {(() => {
-                const filtered = sanPhams.filter(sp =>
-                  sp.ten.toLowerCase().includes(pickSPSearch.toLowerCase()) ||
-                  sp.sku.toLowerCase().includes(pickSPSearch.toLowerCase())
+                const SIZE_RE = /\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])\b.*/i;
+                // Map baseName → SP cha thực sự (không có size)
+                const parentMap = new Map<string, typeof sanPhams[0]>();
+                for (const sp of sanPhams) {
+                  if (!sp.size) parentMap.set(sp.ten.trim(), sp);
+                }
+                // Build danh sách đại diện: SP cha hoặc 1 SP con đầu tiên mỗi nhóm
+                const seenBase = new Set<string>();
+                type Candidate = { sp: typeof sanPhams[0]; displayTen: string; displaySku: string };
+                const candidates: Candidate[] = [];
+                const sorted = [...sanPhams].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                for (const sp of sorted) {
+                  if (!sp.size) {
+                    if (!seenBase.has(sp.ten.trim())) {
+                      seenBase.add(sp.ten.trim());
+                      candidates.push({ sp, displayTen: sp.ten, displaySku: sp.sku });
+                    }
+                  } else {
+                    const base = sp.ten.replace(SIZE_RE, "").trim();
+                    if (seenBase.has(base)) continue;
+                    seenBase.add(base);
+                    const parentSP = parentMap.get(base);
+                    candidates.push({
+                      sp: parentSP ?? sp,
+                      displayTen: base,
+                      displaySku: parentSP ? parentSP.sku : base.replace(/\s+/g, "").toUpperCase(),
+                    });
+                  }
+                }
+                const filtered = candidates.filter(({ displayTen, displaySku }) =>
+                  displayTen.toLowerCase().includes(pickSPSearch.toLowerCase()) ||
+                  displaySku.toLowerCase().includes(pickSPSearch.toLowerCase())
                 );
                 if (filtered.length === 0) return (
                   <p className="text-center text-slate-400 py-8">Không tìm thấy sản phẩm</p>
                 );
-                return filtered.map(sp => {
+                return filtered.map(({ sp, displayTen, displaySku }) => {
                 const soBooking = bookings.filter(b => b.sanPhamId === sp.id).length;
                 return (
                   <div key={sp.id} className="rounded-xl border border-slate-200 hover:border-rose-200 transition">
@@ -2301,9 +2330,9 @@ export default function KocPage() {
                         <Package size={16} className="text-slate-400 group-hover:text-rose-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 truncate">{sp.ten}</p>
+                        <p className="font-semibold text-slate-800 truncate">{displayTen}</p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          <span className="font-mono">{sp.sku}</span>
+                          <span className="font-mono">{displaySku}</span>
                           <span className="mx-2">·</span>
                           Giá nhập: {formatCurrency(sp.giaNhap)}
                           <span className="mx-2">·</span>
