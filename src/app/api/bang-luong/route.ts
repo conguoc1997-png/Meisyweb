@@ -48,7 +48,13 @@ export async function GET(req: NextRequest) {
     const soNgayLvThang = soNgayT2T7;
 
     const nhanViens = await prisma.nhanVien.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        OR: [
+          { ngayNghiViec: null },
+          { ngayNghiViec: { gte: start } },
+        ],
+      },
       orderBy: { ten: "asc" },
     });
 

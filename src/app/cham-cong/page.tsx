@@ -1407,9 +1407,12 @@ export default function ChamCongPage() {
                 {(() => {
                   tongThucLinhRef.current = 0;
                   const isAdmin = blAuth === "ADMIN";
+                  const thangStart = new Date(thang + "-01");
+                  const activeInMonth = (nv: NhanVien) =>
+                    !nv.ngayNghiViec || new Date(nv.ngayNghiViec) >= thangStart;
                   const visibleNV = isAdmin
-                    ? nhanViens
-                    : nhanViens.filter(nv => nv.maNV?.toUpperCase() === blAuth.toUpperCase());
+                    ? nhanViens.filter(activeInMonth)
+                    : nhanViens.filter(nv => nv.maNV?.toUpperCase() === blAuth.toUpperCase() && activeInMonth(nv));
                   const groups = new Map<string, typeof nhanViens>();
                   visibleNV.forEach(nv => {
                     const pb = nv.phongBan?.trim() || "Chưa phân phòng";
