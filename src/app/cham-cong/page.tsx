@@ -410,7 +410,7 @@ export default function ChamCongPage() {
       const data = await res.json();
       if (!res.ok) { console.error("fetchNV error:", data); return; }
       const list = Array.isArray(data) ? data as NhanVien[] : [];
-      setNhanViens(list.filter(nv => nv.active)); // bảng chấm công chỉ hiện NV active
+      setNhanViens(list); // nhanViens useMemo sẽ filter theo tháng
       setAllNVs(list); // modal NV hiện tất cả (kể cả đã nghỉ)
     } catch (e) { console.error("fetchNV error:", e); }
   }, []);

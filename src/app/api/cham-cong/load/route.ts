@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
         if (nv.active) return true;
         if (!nghiColExists) return false;
         if (!monthStart) return false;
-        return nv.ngayNghiViec != null && nv.ngayNghiViec >= monthStart;
+        return nv.ngayNghiViec != null && new Date(nv.ngayNghiViec) >= new Date(monthStart!);
       });
 
     const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }> = {};
