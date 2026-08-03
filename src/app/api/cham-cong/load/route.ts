@@ -81,14 +81,11 @@ export async function GET(req: NextRequest) {
       lichMap[`${r.nhanVienId}_${ngayStr}`] = { gioVao: r.gioVao, gioRa: r.gioRa, ca: r.ca };
     }
 
-    const nhanViens = nvPrisma
-      .map(nv => ({ ...nv, ngayNghiViec: nghiMap[nv.id] ?? null }))
-      .filter(nv => {
-        if (nv.active) return true;
-        if (!nghiColExists) return false;
-        if (!monthStart) return false;
-        return nv.ngayNghiViec != null && new Date(nv.ngayNghiViec) >= new Date(monthStart!);
-      });
+    // Trả về tất cả NV (kể cả đã nghỉ có ngayNghiViec) — client filter theo tháng
+    const nhanViens = nvPrisma.map(nv => ({
+      ...nv,
+      ngayNghiViec: nghiColExists ? (nghiMap[nv.id] ?? null) : null,
+    }));
 
     const phuCapMap: Record<string, { phuCapCC: number; phuCapAn: number; phuCapDB: number; heSoTC: number | null }> = {};
     for (const r of phuCapRows) {
