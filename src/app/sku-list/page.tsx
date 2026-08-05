@@ -195,10 +195,12 @@ export default function SkuListPage() {
   }
   async function addLoai() {
     if (!addRowForm?.nhomXuong || !addRowForm.ma) return;
-    const res = await fetch("/api/gia-cong/loai", {
+    const r = await fetch("/api/gia-cong/loai", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nhomXuong: addRowForm.nhomXuong, ma: addRowForm.ma }),
-    }).then(r => r.json());
+    });
+    const res = await r.json();
+    if (!r.ok) { alert(res.error ?? "Lỗi khi thêm — thử lại"); return; }
     setLoais(prev => [...prev, res]);
     setAddRowForm(null);
   }

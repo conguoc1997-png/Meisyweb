@@ -9,6 +9,7 @@ const DEFAULT_COLS = [
   { key: "may",       label: "MAY",           nhom: "" },
   { key: "giat",      label: "GIẶT",          nhom: "" },
   { key: "gia_cong",  label: "GIA CÔNG",      nhom: "" },
+  { key: "cat",       label: "CẮT",           nhom: "" },
   { key: "cuc",       label: "CÚC",           nhom: "PHU_LIEU" },
   { key: "khoa",      label: "KHOÁ",          nhom: "PHU_LIEU" },
   { key: "lot",       label: "LÓT",           nhom: "PHU_LIEU" },
@@ -18,18 +19,45 @@ const DEFAULT_COLS = [
   { key: "mac",       label: "MÁC",           nhom: "PHU_LIEU" },
 ];
 
+async function getSetting(): Promise<object[]> {
+  try {
+    const row = await prisma.appSettings.findUnique({ where: { key: SETTING_KEY } });
+    return row ? JSON.parse(row.value) : DEFAULT_COLS;
+  } catch {
+    // Bảng AppSettings chưa tồn tại → trả default
+    return DEFAULT_COLS;
+  }
+}
+
+async function setSetting(cols: object[]): Promise<void> {
+  try {
+    await prisma.appSettings.upsert({
+      where: { key: SETTING_KEY },
+      update: { value: JSON.stringify(cols) },
+      create: { key: SETTING_KEY, value: JSON.stringify(cols) },
+    });
+  } catch {
+    // Fallback: tạo bảng rồi thử lại
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "_AppSettings" (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `);
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "_AppSettings"(key,value) VALUES($1,$2)
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`,
+      SETTING_KEY, JSON.stringify(cols)
+    );
+  }
+}
+
 export async function GET() {
-  const row = await prisma.appSettings.findUnique({ where: { key: SETTING_KEY } });
-  const cols = row ? JSON.parse(row.value) : DEFAULT_COLS;
-  return NextResponse.json(cols);
+  return NextResponse.json(await getSetting());
 }
 
 export async function PUT(req: NextRequest) {
   const cols = await req.json();
-  await prisma.appSettings.upsert({
-    where: { key: SETTING_KEY },
-    update: { value: JSON.stringify(cols) },
-    create: { key: SETTING_KEY, value: JSON.stringify(cols) },
-  });
+  await setSetting(cols);
   return NextResponse.json({ ok: true });
 }
