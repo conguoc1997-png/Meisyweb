@@ -57,8 +57,17 @@ function makeFees(coDinhPct: number): FeeItem[] {
 }
 
 type Product = { sku: string; giaNhap: number; giaThanh: number };
-type KhoProduct = { id: string; ten: string; sku: string; giaNhap: number };
-type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; flashSalePct: string; ngaySalePct: string; livePct: string };
+type KhoProduct = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; mauSac: string | null; size: string | null };
+type PriceRow = { id: string; ten: string; sku: string; giaNhap: number; giaBan: number; mauSac: string | null; size: string | null; flashSalePct: string; ngaySalePct: string; livePct: string };
+type ParentGroup = { parentName: string; rows: PriceRow[] };
+
+/** Lấy tên sản phẩm cha (bỏ phần " - size / màu") */
+function getParentName(r: { ten: string; mauSac: string | null; size: string | null }): string {
+  let name = r.ten;
+  if (r.mauSac) name = name.replace(` / ${r.mauSac}`, "").replace(`/${r.mauSac}`, "");
+  if (r.size)   name = name.replace(` - ${r.size}`,   "").replace(`-${r.size}`,   "");
+  return name.trim().replace(/[/\-]+$/, "").trim();
+}
 
 function fmtVnd(n: number) { return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 }); }
 
@@ -78,6 +87,13 @@ export default function GiaBanPage() {
   const [loadingKho, setLoadingKho] = useState(false);
   const [searchBang, setSearchBang] = useState("");
 
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const toggleParent = (name: string) => setExpandedParents(prev => {
+    const next = new Set(prev);
+    next.has(name) ? next.delete(name) : next.add(name);
+    return next;
+  });
+
   const fetchKho = useCallback(async () => {
     setLoadingKho(true);
     try {
@@ -86,7 +102,12 @@ export default function GiaBanPage() {
       if (!Array.isArray(data)) return;
       setPriceRows(prev => {
         const map = Object.fromEntries(prev.map(r => [r.id, r]));
-        return (data as KhoProduct[]).map(p => map[p.id] ?? { id: p.id, ten: p.ten, sku: p.sku, giaNhap: p.giaNhap, flashSalePct: "", ngaySalePct: "", livePct: "" });
+        return (data as KhoProduct[]).map(p => map[p.id] ?? {
+          id: p.id, ten: p.ten, sku: p.sku,
+          giaNhap: p.giaNhap, giaBan: p.giaBan,
+          mauSac: p.mauSac ?? null, size: p.size ?? null,
+          flashSalePct: "", ngaySalePct: "", livePct: "",
+        });
       });
     } catch { /* ignore */ } finally { setLoadingKho(false); }
   }, []);
@@ -160,6 +181,17 @@ export default function GiaBanPage() {
       r.ten.toLowerCase().includes(searchBang.toLowerCase()) ||
       r.sku.toLowerCase().includes(searchBang.toLowerCase())
     ), [priceRows, searchBang]);
+
+  // Gom nhóm theo sản phẩm cha
+  const groupedRows = useMemo<ParentGroup[]>(() => {
+    const map = new Map<string, PriceRow[]>();
+    for (const r of filteredRows) {
+      const pn = getParentName(r);
+      if (!map.has(pn)) map.set(pn, []);
+      map.get(pn)!.push(r);
+    }
+    return Array.from(map.entries()).map(([parentName, rows]) => ({ parentName, rows }));
+  }, [filteredRows]);
 
   // Google Sheets
   const [sheetUrl, setSheetUrl] = useState("");
@@ -514,117 +546,186 @@ export default function GiaBanPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 w-8">#</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Tên sản phẩm</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500">Giá nhập</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-400">
-                  <div className="flex items-center gap-1">SKU <span className="text-[10px] font-normal text-slate-300">↕ thứ tự</span></div>
-                </th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee / TikTok</th>
+                <th className="text-right px-4 py-2.5 text-xs font-medium text-rose-500">Giá Shopee/TikTok</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-green-600">Lợi nhuận</th>
                 <th className="text-center px-3 py-2.5 text-xs font-medium text-orange-500">Flash Sale</th>
                 <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-500">Ngày Sale</th>
                 <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-500">Live</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredRows.length === 0 && (
-                <tr><td colSpan={9} className="text-center py-8 text-slate-400 text-sm">
+            <tbody>
+              {groupedRows.length === 0 && (
+                <tr><td colSpan={8} className="text-center py-8 text-slate-400 text-sm">
                   {loadingKho ? "Đang tải..." : "Không có sản phẩm"}
                 </td></tr>
               )}
-              {filteredRows.map((r, i) => {
-                const realIdx = priceRows.findIndex(x => x.id === r.id);
-                const shopee = calcShopeePrice(r.giaNhap);
-                const flashPrice = shopee > 0 && parseFloat(r.flashSalePct) > 0 ? Math.round(shopee * (1 - parseFloat(r.flashSalePct) / 100)) : 0;
-                const ngayPrice  = shopee > 0 && parseFloat(r.ngaySalePct)  > 0 ? Math.round(shopee * (1 - parseFloat(r.ngaySalePct)  / 100)) : 0;
-                const livePrice  = shopee > 0 && parseFloat(r.livePct)      > 0 ? Math.round(shopee * (1 - parseFloat(r.livePct)      / 100)) : 0;
+              {groupedRows.map((group, gi) => {
+                const isExpanded = expandedParents.has(group.parentName);
+                const hasVariants = group.rows.length > 1;
+                // Dùng giá nhập của variant đầu tiên có giá; lợi nhuận tính trên đó
+                const reprRow = group.rows.find(r => r.giaNhap > 0) ?? group.rows[0];
+                const reprShopee = calcShopeePrice(reprRow.giaNhap);
+                const minGiaNhap = Math.min(...group.rows.map(r => r.giaNhap).filter(v => v > 0));
+                const maxGiaNhap = Math.max(...group.rows.map(r => r.giaNhap).filter(v => v > 0));
+                const priceRange = minGiaNhap > 0 && maxGiaNhap !== minGiaNhap
+                  ? `${fmtVnd(minGiaNhap)}đ – ${fmtVnd(maxGiaNhap)}đ`
+                  : minGiaNhap > 0 ? `${fmtVnd(minGiaNhap)}đ` : "—";
                 return (
-                  <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-2.5 text-xs text-slate-400">{i + 1}</td>
-                    <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[180px] truncate" title={r.ten}>{r.ten}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600 text-xs">{fmtVnd(r.giaNhap)}đ</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex flex-col gap-0.5">
-                          <button onClick={() => moveRow(r.id, -1)} disabled={realIdx === 0}
-                            className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-slate-600 transition">
-                            <ArrowUp size={11} />
-                          </button>
-                          <button onClick={() => moveRow(r.id, 1)} disabled={realIdx === priceRows.length - 1}
-                            className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-slate-600 transition">
-                            <ArrowDown size={11} />
-                          </button>
-                        </div>
-                        <span className="font-mono text-xs text-slate-400">{r.sku}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
-                        {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      {(() => {
-                        const calc = calcLoiNhuan(r.giaNhap);
-                        if (!calc) return <span className="text-slate-300">—</span>;
-                        const pct = ((calc.loiNhuan / calc.gB) * 100).toFixed(1);
-                        return (
-                          <div>
-                            <span className={`font-bold text-sm ${calc.loiNhuan >= 0 ? "text-green-600" : "text-red-500"}`}>
-                              {fmtVnd(calc.loiNhuan)}đ
+                  <Fragment key={group.parentName}>
+                    {/* ── PARENT ROW ── */}
+                    <tr
+                      onClick={() => hasVariants && toggleParent(group.parentName)}
+                      className={`border-t border-slate-100 ${hasVariants ? "cursor-pointer hover:bg-slate-50" : "hover:bg-slate-50/50"} transition-colors`}>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          {hasVariants
+                            ? (isExpanded
+                                ? <ChevronDown size={14} className="text-slate-400 flex-shrink-0" />
+                                : <ChevronDown size={14} className="text-slate-300 flex-shrink-0 -rotate-90" />)
+                            : <span className="w-3.5" />}
+                          <span className="font-semibold text-slate-800 text-sm">{group.parentName}</span>
+                          {hasVariants && (
+                            <span className="text-[10px] bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5 font-medium">
+                              {group.rows.length} SKU
                             </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600 text-xs">{priceRange}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={`font-bold text-sm ${reprShopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                          {reprShopee > 0 ? fmtVnd(reprShopee) + "đ" : "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {(() => {
+                          const calc = calcLoiNhuan(reprRow.giaNhap);
+                          if (!calc) return <span className="text-slate-300 text-xs">—</span>;
+                          const pct = ((calc.loiNhuan / calc.gB) * 100).toFixed(1);
+                          return <div>
+                            <span className={`font-bold text-sm ${calc.loiNhuan >= 0 ? "text-green-600" : "text-red-500"}`}>{fmtVnd(calc.loiNhuan)}đ</span>
                             <div className={`text-xs ${calc.loiNhuan >= 0 ? "text-green-400" : "text-red-400"}`}>{pct}%</div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    {/* Flash Sale */}
-                    <td className="px-2 py-2 text-center">
-                      <div className="flex items-center justify-center gap-0.5 mb-1">
-                        <input type="number" placeholder="%" min={0} max={99}
-                          value={r.flashSalePct}
-                          onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
-                          className="w-12 text-center text-xs border border-orange-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-300 text-orange-500 placeholder:text-slate-300 bg-orange-50" />
-                        <span className="text-[10px] text-slate-400">%</span>
-                      </div>
-                      <div className={`text-sm font-bold ${flashPrice > 0 ? "text-orange-500" : "text-slate-200"}`}>
-                        {flashPrice > 0 ? fmtVnd(flashPrice) + "đ" : "—"}
-                      </div>
-                    </td>
-                    {/* Ngày Sale */}
-                    <td className="px-2 py-2 text-center">
-                      <div className="flex items-center justify-center gap-0.5 mb-1">
-                        <input type="number" placeholder="%" min={0} max={99}
-                          value={r.ngaySalePct}
-                          onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
-                          className="w-12 text-center text-xs border border-blue-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-300 text-blue-500 placeholder:text-slate-300 bg-blue-50" />
-                        <span className="text-[10px] text-slate-400">%</span>
-                      </div>
-                      <div className={`text-sm font-bold ${ngayPrice > 0 ? "text-blue-500" : "text-slate-200"}`}>
-                        {ngayPrice > 0 ? fmtVnd(ngayPrice) + "đ" : "—"}
-                      </div>
-                    </td>
-                    {/* Live */}
-                    <td className="px-2 py-2 text-center">
-                      <div className="flex items-center justify-center gap-0.5 mb-1">
-                        <input type="number" placeholder="%" min={0} max={99}
-                          value={r.livePct}
-                          onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
-                          className="w-12 text-center text-xs border border-purple-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-purple-300 text-purple-500 placeholder:text-slate-300 bg-purple-50" />
-                        <span className="text-[10px] text-slate-400">%</span>
-                      </div>
-                      <div className={`text-sm font-bold ${livePrice > 0 ? "text-purple-500" : "text-slate-200"}`}>
-                        {livePrice > 0 ? fmtVnd(livePrice) + "đ" : "—"}
-                      </div>
-                    </td>
-                  </tr>
+                          </div>;
+                        })()}
+                      </td>
+                      {/* Flash/Ngày/Live — chỉ show ở parent khi 1 SKU, còn nhiều SKU thì để trống */}
+                      {!hasVariants ? (() => {
+                        const r = reprRow;
+                        const shopee = reprShopee;
+                        const flashPrice = shopee > 0 && parseFloat(r.flashSalePct) > 0 ? Math.round(shopee * (1 - parseFloat(r.flashSalePct) / 100)) : 0;
+                        const ngayPrice  = shopee > 0 && parseFloat(r.ngaySalePct)  > 0 ? Math.round(shopee * (1 - parseFloat(r.ngaySalePct)  / 100)) : 0;
+                        const livePrice  = shopee > 0 && parseFloat(r.livePct)      > 0 ? Math.round(shopee * (1 - parseFloat(r.livePct)      / 100)) : 0;
+                        return <>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex items-center justify-center gap-0.5 mb-1">
+                              <input type="number" placeholder="%" min={0} max={99} value={r.flashSalePct}
+                                onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                className="w-12 text-center text-xs border border-orange-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-300 text-orange-500 placeholder:text-slate-300 bg-orange-50" />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <div className={`text-sm font-bold ${flashPrice > 0 ? "text-orange-500" : "text-slate-200"}`}>{flashPrice > 0 ? fmtVnd(flashPrice) + "đ" : "—"}</div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex items-center justify-center gap-0.5 mb-1">
+                              <input type="number" placeholder="%" min={0} max={99} value={r.ngaySalePct}
+                                onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                className="w-12 text-center text-xs border border-blue-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-300 text-blue-500 placeholder:text-slate-300 bg-blue-50" />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <div className={`text-sm font-bold ${ngayPrice > 0 ? "text-blue-500" : "text-slate-200"}`}>{ngayPrice > 0 ? fmtVnd(ngayPrice) + "đ" : "—"}</div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex items-center justify-center gap-0.5 mb-1">
+                              <input type="number" placeholder="%" min={0} max={99} value={r.livePct}
+                                onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                className="w-12 text-center text-xs border border-purple-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-purple-300 text-purple-500 placeholder:text-slate-300 bg-purple-50" />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <div className={`text-sm font-bold ${livePrice > 0 ? "text-purple-500" : "text-slate-200"}`}>{livePrice > 0 ? fmtVnd(livePrice) + "đ" : "—"}</div>
+                          </td>
+                        </>;
+                      })() : <>
+                        <td className="px-2 py-2 text-center text-slate-300 text-xs">—</td>
+                        <td className="px-2 py-2 text-center text-slate-300 text-xs">—</td>
+                        <td className="px-2 py-2 text-center text-slate-300 text-xs">—</td>
+                      </>}
+                    </tr>
+
+                    {/* ── CHILD ROWS (variants) ── */}
+                    {isExpanded && group.rows.map((r) => {
+                      const shopee = calcShopeePrice(r.giaNhap);
+                      const flashPrice = shopee > 0 && parseFloat(r.flashSalePct) > 0 ? Math.round(shopee * (1 - parseFloat(r.flashSalePct) / 100)) : 0;
+                      const ngayPrice  = shopee > 0 && parseFloat(r.ngaySalePct)  > 0 ? Math.round(shopee * (1 - parseFloat(r.ngaySalePct)  / 100)) : 0;
+                      const livePrice  = shopee > 0 && parseFloat(r.livePct)      > 0 ? Math.round(shopee * (1 - parseFloat(r.livePct)      / 100)) : 0;
+                      const variantLabel = [r.size, r.mauSac].filter(Boolean).join(" / ") || r.ten;
+                      return (
+                        <tr key={r.id} className="bg-slate-50/60 border-t border-slate-100/80 hover:bg-slate-100/60 transition-colors">
+                          <td className="pl-10 pr-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500 font-medium">{variantLabel}</span>
+                              <span className="font-mono text-[10px] text-slate-400 bg-white border border-slate-200 rounded px-1.5">{r.sku}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right text-slate-600 text-xs">{r.giaNhap > 0 ? fmtVnd(r.giaNhap) + "đ" : <span className="text-slate-300">—</span>}</td>
+                          <td className="px-4 py-2 text-right">
+                            <span className={`font-bold text-sm ${shopee > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                              {shopee > 0 ? fmtVnd(shopee) + "đ" : "—"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            {(() => {
+                              const calc = calcLoiNhuan(r.giaNhap);
+                              if (!calc) return <span className="text-slate-300 text-xs">—</span>;
+                              const pct = ((calc.loiNhuan / calc.gB) * 100).toFixed(1);
+                              return <div>
+                                <span className={`font-bold text-sm ${calc.loiNhuan >= 0 ? "text-green-600" : "text-red-500"}`}>{fmtVnd(calc.loiNhuan)}đ</span>
+                                <div className={`text-xs ${calc.loiNhuan >= 0 ? "text-green-400" : "text-red-400"}`}>{pct}%</div>
+                              </div>;
+                            })()}
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex items-center justify-center gap-0.5 mb-1">
+                              <input type="number" placeholder="%" min={0} max={99} value={r.flashSalePct}
+                                onChange={e => updatePriceRow(r.id, "flashSalePct", e.target.value)}
+                                className="w-12 text-center text-xs border border-orange-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-300 text-orange-500 placeholder:text-slate-300 bg-orange-50" />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <div className={`text-sm font-bold ${flashPrice > 0 ? "text-orange-500" : "text-slate-200"}`}>{flashPrice > 0 ? fmtVnd(flashPrice) + "đ" : "—"}</div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex items-center justify-center gap-0.5 mb-1">
+                              <input type="number" placeholder="%" min={0} max={99} value={r.ngaySalePct}
+                                onChange={e => updatePriceRow(r.id, "ngaySalePct", e.target.value)}
+                                className="w-12 text-center text-xs border border-blue-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-300 text-blue-500 placeholder:text-slate-300 bg-blue-50" />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <div className={`text-sm font-bold ${ngayPrice > 0 ? "text-blue-500" : "text-slate-200"}`}>{ngayPrice > 0 ? fmtVnd(ngayPrice) + "đ" : "—"}</div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex items-center justify-center gap-0.5 mb-1">
+                              <input type="number" placeholder="%" min={0} max={99} value={r.livePct}
+                                onChange={e => updatePriceRow(r.id, "livePct", e.target.value)}
+                                className="w-12 text-center text-xs border border-purple-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-purple-300 text-purple-500 placeholder:text-slate-300 bg-purple-50" />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <div className={`text-sm font-bold ${livePrice > 0 ? "text-purple-500" : "text-slate-200"}`}>{livePrice > 0 ? fmtVnd(livePrice) + "đ" : "—"}</div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
         </div>
 
-        {filteredRows.length > 0 && (
+        {groupedRows.length > 0 && (
           <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
-            {filteredRows.length} sản phẩm · Giá Shopee/TikTok = Giá nhập ÷ {markupPct}% · Flash Sale / Ngày Sale / Live = % giảm so với giá Shopee
+            {groupedRows.length} sản phẩm ({filteredRows.length} SKU) · Giá Shopee/TikTok = Giá nhập ÷ {markupPct}% · Flash Sale / Ngày Sale / Live = % giảm so với giá Shopee
           </div>
         )}
       </div>
