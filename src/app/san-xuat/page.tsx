@@ -2100,9 +2100,10 @@ export default function SanXuatPage() {
               {modalVai === "new" && vaiForm.maVai.trim() && (() => {
                 const matches = vaiTons.filter(v => v.maVai.trim().toLowerCase() === vaiForm.maVai.trim().toLowerCase());
                 if (matches.length === 0) return null;
-                // Kiểm tra trùng cả mã + màu
+                // Kiểm tra trùng cả mã + màu + cùng kho — khác kho thì vẫn cho thêm
                 const exactDuplicate = matches.find(v =>
-                  (v.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase()
+                  (v.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase() &&
+                  (v.xuong ?? "").trim().toLowerCase() === (vaiForm.xuong ?? "").trim().toLowerCase()
                 );
                 return (
                   <div className={`border rounded-lg overflow-hidden ${exactDuplicate ? "border-red-300 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
@@ -2117,7 +2118,8 @@ export default function SanXuatPage() {
                         let mCays: { soMet: number }[] = [];
                         if (m.cayData) { try { mCays = JSON.parse(m.cayData); } catch {} }
                         const newTotal = vaiCayRows.reduce((s, r) => s + (Number(r.soMet) || 0), 0);
-                        const isExact = (m.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase();
+                        const isExact = (m.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase() &&
+                          (m.xuong ?? "").trim().toLowerCase() === (vaiForm.xuong ?? "").trim().toLowerCase();
                         return (
                           <div key={m.id} className={`flex items-center justify-between px-3 py-2 ${isExact ? "bg-red-50" : ""}`}>
                             <div className="text-xs">
@@ -2395,7 +2397,7 @@ export default function SanXuatPage() {
           {/* Nút cố định ở dưới, không scroll */}
           <div className="flex gap-2 px-6 py-4 border-t border-slate-100 bg-white rounded-b-xl">
               <button onClick={() => setModalVai(null)} className="flex-1 px-4 py-2 border rounded-lg text-sm hover:bg-slate-50">Huỷ</button>
-              <button onClick={saveVai} disabled={!vaiForm.maVai || savingVai || (modalVai === "new" && vaiTons.some(v => v.maVai.trim().toLowerCase() === vaiForm.maVai.trim().toLowerCase() && (v.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase()))}
+              <button onClick={saveVai} disabled={!vaiForm.maVai || savingVai || (modalVai === "new" && vaiTons.some(v => v.maVai.trim().toLowerCase() === vaiForm.maVai.trim().toLowerCase() && (v.mauSac ?? "").trim().toLowerCase() === (vaiForm.mauSac ?? "").trim().toLowerCase() && (v.xuong ?? "").trim().toLowerCase() === (vaiForm.xuong ?? "").trim().toLowerCase()))}
                 className="flex-1 px-4 py-2 bg-rose-500 text-white rounded-lg text-sm hover:bg-rose-600 disabled:opacity-50">
                 {savingVai ? "Đang lưu..." : modalVai === "new" ? "Thêm" : "Lưu"}
               </button>
