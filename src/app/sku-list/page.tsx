@@ -1,24 +1,22 @@
 "use client";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
-import { Plus, Trash2, Settings, Check, X, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Settings, Check, X, ChevronDown, Link2 } from "lucide-react";
 
-/** Tên sản phẩm cha: lấy phần trước " - size / màu" */
-function getParentTen(ten: string): string {
-  // Tách bằng " - " lấy phần đầu; nếu không có " - " thì giữ nguyên
-  const dashIdx = ten.indexOf(" - ");
-  return dashIdx > 0 ? ten.slice(0, dashIdx).trim() : ten.trim();
-}
 /** Nhãn variant: phần sau " - " (size / màu) */
 function getVariantLabel(ten: string): string {
   const dashIdx = ten.indexOf(" - ");
   return dashIdx > 0 ? ten.slice(dashIdx + 3).trim() : "";
 }
 
+interface SanPhamCha {
+  id: string; ma: string; ten: string; skuCount: number;
+}
 interface SanPham {
   id: string; sku: string; ten: string; mauSac: string | null; size: string | null;
   giaNhap: number; giaBan: number; updatedAt: string;
   dinhLuong: number | null; tenVai: string | null; giaVai: number | null;
   loaiGiaCong: string | null; giaGiaCong: number | null;
+  spChaId: string | null;
 }
 interface GiaCongLoai {
   id: string; nhomXuong: string; ma: string; chiPhi: Record<string, number>; thuTu: number;
@@ -73,12 +71,18 @@ function DinhLuongInput({ sp, onSave }: { sp: SanPham; onSave: (sp: SanPham, v: 
 }
 
 export default function SkuListPage() {
-  const [tab, setTab] = useState<"sku" | "vai" | "giacong" | "mau">("sku");
+  const [tab, setTab] = useState<"sku" | "spcha" | "vai" | "giacong" | "mau">("sku");
 
   // SKU
   const [sanPhams, setSanPhams] = useState<SanPham[]>([]);
   const [skuLoading, setSkuLoading] = useState(true);
   const [skuSearch, setSkuSearch] = useState("");
+
+  // SP Cha
+  const [chas, setChas] = useState<SanPhamCha[]>([]);
+  const [chaLoading, setChaLoading] = useState(true);
+  const [addChaForm, setAddChaForm] = useState<{ ten: string } | null>(null);
+  const [autoAssigning, setAutoAssigning] = useState(false);
 
   // Vải
   const [vais, setVais] = useState<VaiItem[]>([]);
@@ -99,11 +103,17 @@ export default function SkuListPage() {
   const [addColForm, setAddColForm] = useState<{ label: string; nhom: string } | null>(null);
 
   // Load
+  const loadChas = useCallback(() => {
+    setChaLoading(true);
+    fetch("/api/kho/san-pham-cha").then(r => r.json()).then(setChas).finally(() => setChaLoading(false));
+  }, []);
+
   useEffect(() => {
     fetch("/api/kho/san-pham").then(r => r.json()).then(setSanPhams).finally(() => setSkuLoading(false));
     fetch("/api/gia-cong/vai").then(r => r.json()).then(setVais).finally(() => setVaiLoading(false));
     fetch("/api/gia-cong/mau").then(r => r.json()).then(setMaus).finally(() => setMauLoading(false));
-  }, []);
+    loadChas();
+  }, [loadChas]);
 
   const loadGiaCong = useCallback(() => {
     setGcLoading(true);
@@ -113,6 +123,62 @@ export default function SkuListPage() {
     ]).then(([l, c]) => { setLoais(l); setCols(c); }).finally(() => setGcLoading(false));
   }, []);
   useEffect(() => { loadGiaCong(); }, [loadGiaCong]);
+
+  // SP Cha CRUD
+  // chaMap dùng khi cần lookup SP Cha theo id (hiện tại groupedSP dùng trực tiếp từ chas array)
+  const _chaMap = useMemo(() => Object.fromEntries(chas.map(c => [c.id, c])), [chas]);
+  void _chaMap; // suppress unused warning
+
+  async function addCha() {
+    if (!addChaForm?.ten) return;
+    const r = await fetch("/api/kho/san-pham-cha", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ten: addChaForm.ten }),
+    });
+    const res = await r.json();
+    if (!r.ok) { alert(res.error ?? "Lỗi thêm SP Cha"); return; }
+    setAddChaForm(null);
+    loadChas();
+  }
+
+  async function deleteCha(id: string) {
+    if (!confirm("Xoá SP Cha này? Các SKU thuộc nhóm này sẽ thành 'Chưa phân loại'.")) return;
+    await fetch(`/api/kho/san-pham-cha/${id}`, { method: "DELETE" });
+    // Update local state
+    setSanPhams(prev => prev.map(sp => sp.spChaId === id ? { ...sp, spChaId: null } : sp));
+    loadChas();
+  }
+
+  async function assignSpCha(spId: string, chaId: string | null) {
+    setSanPhams(prev => prev.map(sp => sp.id === spId ? { ...sp, spChaId: chaId } : sp));
+    await fetch(`/api/kho/san-pham/${spId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spChaId: chaId }),
+    });
+    loadChas(); // refresh count
+  }
+
+  async function autoAssign() {
+    setAutoAssigning(true);
+    try {
+      const r = await fetch("/api/kho/san-pham-cha", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_assign" }),
+      });
+      const res = await r.json();
+      if (!r.ok) { alert(res.error ?? "Lỗi"); return; }
+      // Reload cả SKU và SP Cha
+      const [spData, chaData] = await Promise.all([
+        fetch("/api/kho/san-pham").then(r2 => r2.json()),
+        fetch("/api/kho/san-pham-cha").then(r2 => r2.json()),
+      ]);
+      setSanPhams(spData);
+      setChas(chaData);
+      alert(`Đã tự động tạo ${res.created} SP Cha và gán ${res.assigned} SKU`);
+    } finally {
+      setAutoAssigning(false);
+    }
+  }
 
   // Vải map
   const vaiMap = Object.fromEntries(vais.map(v => [v.ma, v.giaMet]));
@@ -241,25 +307,37 @@ export default function SkuListPage() {
   }
 
   // Derived
-  const filteredSP = sanPhams.filter(sp =>
+  const filteredSP = useMemo(() => sanPhams.filter(sp =>
     !skuSearch || sp.sku.toLowerCase().includes(skuSearch.toLowerCase()) || sp.ten.toLowerCase().includes(skuSearch.toLowerCase())
-  );
+  ), [sanPhams, skuSearch]);
 
-  // Gom nhóm theo sản phẩm cha
+  // Gom nhóm theo SP Cha (entity thực trong DB)
   const groupedSP = useMemo(() => {
-    const map = new Map<string, SanPham[]>();
+    // Map spChaId → items
+    const byCha = new Map<string, SanPham[]>();
+    const unassigned: SanPham[] = [];
     for (const sp of filteredSP) {
-      const parent = getParentTen(sp.ten);
-      if (!map.has(parent)) map.set(parent, []);
-      map.get(parent)!.push(sp);
+      if (sp.spChaId) {
+        if (!byCha.has(sp.spChaId)) byCha.set(sp.spChaId, []);
+        byCha.get(sp.spChaId)!.push(sp);
+      } else {
+        unassigned.push(sp);
+      }
     }
-    return Array.from(map.entries()).map(([parentTen, items]) => ({ parentTen, items }));
-  }, [filteredSP]);
+    // Sắp xếp theo thứ tự SP Cha
+    const result: { chaId: string | null; chaTen: string; items: SanPham[] }[] = [];
+    for (const cha of chas) {
+      const items = byCha.get(cha.id);
+      if (items && items.length > 0) result.push({ chaId: cha.id, chaTen: cha.ten, items });
+    }
+    if (unassigned.length > 0) result.push({ chaId: null, chaTen: "Chưa phân loại", items: unassigned });
+    return result;
+  }, [filteredSP, chas]);
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const toggleGroup = (name: string) => setExpandedGroups(prev => {
+  const toggleGroup = (key: string) => setExpandedGroups(prev => {
     const next = new Set(prev);
-    next.has(name) ? next.delete(name) : next.add(name);
+    next.has(key) ? next.delete(key) : next.add(key);
     return next;
   });
   const loaiMap = Object.fromEntries(loais.map(l => [l.ma, l]));
@@ -269,9 +347,10 @@ export default function SkuListPage() {
   function tong(loai: GiaCongLoai) { return cols.reduce((s, c) => s + (loai.chiPhi[c.key] ?? 0), 0); }
 
   const TABS = [
-    { key: "sku", label: "Danh sách SKU" },
-    { key: "vai", label: "Bảng vải" },
-    { key: "mau", label: "Bảng màu" },
+    { key: "sku",     label: "Danh sách SKU" },
+    { key: "spcha",   label: "SP Cha" },
+    { key: "vai",     label: "Bảng vải" },
+    { key: "mau",     label: "Bảng màu" },
     { key: "giacong", label: "Bảng giá gia công" },
   ] as const;
 
@@ -295,7 +374,7 @@ export default function SkuListPage() {
           <div className="flex items-center gap-3 mb-3">
             <input value={skuSearch} onChange={e => setSkuSearch(e.target.value)}
               placeholder="Tìm mã SKU hoặc tên..." className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm w-64 outline-none focus:border-blue-400"/>
-            <span className="text-sm text-slate-400">{groupedSP.length} sản phẩm · {filteredSP.length} SKU</span>
+            <span className="text-sm text-slate-400">{groupedSP.filter(g => g.chaId !== null).length} SP Cha · {filteredSP.length} SKU</span>
           </div>
           {skuLoading ? <p className="text-slate-400 text-sm">Đang tải...</p> : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -316,92 +395,61 @@ export default function SkuListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groupedSP.map(({ parentTen, items }) => {
-                    const hasVariants = items.length > 1;
-                    const isExpanded = expandedGroups.has(parentTen);
-                    // Đại diện: sp đầu tiên có giá vải / gia công (để hiện trên parent row)
-                    const repr = items.find(sp => sp.giaVai || sp.loaiGiaCong) ?? items[0];
-                    const reprGcLoai = repr.loaiGiaCong ? loaiMap[repr.loaiGiaCong] : null;
-                    const reprGiaGiaCong = repr.giaGiaCong ?? (reprGcLoai ? tong(reprGcLoai) : null);
-                    const reprGiaNhap = (repr.giaVai ?? 0) + (reprGiaGiaCong ?? 0);
-                    // Ngày cập nhật mới nhất trong nhóm
-                    const latestDate = items.reduce((m, sp) => sp.updatedAt > m ? sp.updatedAt : m, "");
+                  {groupedSP.map(({ chaId, chaTen, items }) => {
+                    const groupKey = chaId ?? "__unassigned__";
+                    const isExpanded = expandedGroups.has(groupKey);
+                    const isUnassigned = chaId === null;
 
                     return (
-                      <Fragment key={parentTen}>
-                        {/* ── PARENT ROW ── */}
+                      <Fragment key={groupKey}>
+                        {/* ── GROUP HEADER ── */}
                         <tr
-                          onClick={() => hasVariants && toggleGroup(parentTen)}
-                          className={`border-t border-slate-100 ${hasVariants ? "cursor-pointer hover:bg-slate-50" : "hover:bg-slate-50/50"} transition-colors`}>
-                          <td className="px-4 py-2.5 sticky left-0 bg-white z-10">
+                          onClick={() => toggleGroup(groupKey)}
+                          className={`border-t-2 ${isUnassigned ? "border-slate-300 bg-slate-50" : "border-indigo-100 bg-indigo-50/40"} cursor-pointer hover:brightness-95 transition-all`}>
+                          <td className="px-4 py-2 sticky left-0 z-10 bg-inherit" colSpan={2}>
                             <div className="flex items-center gap-2">
-                              {hasVariants
-                                ? <ChevronDown size={13} className={`text-slate-400 flex-shrink-0 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
-                                : <span className="w-3.5 inline-block" />}
-                              <span className="font-mono font-bold text-slate-800 text-sm">
-                                {hasVariants ? items[0].sku.replace(/[A-Z0-9]+$/, "").replace(/[-_]$/, "") || parentTen : items[0].sku}
+                              <ChevronDown size={14} className={`flex-shrink-0 transition-transform ${isExpanded ? "" : "-rotate-90"} ${isUnassigned ? "text-slate-400" : "text-indigo-400"}`} />
+                              <span className={`font-bold text-sm ${isUnassigned ? "text-slate-500 italic" : "text-indigo-800"}`}>{chaTen}</span>
+                              <span className={`text-[11px] rounded-full px-2 py-0.5 font-medium ${isUnassigned ? "bg-slate-200 text-slate-500" : "bg-indigo-100 text-indigo-600"}`}>
+                                {items.length} SKU
                               </span>
-                              {hasVariants && (
-                                <span className="text-[10px] bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5 font-medium">{items.length}</span>
-                              )}
                             </div>
                           </td>
-                          <td className="px-4 py-2.5 text-slate-700 font-medium max-w-[220px] truncate">{parentTen}</td>
-                          <td className="px-2 py-1.5 text-right text-slate-400 text-xs">{hasVariants ? "—" : <DinhLuongInput sp={repr} onSave={handleDinhLuong} />}</td>
-                          <td className="px-4 py-2.5">
-                            {!hasVariants ? (
-                              <select value={repr.tenVai ?? ""}
-                                onChange={e => handleSelectVai(repr, e.target.value)}
-                                onClick={e => e.stopPropagation()}
-                                className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                                <option value="">—</option>
-                                {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
-                              </select>
-                            ) : <span className="text-slate-300 text-xs">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-slate-600 text-xs">
-                            {!hasVariants && repr.giaVai != null ? repr.giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            {!hasVariants ? (
-                              <select value={repr.loaiGiaCong ?? ""}
-                                onChange={e => updateSku(repr.id, { loaiGiaCong: e.target.value || null })}
-                                onClick={e => e.stopPropagation()}
-                                className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                                <option value="">—</option>
-                                {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
-                              </select>
-                            ) : <span className="text-slate-300 text-xs">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-slate-500 text-xs">
-                            {!hasVariants && reprGiaGiaCong != null ? reprGiaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-amber-700 bg-amber-50">
-                            {!hasVariants && reprGiaNhap > 0 ? reprGiaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 bg-emerald-50">
-                            {!hasVariants
-                              ? <EditableCell value={repr.giaBan || null} type="number" className="text-right text-emerald-700"
-                                  onSave={v => updateSku(repr.id, { giaBan: v === "" ? 0 : Number(v) })} />
-                              : <span className="text-xs text-emerald-600">{repr.giaBan > 0 ? repr.giaBan.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-center text-xs text-slate-400 whitespace-nowrap">
-                            {latestDate ? new Date(latestDate).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"}
+                          <td colSpan={8} className="px-4 py-2 text-right text-xs text-slate-400">
+                            {!isUnassigned && !isExpanded && (() => {
+                              const minBan = Math.min(...items.map(s => s.giaBan).filter(v => v > 0));
+                              const maxBan = Math.max(...items.map(s => s.giaBan).filter(v => v > 0));
+                              return minBan > 0 ? (minBan === maxBan ? minBan.toLocaleString("vi-VN") + " ₫" : minBan.toLocaleString("vi-VN") + " – " + maxBan.toLocaleString("vi-VN") + " ₫") : null;
+                            })()}
                           </td>
                         </tr>
 
-                        {/* ── CHILD ROWS ── */}
+                        {/* ── SKU ROWS (khi expanded) ── */}
                         {isExpanded && items.map(sp => {
                           const gcLoai = sp.loaiGiaCong ? loaiMap[sp.loaiGiaCong] : null;
                           const giaGiaCong = sp.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
                           const giaNhap = (sp.giaVai ?? 0) + (giaGiaCong ?? 0);
-                          const variantLabel = getVariantLabel(sp.ten) || sp.sku;
+                          const variantLabel = getVariantLabel(sp.ten) || sp.ten;
                           return (
-                            <tr key={sp.id} className="bg-slate-50/60 border-t border-slate-100/80 hover:bg-slate-100/60 transition-colors">
-                              <td className="pl-10 pr-4 py-2 sticky left-0 bg-slate-50/80 z-10">
+                            <tr key={sp.id} className="border-t border-slate-100 hover:bg-slate-50/80 transition-colors">
+                              <td className="pl-8 pr-4 py-2 sticky left-0 bg-white z-10">
                                 <span className="font-mono text-[11px] text-slate-500 bg-white border border-slate-200 rounded px-1.5 py-0.5">{sp.sku}</span>
                               </td>
-                              <td className="px-4 py-2 text-slate-500 text-sm">{variantLabel}</td>
+                              <td className="px-4 py-2 text-slate-700 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <span>{variantLabel}</span>
+                                  {isUnassigned && (
+                                    <select
+                                      value=""
+                                      onChange={e => { if (e.target.value) assignSpCha(sp.id, e.target.value); }}
+                                      onClick={e => e.stopPropagation()}
+                                      className="text-[11px] border border-dashed border-slate-300 rounded px-1 py-0.5 bg-white text-slate-400 hover:border-indigo-400 outline-none cursor-pointer max-w-[120px]">
+                                      <option value="">+ Gán SP Cha</option>
+                                      {chas.map(c => <option key={c.id} value={c.id}>{c.ten}</option>)}
+                                    </select>
+                                  )}
+                                </div>
+                              </td>
                               <td className="px-2 py-1 text-right">
                                 <DinhLuongInput sp={sp} onSave={handleDinhLuong} />
                               </td>
@@ -446,6 +494,78 @@ export default function SkuListPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ TAB SP CHA ═══ */}
+      {tab === "spcha" && (
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-3 mb-4">
+            <p className="text-sm text-slate-500 flex-1">Quản lý sản phẩm cha — mỗi SP Cha nhóm nhiều SKU (size / màu)</p>
+            <button
+              onClick={autoAssign}
+              disabled={autoAssigning}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 transition">
+              <Link2 size={14}/>
+              {autoAssigning ? "Đang gán..." : "Tự động gán từ tên SKU"}
+            </button>
+          </div>
+          {chaLoading ? <p className="text-slate-400 text-sm">Đang tải...</p> : (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-semibold uppercase">
+                <tr>
+                  <th className="px-4 py-3 text-left">Tên SP Cha</th>
+                  <th className="px-4 py-3 text-left">Mã</th>
+                  <th className="px-4 py-3 text-center">Số SKU</th>
+                  <th className="px-3 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {chas.map(c => (
+                  <tr key={c.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{c.ten}</td>
+                    <td className="px-4 py-2.5 font-mono text-slate-500 text-xs">{c.ma}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold">{c.skuCount}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button onClick={() => deleteCha(c.id)} className="text-slate-300 hover:text-rose-400 transition"><Trash2 size={14}/></button>
+                    </td>
+                  </tr>
+                ))}
+                {addChaForm ? (
+                  <tr className="bg-blue-50/40">
+                    <td className="px-3 py-2" colSpan={2}>
+                      <input
+                        autoFocus
+                        value={addChaForm.ten}
+                        onChange={e => setAddChaForm({ ten: e.target.value })}
+                        onKeyDown={e => { if (e.key === "Enter") addCha(); if (e.key === "Escape") setAddChaForm(null); }}
+                        placeholder="Tên SP Cha (vd: OR26CT)..."
+                        className="w-full px-2 py-1 border border-blue-300 rounded text-sm outline-none"/>
+                    </td>
+                    <td className="px-3 py-2" colSpan={2}>
+                      <div className="flex gap-1">
+                        <button onClick={addCha} className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700"><Check size={13}/></button>
+                        <button onClick={() => setAddChaForm(null)} className="p-1 border border-slate-200 rounded hover:bg-slate-100"><X size={13}/></button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-2">
+                      <button onClick={() => setAddChaForm({ ten: "" })}
+                        className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-blue-600 transition">
+                        <Plus size={14}/> Thêm SP Cha
+                      </button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
           )}
         </div>

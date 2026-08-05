@@ -1,19 +1,25 @@
-export const revalidate = 30; // cache 30s trên Vercel Edge
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const sanPhams = await prisma.sanPham.findMany({
-      orderBy: { updatedAt: "desc" },
-    });
+    // Dùng raw SQL để lấy cả cột spChaId (không có trong Prisma schema)
+    const sanPhams = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `SELECT s.*, s."spChaId" FROM "SanPham" s ORDER BY s."updatedAt" DESC`
+    ).catch(() =>
+      // Fallback nếu cột chưa tồn tại (sẽ được tạo khi gọi san-pham-cha API)
+      prisma.sanPham.findMany({ orderBy: { updatedAt: "desc" } }).then(rows =>
+        rows.map(r => ({ ...r, spChaId: null }))
+      )
+    );
 
     // Sắp xếp: có giá nhập > lên trước, cùng nhóm thì mới nhất trước
     sanPhams.sort((a, b) => {
-      const aHas = a.giaNhap > 0 ? 1 : 0;
-      const bHas = b.giaNhap > 0 ? 1 : 0;
+      const aHas = Number(a.giaNhap) > 0 ? 1 : 0;
+      const bHas = Number(b.giaNhap) > 0 ? 1 : 0;
       if (bHas !== aHas) return bHas - aHas;
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      return new Date(String(b.updatedAt)).getTime() - new Date(String(a.updatedAt)).getTime();
     });
 
     return NextResponse.json(sanPhams);
