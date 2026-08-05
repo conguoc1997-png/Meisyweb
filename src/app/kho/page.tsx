@@ -242,7 +242,12 @@ export default function KhoPage() {
   const SIZE_RE = /\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])\b.*/i;
 
   function baseName(sp: SanPham): string {
-    if (!sp.size) return sp.ten.trim();
+    if (!sp.size) {
+      // size không lưu trong DB → tách từ tên: phần trước " - " đầu tiên
+      // Ví dụ: "OR26CT - 2XL / XANH ĐẬM" → "OR26CT"
+      const dashIdx = sp.ten.indexOf(" - ");
+      return dashIdx > 0 ? sp.ten.slice(0, dashIdx).trim() : sp.ten.trim();
+    }
     const stripped = sp.ten.replace(SIZE_RE, "").trim();
     if (stripped !== sp.ten.trim()) return stripped;
     return sp.ten.replace(new RegExp(`\\s*-\\s*${sp.size}(-.+)?$`, "i"), "").trim();
@@ -256,19 +261,13 @@ export default function KhoPage() {
   }
 
   // Gom nhóm: spChaId → key "cha:{id}", còn lại dùng baseName
-  const parentSkuMap = new Map<string, string>();
-  for (const sp of filteredSP) {
-    if (!sp.size && !sp.spChaId) parentSkuMap.set(sp.ten.trim(), sp.sku);
-  }
-
   const groupMap = new Map<string, SanPham[]>();
   for (const sp of filteredSP) {
     let key: string;
     if (sp.spChaId) {
       key = `cha:${sp.spChaId}`;
     } else {
-      const base = baseName(sp);
-      key = parentSkuMap.get(base) ?? base;
+      key = baseName(sp); // "OR26CT - 2XL / XANH ĐẬM" → "OR26CT"
     }
     if (!groupMap.has(key)) groupMap.set(key, []);
     groupMap.get(key)!.push(sp);
