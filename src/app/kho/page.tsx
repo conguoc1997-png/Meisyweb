@@ -15,6 +15,14 @@ type SanPham = {
   tonKho: number;
   nguon: string | null;
   tiktokProductId: string | null;
+  spChaId: string | null;
+};
+
+type SanPhamCha = {
+  id: string;
+  ma: string;
+  ten: string;
+  skuCount: number;
 };
 
 type NhapXuat = {
@@ -119,6 +127,7 @@ export default function KhoPage() {
   const [syncingNhanh, setSyncingNhanh] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [chas, setChas] = useState<SanPhamCha[]>([]);
 
   // SKU mapping modal
   type Suggestion = { nhanhBase: string; nhanhName: string; score: number; totalStock: number };
@@ -212,7 +221,11 @@ export default function KhoPage() {
     finally { setSheetConfirming(false); }
   };
 
-  useEffect(() => { fetchData(); fetchSyncStatus(); }, []);
+  useEffect(() => {
+    fetchData();
+    fetchSyncStatus();
+    fetch("/api/kho/san-pham-cha").then(r => r.json()).then(setChas).catch(() => {});
+  }, []);
 
   const filteredSP = sanPhams.filter(
     (sp) =>
@@ -220,51 +233,78 @@ export default function KhoPage() {
       sp.sku.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Nhóm sản phẩm: SP có size → group theo baseName (strip size+màu khỏi tên)
-  const SIZES = ["5XL", "4XL", "3XL", "2XL", "XL", "XS", "L", "M", "S"];
-  // Regex strip "- SIZE" hoặc "- SIZE / MÀU" hoặc "- SIZE-MÀU" ở cuối tên
+  // Map SP Cha
+  const chaMap = new Map<string, SanPhamCha>(chas.map(c => [c.id, c]));
+
+  const SIZE_ORDER = ["S","M","L","XL","2XL","3XL","4XL","5XL","XS"];
+
+  // Nhóm sản phẩm: ưu tiên spChaId (từ DB), fallback text parsing
   const SIZE_RE = /\s*-\s*(5XL|4XL|3XL|2XL|XL|XS|[LMS])\b.*/i;
 
   function baseName(sp: SanPham): string {
     if (!sp.size) return sp.ten.trim();
-    // Strip "- SIZE-..." từ cuối tên
     const stripped = sp.ten.replace(SIZE_RE, "").trim();
     if (stripped !== sp.ten.trim()) return stripped;
-    // Fallback: strip theo sp.size literal
     return sp.ten.replace(new RegExp(`\\s*-\\s*${sp.size}(-.+)?$`, "i"), "").trim();
   }
 
   function baseSkuOf(sp: SanPham): string {
     if (!sp.size) return sp.sku;
-    // Tìm vị trí size trong SKU (vd "OR26CT5XL-XANH" → idx=6 → "OR26CT")
     const idx = sp.sku.toUpperCase().indexOf(sp.size.toUpperCase());
     if (idx > 0) return sp.sku.slice(0, idx);
     return sp.sku;
   }
 
-  // Map: baseName → group key (dùng SKU cha nếu tồn tại, không thì dùng baseName)
-  const parentSkuMap = new Map<string, string>(); // baseName → SKU mẹ
+  // Gom nhóm: spChaId → key "cha:{id}", còn lại dùng baseName
+  const parentSkuMap = new Map<string, string>();
   for (const sp of filteredSP) {
-    if (!sp.size) parentSkuMap.set(sp.ten.trim(), sp.sku);
+    if (!sp.size && !sp.spChaId) parentSkuMap.set(sp.ten.trim(), sp.sku);
   }
 
   const groupMap = new Map<string, SanPham[]>();
   for (const sp of filteredSP) {
-    const base = baseName(sp);
-    const key = parentSkuMap.get(base) ?? base;
+    let key: string;
+    if (sp.spChaId) {
+      key = `cha:${sp.spChaId}`;
+    } else {
+      const base = baseName(sp);
+      key = parentSkuMap.get(base) ?? base;
+    }
     if (!groupMap.has(key)) groupMap.set(key, []);
     groupMap.get(key)!.push(sp);
   }
 
-  const SIZE_ORDER = ["S","M","L","XL","2XL","3XL","4XL","5XL","XS"];
   const groups = Array.from(groupMap.entries()).map(([key, items]) => {
     const sorted = [...items].sort((a, b) => SIZE_ORDER.indexOf(a.size ?? "") - SIZE_ORDER.indexOf(b.size ?? ""));
-    const hasVariants = items.some(sp => sp.size) && items.length > 1;
-    const totalTon = items.filter(sp => sp.size || !hasVariants).reduce((s, sp) => s + sp.tonKho, 0);
-    const reprItem = items.find(sp => !sp.size) ?? sorted[0];
-    const displayName = baseName(reprItem);
-    const baseSku = baseSkuOf(reprItem);
-    return { key, items: sorted, hasVariants, totalTon, repr: reprItem, displayName, baseSku };
+    const hasVariants = items.length > 1;
+    const totalTon = items.reduce((s, sp) => s + sp.tonKho, 0);
+    const reprItem = sorted[0];
+
+    // Nếu có SP Cha từ DB → dùng tên + mã từ DB
+    if (key.startsWith("cha:")) {
+      const chaId = key.slice(4);
+      const cha = chaMap.get(chaId);
+      return {
+        key, items: sorted, hasVariants, totalTon, repr: reprItem,
+        displayName: cha?.ten ?? reprItem.ten,
+        baseSku: cha?.ma ?? reprItem.sku,
+        isCha: true,
+      };
+    }
+
+    return {
+      key, items: sorted, hasVariants, totalTon, repr: reprItem,
+      displayName: baseName(reprItem),
+      baseSku: baseSkuOf(reprItem),
+      isCha: false,
+    };
+  });
+
+  // Sắp xếp: SP Cha (có spChaId) lên trước theo tên, unassigned ở sau
+  groups.sort((a, b) => {
+    if (a.isCha && !b.isCha) return -1;
+    if (!a.isCha && b.isCha) return 1;
+    return a.displayName.localeCompare(b.displayName, "vi");
   });
 
   const toggleGroup = (key: string) => {
@@ -684,16 +724,15 @@ export default function KhoPage() {
                     Chưa có sản phẩm nào
                   </td>
                 </tr>
-              ) : groups.map(({ key, items, hasVariants, totalTon, repr, displayName, baseSku }) => {
+              ) : groups.map(({ key, items, hasVariants, totalTon, repr, displayName, baseSku, isCha }) => {
                 const isExpanded = expandedGroups.has(key);
-                const sizeCount = items.filter(sp => sp.size).length;
                 const mauLabels = [...new Set(items.map(sp => sp.mauSac).filter(Boolean))];
                 return (
                   <>
                     {/* Row cha / row đơn */}
                     <tr
                       key={key}
-                      className={`${hasVariants ? "cursor-pointer hover:bg-slate-50" : "hover:bg-slate-50"} ${repr.giaNhap === 0 && !hasVariants ? "bg-amber-50" : ""}`}
+                      className={`${hasVariants ? "cursor-pointer hover:bg-slate-50" : "hover:bg-slate-50"} ${repr.giaNhap === 0 && !hasVariants ? "bg-amber-50" : ""} ${isCha ? "border-l-4 border-l-indigo-300" : ""}`}
                       onClick={hasVariants ? () => toggleGroup(key) : undefined}
                     >
                       <td className="px-4 py-3 text-slate-400">
@@ -702,14 +741,19 @@ export default function KhoPage() {
                           : null}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-800">{displayName}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-800">{displayName}</p>
+                          {isCha && hasVariants && (
+                            <span className="text-[10px] bg-indigo-100 text-indigo-600 rounded-full px-1.5 py-0.5 font-semibold">{items.length} SKU</span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-400 font-mono">{baseSku}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {hasVariants
                           ? <span className="text-xs text-slate-500">
                               {mauLabels.length > 0 && <span>{mauLabels.join(", ")} · </span>}
-                              <span className="font-medium">{sizeCount} size</span>
+                              <span className="font-medium">{items.length} SKU</span>
                             </span>
                           : ([repr.mauSac, repr.size].filter(Boolean).join(" / ") || "—")}
                       </td>
@@ -756,18 +800,18 @@ export default function KhoPage() {
                       </td>
                     </tr>
 
-                    {/* Rows con (size variants) */}
-                    {hasVariants && isExpanded && items.filter(sp => sp.size).map(sp => {
-                      const sizeLabel = sp.size ?? "—";
+                    {/* Rows con */}
+                    {hasVariants && isExpanded && items.map(sp => {
+                      const variantLabel = [sp.size, sp.mauSac].filter(Boolean).join(" / ") || sp.sku;
                       return (
-                        <tr key={sp.id} className={`bg-slate-50/70 hover:bg-slate-100/60 border-l-2 border-blue-200 ${sp.giaNhap === 0 ? "bg-amber-50/60" : ""}`}>
+                        <tr key={sp.id} className={`bg-slate-50/70 hover:bg-slate-100/60 border-l-4 ${isCha ? "border-l-indigo-200" : "border-l-blue-200"} ${sp.giaNhap === 0 ? "bg-amber-50/60" : ""}`}>
                           <td className="px-4 py-2"></td>
                           <td className="px-4 py-2 pl-8">
                             <p className="text-xs text-slate-500 font-mono">{sp.sku}</p>
                           </td>
                           <td className="px-4 py-2">
-                            <span className="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded">
-                              {sizeLabel}
+                            <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded ${isCha ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"}`}>
+                              {variantLabel}
                             </span>
                           </td>
                           <td className="px-4 py-2"></td>
