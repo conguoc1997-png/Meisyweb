@@ -161,20 +161,52 @@ export default function SkuListPage() {
   async function autoAssign() {
     setAutoAssigning(true);
     try {
-      const r = await fetch("/api/kho/san-pham-cha", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "auto_assign" }),
-      });
-      const res = await r.json();
-      if (!r.ok) { alert(res.error ?? "Lỗi"); return; }
-      // Reload cả SKU và SP Cha
+      // Sort màu vietTat dài nhất trước để match chính xác hơn
+      const colorCodes = maus
+        .map(m => m.vietTat?.toUpperCase().trim())
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length);
+
+      // Từ mã SKU, trích SP Cha = phần trước ký tự màu đầu tiên
+      function getSpChaFromSku(sku: string): string {
+        const upper = sku.toUpperCase();
+        for (const color of colorCodes) {
+          const idx = upper.indexOf(color);
+          if (idx > 0) return upper.slice(0, idx); // ví dụ: 0R26CT
+        }
+        // Fallback: tách từ tên sản phẩm
+        return sku.trim();
+      }
+
+      // Gom các SKU chưa có spChaId theo SP Cha code
+      const unassigned = sanPhams.filter(sp => !sp.spChaId);
+      const groups = new Map<string, string[]>(); // chaCode → [spId]
+      for (const sp of unassigned) {
+        const chaCode = getSpChaFromSku(sp.sku);
+        if (!groups.has(chaCode)) groups.set(chaCode, []);
+        groups.get(chaCode)!.push(sp.id);
+      }
+
+      if (groups.size === 0) { alert("Tất cả SKU đã được gán SP Cha rồi!"); return; }
+
+      // Gọi API tạo SP Cha + assign từng nhóm
+      let created = 0; let assigned = 0;
+      for (const [chaCode, ids] of groups) {
+        const r = await fetch("/api/kho/san-pham-cha", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ten: chaCode, ma: chaCode, autoAssign: true, skuIds: ids }),
+        });
+        if (r.ok) { created++; assigned += ids.length; }
+      }
+
+      // Reload SKU + SP Cha
       const [spData, chaData] = await Promise.all([
         fetch("/api/kho/san-pham").then(r2 => r2.json()),
         fetch("/api/kho/san-pham-cha").then(r2 => r2.json()),
       ]);
       setSanPhams(spData);
       setChas(chaData);
-      alert(`Đã tự động tạo ${res.created} SP Cha và gán ${res.assigned} SKU`);
+      alert(`Đã tạo ${created} SP Cha, gán ${assigned} SKU`);
     } finally {
       setAutoAssigning(false);
     }
