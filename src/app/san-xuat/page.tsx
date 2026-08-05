@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical, Search } from "lucide-react";
+import { Plus, Scissors, CheckCircle, Clock, Pencil, History, X, ChevronDown, ChevronRight, Trash2, MoreVertical, Search, ArrowRightLeft } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 type SanPham = { id: string; sku: string; ten: string };
@@ -150,6 +150,77 @@ export default function SanXuatPage() {
   const fetchVaiTon = async () => {
     const data = await fetch("/api/san-xuat/vai-ton").then(r => r.json());
     setVaiTons(Array.isArray(data) ? data : []);
+  };
+
+  // ── Chuyển kho ──
+  const [modalChuyenKho, setModalChuyenKho] = useState<VaiTon | null>(null);
+  const [chuyenKhoForm, setChuyenKhoForm] = useState({ soMet: "", xuongDich: "", ghiChu: "" });
+  const [chuyenKhoLoading, setChuyenKhoLoading] = useState(false);
+
+  const openChuyenKho = (v: VaiTon) => {
+    setModalChuyenKho(v);
+    setChuyenKhoForm({ soMet: "", xuongDich: "", ghiChu: "" });
+  };
+
+  const doChuyenKho = async () => {
+    if (!modalChuyenKho) return;
+    const soMet = parseFloat(chuyenKhoForm.soMet);
+    if (!soMet || soMet <= 0) return;
+    if (!chuyenKhoForm.xuongDich) return;
+    if (chuyenKhoForm.xuongDich === (modalChuyenKho.xuong ?? "")) return;
+    if (soMet > modalChuyenKho.soMet) return;
+    setChuyenKhoLoading(true);
+    try {
+      const src = modalChuyenKho;
+      // ─ Trừ kho nguồn ─
+      const srcCays: { soMet: number; cut?: boolean; lotId?: string }[] =
+        src.cayData ? JSON.parse(src.cayData) : [{ soMet: src.soMet }];
+      // Trừ dần từ cây cuối
+      let remaining = soMet;
+      const newSrcCays = [...srcCays].map(c => {
+        if (remaining <= 0 || c.cut) return c;
+        const take = Math.min(c.soMet, remaining);
+        remaining -= take;
+        return { ...c, soMet: Math.round((c.soMet - take) * 1000) / 1000 };
+      }).filter(c => c.soMet > 0);
+      const newSrcSoMet = newSrcCays.reduce((s, c) => s + c.soMet, 0);
+      await fetch(`/api/san-xuat/vai-ton/${src.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cayData: newSrcCays, soMet: newSrcSoMet, nguon: "xuat_kho",
+          ghiChuLog: `Chuyển ${soMet} ${src.donVi} → ${XUONG_LABEL[chuyenKhoForm.xuongDich] ?? chuyenKhoForm.xuongDich}` }),
+      });
+      // ─ Cộng kho đích ─
+      const existing = vaiTons.find(v =>
+        v.maVai.trim().toLowerCase() === src.maVai.trim().toLowerCase() &&
+        (v.mauSac ?? "").trim().toLowerCase() === (src.mauSac ?? "").trim().toLowerCase() &&
+        (v.xuong ?? "") === chuyenKhoForm.xuongDich
+      );
+      if (existing) {
+        const dstCays: { soMet: number }[] = existing.cayData ? JSON.parse(existing.cayData) : [{ soMet: existing.soMet }];
+        const mergedCays = [...dstCays, { soMet }];
+        const newDstSoMet = mergedCays.reduce((s, c) => s + c.soMet, 0);
+        await fetch(`/api/san-xuat/vai-ton/${existing.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cayData: mergedCays, soMet: newDstSoMet, nguon: "cong_vao",
+            ghiChuLog: `Nhận chuyển kho từ ${XUONG_LABEL[src.xuong ?? ""] ?? src.xuong ?? "?"}` }),
+        });
+      } else {
+        // Tạo mới ở kho đích
+        await fetch("/api/san-xuat/vai-ton", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            maVai: src.maVai, donVi: src.donVi, mauSac: src.mauSac ?? "",
+            xuong: chuyenKhoForm.xuongDich, ghiChu: chuyenKhoForm.ghiChu || null,
+            cayData: [{ soMet }],
+            ghiChuLog: `Nhận chuyển kho từ ${XUONG_LABEL[src.xuong ?? ""] ?? src.xuong ?? "?"}`,
+          }),
+        });
+      }
+      setModalChuyenKho(null);
+      fetchVaiTon();
+    } finally {
+      setChuyenKhoLoading(false);
+    }
   };
 
   const handleAddNCC = async () => {
@@ -1415,6 +1486,7 @@ export default function SanXuatPage() {
                             setModalVai(v);
                           }}
                             className="text-rose-500 hover:underline">Sửa</button>
+                          <button onClick={() => openChuyenKho(v)} className="text-slate-400 hover:text-blue-500 transition" title="Chuyển kho"><ArrowRightLeft size={12} /></button>
                           <button onClick={() => openVaiLog(v)} className="text-slate-400 hover:text-slate-600 transition" title="Lịch sử"><History size={12} /></button>
                           <button onClick={() => deleteVai(v.id)} className="text-slate-300 hover:text-red-500 transition"><X size={12} /></button>
                         </td>
@@ -3191,6 +3263,136 @@ export default function SanXuatPage() {
           </div>
         </div>
       )}
+
+      {/* ══ Modal chuyển kho ══ */}
+      {modalChuyenKho && (() => {
+        const src = modalChuyenKho;
+        const soMetVal = parseFloat(chuyenKhoForm.soMet) || 0;
+        const validSoMet = soMetVal > 0 && soMetVal <= src.soMet;
+        const validXuong = !!chuyenKhoForm.xuongDich && chuyenKhoForm.xuongDich !== (src.xuong ?? "");
+        const canSubmit = validSoMet && validXuong && !chuyenKhoLoading;
+        // kho đích đã có mã này chưa
+        const existingDst = chuyenKhoForm.xuongDich
+          ? vaiTons.find(v =>
+              v.id !== src.id &&
+              v.maVai.trim().toLowerCase() === src.maVai.trim().toLowerCase() &&
+              (v.mauSac ?? "").trim().toLowerCase() === (src.mauSac ?? "").trim().toLowerCase() &&
+              (v.xuong ?? "") === chuyenKhoForm.xuongDich
+            )
+          : null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <ArrowRightLeft size={16} className="text-blue-500" /> Chuyển kho
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Mã: <span className="font-semibold text-slate-600">{src.maVai}</span>
+                    {src.mauSac && <span className="ml-1.5">{src.mauSac}</span>}
+                    {" · "}Tồn: <span className="font-semibold text-blue-600">{src.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {src.donVi}</span>
+                  </p>
+                </div>
+                <button onClick={() => setModalChuyenKho(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
+              </div>
+
+              <div className="px-5 py-4 space-y-4">
+                {/* Kho nguồn → kho đích */}
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex-1 bg-slate-50 rounded-lg px-3 py-2 text-center">
+                    <p className="text-[10px] text-slate-400 mb-1">Kho nguồn</p>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${src.xuong === "meisy" ? "bg-rose-100 text-rose-600" : src.xuong === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                      {XUONG_LABEL[src.xuong ?? ""] ?? src.xuong ?? "Chưa chọn"}
+                    </span>
+                  </div>
+                  <ArrowRightLeft size={16} className="text-slate-400 flex-shrink-0" />
+                  <div className="flex-1 bg-slate-50 rounded-lg px-3 py-2 text-center">
+                    <p className="text-[10px] text-slate-400 mb-1">Kho đích</p>
+                    {chuyenKhoForm.xuongDich
+                      ? <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${chuyenKhoForm.xuongDich === "meisy" ? "bg-rose-100 text-rose-600" : chuyenKhoForm.xuongDich === "dung_linh" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                          {XUONG_LABEL[chuyenKhoForm.xuongDich] ?? chuyenKhoForm.xuongDich}
+                        </span>
+                      : <span className="text-xs text-slate-300">Chưa chọn</span>
+                    }
+                  </div>
+                </div>
+
+                {/* Chọn kho đích */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Chuyển đến kho</label>
+                  <div className="flex flex-wrap gap-2">
+                    {xuongList.filter(x => x.key !== (src.xuong ?? "")).map(x => (
+                      <button key={x.key} type="button"
+                        onClick={() => setChuyenKhoForm(f => ({ ...f, xuongDich: x.key }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                          chuyenKhoForm.xuongDich === x.key
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-600"
+                        }`}>
+                        {x.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Số mét chuyển */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Số mét chuyển</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min="0.01" step="0.01" max={src.soMet}
+                      value={chuyenKhoForm.soMet}
+                      onChange={e => setChuyenKhoForm(f => ({ ...f, soMet: e.target.value }))}
+                      placeholder={`Tối đa ${src.soMet.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}`}
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                    <span className="text-sm text-slate-500">{src.donVi}</span>
+                    <button type="button" onClick={() => setChuyenKhoForm(f => ({ ...f, soMet: String(src.soMet) }))}
+                      className="text-xs text-blue-500 hover:underline whitespace-nowrap">Tất cả</button>
+                  </div>
+                  {soMetVal > src.soMet && <p className="text-xs text-red-500 mt-1">Vượt quá tồn kho ({src.soMet} {src.donVi})</p>}
+                </div>
+
+                {/* Preview kết quả */}
+                {validSoMet && validXuong && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">{XUONG_LABEL[src.xuong ?? ""] ?? src.xuong} còn lại:</span>
+                      <span className="font-semibold text-slate-700">{(src.soMet - soMetVal).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {src.donVi}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">{XUONG_LABEL[chuyenKhoForm.xuongDich] ?? chuyenKhoForm.xuongDich} nhận:</span>
+                      <span className="font-semibold text-emerald-700">
+                        {existingDst
+                          ? `${(existingDst.soMet + soMetVal).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ${src.donVi} (+${soMetVal})`
+                          : `${soMetVal.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ${src.donVi} (tạo mới)`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ghi chú */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Ghi chú (tùy chọn)</label>
+                  <input type="text" value={chuyenKhoForm.ghiChu}
+                    onChange={e => setChuyenKhoForm(f => ({ ...f, ghiChu: e.target.value }))}
+                    placeholder="VD: Chuyển để sản xuất đơn hàng X..."
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                </div>
+              </div>
+
+              <div className="flex gap-2 px-5 py-4 border-t border-slate-100">
+                <button onClick={() => setModalChuyenKho(null)} className="flex-1 px-4 py-2 border rounded-lg text-sm hover:bg-slate-50">Huỷ</button>
+                <button onClick={doChuyenKho} disabled={!canSubmit}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                  <ArrowRightLeft size={14} />
+                  {chuyenKhoLoading ? "Đang chuyển..." : "Xác nhận chuyển kho"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ══ Modal lịch sử nhập xuất vải ══ */}
       {showVaiLog && (
