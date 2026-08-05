@@ -322,16 +322,27 @@ export default function KhoPage() {
       const maus = formSP.mauSac.length > 0 ? formSP.mauSac : [""];
       const hasVariants = formSP.size.length > 0 || formSP.mauSac.length > 0;
 
-      // Tạo SP cha nếu có variants
+      // 1. Tạo / upsert SP Cha trong SanPhamCha (tên SP = tên SP Cha)
+      let spChaId: string | null = null;
+      const chaRes = await fetch("/api/kho/san-pham-cha", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ten: formSP.ten.trim(), ma: formSP.sku.trim() }),
+      });
+      if (chaRes.ok) {
+        const chaData = await chaRes.json();
+        spChaId = chaData.id ?? null;
+      }
+
+      // 2. Tạo SP placeholder cha (nếu có variants) — giữ nguyên logic cũ
       if (hasVariants) {
         const parentRes = await fetch("/api/kho/san-pham", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formSP, mauSac: "", size: "", tonKho: "0" }),
+          body: JSON.stringify({ ...formSP, mauSac: "", size: "", tonKho: "0", spChaId }),
         });
         if (!parentRes.ok) throw new Error((await parentRes.json()).error);
       }
 
-      // Tạo SP con (size × màu)
+      // 3. Tạo SP con (size × màu) — gán spChaId
       const toCreate = sizes.flatMap(sz => maus.map(mau => {
         const vietTat = mau ? (mauList.find(m => m.ten === mau)?.vietTat ?? mau.replace(/\s+/g, "").toUpperCase()) : "";
         const skuSuffix = [vietTat, sz].filter(Boolean).join("").toUpperCase();
@@ -342,6 +353,7 @@ export default function KhoPage() {
           size: sz,
           sku: skuSuffix ? formSP.sku + skuSuffix : formSP.sku,
           ten: nameSuffix ? formSP.ten + " - " + nameSuffix : formSP.ten,
+          spChaId,
         };
       }));
       for (const sp of toCreate) {
@@ -351,6 +363,9 @@ export default function KhoPage() {
         });
         if (!res.ok) throw new Error((await res.json()).error);
       }
+
+      // Reload SP Cha list
+      fetch("/api/kho/san-pham-cha").then(r => r.json()).then(setChas).catch(() => {});
       setModal(null);
       setFormSP({ ten: "", sku: "", mauSac: [], size: [], giaNhap: "", giaBan: "", tonKho: "", nguon: "shopee" });
       fetchData();

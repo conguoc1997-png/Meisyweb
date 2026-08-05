@@ -31,6 +31,20 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // Nếu có spChaId → dùng raw SQL để ghi cột không có trong schema
+    if (body.spChaId) {
+      const rows = await prisma.$queryRawUnsafe<object[]>(
+        `INSERT INTO "SanPham"(id, ten, sku, "mauSac", size, "giaNhap", "giaBan", "tonKho", nguon, "spChaId", "createdAt", "updatedAt")
+         VALUES(gen_random_uuid()::text, $1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())
+         RETURNING *`,
+        body.ten, body.sku, body.mauSac || null, body.size || null,
+        Number(body.giaNhap) || 0, Number(body.giaBan) || 0,
+        Number(body.tonKho) || 0, body.nguon || null, body.spChaId
+      );
+      return NextResponse.json(rows[0], { status: 201 });
+    }
+
     const sp = await prisma.sanPham.create({
       data: {
         ten: body.ten,
