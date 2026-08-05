@@ -90,6 +90,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ...row, congNoNccId: congNo.id, congNo }, { status: 201 });
     }
 
+    // ── Ghi log nhập mới ──
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "VaiLog" (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "vaiTonId" TEXT NOT NULL, "maVai" TEXT NOT NULL, "mauSac" TEXT, "xuong" TEXT,
+        "donVi" TEXT NOT NULL DEFAULT 'm', "loai" TEXT NOT NULL, "soMet" FLOAT NOT NULL,
+        "soMetTruoc" FLOAT, "soMetSau" FLOAT, "nguon" TEXT, "ghiChu" TEXT,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `).catch(() => {});
+    const ghiChuLog = [
+      b.tenNCC ? `NCC: ${b.tenNCC}` : "",
+      b.soHoaDon ? `HĐ: ${b.soHoaDon}` : "",
+    ].filter(Boolean).join(" — ") || null;
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "VaiLog"("vaiTonId","maVai","mauSac","xuong","donVi","loai","soMet","soMetTruoc","soMetSau","nguon","ghiChu")
+       VALUES($1,$2,$3,$4,$5,'nhap',$6,0,$6,'them_moi',$7)`,
+      row.id, row.maVai, row.mauSac ?? null, row.xuong ?? null, row.donVi, soMet, ghiChuLog
+    ).catch(() => {});
+
     return NextResponse.json(row, { status: 201 });
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Lỗi server" }, { status: 500 });

@@ -123,6 +123,30 @@ export default function SanXuatPage() {
     return next;
   });
 
+  // ── Lịch sử nhập xuất vải ──
+  type VaiLog = {
+    id: string; vaiTonId: string; maVai: string; mauSac: string | null; xuong: string | null;
+    donVi: string; loai: string; soMet: number; soMetTruoc: number | null; soMetSau: number | null;
+    nguon: string | null; ghiChu: string | null; createdAt: string;
+  };
+  const [showVaiLog, setShowVaiLog] = useState(false);
+  const [vaiLogTarget, setVaiLogTarget] = useState<VaiTon | null>(null); // null = xem tất cả
+  const [vaiLogs, setVaiLogs] = useState<VaiLog[]>([]);
+  const [vaiLogLoading, setVaiLogLoading] = useState(false);
+  const fetchVaiLog = async (vaiTon?: VaiTon | null) => {
+    setVaiLogLoading(true);
+    const url = vaiTon ? `/api/san-xuat/vai-log?vaiTonId=${vaiTon.id}` : "/api/san-xuat/vai-log";
+    const data = await fetch(url).then(r => r.json()).catch(() => []);
+    setVaiLogs(Array.isArray(data) ? data : []);
+    setVaiLogLoading(false);
+  };
+  const openVaiLog = (vaiTon?: VaiTon) => {
+    const target = vaiTon ?? null;
+    setVaiLogTarget(target);
+    setShowVaiLog(true);
+    fetchVaiLog(target);
+  };
+
   const fetchVaiTon = async () => {
     const data = await fetch("/api/san-xuat/vai-ton").then(r => r.json());
     setVaiTons(Array.isArray(data) ? data : []);
@@ -174,7 +198,7 @@ export default function SanXuatPage() {
       const newSoMet = mergedCays.reduce((s, c) => s + (c.soMet ?? 0), 0);
       await fetch(`/api/san-xuat/vai-ton/${target.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cayData: mergedCays, soMet: newSoMet, soCay: mergedCays.length }),
+        body: JSON.stringify({ cayData: mergedCays, soMet: newSoMet, soCay: mergedCays.length, nguon: "cong_vao" }),
       });
       setModalVai(null); fetchVaiTon();
     } finally {
@@ -190,7 +214,7 @@ export default function SanXuatPage() {
 
   const saveVaiMet = async (v: VaiTon, val: string) => {
     setEditingVaiMet(null);
-    await fetch(`/api/san-xuat/vai-ton/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soMet: Number(val) || 0 }) });
+    await fetch(`/api/san-xuat/vai-ton/${v.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soMet: Number(val) || 0, nguon: "dieu_chinh" }) });
     fetchVaiTon();
   };
 
@@ -840,7 +864,7 @@ export default function SanXuatPage() {
       setVaiTons(prev => prev.map(v => v.id === vai.id ? { ...v, cayData: JSON.stringify(newCays) } : v));
       await fetch(`/api/san-xuat/vai-ton/${vai.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cayData: newCays }),
+        body: JSON.stringify({ cayData: newCays, nguon: "hoan_tac" }),
       });
       fetchVaiTon();
     } catch { /* ignore */ }
@@ -984,7 +1008,7 @@ export default function SanXuatPage() {
             setVaiTons(prev => prev.map(v => v.id === matchedVai.id ? { ...v, cayData: JSON.stringify(newCays) } : v));
             fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cayData: newCays }),
+              body: JSON.stringify({ cayData: newCays, nguon: "cat" }),
             }).catch(() => fetchVaiTon());
           }
         } catch { /* ignore */ }
@@ -1016,7 +1040,7 @@ export default function SanXuatPage() {
             setVaiTons(prev => prev.map(v => v.id === matchedVai.id ? { ...v, cayData: JSON.stringify(newVaiCays) } : v));
             fetch(`/api/san-xuat/vai-ton/${matchedVai.id}`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ cayData: newVaiCays }),
+              body: JSON.stringify({ cayData: newVaiCays, nguon: "cat" }),
             }).catch(() => fetchVaiTon());
           }
         }
@@ -1209,11 +1233,18 @@ export default function SanXuatPage() {
             <span className="font-semibold text-sm text-slate-700">Tồn kho vải</span>
             <span className="text-xs text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{vaiTons.length} loại</span>
           </div>
-          <button
-            onClick={e => { e.stopPropagation(); setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" }); setVaiCayRows([{ soMet: "" }]); setShowAddNCC(false); setNewNccName(""); setModalVai("new"); }}
-            className="flex items-center gap-1 text-xs bg-rose-500 text-white px-3 py-1.5 rounded-lg hover:bg-rose-600 transition">
-            <Plus size={12} /> Thêm vải
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={e => { e.stopPropagation(); openVaiLog(); }}
+              className="flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
+              <History size={12} /> Lịch sử
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); setVaiForm({ maVai: "", donVi: "m", mauSac: "", xuong: "", ghiChu: "", tenNCC: "", soHoaDon: "", chiPhiThucNhap: "", soTienHoaDon: "", vatPct: "", tinhNoTheo: "thuc_te" }); setVaiCayRows([{ soMet: "" }]); setShowAddNCC(false); setNewNccName(""); setModalVai("new"); }}
+              className="flex items-center gap-1 text-xs bg-rose-500 text-white px-3 py-1.5 rounded-lg hover:bg-rose-600 transition">
+              <Plus size={12} /> Thêm vải
+            </button>
+          </div>
         </div>
 
         {showVaiTon && (() => {
@@ -1384,6 +1415,7 @@ export default function SanXuatPage() {
                             setModalVai(v);
                           }}
                             className="text-rose-500 hover:underline">Sửa</button>
+                          <button onClick={() => openVaiLog(v)} className="text-slate-400 hover:text-slate-600 transition" title="Lịch sử"><History size={12} /></button>
                           <button onClick={() => deleteVai(v.id)} className="text-slate-300 hover:text-red-500 transition"><X size={12} /></button>
                         </td>
                       </tr>
@@ -3156,6 +3188,116 @@ export default function SanXuatPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal lịch sử nhập xuất vải ══ */}
+      {showVaiLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">
+                  Lịch sử nhập / xuất vải
+                </h3>
+                {vaiLogTarget && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Mã: <span className="font-semibold text-slate-600">{vaiLogTarget.maVai}</span>
+                    {vaiLogTarget.mauSac && <span className="ml-1.5 text-slate-500">· {vaiLogTarget.mauSac}</span>}
+                    {vaiLogTarget.xuong && <span className="ml-1.5 text-slate-400">· {XUONG_LABEL[vaiLogTarget.xuong] ?? vaiLogTarget.xuong}</span>}
+                  </p>
+                )}
+              </div>
+              <button onClick={() => setShowVaiLog(false)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-2 py-2">
+              {vaiLogLoading ? (
+                <p className="text-center text-slate-400 py-12 text-sm">Đang tải...</p>
+              ) : vaiLogs.length === 0 ? (
+                <p className="text-center text-slate-400 py-12 text-sm">Chưa có lịch sử</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-400 border-b border-slate-100">
+                      <th className="text-left px-3 py-2 font-medium">Thời gian</th>
+                      {!vaiLogTarget && <th className="text-left px-3 py-2 font-medium">Mã vải</th>}
+                      {!vaiLogTarget && <th className="text-left px-3 py-2 font-medium">Xưởng</th>}
+                      <th className="text-center px-3 py-2 font-medium">Loại</th>
+                      <th className="text-right px-3 py-2 font-medium">Số mét</th>
+                      <th className="text-right px-3 py-2 font-medium">Tồn trước</th>
+                      <th className="text-right px-3 py-2 font-medium">Tồn sau</th>
+                      <th className="text-left px-3 py-2 font-medium">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {vaiLogs.map(log => {
+                      const isNhap = log.loai === "nhap";
+                      const isDC   = log.loai === "dieu_chinh";
+                      const delta  = log.soMet;
+                      const nguonLabel: Record<string, string> = {
+                        them_moi:   "Nhập mới",
+                        cong_vao:   "Cộng vào",
+                        cat:        "Cắt",
+                        hoan_tac:   "Hoàn tác",
+                        dieu_chinh: "Điều chỉnh",
+                        xuat_kho:   "Xuất kho",
+                      };
+                      const dt = new Date(log.createdAt);
+                      const dateStr = dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit" });
+                      const timeStr = dt.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/70 transition">
+                          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap text-xs">
+                            <div>{dateStr}</div>
+                            <div className="text-slate-300">{timeStr}</div>
+                          </td>
+                          {!vaiLogTarget && (
+                            <td className="px-3 py-2.5">
+                              <span className="font-semibold text-slate-700">{log.maVai}</span>
+                              {log.mauSac && <span className="ml-1.5 text-xs text-slate-400">{log.mauSac}</span>}
+                            </td>
+                          )}
+                          {!vaiLogTarget && (
+                            <td className="px-3 py-2.5 text-xs text-slate-500">
+                              {log.xuong ? (XUONG_LABEL[log.xuong] ?? log.xuong) : <span className="text-slate-300">—</span>}
+                            </td>
+                          )}
+                          <td className="px-3 py-2.5 text-center">
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                              isNhap ? "bg-emerald-100 text-emerald-700"
+                              : isDC  ? "bg-blue-100 text-blue-700"
+                              : "bg-rose-100 text-rose-700"
+                            }`}>
+                              {nguonLabel[log.nguon ?? ""] ?? (isNhap ? "Nhập" : isDC ? "Điều chỉnh" : "Xuất")}
+                            </span>
+                          </td>
+                          <td className={`px-3 py-2.5 text-right font-bold font-mono ${isNhap ? "text-emerald-600" : isDC ? "text-blue-600" : "text-rose-600"}`}>
+                            {isNhap ? "+" : ""}{delta > 0 && !isNhap ? "" : ""}{delta.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} {log.donVi}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs text-slate-400 font-mono">
+                            {log.soMetTruoc != null ? log.soMetTruoc.toLocaleString("vi-VN", { maximumFractionDigits: 2 }) : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs text-slate-600 font-mono font-semibold">
+                            {log.soMetSau != null ? log.soMetSau.toLocaleString("vi-VN", { maximumFractionDigits: 2 }) : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-slate-400 max-w-[140px] truncate">{log.ghiChu ?? ""}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-slate-100 flex justify-between items-center">
+              <span className="text-xs text-slate-400">{vaiLogs.length} bản ghi</span>
+              <button onClick={() => setShowVaiLog(false)} className="px-4 py-2 text-sm border rounded-lg hover:bg-slate-50">Đóng</button>
+            </div>
           </div>
         </div>
       )}
