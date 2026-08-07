@@ -495,6 +495,7 @@ export default function SkuListPage() {
                   <tr>
                     <th className="px-4 py-3 text-left sticky left-0 bg-slate-50 z-10">Mã SKU</th>
                     <th className="px-4 py-3 text-left">Tên sản phẩm</th>
+                    <th className="px-4 py-3 text-left">Màu sắc</th>
                     <th className="px-4 py-3 text-right">ĐL (M)</th>
                     <th className="px-4 py-3 text-left">Tên vải</th>
                     <th className="px-4 py-3 text-right">Giá vải</th>
@@ -515,6 +516,10 @@ export default function SkuListPage() {
                     const giaGiaCong = repGC?.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
                     const giaVai = repVai?.giaVai ?? null;
                     const giaNhap = (giaVai ?? 0) + (giaGiaCong ?? 0);
+                    // Màu unique từ các SKU con
+                    const uniqueColors = Array.from(new Set(
+                      items.map(sp => sp.mauSac).filter((c): c is string => !!c)
+                    ));
 
                     return (
                       <tr key={chaId} className="border-t border-indigo-100 hover:bg-indigo-50/20 transition-colors">
@@ -525,6 +530,15 @@ export default function SkuListPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-700 text-sm">{chaTen}</span>
                             <span className="text-[11px] bg-indigo-100 text-indigo-600 rounded-full px-2 py-0.5 font-medium">{items.length} SKU</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 max-w-[200px]">
+                          <div className="flex flex-wrap gap-1">
+                            {uniqueColors.length > 0
+                              ? uniqueColors.map(c => (
+                                  <span key={c} className="text-[11px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 whitespace-nowrap">{c}</span>
+                                ))
+                              : <span className="text-slate-300 text-xs">—</span>}
                           </div>
                         </td>
                         <td className="px-2 py-1 text-right">
