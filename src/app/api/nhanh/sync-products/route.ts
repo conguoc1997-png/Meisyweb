@@ -46,7 +46,7 @@ interface NhanhProduct {
   id: number; parentId?: number; code: string; name: string;
   attributes?: NhanhAttribute[];
   prices?: { import?: number; retail?: number };
-  inventory?: { remain?: number; available?: number; oneway?: number; reserve?: number };
+  inventory?: { remain?: number; available?: number; shipping?: number; holding?: number; damaged?: number; transfering?: number };
 }
 
 async function fetchAllNhanhProducts(token: string, businessId: string): Promise<NhanhProduct[]> {
@@ -107,8 +107,8 @@ export async function POST(): Promise<NextResponse> {
       if (p.inventory?.remain !== undefined) {
         nhanhInvMap.set(up(p.code), {
           remain: p.inventory.remain ?? 0,
-          oneway: p.inventory.oneway ?? 0,
-          reserve: p.inventory.reserve ?? 0,
+          oneway: p.inventory.shipping ?? 0,
+          reserve: p.inventory.holding ?? 0,
         });
       }
     }
@@ -183,7 +183,7 @@ export async function POST(): Promise<NextResponse> {
         if (inv) {
           await prisma.$executeRawUnsafe(
             `UPDATE "SanPham" SET "tonKho"=$2,"hangTrenDuong"=$3,"hangTamGiu"=$4,"updatedAt"=now() WHERE id=$1`,
-            existLocal.id, inv.remain ?? 0, inv.oneway ?? 0, inv.reserve ?? 0
+            existLocal.id, inv.remain ?? 0, inv.shipping ?? 0, inv.holding ?? 0
           );
           if ((inv.remain ?? 0) !== existLocal.tonKho) tonKhoUpdated++;
         }
@@ -209,8 +209,8 @@ export async function POST(): Promise<NextResponse> {
       const mauSac = colorAttr?.value ?? parentLocal.mauSac ?? parseSkuColor(variant.code);
       const sizeVal = sizeAttr?.value ?? size;
       const tonKho = variant.inventory?.remain ?? 0;
-      const hangTrenDuong = variant.inventory?.oneway ?? 0;
-      const hangTamGiu = variant.inventory?.reserve ?? 0;
+      const hangTrenDuong = variant.inventory?.shipping ?? 0;
+      const hangTamGiu = variant.inventory?.holding ?? 0;
       const ten = parentLocal.ten + " - " + sizeVal;
 
       await prisma.$executeRawUnsafe(
