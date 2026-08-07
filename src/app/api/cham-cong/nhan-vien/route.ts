@@ -49,16 +49,18 @@ export async function GET(req: NextRequest) {
 
     await autoMigrate();
     const withHistory = url.searchParams.get("h") === "1";
-    const list = await prisma.nhanVien.findMany({
-      where: {
-        OR: [
-          { active: true },
-          { active: false, ngayNghiViec: { not: null } },
-        ],
-      },
+    const allList = await prisma.nhanVien.findMany({
       orderBy: { ten: "asc" },
       ...(withHistory ? { include: { luongCBHistory: { orderBy: { thangApDung: "asc" } } } } : {}),
     });
+    // ngayNghiViec không có trong Prisma schema → dùng raw SQL
+    const nghiRaw = await prisma.$queryRawUnsafe<{ id: string; ngayNghiViec: unknown }[]>(
+      `SELECT "id", "ngayNghiViec" FROM "NhanVien"`
+    ).catch(() => [] as { id: string; ngayNghiViec: unknown }[]);
+    const nghiMap = new Map(nghiRaw.map(r => [r.id, r.ngayNghiViec ?? null]));
+    const list = allList
+      .map(nv => ({ ...nv, ngayNghiViec: nghiMap.get(nv.id) ?? null }))
+      .filter(nv => nv.active || nghiMap.get(nv.id) != null);
     return NextResponse.json(list);
   } catch (e) {
     console.error("GET /api/cham-cong/nhan-vien error:", e);
