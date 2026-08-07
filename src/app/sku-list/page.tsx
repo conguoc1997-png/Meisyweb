@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
-import { Plus, Trash2, Settings, Check, X, Link2 } from "lucide-react";
+import { Plus, Trash2, Settings, Check, X, Link2, ChevronDown } from "lucide-react";
 
 interface SanPhamCha {
   id: string; ma: string; ten: string; skuCount: number;
@@ -86,6 +86,36 @@ function SpChaDinhLuongInput({ chaId, items, onSave }: {
   );
 }
 
+// Input định lượng cho từng màu (items = tất cả SKU cùng màu)
+function ColorDinhLuongInput({ colorKey, items, onSave }: {
+  colorKey: string; items: SanPham[];
+  onSave: (items: SanPham[], val: string) => void;
+}) {
+  const repVal = items.find(sp => sp.dinhLuong != null)?.dinhLuong;
+  const [val, setVal] = useState(repVal != null ? String(repVal) : "");
+  useEffect(() => {
+    const v = items.find(sp => sp.dinhLuong != null)?.dinhLuong;
+    setVal(v != null ? String(v) : "");
+  }, [items, colorKey]);
+  return (
+    <input type="number" step="0.01" value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={() => onSave(items, val)}
+      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      placeholder="—"
+      className="w-16 text-right px-2 py-1 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded outline-none text-sm bg-transparent focus:bg-white transition"
+    />
+  );
+}
+
+// Strip đuôi size để lấy base SKU theo màu (OR02XDAMM → OR02XDAM)
+const SIZE_SFXS = ["5XL","4XL","3XL","2XL","XL","XS","L","M","S"];
+function stripSzEnd(sku: string): string {
+  const u = sku.toUpperCase();
+  for (const sz of SIZE_SFXS) { if (u.endsWith(sz)) return sku.slice(0, sku.length - sz.length); }
+  return sku;
+}
+
 export default function SkuListPage() {
   const [tab, setTab] = useState<"sku" | "spcha" | "vai" | "giacong" | "mau">("sku");
 
@@ -99,6 +129,10 @@ export default function SkuListPage() {
   const [chaLoading, setChaLoading] = useState(true);
   const [addChaForm, setAddChaForm] = useState<{ ten: string } | null>(null);
   const [autoAssigning, setAutoAssigning] = useState(false);
+  const [expandedChas, setExpandedChas] = useState<Set<string>>(new Set());
+  const toggleCha = (id: string) => setExpandedChas(prev => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
+  });
 
   // Vải
   const [vais, setVais] = useState<VaiItem[]>([]);
@@ -313,6 +347,54 @@ export default function SkuListPage() {
     ));
   }
 
+  // ── Màu pricing: áp dụng cho items cùng màu ──
+  async function handleDinhLuongForColor(colorItems: SanPham[], val: string) {
+    const dl = val === "" ? null : Number(val);
+    const ids = new Set(colorItems.map(sp => sp.id));
+    setSanPhams(prev => prev.map(sp => {
+      if (!ids.has(sp.id)) return sp;
+      const giaMet = sp.tenVai ? (vaiMap[sp.tenVai] ?? null) : null;
+      const giaVai = dl != null && giaMet != null ? Math.round(dl * giaMet) : sp.giaVai;
+      return { ...sp, dinhLuong: dl, giaVai };
+    }));
+    await Promise.all(colorItems.map(sp => {
+      const giaMet = sp.tenVai ? (vaiMap[sp.tenVai] ?? null) : null;
+      const giaVai = dl != null && giaMet != null ? Math.round(dl * giaMet) : null;
+      return fetch(`/api/kho/san-pham/${sp.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dinhLuong: dl, giaVai }),
+      });
+    }));
+  }
+
+  async function handleSelectVaiForColor(colorItems: SanPham[], maVai: string) {
+    const giaMet = maVai ? (vaiMap[maVai] ?? null) : null;
+    const ids = new Set(colorItems.map(sp => sp.id));
+    setSanPhams(prev => prev.map(sp => {
+      if (!ids.has(sp.id)) return sp;
+      const giaVai = giaMet != null && sp.dinhLuong != null ? Math.round(sp.dinhLuong * giaMet) : null;
+      return { ...sp, tenVai: maVai || null, giaVai };
+    }));
+    await Promise.all(colorItems.map(sp => {
+      const giaVai = giaMet != null && sp.dinhLuong != null ? Math.round(sp.dinhLuong * giaMet) : null;
+      return fetch(`/api/kho/san-pham/${sp.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenVai: maVai || null, giaVai }),
+      });
+    }));
+  }
+
+  async function handleLoaiGiaCongForColor(colorItems: SanPham[], val: string) {
+    const ids = new Set(colorItems.map(sp => sp.id));
+    setSanPhams(prev => prev.map(sp => ids.has(sp.id) ? { ...sp, loaiGiaCong: val || null } : sp));
+    await Promise.all(colorItems.map(sp =>
+      fetch(`/api/kho/san-pham/${sp.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loaiGiaCong: val || null }),
+      })
+    ));
+  }
+
   // Vải CRUD
   async function saveVais(newVais: VaiItem[]) {
     setVais(newVais);
@@ -494,8 +576,7 @@ export default function SkuListPage() {
                 <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-semibold uppercase tracking-wide">
                   <tr>
                     <th className="px-4 py-3 text-left sticky left-0 bg-slate-50 z-10">Mã SKU</th>
-                    <th className="px-4 py-3 text-left">Tên sản phẩm</th>
-                    <th className="px-4 py-3 text-left">Màu sắc</th>
+                    <th className="px-4 py-3 text-left">Tên / Màu sắc</th>
                     <th className="px-4 py-3 text-right">ĐL (M)</th>
                     <th className="px-4 py-3 text-left">Tên vải</th>
                     <th className="px-4 py-3 text-right">Giá vải</th>
@@ -503,82 +584,111 @@ export default function SkuListPage() {
                     <th className="px-4 py-3 text-right">Giá gia công</th>
                     <th className="px-4 py-3 text-right bg-amber-50 text-amber-700">Giá nhập</th>
                     <th className="px-4 py-3 text-right bg-emerald-50 text-emerald-700">Giá bán</th>
-                    <th className="px-4 py-3 text-center text-slate-400">Cập nhật</th>
                   </tr>
                 </thead>
                 <tbody>
                   {groupedSP.filter(g => g.chaId !== null).map(({ chaId, chaTen, items }) => {
+                    const isExpanded = expandedChas.has(chaId!);
 
-                    // ── 1 hàng cho mỗi SP Cha ──
-                    const repVai = items.find(sp => sp.tenVai) ?? items[0];
-                    const repGC  = items.find(sp => sp.loaiGiaCong) ?? items[0];
-                    const gcLoai = repGC?.loaiGiaCong ? loaiMap[repGC.loaiGiaCong] : null;
-                    const giaGiaCong = repGC?.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
-                    const giaVai = repVai?.giaVai ?? null;
-                    const giaNhap = (giaVai ?? 0) + (giaGiaCong ?? 0);
-                    // Màu unique từ các SKU con
-                    const uniqueColors = Array.from(new Set(
-                      items.map(sp => sp.mauSac).filter((c): c is string => !!c)
-                    ));
+                    // Nhóm theo màu
+                    const colorMap = new Map<string, SanPham[]>();
+                    for (const sp of items) {
+                      const c = sp.mauSac ?? "";
+                      if (!colorMap.has(c)) colorMap.set(c, []);
+                      colorMap.get(c)!.push(sp);
+                    }
+                    const colorGroups = Array.from(colorMap.entries());
+
+                    // Tóm tắt giá bán cho header
+                    const allPrices = items.map(s => s.giaBan).filter(v => v > 0);
+                    const minBan = allPrices.length ? Math.min(...allPrices) : 0;
+                    const maxBan = allPrices.length ? Math.max(...allPrices) : 0;
 
                     return (
-                      <tr key={chaId} className="border-t border-indigo-100 hover:bg-indigo-50/20 transition-colors">
-                        <td className="px-4 py-2.5 sticky left-0 bg-white z-10">
-                          <span className="font-mono text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">{chaTen}</span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-700 text-sm">{chaTen}</span>
-                            <span className="text-[11px] bg-indigo-100 text-indigo-600 rounded-full px-2 py-0.5 font-medium">{items.length} SKU</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2.5 max-w-[200px]">
-                          <div className="flex flex-wrap gap-1">
-                            {uniqueColors.length > 0
-                              ? uniqueColors.map(c => (
-                                  <span key={c} className="text-[11px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 whitespace-nowrap">{c}</span>
-                                ))
-                              : <span className="text-slate-300 text-xs">—</span>}
-                          </div>
-                        </td>
-                        <td className="px-2 py-1 text-right">
-                          <SpChaDinhLuongInput chaId={chaId!} items={items} onSave={handleDinhLuongForCha} />
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <select value={repVai?.tenVai ?? ""}
-                            onChange={e => handleSelectVaiForCha(chaId!, items, e.target.value)}
-                            className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                            <option value="">—</option>
-                            {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-slate-600 text-xs">
-                          {giaVai != null ? giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <select value={repGC?.loaiGiaCong ?? ""}
-                            onChange={e => handleLoaiGiaCongForCha(chaId!, items, e.target.value)}
-                            className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                            <option value="">—</option>
-                            {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-slate-500 text-xs">
-                          {giaGiaCong != null ? giaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-amber-700 bg-amber-50">
-                          {giaNhap > 0 ? giaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 bg-emerald-50 text-xs">
-                          {(() => {
-                            const prices = items.map(s => s.giaBan).filter(v => v > 0);
-                            if (!prices.length) return <span className="text-slate-300">—</span>;
-                            const min = Math.min(...prices); const max = Math.max(...prices);
-                            return min === max ? min.toLocaleString("vi-VN") : `${min.toLocaleString("vi-VN")}–${max.toLocaleString("vi-VN")}`;
-                          })()}
-                        </td>
-                        <td className="px-4 py-2.5 text-center text-xs text-slate-400">—</td>
-                      </tr>
+                      <Fragment key={chaId}>
+                        {/* ── SP CHA HEADER ── */}
+                        <tr
+                          onClick={() => toggleCha(chaId!)}
+                          className="border-t-2 border-indigo-100 bg-indigo-50/40 cursor-pointer hover:bg-indigo-50/70 transition-all">
+                          <td className="px-4 py-2.5 sticky left-0 bg-indigo-50/60 z-10">
+                            <div className="flex items-center gap-1.5">
+                              <ChevronDown size={13} className={`text-indigo-400 transition-transform flex-shrink-0 ${isExpanded ? "" : "-rotate-90"}`}/>
+                              <span className="font-mono text-xs text-indigo-700 bg-indigo-100 border border-indigo-200 rounded px-1.5 py-0.5">{chaTen}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-indigo-800">{chaTen}</span>
+                              <span className="text-[11px] bg-indigo-100 text-indigo-600 rounded-full px-2 py-0.5 font-medium">{items.length} SKU</span>
+                              {colorGroups.map(([c]) => c && (
+                                <span key={c} className="text-[10px] bg-slate-200 text-slate-600 rounded px-1.5 py-0.5">{c}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td colSpan={6} />
+                          <td className="px-4 py-2.5 text-right text-xs text-indigo-600 font-semibold">
+                            {minBan > 0 ? (minBan === maxBan ? minBan.toLocaleString("vi-VN") : `${minBan.toLocaleString("vi-VN")}–${maxBan.toLocaleString("vi-VN")}`) : ""}
+                          </td>
+                        </tr>
+
+                        {/* ── MÀU SUB-ROWS (khi expanded) ── */}
+                        {isExpanded && colorGroups.map(([color, colorItems]) => {
+                          const repVai = colorItems.find(sp => sp.tenVai) ?? colorItems[0];
+                          const repGC  = colorItems.find(sp => sp.loaiGiaCong) ?? colorItems[0];
+                          const gcLoai = repGC?.loaiGiaCong ? loaiMap[repGC.loaiGiaCong] : null;
+                          const giaGiaCong = repGC?.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
+                          const giaVai = repVai?.giaVai ?? null;
+                          const giaNhap = (giaVai ?? 0) + (giaGiaCong ?? 0);
+                          // Base SKU cho màu này
+                          const colorBase = stripSzEnd(colorItems[0]?.sku ?? chaTen);
+                          const colorKey = `${chaId}_${color}`;
+
+                          return (
+                            <tr key={colorKey} className="border-t border-slate-100 bg-white hover:bg-slate-50/60 transition-colors">
+                              <td className="pl-10 pr-4 py-2 sticky left-0 bg-white z-10">
+                                <span className="font-mono text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5">{colorBase}</span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  {color
+                                    ? <span className="text-xs font-medium text-slate-700 bg-slate-100 rounded px-2 py-0.5">{color}</span>
+                                    : <span className="text-xs text-slate-400 italic">Không màu</span>}
+                                  <span className="text-[11px] text-slate-400">{colorItems.length} size</span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1 text-right">
+                                <ColorDinhLuongInput colorKey={colorKey} items={colorItems} onSave={handleDinhLuongForColor} />
+                              </td>
+                              <td className="px-4 py-2">
+                                <select value={repVai?.tenVai ?? ""}
+                                  onChange={e => handleSelectVaiForColor(colorItems, e.target.value)}
+                                  className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
+                                  <option value="">—</option>
+                                  {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
+                                </select>
+                              </td>
+                              <td className="px-4 py-2 text-right text-slate-600 text-xs">
+                                {giaVai != null ? giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                              </td>
+                              <td className="px-4 py-2">
+                                <select value={repGC?.loaiGiaCong ?? ""}
+                                  onChange={e => handleLoaiGiaCongForColor(colorItems, e.target.value)}
+                                  className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
+                                  <option value="">—</option>
+                                  {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
+                                </select>
+                              </td>
+                              <td className="px-4 py-2 text-right text-slate-500 text-xs">
+                                {giaGiaCong != null ? giaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                              </td>
+                              <td className="px-4 py-2 text-right font-semibold text-amber-700 bg-amber-50/60">
+                                {giaNhap > 0 ? giaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                              </td>
+                              <td className="px-4 py-2 text-right text-slate-400 text-xs">—</td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
                     );
                   })}
                 </tbody>
