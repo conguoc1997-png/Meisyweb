@@ -617,12 +617,9 @@ export default function SkuListPage() {
                             </div>
                           </td>
                           <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
                               <span className="font-bold text-sm text-indigo-800">{chaTen}</span>
                               <span className="text-[11px] bg-indigo-100 text-indigo-600 rounded-full px-2 py-0.5 font-medium">{items.length} SKU</span>
-                              {colorGroups.map(([c]) => c && (
-                                <span key={c} className="text-[10px] bg-slate-200 text-slate-600 rounded px-1.5 py-0.5">{c}</span>
-                              ))}
                             </div>
                           </td>
                           <td colSpan={6} />
