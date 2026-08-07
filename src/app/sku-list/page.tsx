@@ -463,7 +463,18 @@ export default function SkuListPage() {
               placeholder="Tìm mã SKU hoặc tên..." className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm w-64 outline-none focus:border-blue-400"/>
             <span className="text-sm text-slate-400">{groupedSP.filter(g => g.chaId !== null).length} SP Cha · {filteredSP.length} SKU</span>
           </div>
-          {skuLoading ? <p className="text-slate-400 text-sm">Đang tải...</p> : (
+          {skuLoading ? <p className="text-slate-400 text-sm">Đang tải...</p> :
+           groupedSP.filter(g => g.chaId !== null).length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center">
+              <p className="text-slate-500 font-medium mb-1">Chưa có SP Cha nào được gán</p>
+              <p className="text-slate-400 text-sm mb-5">Nhấn nút bên dưới để tự động nhóm {filteredSP.length} SKU theo mã màu</p>
+              <button onClick={autoAssign} disabled={autoAssigning}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition">
+                <Link2 size={15}/>
+                {autoAssigning ? "Đang gán..." : "Tự động gán SP Cha từ SKU"}
+              </button>
+            </div>
+           ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
