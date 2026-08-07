@@ -6,7 +6,10 @@ export async function GET() {
   try {
     // Dùng raw SQL để lấy cả cột spChaId (không có trong Prisma schema)
     const sanPhams = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      `SELECT s.*, s."spChaId" FROM "SanPham" s ORDER BY s."updatedAt" DESC`
+      `SELECT s.*, s."spChaId",
+        COALESCE(s."hangTrenDuong",0) as "hangTrenDuong",
+        COALESCE(s."hangTamGiu",0) as "hangTamGiu"
+       FROM "SanPham" s ORDER BY s."updatedAt" DESC`
     ).catch(() =>
       // Fallback nếu cột chưa tồn tại (sẽ được tạo khi gọi san-pham-cha API)
       prisma.sanPham.findMany({ orderBy: { updatedAt: "desc" } }).then(rows =>

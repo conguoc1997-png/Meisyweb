@@ -46,7 +46,7 @@ interface NhanhProduct {
   id: number; parentId?: number; code: string; name: string;
   attributes?: NhanhAttribute[];
   prices?: { import?: number; retail?: number };
-  inventory?: { remain?: number; available?: number };
+  inventory?: { remain?: number; available?: number; oneway?: number; reserve?: number };
 }
 
 async function fetchAllNhanhProducts(token: string, businessId: string): Promise<NhanhProduct[]> {
@@ -95,11 +95,22 @@ export async function POST(): Promise<NextResponse> {
     const nhanhProducts = await fetchAllNhanhProducts(tokenRow.value, bizRow.value);
     const nhanhVariants = nhanhProducts.filter(p => p.code && typeof p.code === "string" && p.parentId && p.parentId > 0 && p.attributes?.length);
 
-    // Map SKU Nhanh → inventory.remain (exact match)
-    const nhanhStockMap = new Map<string, number>();
+    // Thêm cột nếu chưa có
+    await prisma.$executeRawUnsafe(`ALTER TABLE "SanPham" ADD COLUMN IF NOT EXISTS "hangTrenDuong" INTEGER NOT NULL DEFAULT 0`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "SanPham" ADD COLUMN IF NOT EXISTS "hangTamGiu" INTEGER NOT NULL DEFAULT 0`);
+
+    // Map SKU Nhanh → inventory (exact match)
+    interface InvData { remain: number; oneway: number; reserve: number }
+    const nhanhInvMap = new Map<string, InvData>();
     for (const p of nhanhProducts) {
       if (!p.code || typeof p.code !== "string") continue;
-      if (p.inventory?.remain !== undefined) nhanhStockMap.set(up(p.code), p.inventory.remain);
+      if (p.inventory?.remain !== undefined) {
+        nhanhInvMap.set(up(p.code), {
+          remain: p.inventory.remain ?? 0,
+          oneway: p.inventory.oneway ?? 0,
+          reserve: p.inventory.reserve ?? 0,
+        });
+      }
     }
 
     // Pre-compute: local SKU nào có size variants trong Nhanh (sẽ bị zero-out stock)
@@ -143,20 +154,21 @@ export async function POST(): Promise<NextResponse> {
         continue;
       }
 
-      // Sản phẩm đơn (không có size variants): sync tồn kho trực tiếp từ Nhanh
-      const nhanhStock = nhanhStockMap.get(up(local.sku));
-      if (nhanhStock === undefined) localNoMatch.push(local.sku);
-      const stockChanged = nhanhStock !== undefined && nhanhStock !== local.tonKho;
+      // Sản phẩm đơn (không có size variants): sync tồn kho + oneway + reserve từ Nhanh
+      const nhanhInv = nhanhInvMap.get(up(local.sku));
+      if (nhanhInv === undefined) localNoMatch.push(local.sku);
+      const stockChanged = nhanhInv !== undefined && nhanhInv.remain !== local.tonKho;
 
       if (!colorChanged && !stockChanged && !sizeWrong) continue;
-      await prisma.sanPham.update({
-        where: { id: local.id },
-        data: {
-          ...(colorChanged ? { mauSac: color } : {}),
-          ...(sizeWrong ? { size: null } : {}),
-          ...(stockChanged ? { tonKho: nhanhStock } : {}),
-        },
-      });
+      await prisma.$executeRawUnsafe(
+        `UPDATE "SanPham" SET "mauSac"=$2,"size"=$3,"tonKho"=$4,"hangTrenDuong"=$5,"hangTamGiu"=$6,"updatedAt"=now() WHERE id=$1`,
+        local.id,
+        colorChanged ? color : (local.mauSac ?? null),
+        sizeWrong ? null : local.size,
+        nhanhInv ? nhanhInv.remain : local.tonKho,
+        nhanhInv ? nhanhInv.oneway : 0,
+        nhanhInv ? nhanhInv.reserve : 0,
+      );
       if (colorChanged) colorUpdated++;
       if (stockChanged) tonKhoUpdated++;
     }
@@ -164,7 +176,19 @@ export async function POST(): Promise<NextResponse> {
     // 4. Tạo size variants từ Nhanh (nếu chưa có trong local)
     for (const variant of nhanhVariants) {
       const nhanhSku = up(variant.code);
-      if (localBySku.has(nhanhSku)) { sizeSkipped++; continue; }
+      if (localBySku.has(nhanhSku)) {
+        // Cập nhật tồn kho + oneway + reserve cho size variant đã tồn tại
+        const existLocal = localBySku.get(nhanhSku)!;
+        const inv = variant.inventory;
+        if (inv) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "SanPham" SET "tonKho"=$2,"hangTrenDuong"=$3,"hangTamGiu"=$4,"updatedAt"=now() WHERE id=$1`,
+            existLocal.id, inv.remain ?? 0, inv.oneway ?? 0, inv.reserve ?? 0
+          );
+          if ((inv.remain ?? 0) !== existLocal.tonKho) tonKhoUpdated++;
+        }
+        sizeSkipped++; continue;
+      }
 
       const { base, size } = stripSize(variant.code);
       if (!size) continue;
@@ -185,22 +209,19 @@ export async function POST(): Promise<NextResponse> {
       const mauSac = colorAttr?.value ?? parentLocal.mauSac ?? parseSkuColor(variant.code);
       const sizeVal = sizeAttr?.value ?? size;
       const tonKho = variant.inventory?.remain ?? 0;
+      const hangTrenDuong = variant.inventory?.oneway ?? 0;
+      const hangTamGiu = variant.inventory?.reserve ?? 0;
       const ten = parentLocal.ten + " - " + sizeVal;
 
-      await prisma.sanPham.create({
-        data: {
-          sku: variant.code,
-          ten,
-          mauSac: mauSac ?? null,
-          size: sizeVal,
-          giaNhap: parentLocal.giaNhap,
-          giaBan: parentLocal.giaBan,
-          tonKho,
-          nguon: parentLocal.nguon,
-        },
-      });
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "SanPham"(id,sku,ten,"mauSac",size,"giaNhap","giaBan","tonKho","hangTrenDuong","hangTamGiu",nguon,"createdAt","updatedAt")
+         VALUES(gen_random_uuid()::text,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
+        variant.code, ten, mauSac ?? null, sizeVal,
+        parentLocal.giaNhap, parentLocal.giaBan, tonKho, hangTrenDuong, hangTamGiu,
+        parentLocal.nguon
+      );
 
-      localBySku.set(nhanhSku, { id: "", sku: variant.code, ten, mauSac: mauSac ?? null, size: sizeVal, giaNhap: parentLocal.giaNhap, giaBan: parentLocal.giaBan, tonKho, nguon: parentLocal.nguon, tiktokProductId: null, createdAt: new Date(), updatedAt: new Date(), dinhLuong: null, tenVai: null, giaVai: null, loaiGiaCong: null, giaGiaCong: null });
+      localBySku.set(nhanhSku, { id: "", sku: variant.code, ten, mauSac: mauSac ?? null, size: sizeVal, giaNhap: parentLocal.giaNhap, giaBan: parentLocal.giaBan, tonKho, nguon: parentLocal.nguon, tiktokProductId: null, createdAt: new Date(), updatedAt: new Date(), dinhLuong: null, tenVai: null, giaVai: null, loaiGiaCong: null, giaGiaCong: null } as Parameters<typeof localBySku.set>[1]);
       sizeCreated++;
       if (tonKho > 0) tonKhoUpdated++;
     }

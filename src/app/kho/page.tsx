@@ -13,6 +13,8 @@ type SanPham = {
   giaNhap: number;
   giaBan: number;
   tonKho: number;
+  hangTrenDuong: number;
+  hangTamGiu: number;
   nguon: string | null;
   tiktokProductId: string | null;
   spChaId: string | null;
@@ -830,6 +832,8 @@ export default function KhoPage() {
                 <th className="text-left px-4 py-3 text-slate-600 font-medium">TikTok ID</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Giá nhập</th>
                 <th className="text-right px-4 py-3 text-green-600 font-medium">Giá bán</th>
+                <th className="text-right px-4 py-3 text-blue-600 font-medium" title="Đang giao hàng">🚚</th>
+                <th className="text-right px-4 py-3 text-orange-600 font-medium" title="Tạm giữ">⏸</th>
                 <th className="text-right px-4 py-3 text-slate-600 font-medium">Tồn kho</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -837,7 +841,7 @@ export default function KhoPage() {
             <tbody className="divide-y divide-slate-100">
               {groups.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-slate-400">
+                  <td colSpan={11} className="text-center py-12 text-slate-400">
                     <Package size={32} className="mx-auto mb-2 opacity-40" />
                     Chưa có sản phẩm nào
                   </td>
@@ -955,6 +959,16 @@ export default function KhoPage() {
                             {sp.giaBan === 0
                               ? <span className="text-slate-300 text-xs">—</span>
                               : <span className="text-green-600 text-xs font-semibold">{formatCurrency(sp.giaBan)}</span>}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className="text-blue-500 text-xs font-medium">
+                              {sp.hangTrenDuong > 0 ? sp.hangTrenDuong : <span className="text-slate-200">—</span>}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className="text-orange-500 text-xs font-medium">
+                              {sp.hangTamGiu > 0 ? sp.hangTamGiu : <span className="text-slate-200">—</span>}
+                            </span>
                           </td>
                           <td className="px-4 py-2 text-right">
                             <span className={`font-bold text-sm ${sp.tonKho <= 5 ? "text-red-600" : sp.tonKho <= 20 ? "text-amber-600" : "text-green-600"}`}>
