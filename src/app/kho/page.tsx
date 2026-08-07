@@ -130,16 +130,19 @@ export default function KhoPage() {
   const [chas, setChas] = useState<SanPhamCha[]>([]);
 
   // SKU mapping modal
-  type Suggestion = { nhanhBase: string; nhanhName: string; score: number; totalStock: number };
-  type UnmatchedItem = { localSku: string; ten: string; mauSac: string | null; suggestions: Suggestion[] };
-  type NhanhUnmatchedItem = { nhanhBase: string; nhanhName: string; totalStock: number; suggestions: Array<{ localSku: string; ten: string; score: number }> };
+  type MatchedItem = { localSku: string; localTen: string; nhanhBase: string; nhanhName: string; nhanhStock: number };
+  type UnmatchedNhanh = { nhanhBase: string; nhanhName: string; nhanhStock: number };
+  type LocalSkuItem = { sku: string; ten: string };
   const [showMapping, setShowMapping] = useState(false);
   const [mappingLoading, setMappingLoading] = useState(false);
-  const [unmatchedList, setUnmatchedList] = useState<UnmatchedItem[]>([]);
-  const [nhanhUnmatchedList, setNhanhUnmatchedList] = useState<NhanhUnmatchedItem[]>([]);
-  const [mappingTab, setMappingTab] = useState<"local" | "nhanh">("nhanh");
-  const [selectedMapping, setSelectedMapping] = useState<Record<string, string>>({});
+  const [matchedList, setMatchedList] = useState<MatchedItem[]>([]);
+  const [unmatchedNhanh, setUnmatchedNhanh] = useState<UnmatchedNhanh[]>([]);
+  const [localSkuList, setLocalSkuList] = useState<LocalSkuItem[]>([]);
+  const [mappingTab, setMappingTab] = useState<"matched" | "unmatched">("unmatched");
+  const [pendingMapping, setPendingMapping] = useState<Record<string, string>>({}); // nhanhBase → localSku
+  const [mappingSearch, setMappingSearch] = useState("");
   const [mappingSaving, setMappingSaving] = useState(false);
+  const [unmatchedSearch, setUnmatchedSearch] = useState("");
 
   // ── Sheet update states ───────────────────────────────────────────────────
   type SheetRow = {
@@ -532,40 +535,51 @@ export default function KhoPage() {
   const openMapping = async () => {
     setShowMapping(true);
     setMappingLoading(true);
-    setUnmatchedList([]);
-    setNhanhUnmatchedList([]);
-    setSelectedMapping({});
+    setMatchedList([]);
+    setUnmatchedNhanh([]);
+    setPendingMapping({});
+    setMappingSearch("");
+    setUnmatchedSearch("");
     try {
       const res = await fetch("/api/nhanh/suggest-mapping");
       const data = await res.json();
-      setUnmatchedList(data.unmatched ?? []);
-      setNhanhUnmatchedList(data.nhanhUnmatched ?? []);
-      setMappingTab((data.nhanhUnmatched ?? []).length > 0 ? "nhanh" : "local");
-      // Pre-select top suggestion nếu score >= 0.8
-      const preSelect: Record<string, string> = {};
-      for (const item of (data.unmatched ?? [])) {
-        if (item.suggestions[0]?.score >= 0.8) preSelect[item.localSku.toUpperCase()] = item.suggestions[0].nhanhBase;
-      }
-      // Pre-select cho nhanh→local
-      for (const item of (data.nhanhUnmatched ?? [])) {
-        if (item.suggestions[0]?.score >= 0.8) preSelect[item.suggestions[0].localSku.toUpperCase()] = item.nhanhBase;
-      }
-      setSelectedMapping(preSelect);
+      setMatchedList(data.matched ?? []);
+      setUnmatchedNhanh(data.unmatched ?? []);
+      setLocalSkuList(data.localSkus ?? []);
+      setMappingTab((data.unmatched ?? []).length > 0 ? "unmatched" : "matched");
     } catch { /* ignore */ }
     finally { setMappingLoading(false); }
   };
 
   const saveMapping = async () => {
+    if (Object.keys(pendingMapping).length === 0) return;
     setMappingSaving(true);
     try {
+      // pendingMapping: nhanhBase → localSku  →  cần đổi thành localSku → nhanhBase
+      const toSave: Record<string, string> = {};
+      for (const [nhanh, local] of Object.entries(pendingMapping)) {
+        if (local) toSave[local.toUpperCase()] = nhanh;
+      }
       await fetch("/api/nhanh/suggest-mapping", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mapping: selectedMapping }),
+        body: JSON.stringify({ mapping: toSave }),
       });
-      setShowMapping(false);
-      alert("Đã lưu mapping. Bấm Đồng bộ Nhanh để cập nhật tồn kho.");
+      // Reload
+      await openMapping();
+      alert(`Đã ghép ${Object.keys(toSave).length} sản phẩm. Bấm Đồng bộ Nhanh để cập nhật tồn kho.`);
     } catch { alert("Lỗi lưu mapping"); }
     finally { setMappingSaving(false); }
+  };
+
+  const unlinkMapping = async (localSku: string) => {
+    if (!confirm(`Hủy ghép "${localSku}"?`)) return;
+    await fetch("/api/nhanh/suggest-mapping", {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ localSku }),
+    });
+    setMatchedList(prev => prev.filter(m => m.localSku.toUpperCase() !== localSku.toUpperCase()));
+    // Move back to unmatched
+    await openMapping();
   };
 
   const handleSyncNhanh = async () => {
@@ -1209,118 +1223,153 @@ export default function KhoPage() {
         </div>
       )}
 
-      {/* ── Modal Khớp SKU Nhanh ─────────────────────────────────────────── */}
+      {/* ── Modal Ghép SP Nhanh.vn ───────────────────────────────────────── */}
       {showMapping && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-slate-800">Khớp SKU với Nhanh.vn</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Chọn mã tương ứng để đồng bộ tồn kho chính xác</p>
+                <h2 className="font-bold text-slate-800 text-lg">Ghép sản phẩm với Nhanh.vn</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Liên kết SKU local ↔ Nhanh để đồng bộ tồn kho</p>
               </div>
-              <button onClick={() => setShowMapping(false)} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+              <button onClick={() => setShowMapping(false)} className="text-slate-400 hover:text-slate-600 p-1"><span className="text-xl">✕</span></button>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 px-5 pt-3 border-b border-slate-100">
-              <button onClick={() => setMappingTab("nhanh")}
-                className={`px-4 py-1.5 text-sm rounded-t-lg font-medium transition ${mappingTab === "nhanh" ? "bg-violet-600 text-white" : "text-slate-500 hover:text-slate-700"}`}>
-                Nhanh → Local {nhanhUnmatchedList.length > 0 && <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{nhanhUnmatchedList.length}</span>}
+            <div className="flex border-b border-slate-200 px-6">
+              <button onClick={() => setMappingTab("matched")}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition -mb-px ${mappingTab === "matched" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+                Sản phẩm đã ghép
+                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${mappingTab === "matched" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"}`}>{matchedList.length}</span>
               </button>
-              <button onClick={() => setMappingTab("local")}
-                className={`px-4 py-1.5 text-sm rounded-t-lg font-medium transition ${mappingTab === "local" ? "bg-violet-600 text-white" : "text-slate-500 hover:text-slate-700"}`}>
-                Local → Nhanh {unmatchedList.length > 0 && <span className="ml-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full">{unmatchedList.length}</span>}
+              <button onClick={() => setMappingTab("unmatched")}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition -mb-px ${mappingTab === "unmatched" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+                Sản phẩm chưa ghép
+                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${mappingTab === "unmatched" ? "bg-red-100 text-red-600" : "bg-red-50 text-red-500"}`}>{unmatchedNhanh.length}</span>
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-5 space-y-4">
-              {mappingLoading && <p className="text-center text-slate-400 py-8">Đang phân tích...</p>}
+            {/* Loading */}
+            {mappingLoading && (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-slate-400">Đang tải dữ liệu Nhanh.vn...</p>
+              </div>
+            )}
 
-              {/* Tab: Nhanh → Local (Nhanh base chưa có parent local) */}
-              {!mappingLoading && mappingTab === "nhanh" && (
-                nhanhUnmatchedList.length === 0
-                  ? <p className="text-center text-slate-400 py-8">Tất cả sản phẩm Nhanh đã có parent local</p>
-                  : nhanhUnmatchedList.map(item => (
-                    <div key={item.nhanhBase} className="border border-slate-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="flex-1">
-                          <p className="font-semibold text-slate-800 font-mono">{item.nhanhBase}</p>
-                          {item.nhanhName && <p className="text-xs text-slate-400 mt-0.5">{item.nhanhName}</p>}
-                          <p className="text-xs text-blue-600 mt-0.5">Tồn Nhanh: {item.totalStock}</p>
-                        </div>
-                        <span className="text-xs text-slate-400 mt-1">Chọn SP local:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {item.suggestions.map(sg => {
-                          const isSelected = selectedMapping[sg.localSku.toUpperCase()] === item.nhanhBase;
+            {/* Tab: SP đã ghép */}
+            {!mappingLoading && mappingTab === "matched" && (
+              <div className="flex-1 overflow-y-auto">
+                <div className="px-6 py-3 border-b border-slate-100 bg-slate-50">
+                  <input value={mappingSearch} onChange={e => setMappingSearch(e.target.value)}
+                    placeholder="Tìm theo SKU hoặc tên..." className="w-64 px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-violet-400"/>
+                </div>
+                {matchedList.length === 0
+                  ? <p className="text-center text-slate-400 py-12">Chưa có sản phẩm nào được ghép</p>
+                  : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-semibold uppercase sticky top-0">
+                      <tr>
+                        <th className="px-5 py-3 text-left">SP Local (của mình)</th>
+                        <th className="px-5 py-3 text-left">↔</th>
+                        <th className="px-5 py-3 text-left">SP Nhanh.vn</th>
+                        <th className="px-5 py-3 text-right">Tồn Nhanh</th>
+                        <th className="px-5 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {matchedList
+                        .filter(m => !mappingSearch || m.localSku.toLowerCase().includes(mappingSearch.toLowerCase()) || m.nhanhBase.toLowerCase().includes(mappingSearch.toLowerCase()) || m.localTen.toLowerCase().includes(mappingSearch.toLowerCase()))
+                        .map(m => (
+                        <tr key={m.localSku} className="hover:bg-slate-50">
+                          <td className="px-5 py-3">
+                            <p className="font-mono font-semibold text-slate-800">{m.localSku}</p>
+                            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[240px]">{m.localTen}</p>
+                          </td>
+                          <td className="px-5 py-3 text-slate-300 text-lg">⇄</td>
+                          <td className="px-5 py-3">
+                            <p className="font-mono font-semibold text-violet-700">{m.nhanhBase}</p>
+                            {m.nhanhName && <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[240px]">{m.nhanhName}</p>}
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <span className={`font-bold ${m.nhanhStock <= 5 ? "text-red-600" : m.nhanhStock <= 20 ? "text-amber-600" : "text-green-600"}`}>{m.nhanhStock}</span>
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <button onClick={() => unlinkMapping(m.localSku)}
+                              className="text-xs text-slate-300 hover:text-red-500 transition px-2 py-1 rounded hover:bg-red-50">Hủy ghép</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* Tab: SP chưa ghép */}
+            {!mappingLoading && mappingTab === "unmatched" && (
+              <div className="flex-1 overflow-y-auto flex flex-col">
+                <div className="px-6 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
+                  <input value={unmatchedSearch} onChange={e => setUnmatchedSearch(e.target.value)}
+                    placeholder="Tìm SKU Nhanh..." className="w-64 px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-violet-400"/>
+                  <span className="text-xs text-slate-400">{unmatchedNhanh.filter(u => !pendingMapping[u.nhanhBase]).length} chưa chọn · {Object.keys(pendingMapping).filter(k => pendingMapping[k]).length} đã chọn</span>
+                </div>
+                {unmatchedNhanh.length === 0
+                  ? <p className="text-center text-slate-400 py-12">Tất cả sản phẩm Nhanh đã được ghép ✓</p>
+                  : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-semibold uppercase sticky top-0">
+                      <tr>
+                        <th className="px-5 py-3 text-left">SKU Nhanh.vn</th>
+                        <th className="px-5 py-3 text-right">Tồn</th>
+                        <th className="px-5 py-3 text-left w-72">Chọn SP Local</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {unmatchedNhanh
+                        .filter(u => !unmatchedSearch || u.nhanhBase.toLowerCase().includes(unmatchedSearch.toLowerCase()) || u.nhanhName.toLowerCase().includes(unmatchedSearch.toLowerCase()))
+                        .map(u => {
+                          const selected = pendingMapping[u.nhanhBase] ?? "";
                           return (
-                            <button key={sg.localSku}
-                              onClick={() => setSelectedMapping(prev => ({ ...prev, [sg.localSku.toUpperCase()]: item.nhanhBase }))}
-                              className={`px-3 py-1.5 rounded-lg text-sm border transition text-left ${
-                                isSelected ? "bg-violet-600 text-white border-violet-600"
-                                  : sg.score >= 1.0 ? "bg-violet-50 border-violet-300 text-violet-800 hover:bg-violet-100"
-                                  : "bg-white text-slate-700 border-slate-200 hover:border-violet-400"
-                              }`}>
-                              <div className="font-mono font-semibold">{sg.localSku}</div>
-                              <div className="text-xs opacity-80 mt-0.5">{sg.ten}</div>
-                              <div className="text-xs opacity-60 mt-0.5">{sg.score >= 1.0 ? "✓ Khớp tên" : `${Math.round(sg.score * 100)}%`}</div>
-                            </button>
+                            <tr key={u.nhanhBase} className={`hover:bg-slate-50 ${selected ? "bg-violet-50/40" : ""}`}>
+                              <td className="px-5 py-3">
+                                <p className="font-mono font-semibold text-slate-800">{u.nhanhBase}</p>
+                                {u.nhanhName && <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[280px]">{u.nhanhName}</p>}
+                              </td>
+                              <td className="px-5 py-3 text-right">
+                                <span className={`font-bold text-sm ${u.nhanhStock <= 5 ? "text-red-600" : u.nhanhStock <= 20 ? "text-amber-600" : "text-green-600"}`}>{u.nhanhStock}</span>
+                              </td>
+                              <td className="px-5 py-3">
+                                <select
+                                  value={selected}
+                                  onChange={e => setPendingMapping(prev => ({ ...prev, [u.nhanhBase]: e.target.value }))}
+                                  className={`w-full px-2 py-1.5 text-sm border rounded-lg outline-none focus:border-violet-400 ${selected ? "border-violet-400 bg-violet-50 text-violet-800 font-medium" : "border-slate-200 bg-white text-slate-500"}`}>
+                                  <option value="">— Chọn SP local —</option>
+                                  {localSkuList.map(l => (
+                                    <option key={l.sku} value={l.sku}>{l.sku} · {l.ten.slice(0, 40)}</option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
                           );
                         })}
-                        <button onClick={() => setSelectedMapping(prev => {
-                          const n = {...prev};
-                          item.suggestions.forEach(sg => delete n[sg.localSku.toUpperCase()]);
-                          return n;
-                        })} className="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-400 hover:bg-slate-50">Bỏ qua</button>
-                      </div>
-                    </div>
-                  ))
-              )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
 
-              {/* Tab: Local → Nhanh */}
-              {!mappingLoading && mappingTab === "local" && (
-                unmatchedList.length === 0
-                  ? <p className="text-center text-slate-400 py-8">Tất cả SKU local đã được khớp</p>
-                  : unmatchedList.map(item => (
-                    <div key={item.localSku} className="border border-slate-200 rounded-lg p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div>
-                          <p className="font-semibold text-slate-800 font-mono">{item.localSku}</p>
-                          <p className="text-xs text-slate-400">{item.ten}{item.mauSac ? ` · ${item.mauSac}` : ""}</p>
-                        </div>
-                        <span className="ml-auto text-xs text-slate-400">Chọn mã Nhanh:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {item.suggestions.map(sg => {
-                          const isSelected = selectedMapping[item.localSku.toUpperCase()] === sg.nhanhBase;
-                          return (
-                            <button key={sg.nhanhBase}
-                              onClick={() => setSelectedMapping(prev => ({ ...prev, [item.localSku.toUpperCase()]: sg.nhanhBase }))}
-                              className={`px-3 py-1.5 rounded-lg text-sm border transition text-left ${
-                                isSelected ? "bg-violet-600 text-white border-violet-600"
-                                  : sg.score >= 1.0 ? "bg-violet-50 border-violet-300 text-violet-800 hover:bg-violet-100"
-                                  : "bg-white text-slate-700 border-slate-200 hover:border-violet-400"
-                              }`}>
-                              <div className="font-mono font-semibold">{sg.nhanhBase}</div>
-                              {sg.nhanhName && <div className="text-xs opacity-80 mt-0.5">{sg.nhanhName}</div>}
-                              <div className="text-xs opacity-60 mt-0.5">{sg.score >= 1.0 ? "✓ Khớp tên" : `${Math.round(sg.score * 100)}%`} · {sg.totalStock} tồn</div>
-                            </button>
-                          );
-                        })}
-                        <button onClick={() => setSelectedMapping(prev => { const n = {...prev}; delete n[item.localSku.toUpperCase()]; return n; })}
-                          className="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-400 hover:bg-slate-50">Bỏ qua</button>
-                      </div>
-                    </div>
-                  ))
+            {/* Footer */}
+            <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button onClick={() => setShowMapping(false)} className="px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-white transition">Đóng</button>
+              <div className="flex-1"/>
+              {mappingTab === "unmatched" && (
+                <button onClick={saveMapping}
+                  disabled={mappingSaving || Object.values(pendingMapping).filter(Boolean).length === 0}
+                  className="px-5 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-40 transition font-medium">
+                  {mappingSaving ? "Đang lưu..." : `Ghép ${Object.values(pendingMapping).filter(Boolean).length} sản phẩm`}
+                </button>
               )}
-            </div>
-
-            <div className="flex gap-2 p-5 border-t border-slate-200">
-              <button onClick={() => setShowMapping(false)} className="flex-1 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Huỷ</button>
-              <button onClick={saveMapping} disabled={mappingSaving || Object.keys(selectedMapping).length === 0}
-                className="flex-1 px-4 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
-                {mappingSaving ? "Đang lưu..." : `Lưu ${Object.keys(selectedMapping).length} mapping`}
-              </button>
             </div>
           </div>
         </div>
