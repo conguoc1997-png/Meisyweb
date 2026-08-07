@@ -36,6 +36,96 @@ type NhapXuat = {
 
 type ModalType = "them-sp" | "nhap" | "xuat" | "sua" | null;
 
+/** Combobox tìm kiếm để chọn SP local khi ghép Nhanh */
+function SearchableSelect({
+  options, value, onChange, placeholder = "— Chọn SP local —"
+}: {
+  options: { sku: string; ten: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Đóng khi click ra ngoài
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const filtered = query.trim()
+    ? options.filter(o =>
+        o.sku.toLowerCase().includes(query.toLowerCase()) ||
+        o.ten.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 50)
+    : options.slice(0, 50);
+
+  const selectedOpt = options.find(o => o.sku === value);
+
+  function select(sku: string) {
+    onChange(sku);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative w-full">
+      <div
+        className={`flex items-center gap-1 border rounded-lg px-2 py-1.5 cursor-text text-sm ${open ? "border-violet-400 ring-1 ring-violet-200" : value ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white"}`}
+        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
+      >
+        {!open && value && (
+          <span className="font-mono font-semibold text-violet-800 truncate flex-1">{value}</span>
+        )}
+        {!open && !value && (
+          <span className="text-slate-400 flex-1">{placeholder}</span>
+        )}
+        {open && (
+          <input
+            ref={inputRef}
+            autoFocus
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={selectedOpt ? selectedOpt.sku : "Gõ SKU hoặc tên..."}
+            className="flex-1 outline-none bg-transparent text-sm min-w-0"
+            onKeyDown={e => {
+              if (e.key === "Escape") { setOpen(false); setQuery(""); }
+              if (e.key === "Enter" && filtered.length > 0) select(filtered[0].sku);
+            }}
+          />
+        )}
+        {value && !open && (
+          <button onMouseDown={e => { e.stopPropagation(); onChange(""); }}
+            className="text-slate-300 hover:text-red-400 flex-shrink-0 ml-1 leading-none">✕</button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {filtered.length === 0
+            ? <p className="px-3 py-2 text-xs text-slate-400">Không tìm thấy</p>
+            : filtered.map(o => (
+              <button key={o.sku} type="button"
+                onMouseDown={e => { e.preventDefault(); select(o.sku); }}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-violet-50 ${o.sku === value ? "bg-violet-50 text-violet-800" : "text-slate-700"}`}>
+                <span className="font-mono font-semibold text-xs flex-shrink-0 min-w-[90px]">{o.sku}</span>
+                <span className="text-slate-400 text-xs truncate">{o.ten}</span>
+              </button>
+            ))
+          }
+          {filtered.length === 50 && (
+            <p className="px-3 py-1.5 text-xs text-slate-300 border-t">Gõ thêm để lọc kết quả...</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MauAutocomplete({ value, mauList, onChange }: { value: string[]; mauList: { ten: string; vietTat: string }[]; onChange: (v: string[]) => void }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -1340,15 +1430,11 @@ export default function KhoPage() {
                                 <span className={`font-bold text-sm ${u.nhanhStock <= 5 ? "text-red-600" : u.nhanhStock <= 20 ? "text-amber-600" : "text-green-600"}`}>{u.nhanhStock}</span>
                               </td>
                               <td className="px-5 py-3">
-                                <select
+                                <SearchableSelect
+                                  options={localSkuList}
                                   value={selected}
-                                  onChange={e => setPendingMapping(prev => ({ ...prev, [u.nhanhBase]: e.target.value }))}
-                                  className={`w-full px-2 py-1.5 text-sm border rounded-lg outline-none focus:border-violet-400 ${selected ? "border-violet-400 bg-violet-50 text-violet-800 font-medium" : "border-slate-200 bg-white text-slate-500"}`}>
-                                  <option value="">— Chọn SP local —</option>
-                                  {localSkuList.map(l => (
-                                    <option key={l.sku} value={l.sku}>{l.sku} · {l.ten.slice(0, 40)}</option>
-                                  ))}
-                                </select>
+                                  onChange={v => setPendingMapping(prev => ({ ...prev, [u.nhanhBase]: v }))}
+                                />
                               </td>
                             </tr>
                           );
