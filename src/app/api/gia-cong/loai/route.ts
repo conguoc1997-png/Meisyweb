@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
     const thuTu = parseInt(countRes[0]?.count ?? "0");
     const chiPhi = body.chiPhi ?? {};
     const rows = await prisma.$queryRawUnsafe<object[]>(
-      `INSERT INTO "GiaCongLoai"("nhomXuong","ma","chiPhi","thuTu")
-       VALUES($1,$2,$3::jsonb,$4)
+      `INSERT INTO "GiaCongLoai"(id,"nhomXuong","ma","chiPhi","thuTu")
+       VALUES(gen_random_uuid()::text,$1,$2,$3::jsonb,$4)
        RETURNING *`,
       body.nhomXuong, body.ma, JSON.stringify(chiPhi), thuTu
     );
