@@ -482,76 +482,7 @@ export default function SkuListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groupedSP.map(({ chaId, chaTen, items }) => {
-                    const isUnassigned = chaId === null;
-
-                    if (isUnassigned) {
-                      return (
-                        <Fragment key="__unassigned__">
-                          <tr className="border-t-2 border-slate-300 bg-slate-50">
-                            <td colSpan={10} className="px-4 py-2">
-                              <span className="font-bold text-sm text-slate-500 italic">Chưa phân loại</span>
-                              <span className="ml-2 text-[11px] bg-slate-200 text-slate-500 rounded-full px-2 py-0.5">{items.length} SKU</span>
-                            </td>
-                          </tr>
-                          {items.map(sp => {
-                            const gcLoai = sp.loaiGiaCong ? loaiMap[sp.loaiGiaCong] : null;
-                            const giaGiaCong = sp.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
-                            const giaNhap = (sp.giaVai ?? 0) + (giaGiaCong ?? 0);
-                            return (
-                              <tr key={sp.id} className="border-t border-slate-100 hover:bg-slate-50/80 transition-colors">
-                                <td className="px-4 py-2 sticky left-0 bg-white z-10">
-                                  <span className="font-mono text-[11px] text-slate-500 bg-white border border-slate-200 rounded px-1.5 py-0.5">{sp.sku}</span>
-                                </td>
-                                <td className="px-4 py-2 text-slate-700 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <span>{sp.ten}</span>
-                                    <select value="" onChange={e => { if (e.target.value) assignSpCha(sp.id, e.target.value); }}
-                                      className="text-[11px] border border-dashed border-slate-300 rounded px-1 py-0.5 bg-white text-slate-400 hover:border-indigo-400 outline-none cursor-pointer max-w-[120px]">
-                                      <option value="">+ Gán SP Cha</option>
-                                      {chas.map(c => <option key={c.id} value={c.id}>{c.ten}</option>)}
-                                    </select>
-                                  </div>
-                                </td>
-                                <td className="px-2 py-1 text-right">
-                                  <DinhLuongInput sp={sp} onSave={handleDinhLuong} />
-                                </td>
-                                <td className="px-4 py-2">
-                                  <select value={sp.tenVai ?? ""} onChange={e => handleSelectVai(sp, e.target.value)}
-                                    className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                                    <option value="">—</option>
-                                    {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
-                                  </select>
-                                </td>
-                                <td className="px-4 py-2 text-right text-slate-600 text-xs">
-                                  {sp.giaVai != null ? sp.giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                                </td>
-                                <td className="px-4 py-2">
-                                  <select value={sp.loaiGiaCong ?? ""} onChange={e => updateSku(sp.id, { loaiGiaCong: e.target.value || null })}
-                                    className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                                    <option value="">—</option>
-                                    {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
-                                  </select>
-                                </td>
-                                <td className="px-4 py-2 text-right text-slate-500 text-xs">
-                                  {giaGiaCong != null ? giaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                                </td>
-                                <td className="px-4 py-2 text-right font-semibold text-amber-700 bg-amber-50">
-                                  {giaNhap > 0 ? giaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                                </td>
-                                <td className="px-4 py-2 text-right font-semibold text-emerald-700 bg-emerald-50">
-                                  <EditableCell value={sp.giaBan || null} type="number" className="text-right text-emerald-700"
-                                    onSave={v => updateSku(sp.id, { giaBan: v === "" ? 0 : Number(v) })} />
-                                </td>
-                                <td className="px-4 py-2 text-center text-xs text-slate-400 whitespace-nowrap">
-                                  {sp.updatedAt ? new Date(sp.updatedAt).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </Fragment>
-                      );
-                    }
+                  {groupedSP.filter(g => g.chaId !== null).map(({ chaId, chaTen, items }) => {
 
                     // ── 1 hàng cho mỗi SP Cha ──
                     const repVai = items.find(sp => sp.tenVai) ?? items[0];
@@ -573,11 +504,11 @@ export default function SkuListPage() {
                           </div>
                         </td>
                         <td className="px-2 py-1 text-right">
-                          <SpChaDinhLuongInput chaId={chaId} items={items} onSave={handleDinhLuongForCha} />
+                          <SpChaDinhLuongInput chaId={chaId!} items={items} onSave={handleDinhLuongForCha} />
                         </td>
                         <td className="px-4 py-2.5">
                           <select value={repVai?.tenVai ?? ""}
-                            onChange={e => handleSelectVaiForCha(chaId, items, e.target.value)}
+                            onChange={e => handleSelectVaiForCha(chaId!, items, e.target.value)}
                             className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
                             <option value="">—</option>
                             {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
@@ -588,7 +519,7 @@ export default function SkuListPage() {
                         </td>
                         <td className="px-4 py-2.5">
                           <select value={repGC?.loaiGiaCong ?? ""}
-                            onChange={e => handleLoaiGiaCongForCha(chaId, items, e.target.value)}
+                            onChange={e => handleLoaiGiaCongForCha(chaId!, items, e.target.value)}
                             className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
                             <option value="">—</option>
                             {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
