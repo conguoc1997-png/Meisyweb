@@ -108,12 +108,25 @@ export async function GET(): Promise<NextResponse> {
       }
     }
 
-    // SP chưa ghép: Nhanh SKU không có local match
     const localSkuSetUpper = new Set(localAll.map(p => p.sku.toUpperCase()));
+
+    // Xác định Nhanh base nào đã ghép qua variant trực tiếp
+    // (ít nhất 1 Nhanh variant = base+size tồn tại trong local)
+    const nhanhBaseMatchedViaVariant = new Set<string>();
+    for (const p of nhanhAll) {
+      if (!p.code || typeof p.code !== "string") continue;
+      if (localSkuSetUpper.has(p.code.toUpperCase())) {
+        // Variant này khớp trực tiếp → base của nó coi như đã ghép
+        nhanhBaseMatchedViaVariant.add(stripSize(p.code).toUpperCase());
+      }
+    }
+
+    // SP chưa ghép: Nhanh base không có variant nào tồn tại trong local
     const unmatched: Array<{ nhanhBase: string; nhanhName: string; nhanhStock: number }> = [];
     for (const [base, info] of nhanhInfoMap.entries()) {
-      if (localSkuSetUpper.has(base)) continue; // direct match
-      if (reverseMapping[base]) continue; // đã có mapping
+      if (localSkuSetUpper.has(base)) continue;          // exact base match
+      if (reverseMapping[base]) continue;                 // đã map thủ công
+      if (nhanhBaseMatchedViaVariant.has(base)) continue; // variants đã khớp trực tiếp
       unmatched.push({ nhanhBase: base, nhanhName: info.name, nhanhStock: info.stock });
     }
     unmatched.sort((a, b) => b.nhanhStock - a.nhanhStock);
