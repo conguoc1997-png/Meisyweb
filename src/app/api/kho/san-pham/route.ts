@@ -4,17 +4,19 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Dùng raw SQL để lấy cả cột spChaId (không có trong Prisma schema)
+    // Đảm bảo các cột extra tồn tại (idempotent, an toàn khi chạy nhiều lần)
+    await Promise.all([
+      prisma.$executeRawUnsafe(`ALTER TABLE "SanPham" ADD COLUMN IF NOT EXISTS "spChaId" TEXT`),
+      prisma.$executeRawUnsafe(`ALTER TABLE "SanPham" ADD COLUMN IF NOT EXISTS "hangTrenDuong" INTEGER NOT NULL DEFAULT 0`),
+      prisma.$executeRawUnsafe(`ALTER TABLE "SanPham" ADD COLUMN IF NOT EXISTS "hangTamGiu" INTEGER NOT NULL DEFAULT 0`),
+    ]).catch(() => {});
+
     const sanPhams = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      `SELECT s.*, s."spChaId",
-        COALESCE(s."hangTrenDuong",0) as "hangTrenDuong",
-        COALESCE(s."hangTamGiu",0) as "hangTamGiu"
+      `SELECT s.*,
+        COALESCE(s."spChaId", NULL) as "spChaId",
+        COALESCE(s."hangTrenDuong", 0) as "hangTrenDuong",
+        COALESCE(s."hangTamGiu", 0) as "hangTamGiu"
        FROM "SanPham" s ORDER BY s."updatedAt" DESC`
-    ).catch(() =>
-      // Fallback nếu cột chưa tồn tại (sẽ được tạo khi gọi san-pham-cha API)
-      prisma.sanPham.findMany({ orderBy: { updatedAt: "desc" } }).then(rows =>
-        rows.map(r => ({ ...r, spChaId: null }))
-      )
     );
 
     // Sắp xếp: có giá nhập > lên trước, cùng nhóm thì mới nhất trước
