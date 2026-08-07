@@ -910,6 +910,30 @@ export default function KhoPage() {
                             : <span className="font-semibold text-green-600">{formatCurrency(repr.giaBan)}</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
+                        {hasVariants ? (
+                          (() => {
+                            const tot = items.reduce((s, sp) => s + (sp.hangTrenDuong ?? 0), 0);
+                            return tot > 0 ? <span className="text-blue-500 text-xs font-medium">{tot}</span> : <span className="text-slate-200 text-xs">—</span>;
+                          })()
+                        ) : (
+                          repr.hangTrenDuong > 0
+                            ? <span className="text-blue-500 text-xs font-medium">{repr.hangTrenDuong}</span>
+                            : <span className="text-slate-200 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {hasVariants ? (
+                          (() => {
+                            const tot = items.reduce((s, sp) => s + (sp.hangTamGiu ?? 0), 0);
+                            return tot > 0 ? <span className="text-orange-500 text-xs font-medium">{tot}</span> : <span className="text-slate-200 text-xs">—</span>;
+                          })()
+                        ) : (
+                          repr.hangTamGiu > 0
+                            ? <span className="text-orange-500 text-xs font-medium">{repr.hangTamGiu}</span>
+                            : <span className="text-slate-200 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
                         <span className={`font-bold ${totalTon <= 5 ? "text-red-600" : totalTon <= 20 ? "text-amber-600" : "text-green-600"}`}>
                           {totalTon}
                         </span>
