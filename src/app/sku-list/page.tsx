@@ -1,12 +1,6 @@
 "use client";
 import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
-import { Plus, Trash2, Settings, Check, X, ChevronDown, Link2 } from "lucide-react";
-
-/** Nhãn variant: phần sau " - " (size / màu) */
-function getVariantLabel(ten: string): string {
-  const dashIdx = ten.indexOf(" - ");
-  return dashIdx > 0 ? ten.slice(dashIdx + 3).trim() : "";
-}
+import { Plus, Trash2, Settings, Check, X, Link2 } from "lucide-react";
 
 interface SanPhamCha {
   id: string; ma: string; ten: string; skuCount: number;
@@ -63,6 +57,28 @@ function DinhLuongInput({ sp, onSave }: { sp: SanPham; onSave: (sp: SanPham, v: 
       type="number" step="0.01" value={val}
       onChange={e => setVal(e.target.value)}
       onBlur={() => onSave(sp, val)}
+      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      placeholder="—"
+      className="w-16 text-right px-2 py-1 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded outline-none text-sm bg-transparent focus:bg-white transition"
+    />
+  );
+}
+
+// Input định lượng cho SP Cha (lấy giá trị đại diện từ con đầu tiên có dữ liệu)
+function SpChaDinhLuongInput({ chaId, items, onSave }: {
+  chaId: string; items: SanPham[];
+  onSave: (chaId: string, items: SanPham[], val: string) => void;
+}) {
+  const repVal = items.find(sp => sp.dinhLuong != null)?.dinhLuong;
+  const [val, setVal] = useState(repVal != null ? String(repVal) : "");
+  useEffect(() => {
+    const v = items.find(sp => sp.dinhLuong != null)?.dinhLuong;
+    setVal(v != null ? String(v) : "");
+  }, [items]);
+  return (
+    <input type="number" step="0.01" value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={() => onSave(chaId, items, val)}
       onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
       placeholder="—"
       className="w-16 text-right px-2 py-1 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded outline-none text-sm bg-transparent focus:bg-white transition"
@@ -239,6 +255,51 @@ export default function SkuListPage() {
     await updateSku(sp.id, { dinhLuong: dl, giaVai });
   }
 
+  // ── SP Cha pricing: áp dụng cho tất cả SKU con ──
+  async function handleSelectVaiForCha(chaId: string, items: SanPham[], maVai: string) {
+    const giaMet = maVai ? (vaiMap[maVai] ?? null) : null;
+    setSanPhams(prev => prev.map(sp => {
+      if (sp.spChaId !== chaId) return sp;
+      const giaVai = giaMet != null && sp.dinhLuong != null ? Math.round(sp.dinhLuong * giaMet) : null;
+      return { ...sp, tenVai: maVai || null, giaVai };
+    }));
+    await Promise.all(items.map(sp => {
+      const giaVai = giaMet != null && sp.dinhLuong != null ? Math.round(sp.dinhLuong * giaMet) : null;
+      return fetch(`/api/kho/san-pham/${sp.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenVai: maVai || null, giaVai }),
+      });
+    }));
+  }
+
+  async function handleDinhLuongForCha(chaId: string, items: SanPham[], val: string) {
+    const dl = val === "" ? null : Number(val);
+    setSanPhams(prev => prev.map(sp => {
+      if (sp.spChaId !== chaId) return sp;
+      const giaMet = sp.tenVai ? (vaiMap[sp.tenVai] ?? null) : null;
+      const giaVai = dl != null && giaMet != null ? Math.round(dl * giaMet) : sp.giaVai;
+      return { ...sp, dinhLuong: dl, giaVai };
+    }));
+    await Promise.all(items.map(sp => {
+      const giaMet = sp.tenVai ? (vaiMap[sp.tenVai] ?? null) : null;
+      const giaVai = dl != null && giaMet != null ? Math.round(dl * giaMet) : null;
+      return fetch(`/api/kho/san-pham/${sp.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dinhLuong: dl, giaVai }),
+      });
+    }));
+  }
+
+  async function handleLoaiGiaCongForCha(chaId: string, items: SanPham[], val: string) {
+    setSanPhams(prev => prev.map(sp => sp.spChaId === chaId ? { ...sp, loaiGiaCong: val || null } : sp));
+    await Promise.all(items.map(sp =>
+      fetch(`/api/kho/san-pham/${sp.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loaiGiaCong: val || null }),
+      })
+    ));
+  }
+
   // Vải CRUD
   async function saveVais(newVais: VaiItem[]) {
     setVais(newVais);
@@ -366,12 +427,6 @@ export default function SkuListPage() {
     return result;
   }, [filteredSP, chas]);
 
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const toggleGroup = (key: string) => setExpandedGroups(prev => {
-    const next = new Set(prev);
-    next.has(key) ? next.delete(key) : next.add(key);
-    return next;
-  });
   const loaiMap = Object.fromEntries(loais.map(l => [l.ma, l]));
   const nhomGroups = Array.from(new Set(loais.map(l => l.nhomXuong)));
   const mainCols = cols.filter(c => c.nhom === "");
@@ -428,99 +483,133 @@ export default function SkuListPage() {
                 </thead>
                 <tbody>
                   {groupedSP.map(({ chaId, chaTen, items }) => {
-                    const groupKey = chaId ?? "__unassigned__";
-                    const isExpanded = expandedGroups.has(groupKey);
                     const isUnassigned = chaId === null;
 
-                    return (
-                      <Fragment key={groupKey}>
-                        {/* ── GROUP HEADER ── */}
-                        <tr
-                          onClick={() => toggleGroup(groupKey)}
-                          className={`border-t-2 ${isUnassigned ? "border-slate-300 bg-slate-50" : "border-indigo-100 bg-indigo-50/40"} cursor-pointer hover:brightness-95 transition-all`}>
-                          <td className="px-4 py-2 sticky left-0 z-10 bg-inherit" colSpan={2}>
-                            <div className="flex items-center gap-2">
-                              <ChevronDown size={14} className={`flex-shrink-0 transition-transform ${isExpanded ? "" : "-rotate-90"} ${isUnassigned ? "text-slate-400" : "text-indigo-400"}`} />
-                              <span className={`font-bold text-sm ${isUnassigned ? "text-slate-500 italic" : "text-indigo-800"}`}>{chaTen}</span>
-                              <span className={`text-[11px] rounded-full px-2 py-0.5 font-medium ${isUnassigned ? "bg-slate-200 text-slate-500" : "bg-indigo-100 text-indigo-600"}`}>
-                                {items.length} SKU
-                              </span>
-                            </div>
-                          </td>
-                          <td colSpan={8} className="px-4 py-2 text-right text-xs text-slate-400">
-                            {!isUnassigned && !isExpanded && (() => {
-                              const minBan = Math.min(...items.map(s => s.giaBan).filter(v => v > 0));
-                              const maxBan = Math.max(...items.map(s => s.giaBan).filter(v => v > 0));
-                              return minBan > 0 ? (minBan === maxBan ? minBan.toLocaleString("vi-VN") + " ₫" : minBan.toLocaleString("vi-VN") + " – " + maxBan.toLocaleString("vi-VN") + " ₫") : null;
-                            })()}
-                          </td>
-                        </tr>
-
-                        {/* ── SKU ROWS (khi expanded) ── */}
-                        {isExpanded && items.map(sp => {
-                          const gcLoai = sp.loaiGiaCong ? loaiMap[sp.loaiGiaCong] : null;
-                          const giaGiaCong = sp.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
-                          const giaNhap = (sp.giaVai ?? 0) + (giaGiaCong ?? 0);
-                          const variantLabel = getVariantLabel(sp.ten) || sp.ten;
-                          return (
-                            <tr key={sp.id} className="border-t border-slate-100 hover:bg-slate-50/80 transition-colors">
-                              <td className="pl-8 pr-4 py-2 sticky left-0 bg-white z-10">
-                                <span className="font-mono text-[11px] text-slate-500 bg-white border border-slate-200 rounded px-1.5 py-0.5">{sp.sku}</span>
-                              </td>
-                              <td className="px-4 py-2 text-slate-700 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <span>{variantLabel}</span>
-                                  {isUnassigned && (
-                                    <select
-                                      value=""
-                                      onChange={e => { if (e.target.value) assignSpCha(sp.id, e.target.value); }}
-                                      onClick={e => e.stopPropagation()}
+                    if (isUnassigned) {
+                      return (
+                        <Fragment key="__unassigned__">
+                          <tr className="border-t-2 border-slate-300 bg-slate-50">
+                            <td colSpan={10} className="px-4 py-2">
+                              <span className="font-bold text-sm text-slate-500 italic">Chưa phân loại</span>
+                              <span className="ml-2 text-[11px] bg-slate-200 text-slate-500 rounded-full px-2 py-0.5">{items.length} SKU</span>
+                            </td>
+                          </tr>
+                          {items.map(sp => {
+                            const gcLoai = sp.loaiGiaCong ? loaiMap[sp.loaiGiaCong] : null;
+                            const giaGiaCong = sp.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
+                            const giaNhap = (sp.giaVai ?? 0) + (giaGiaCong ?? 0);
+                            return (
+                              <tr key={sp.id} className="border-t border-slate-100 hover:bg-slate-50/80 transition-colors">
+                                <td className="px-4 py-2 sticky left-0 bg-white z-10">
+                                  <span className="font-mono text-[11px] text-slate-500 bg-white border border-slate-200 rounded px-1.5 py-0.5">{sp.sku}</span>
+                                </td>
+                                <td className="px-4 py-2 text-slate-700 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <span>{sp.ten}</span>
+                                    <select value="" onChange={e => { if (e.target.value) assignSpCha(sp.id, e.target.value); }}
                                       className="text-[11px] border border-dashed border-slate-300 rounded px-1 py-0.5 bg-white text-slate-400 hover:border-indigo-400 outline-none cursor-pointer max-w-[120px]">
                                       <option value="">+ Gán SP Cha</option>
                                       {chas.map(c => <option key={c.id} value={c.id}>{c.ten}</option>)}
                                     </select>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-2 py-1 text-right">
-                                <DinhLuongInput sp={sp} onSave={handleDinhLuong} />
-                              </td>
-                              <td className="px-4 py-2">
-                                <select value={sp.tenVai ?? ""}
-                                  onChange={e => handleSelectVai(sp, e.target.value)}
-                                  className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                                  <option value="">—</option>
-                                  {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
-                                </select>
-                              </td>
-                              <td className="px-4 py-2 text-right text-slate-600 text-xs">
-                                {sp.giaVai != null ? sp.giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                              </td>
-                              <td className="px-4 py-2">
-                                <select value={sp.loaiGiaCong ?? ""}
-                                  onChange={e => updateSku(sp.id, { loaiGiaCong: e.target.value || null })}
-                                  className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
-                                  <option value="">—</option>
-                                  {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
-                                </select>
-                              </td>
-                              <td className="px-4 py-2 text-right text-slate-500 text-xs">
-                                {giaGiaCong != null ? giaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                              </td>
-                              <td className="px-4 py-2 text-right font-semibold text-amber-700 bg-amber-50">
-                                {giaNhap > 0 ? giaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
-                              </td>
-                              <td className="px-4 py-2 text-right font-semibold text-emerald-700 bg-emerald-50">
-                                <EditableCell value={sp.giaBan || null} type="number" className="text-right text-emerald-700"
-                                  onSave={v => updateSku(sp.id, { giaBan: v === "" ? 0 : Number(v) })} />
-                              </td>
-                              <td className="px-4 py-2 text-center text-xs text-slate-400 whitespace-nowrap">
-                                {sp.updatedAt ? new Date(sp.updatedAt).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </Fragment>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-1 text-right">
+                                  <DinhLuongInput sp={sp} onSave={handleDinhLuong} />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <select value={sp.tenVai ?? ""} onChange={e => handleSelectVai(sp, e.target.value)}
+                                    className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
+                                    <option value="">—</option>
+                                    {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
+                                  </select>
+                                </td>
+                                <td className="px-4 py-2 text-right text-slate-600 text-xs">
+                                  {sp.giaVai != null ? sp.giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                                </td>
+                                <td className="px-4 py-2">
+                                  <select value={sp.loaiGiaCong ?? ""} onChange={e => updateSku(sp.id, { loaiGiaCong: e.target.value || null })}
+                                    className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
+                                    <option value="">—</option>
+                                    {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
+                                  </select>
+                                </td>
+                                <td className="px-4 py-2 text-right text-slate-500 text-xs">
+                                  {giaGiaCong != null ? giaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                                </td>
+                                <td className="px-4 py-2 text-right font-semibold text-amber-700 bg-amber-50">
+                                  {giaNhap > 0 ? giaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                                </td>
+                                <td className="px-4 py-2 text-right font-semibold text-emerald-700 bg-emerald-50">
+                                  <EditableCell value={sp.giaBan || null} type="number" className="text-right text-emerald-700"
+                                    onSave={v => updateSku(sp.id, { giaBan: v === "" ? 0 : Number(v) })} />
+                                </td>
+                                <td className="px-4 py-2 text-center text-xs text-slate-400 whitespace-nowrap">
+                                  {sp.updatedAt ? new Date(sp.updatedAt).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    }
+
+                    // ── 1 hàng cho mỗi SP Cha ──
+                    const repVai = items.find(sp => sp.tenVai) ?? items[0];
+                    const repGC  = items.find(sp => sp.loaiGiaCong) ?? items[0];
+                    const gcLoai = repGC?.loaiGiaCong ? loaiMap[repGC.loaiGiaCong] : null;
+                    const giaGiaCong = repGC?.giaGiaCong ?? (gcLoai ? tong(gcLoai) : null);
+                    const giaVai = repVai?.giaVai ?? null;
+                    const giaNhap = (giaVai ?? 0) + (giaGiaCong ?? 0);
+
+                    return (
+                      <tr key={chaId} className="border-t border-indigo-100 hover:bg-indigo-50/20 transition-colors">
+                        <td className="px-4 py-2.5 sticky left-0 bg-white z-10">
+                          <span className="font-mono text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">{chaTen}</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-700 text-sm">{chaTen}</span>
+                            <span className="text-[11px] bg-indigo-100 text-indigo-600 rounded-full px-2 py-0.5 font-medium">{items.length} SKU</span>
+                          </div>
+                        </td>
+                        <td className="px-2 py-1 text-right">
+                          <SpChaDinhLuongInput chaId={chaId} items={items} onSave={handleDinhLuongForCha} />
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <select value={repVai?.tenVai ?? ""}
+                            onChange={e => handleSelectVaiForCha(chaId, items, e.target.value)}
+                            className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
+                            <option value="">—</option>
+                            {vais.map(v => <option key={v.ma} value={v.ma}>{v.ma}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-600 text-xs">
+                          {giaVai != null ? giaVai.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <select value={repGC?.loaiGiaCong ?? ""}
+                            onChange={e => handleLoaiGiaCongForCha(chaId, items, e.target.value)}
+                            className="border border-slate-200 rounded px-2 py-0.5 text-sm bg-white outline-none focus:border-blue-400 w-full max-w-[120px]">
+                            <option value="">—</option>
+                            {loais.map(l => <option key={l.id} value={l.ma}>{l.ma}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-500 text-xs">
+                          {giaGiaCong != null ? giaGiaCong.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-amber-700 bg-amber-50">
+                          {giaNhap > 0 ? giaNhap.toLocaleString("vi-VN") : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 bg-emerald-50 text-xs">
+                          {(() => {
+                            const prices = items.map(s => s.giaBan).filter(v => v > 0);
+                            if (!prices.length) return <span className="text-slate-300">—</span>;
+                            const min = Math.min(...prices); const max = Math.max(...prices);
+                            return min === max ? min.toLocaleString("vi-VN") : `${min.toLocaleString("vi-VN")}–${max.toLocaleString("vi-VN")}`;
+                          })()}
+                        </td>
+                        <td className="px-4 py-2.5 text-center text-xs text-slate-400">—</td>
+                      </tr>
                     );
                   })}
                 </tbody>
