@@ -183,15 +183,28 @@ export default function SkuListPage() {
         .filter(Boolean)
         .sort((a, b) => b.length - a.length);
 
-      // Từ mã SKU, trích SP Cha = phần trước ký tự màu đầu tiên
+      // Các đuôi size cần strip (từ dài đến ngắn để tránh nhầm XL vs L)
+      const SIZE_SUFFIXES = ["5XL","4XL","3XL","2XL","XL","XS","L","M","S"];
+      function stripSizeSuffix(s: string): string {
+        for (const sz of SIZE_SUFFIXES) {
+          if (s.endsWith(sz)) return s.slice(0, s.length - sz.length);
+        }
+        return s;
+      }
+
+      // Từ mã SKU, trích SP Cha:
+      // 1. Tìm vị trí mã màu → lấy phần trước (OR26CTXDAM5XL → OR26CT)
+      // 2. Nếu không có màu → strip đuôi size (SCG2XL → SCG, SHORTXOEL → SHORTXOE)
+      // 3. Nếu không có size → giữ nguyên
       function getSpChaFromSku(sku: string): string {
         const upper = sku.toUpperCase();
         for (const color of colorCodes) {
           const idx = upper.indexOf(color);
-          if (idx > 0) return upper.slice(0, idx); // ví dụ: 0R26CT
+          if (idx > 0) return upper.slice(0, idx);
         }
-        // Fallback: tách từ tên sản phẩm
-        return sku.trim();
+        // Fallback: strip đuôi size
+        const stripped = stripSizeSuffix(upper);
+        return stripped.length > 0 && stripped !== upper ? stripped : upper.trim();
       }
 
       // Gom các SKU chưa có spChaId theo SP Cha code
