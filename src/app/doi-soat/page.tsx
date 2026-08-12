@@ -202,10 +202,29 @@ export default function DoiSoatPage() {
   const [showScanLog, setShowScanLog] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
-  // Lưu log vào localStorage mỗi khi thay đổi
+  // Lưu log vào localStorage, tự xoá > 30 ngày
   useEffect(() => {
-    try { localStorage.setItem(SCAN_LOG_KEY, JSON.stringify(scanLog)); } catch {}
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const trimmed = scanLog.filter(l => l.ts > cutoff);
+    if (trimmed.length !== scanLog.length) setScanLog(trimmed);
+    try { localStorage.setItem(SCAN_LOG_KEY, JSON.stringify(trimmed)); } catch {}
   }, [scanLog]);
+
+  // Xuất CSV cho 1 ngày
+  const exportDayCSV = (dateLabel: string, items: { maDon: string; status: string; ts: number }[]) => {
+    const rows = [["Mã đơn", "Kết quả", "Giờ quét"]];
+    items.forEach(l => rows.push([
+      l.maDon,
+      l.status === "ok" ? "Đã đối soát" : l.status === "already" ? "Đã soát trước đó" : "Không tìm thấy",
+      new Date(l.ts).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    ]));
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `doi-soat-${dateLabel.replace(/\//g, "-")}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
 
   const handleScan = useCallback(async (raw: string) => {
     const maDon = raw.trim();
@@ -607,12 +626,19 @@ export default function DoiSoatPage() {
                   {/* Tiêu đề ngày */}
                   <div className="sticky top-0 z-10 bg-slate-50 border-y border-slate-100 px-4 py-1.5 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">{g.dateLabel}</span>
-                    <span className="text-[11px] text-slate-400">
-                      <span className="text-green-600 font-semibold">{g.items.filter(l => l.status === "ok").length} soát</span>
-                      {g.items.some(l => l.status === "not_found") && (
-                        <> · <span className="text-red-500 font-semibold">{g.items.filter(l => l.status === "not_found").length} không thấy</span></>
-                      )}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-slate-400">
+                        <span className="text-green-600 font-semibold">{g.items.filter(l => l.status === "ok").length} soát</span>
+                        {g.items.some(l => l.status === "not_found") && (
+                          <> · <span className="text-red-500 font-semibold">{g.items.filter(l => l.status === "not_found").length} không thấy</span></>
+                        )}
+                      </span>
+                      <button
+                        onClick={() => exportDayCSV(g.dateKey, g.items)}
+                        className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition whitespace-nowrap">
+                        ↓ Tải CSV
+                      </button>
+                    </div>
                   </div>
                   {/* Bảng các lần quét trong ngày */}
                   <table className="w-full text-xs">
