@@ -10,6 +10,11 @@ export async function GET() {
       `ALTER TABLE "DoiTra" ADD COLUMN IF NOT EXISTS "ngayGui" TIMESTAMPTZ`
     ).catch(() => {});
 
+    // Backfill: những đơn đã có maVanDon nhưng ngayGui null → dùng updatedAt làm xấp xỉ
+    await prisma.$executeRawUnsafe(
+      `UPDATE "DoiTra" SET "ngayGui" = "updatedAt" WHERE "maVanDon" IS NOT NULL AND "ngayGui" IS NULL`
+    ).catch(() => {});
+
     const records = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
       `SELECT *, "ngayGui" FROM "DoiTra" ORDER BY "createdAt" DESC`
     );
