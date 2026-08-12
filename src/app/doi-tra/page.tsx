@@ -949,11 +949,10 @@ export default function DoiTraPage() {
 
               return (
                 <tr key={r.id} className={`transition-colors ${
-                  scannedId === r.id ? "bg-lime-200 ring-2 ring-inset ring-lime-500" :
-                  daXacNhan ? "bg-lime-50 hover:bg-lime-100" :
+                  scannedId === r.id ? "bg-lime-300 ring-2 ring-inset ring-lime-600" :
+                  daXacNhan ? "bg-lime-200 hover:bg-lime-300" :
                   trung ? "bg-red-50 hover:bg-red-100" :
-                  daGui ? "bg-yellow-50 hover:bg-yellow-100" :
-                  "bg-amber-50 hover:bg-amber-100"
+                  "bg-white hover:bg-slate-50"
                 }`}>
                   {/* Nguồn */}
                   <td className="px-3 py-2.5">
