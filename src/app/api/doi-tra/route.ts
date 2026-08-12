@@ -5,9 +5,14 @@ import { genMaDoiTra } from "@/lib/utils";
 
 export async function GET() {
   try {
-    const records = await prisma.doiTra.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    // Tạo cột ngayGui nếu chưa có
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "DoiTra" ADD COLUMN IF NOT EXISTS "ngayGui" TIMESTAMPTZ`
+    ).catch(() => {});
+
+    const records = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `SELECT *, "ngayGui" FROM "DoiTra" ORDER BY "createdAt" DESC`
+    );
     return NextResponse.json(records);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Lỗi server";

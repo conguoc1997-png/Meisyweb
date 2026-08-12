@@ -18,6 +18,7 @@ type DoiTra = {
   phiShip: number;
   soChieuShip: number;
   maVanDon: string | null;
+  ngayGui: string | null;
   nguoiXuLy: string | null;
   nguon: string | null;
   createdAt: string;
@@ -916,6 +917,7 @@ export default function DoiTraPage() {
               <th className="px-3 py-3 text-right">Thu KH</th>
               <th className="px-3 py-3 text-center">Chiều</th>
               <th className="px-3 py-3 text-left">Mã vận đơn</th>
+              <th className="px-3 py-3 text-left">Ngày gửi</th>
               <th className="px-3 py-3 text-left">Ngày tạo</th>
               <th className="px-3 py-3"></th>
             </tr>
@@ -1030,7 +1032,17 @@ export default function DoiTraPage() {
                     {daGui && <p className="text-xs text-green-600 mt-0.5">✓ Đã gửi</p>}
                   </td>
 
-                  {/* Ngày */}
+                  {/* Ngày gửi */}
+                  <td className="px-3 py-2.5 text-xs">
+                    {r.ngayGui
+                      ? <span className="text-green-600 font-medium">{formatDateTime(r.ngayGui)}</span>
+                      : r.maVanDon
+                        ? <span className="text-amber-500 italic">Có MVĐ, chưa rõ ngày</span>
+                        : <span className="text-slate-300">—</span>
+                    }
+                  </td>
+
+                  {/* Ngày tạo */}
                   <td className="px-3 py-2.5 text-xs text-slate-400">{formatDateTime(r.createdAt)}</td>
 
                   {/* Nút sửa / xóa */}
