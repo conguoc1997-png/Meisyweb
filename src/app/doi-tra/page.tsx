@@ -109,6 +109,7 @@ export default function DoiTraPage() {
   type ScanLog = { mvd: string; status: "ok" | "err"; tenKhach: string; ts: number };
   const [scanHistory, setScanHistory] = useState<ScanLog[]>([]);
   const [showScanHistory, setShowScanHistory] = useState(false);
+  const [scannedId, setScannedId] = useState<string | null>(null);
   const [deleteInput, setDeleteInput] = useState("");
 
   // ─── Tab & Feedback state ──────────────────────────────
@@ -191,9 +192,11 @@ export default function DoiTraPage() {
     if (found) {
       setScanMsg({ type: "ok", text: `✅ Tìm thấy: ${found.tenKhach || found.maDoiTra} — ${found.maVanDon}` });
       setSearch(mvd);
+      setScannedId(found.id);
       setScanHistory(prev => [{ mvd, status: "ok", tenKhach: found.tenKhach || found.maDoiTra, ts: Date.now() }, ...prev].slice(0, 200));
     } else {
       setScanMsg({ type: "err", text: `Không tìm thấy mã vận đơn: ${mvd}` });
+      setScannedId(null);
       setScanHistory(prev => [{ mvd, status: "err", tenKhach: "", ts: Date.now() }, ...prev].slice(0, 200));
     }
     setTimeout(() => setScanMsg(null), 4000);
@@ -917,8 +920,8 @@ export default function DoiTraPage() {
               <th className="px-3 py-3 text-right">Thu KH</th>
               <th className="px-3 py-3 text-center">Chiều</th>
               <th className="px-3 py-3 text-left">Mã vận đơn</th>
-              <th className="px-3 py-3 text-left">Ngày gửi</th>
               <th className="px-3 py-3 text-left">Ngày tạo</th>
+              <th className="px-3 py-3 text-left">Ngày gửi</th>
               <th className="px-3 py-3"></th>
             </tr>
           </thead>
@@ -937,6 +940,7 @@ export default function DoiTraPage() {
 
               return (
                 <tr key={r.id} className={`transition-colors ${
+                  scannedId === r.id ? "bg-blue-100 ring-2 ring-inset ring-blue-400" :
                   trung ? "bg-red-50 hover:bg-red-100" :
                   !daGui ? "bg-amber-50 hover:bg-amber-100" :
                   "hover:bg-slate-50"
@@ -1029,21 +1033,19 @@ export default function DoiTraPage() {
                         {daGui ? r.maVanDon : "— chưa có —"}
                       </span>
                     )}
-                    {daGui && <p className="text-xs text-green-600 mt-0.5">✓ Đã gửi</p>}
+                    {scannedId === r.id && <p className="text-xs text-blue-600 font-semibold mt-0.5">✓ Đã xác nhận gửi</p>}
                   </td>
+
+                  {/* Ngày tạo — gần MVĐ */}
+                  <td className="px-3 py-2.5 text-xs text-slate-400">{formatDateTime(r.createdAt)}</td>
 
                   {/* Ngày gửi */}
                   <td className="px-3 py-2.5 text-xs">
                     {r.ngayGui
                       ? <span className="text-green-600 font-medium">{formatDateTime(r.ngayGui)}</span>
-                      : r.maVanDon
-                        ? <span className="text-amber-500 italic">Có MVĐ, chưa rõ ngày</span>
-                        : <span className="text-slate-300">—</span>
+                      : <span className="text-slate-300">—</span>
                     }
                   </td>
-
-                  {/* Ngày tạo */}
-                  <td className="px-3 py-2.5 text-xs text-slate-400">{formatDateTime(r.createdAt)}</td>
 
                   {/* Nút sửa / xóa */}
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
