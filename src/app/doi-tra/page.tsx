@@ -222,13 +222,14 @@ export default function DoiTraPage() {
   const isDuplicate = (r: DoiTra) =>
     !!r.sdtHienTai && (sdtCount[r.sdtHienTai] || 0) > 1;
 
-  // Phí ship: đổi size = 30k, lỗi shop = 0
+  // Phí ship: đổi size = 30k, lỗi shop = 0. KOC → mặc định 1 chiều
   const handleLoaiChange = (loai: string, target: typeof form) => {
     const phiShop = LOAI_VAN_DE[loai]?.phiShop;
     return {
       ...target,
       loaiVanDe: loai,
       phiShip: phiShop ? "0" : loai === "doi_size" ? "30000" : target.phiShip,
+      soChieuShip: loai === "don_hang_loi" ? "1" : target.soChieuShip,
     };
   };
 

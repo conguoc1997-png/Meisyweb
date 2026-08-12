@@ -34,7 +34,7 @@ export const LOAI_VAN_DE: Record<string, { label: string; color: string; phiShop
   doi_size:     { label: "Đổi size",     color: "bg-blue-100 text-blue-700",     phiShop: false, chiPhi: 25000 },
   gui_nham:     { label: "Gửi nhầm",     color: "bg-purple-100 text-purple-700", phiShop: true,  chiPhi: 25000 },
   hang_loi:     { label: "Hàng lỗi",     color: "bg-red-100 text-red-700",       phiShop: true,  chiPhi: 25000 },
-  don_hang_loi: { label: "Đơn hàng lỗi", color: "bg-orange-100 text-orange-700", phiShop: true,  chiPhi: 25000 },
+  don_hang_loi: { label: "KOC",           color: "bg-orange-100 text-orange-700", phiShop: true,  chiPhi: 25000 },
   khac:         { label: "Khác",          color: "bg-slate-100 text-slate-600",  phiShop: false, chiPhi: 0     },
 };
 
