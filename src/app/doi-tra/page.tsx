@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
 import { Plus, Search, AlertTriangle, Pencil, Trash2, X, ChevronDown, Star, MessageSquare, RefreshCcw, Download } from "lucide-react";
 import { formatDateTime, formatCurrency, LOAI_VAN_DE, LOAI_FEEDBACK, KENH_FEEDBACK, LOI_BU, TRANG_THAI_BU } from "@/lib/utils";
 
@@ -177,17 +176,17 @@ export default function DoiTraPage() {
   useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); fetchUngTiens(); }, []);
 
   // ─── Auto-open form từ URL params (VD: từ trang KOC gửi đơn) ─────────
-  const searchParams = useSearchParams();
   const autoOpenDone = useRef(false);
   useEffect(() => {
     if (autoOpenDone.current) return;
-    if (searchParams.get("create") !== "1") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
     autoOpenDone.current = true;
-    const loai = searchParams.get("loai") || "don_hang_loi";
-    const ten = searchParams.get("ten") || "";
-    const sdt = searchParams.get("sdt") || "";
-    const diaChi = searchParams.get("diaChi") || "";
-    const ghiChu = searchParams.get("ghiChu") || "";
+    const loai = params.get("loai") || "don_hang_loi";
+    const ten = params.get("ten") || "";
+    const sdt = params.get("sdt") || "";
+    const diaChi = params.get("diaChi") || "";
+    const ghiChu = params.get("ghiChu") || "";
     setForm({
       ...emptyForm,
       tenKhach: ten,
@@ -199,7 +198,7 @@ export default function DoiTraPage() {
       nguon: "tiktok",
     });
     setShowModal(true);
-  }, [searchParams]);
+  }, []);
 
   // ─── Export CSV ────────────────────────────────────────
   const exportCSV = () => {
