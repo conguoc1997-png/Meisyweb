@@ -1435,6 +1435,23 @@ export default function KocPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center gap-1 justify-end">
+                                    <button
+                                      onClick={() => {
+                                        const params = new URLSearchParams({
+                                          create: "1",
+                                          loai: "don_hang_loi",
+                                          ten: b.koc.ten,
+                                          sdt: b.koc.sdt || "",
+                                          diaChi: b.koc.diaChi || "",
+                                          ghiChu: `KOC: ${b.koc.ten}`,
+                                        });
+                                        window.open(`/doi-tra?${params.toString()}`, "_blank");
+                                      }}
+                                      className="text-xs text-blue-500 hover:underline px-2 py-1 whitespace-nowrap"
+                                      title="Tạo đơn gửi hàng cho KOC"
+                                    >
+                                      📦 Gửi đơn
+                                    </button>
                                     <button onClick={() => openUpdate(b)} className="text-xs text-rose-500 hover:underline px-2 py-1">Kết quả</button>
                                     <button onClick={() => openEditBooking(b)} className="p-1.5 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition" title="Sửa booking">
                                       <Pencil size={13} />
