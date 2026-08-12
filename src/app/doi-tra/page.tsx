@@ -194,6 +194,11 @@ export default function DoiTraPage() {
       setSearch(mvd);
       setScannedId(found.id);
       setScanHistory(prev => [{ mvd, status: "ok", tenKhach: found.tenKhach || found.maDoiTra, ts: Date.now() }, ...prev].slice(0, 200));
+      // Ghi ngayGui vào DB khi scan xác nhận
+      fetch(`/api/doi-tra/${found.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ setNgayGui: true }) })
+        .then(r => r.json()).then(updated => {
+          setRecords(prev => prev.map(x => x.id === found.id ? { ...x, ngayGui: (updated as DoiTra & { ngayGui: string }).ngayGui } : x));
+        }).catch(() => {});
     } else {
       setScanMsg({ type: "err", text: `Không tìm thấy mã vận đơn: ${mvd}` });
       setScannedId(null);
@@ -938,12 +943,15 @@ export default function DoiTraPage() {
               const trung = isDuplicate(r);
               const daGui = daDuocXuLy(r);
 
+              const daXacNhan = !!r.ngayGui; // đã quét scan xác nhận gửi
+
               return (
                 <tr key={r.id} className={`transition-colors ${
-                  scannedId === r.id ? "bg-blue-100 ring-2 ring-inset ring-blue-400" :
+                  scannedId === r.id ? "bg-blue-200 ring-2 ring-inset ring-blue-500" :
+                  daXacNhan ? "bg-blue-50 hover:bg-blue-100" :
                   trung ? "bg-red-50 hover:bg-red-100" :
-                  !daGui ? "bg-amber-50 hover:bg-amber-100" :
-                  "hover:bg-slate-50"
+                  daGui ? "bg-yellow-50 hover:bg-yellow-100" :
+                  "bg-amber-50 hover:bg-amber-100"
                 }`}>
                   {/* Nguồn */}
                   <td className="px-3 py-2.5">

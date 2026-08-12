@@ -10,9 +10,6 @@ export async function PATCH(
   try {
     const body = await req.json();
 
-    // Nếu đang set maVanDon (lần đầu) → ghi ngayGui = now()
-    const setNgayGui = body.maVanDon !== undefined && body.maVanDon;
-
     const record = await prisma.doiTra.update({
       where: { id },
       data: {
@@ -32,10 +29,10 @@ export async function PATCH(
       },
     });
 
-    // Ghi ngayGui bằng raw SQL (cột ngoài Prisma schema)
-    if (setNgayGui) {
+    // Ghi ngayGui khi scan xác nhận (body.ngayGui = true)
+    if (body.setNgayGui) {
       await prisma.$executeRawUnsafe(
-        `UPDATE "DoiTra" SET "ngayGui" = now() WHERE id = $1 AND "ngayGui" IS NULL`,
+        `UPDATE "DoiTra" SET "ngayGui" = now() WHERE id = $1`,
         id
       ).catch(() => {});
     }
