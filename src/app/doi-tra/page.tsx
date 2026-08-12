@@ -742,6 +742,55 @@ export default function DoiTraPage() {
         </div>
       )}
 
+      {/* ── Thanh quét mã vận đơn ── */}
+      <div className="mb-4 flex items-center gap-2 bg-slate-900 rounded-xl px-4 py-2.5">
+        <span className="text-sm font-medium text-slate-300 whitespace-nowrap flex items-center gap-1.5 shrink-0">
+          📦 Quét mã vận đơn
+        </span>
+        <input
+          ref={scanRef}
+          type="text"
+          value={scanValue}
+          onChange={e => setScanValue(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleScan(scanValue); }}
+          placeholder="Scan hoặc nhập mã vận đơn rồi Enter..."
+          className="flex-1 bg-slate-800 text-white placeholder-slate-500 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 min-w-0"
+        />
+        <button
+          onClick={() => handleScan(scanValue)}
+          className="px-4 py-1.5 bg-green-500 hover:bg-green-400 text-white text-sm font-medium rounded-lg transition whitespace-nowrap shrink-0"
+        >
+          Xác nhận
+        </button>
+        <select
+          value={filterThang}
+          onChange={e => setFilterThang(e.target.value)}
+          className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 shrink-0"
+        >
+          <option value="">Tất cả tháng</option>
+          {Array.from({ length: 12 }, (_, i) => {
+            const d = new Date(); d.setMonth(d.getMonth() - i);
+            const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
+            return <option key={`${y}-${m}`} value={`${y}-${m}`}>{`T${d.getMonth() + 1}/${y}`}</option>;
+          })}
+        </select>
+        <button
+          onClick={() => {/* TODO: lịch sử scan */}}
+          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition whitespace-nowrap shrink-0 flex items-center gap-1"
+        >
+          ↓ Lịch sử
+        </button>
+      </div>
+
+      {/* Thông báo kết quả scan */}
+      {scanMsg && (
+        <div className={`mb-3 px-4 py-2.5 rounded-lg text-sm font-medium ${
+          scanMsg.type === "ok" ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-300"
+        }`}>
+          {scanMsg.text}
+        </div>
+      )}
+
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-48 max-w-sm">
@@ -1740,51 +1789,6 @@ export default function DoiTraPage() {
           </div>
         </div>
       )}
-      {/* ── Thanh quét mã vận đơn cố định dưới cùng ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 text-white px-4 py-2.5 flex items-center gap-3 shadow-2xl">
-        <span className="text-sm font-medium text-slate-300 whitespace-nowrap flex items-center gap-1.5">
-          📦 Quét mã vận đơn
-        </span>
-        <input
-          ref={scanRef}
-          type="text"
-          value={scanValue}
-          onChange={e => setScanValue(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") handleScan(scanValue); }}
-          placeholder="Scan hoặc nhập mã vận đơn rồi Enter..."
-          className="flex-1 bg-slate-800 text-white placeholder-slate-500 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-        />
-        <button
-          onClick={() => handleScan(scanValue)}
-          className="px-4 py-1.5 bg-green-500 hover:bg-green-400 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
-        >
-          Xác nhận
-        </button>
-        <select
-          value={filterThang}
-          onChange={e => setFilterThang(e.target.value)}
-          className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-        >
-          <option value="">Tất cả tháng</option>
-          {Array.from({ length: 12 }, (_, i) => {
-            const d = new Date(); d.setMonth(d.getMonth() - i);
-            const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
-            return <option key={`${y}-${m}`} value={`${y}-${m}`}>{`T${d.getMonth() + 1}/${y}`}</option>;
-          })}
-        </select>
-      </div>
-
-      {/* Thông báo kết quả scan */}
-      {scanMsg && (
-        <div className={`fixed bottom-14 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-xl transition-all ${
-          scanMsg.type === "ok" ? "bg-green-500 text-white" : "bg-amber-400 text-slate-900"
-        }`}>
-          {scanMsg.text}
-        </div>
-      )}
-
-      {/* Padding để nội dung không bị che bởi thanh scan */}
-      <div className="h-14" />
     </div>
   );
 }
