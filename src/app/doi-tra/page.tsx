@@ -105,6 +105,9 @@ export default function DoiTraPage() {
   const [scanValue, setScanValue] = useState("");
   const [scanMsg, setScanMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
+  type ScanLog = { mvd: string; status: "ok" | "err"; tenKhach: string; ts: number };
+  const [scanHistory, setScanHistory] = useState<ScanLog[]>([]);
+  const [showScanHistory, setShowScanHistory] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
 
   // ─── Tab & Feedback state ──────────────────────────────
@@ -187,12 +190,30 @@ export default function DoiTraPage() {
     if (found) {
       setScanMsg({ type: "ok", text: `✅ Tìm thấy: ${found.tenKhach || found.maDoiTra} — ${found.maVanDon}` });
       setSearch(mvd);
-      setTimeout(() => setScanMsg(null), 4000);
+      setScanHistory(prev => [{ mvd, status: "ok", tenKhach: found.tenKhach || found.maDoiTra, ts: Date.now() }, ...prev].slice(0, 200));
     } else {
       setScanMsg({ type: "err", text: `Không tìm thấy mã vận đơn: ${mvd}` });
-      setTimeout(() => setScanMsg(null), 4000);
+      setScanHistory(prev => [{ mvd, status: "err", tenKhach: "", ts: Date.now() }, ...prev].slice(0, 200));
     }
+    setTimeout(() => setScanMsg(null), 4000);
   }, [records]);
+
+  const exportScanHistory = () => {
+    if (!scanHistory.length) return;
+    const rows = [["Mã vận đơn", "Kết quả", "Tên khách", "Thời gian"]];
+    scanHistory.forEach(l => rows.push([
+      l.mvd,
+      l.status === "ok" ? "Tìm thấy" : "Không tìm thấy",
+      l.tenKhach,
+      new Date(l.ts).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }),
+    ]));
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `lich-su-quet-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
 
   // ─── Auto-open form từ URL params (VD: từ trang KOC gửi đơn) ─────────
   const autoOpenDone = useRef(false);
@@ -775,10 +796,10 @@ export default function DoiTraPage() {
           })}
         </select>
         <button
-          onClick={() => {/* TODO: lịch sử scan */}}
-          className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition whitespace-nowrap shrink-0 flex items-center gap-1"
+          onClick={() => setShowScanHistory(v => !v)}
+          className={`px-3 py-1.5 text-sm rounded-lg transition whitespace-nowrap shrink-0 flex items-center gap-1 ${showScanHistory ? "bg-blue-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-200"}`}
         >
-          ↓ Lịch sử
+          {showScanHistory ? "↑" : "↓"} Lịch sử {scanHistory.length > 0 && <span className="bg-white/20 rounded px-1">{scanHistory.length}</span>}
         </button>
       </div>
 
@@ -788,6 +809,64 @@ export default function DoiTraPage() {
           scanMsg.type === "ok" ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-300"
         }`}>
           {scanMsg.text}
+        </div>
+      )}
+
+      {/* Panel lịch sử quét */}
+      {showScanHistory && (
+        <div className="mb-4 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+            <span className="text-sm font-semibold text-slate-700">📋 Lịch sử quét ({scanHistory.length})</span>
+            <div className="flex items-center gap-2">
+              {scanHistory.length > 0 && (
+                <>
+                  <button onClick={exportScanHistory}
+                    className="flex items-center gap-1.5 px-3 py-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+                    <Download size={12} /> Xuất CSV
+                  </button>
+                  <button onClick={() => setScanHistory([])}
+                    className="px-3 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition">
+                    Xoá lịch sử
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          {scanHistory.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-slate-400">Chưa có lần quét nào</p>
+          ) : (
+            <div className="max-h-56 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-100 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">#</th>
+                    <th className="px-4 py-2 text-left font-medium">Mã vận đơn</th>
+                    <th className="px-4 py-2 text-left font-medium">Kết quả</th>
+                    <th className="px-4 py-2 text-left font-medium">Tên khách</th>
+                    <th className="px-4 py-2 text-left font-medium">Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {scanHistory.map((l, i) => (
+                    <tr key={l.ts} className={l.status === "err" ? "bg-amber-50" : ""}>
+                      <td className="px-4 py-2 text-slate-400 text-xs">{i + 1}</td>
+                      <td className="px-4 py-2 font-mono font-medium text-slate-800">{l.mvd}</td>
+                      <td className="px-4 py-2">
+                        {l.status === "ok"
+                          ? <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">✅ Tìm thấy</span>
+                          : <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">❌ Không thấy</span>
+                        }
+                      </td>
+                      <td className="px-4 py-2 text-slate-600">{l.tenKhach || "—"}</td>
+                      <td className="px-4 py-2 text-slate-400 text-xs whitespace-nowrap">
+                        {new Date(l.ts).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", second: "2-digit", day: "2-digit", month: "2-digit" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
