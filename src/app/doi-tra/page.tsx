@@ -949,8 +949,8 @@ export default function DoiTraPage() {
 
               return (
                 <tr key={r.id} className={`transition-colors ${
-                  scannedId === r.id ? "bg-blue-200 ring-2 ring-inset ring-blue-500" :
-                  daXacNhan ? "bg-blue-50 hover:bg-blue-100" :
+                  scannedId === r.id ? "bg-lime-200 ring-2 ring-inset ring-lime-500" :
+                  daXacNhan ? "bg-lime-50 hover:bg-lime-100" :
                   trung ? "bg-red-50 hover:bg-red-100" :
                   daGui ? "bg-yellow-50 hover:bg-yellow-100" :
                   "bg-amber-50 hover:bg-amber-100"
