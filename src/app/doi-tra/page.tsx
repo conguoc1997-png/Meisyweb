@@ -102,6 +102,9 @@ export default function DoiTraPage() {
   const [editMVD, setEditMVD] = useState<{ id: string; value: string } | null>(null);
   const [showStats, setShowStats] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<DoiTra | null>(null);
+  const [scanValue, setScanValue] = useState("");
+  const [scanMsg, setScanMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const scanRef = useRef<HTMLInputElement>(null);
   const [deleteInput, setDeleteInput] = useState("");
 
   // ─── Tab & Feedback state ──────────────────────────────
@@ -174,6 +177,22 @@ export default function DoiTraPage() {
   };
 
   useEffect(() => { fetchData(); fetchFeedbacks(); fetchBuTiens(); fetchUngTiens(); }, []);
+
+  // ─── Scan mã vận đơn ──────────────────────────────────────
+  const handleScan = useCallback((raw: string) => {
+    const mvd = raw.trim();
+    if (!mvd) return;
+    setScanValue("");
+    const found = records.find(r => (r.maVanDon || "").trim() === mvd);
+    if (found) {
+      setScanMsg({ type: "ok", text: `✅ Tìm thấy: ${found.tenKhach || found.maDoiTra} — ${found.maVanDon}` });
+      setSearch(mvd);
+      setTimeout(() => setScanMsg(null), 4000);
+    } else {
+      setScanMsg({ type: "err", text: `Không tìm thấy mã vận đơn: ${mvd}` });
+      setTimeout(() => setScanMsg(null), 4000);
+    }
+  }, [records]);
 
   // ─── Auto-open form từ URL params (VD: từ trang KOC gửi đơn) ─────────
   const autoOpenDone = useRef(false);
@@ -1721,6 +1740,51 @@ export default function DoiTraPage() {
           </div>
         </div>
       )}
+      {/* ── Thanh quét mã vận đơn cố định dưới cùng ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 text-white px-4 py-2.5 flex items-center gap-3 shadow-2xl">
+        <span className="text-sm font-medium text-slate-300 whitespace-nowrap flex items-center gap-1.5">
+          📦 Quét mã vận đơn
+        </span>
+        <input
+          ref={scanRef}
+          type="text"
+          value={scanValue}
+          onChange={e => setScanValue(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleScan(scanValue); }}
+          placeholder="Scan hoặc nhập mã vận đơn rồi Enter..."
+          className="flex-1 bg-slate-800 text-white placeholder-slate-500 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+        />
+        <button
+          onClick={() => handleScan(scanValue)}
+          className="px-4 py-1.5 bg-green-500 hover:bg-green-400 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
+        >
+          Xác nhận
+        </button>
+        <select
+          value={filterThang}
+          onChange={e => setFilterThang(e.target.value)}
+          className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+        >
+          <option value="">Tất cả tháng</option>
+          {Array.from({ length: 12 }, (_, i) => {
+            const d = new Date(); d.setMonth(d.getMonth() - i);
+            const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0");
+            return <option key={`${y}-${m}`} value={`${y}-${m}`}>{`T${d.getMonth() + 1}/${y}`}</option>;
+          })}
+        </select>
+      </div>
+
+      {/* Thông báo kết quả scan */}
+      {scanMsg && (
+        <div className={`fixed bottom-14 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-xl transition-all ${
+          scanMsg.type === "ok" ? "bg-green-500 text-white" : "bg-amber-400 text-slate-900"
+        }`}>
+          {scanMsg.text}
+        </div>
+      )}
+
+      {/* Padding để nội dung không bị che bởi thanh scan */}
+      <div className="h-14" />
     </div>
   );
 }
