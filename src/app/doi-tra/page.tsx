@@ -191,7 +191,6 @@ export default function DoiTraPage() {
     const found = records.find(r => (r.maVanDon || "").trim() === mvd);
     if (found) {
       setScanMsg({ type: "ok", text: `✅ Tìm thấy: ${found.tenKhach || found.maDoiTra} — ${found.maVanDon}` });
-      setSearch(mvd);
       setScannedId(found.id);
       setScanHistory(prev => [{ mvd, status: "ok", tenKhach: found.tenKhach || found.maDoiTra, ts: Date.now() }, ...prev].slice(0, 200));
       // Ghi ngayGui vào DB khi scan xác nhận
